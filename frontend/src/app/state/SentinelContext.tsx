@@ -1,0 +1,1132 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from "react";
+import {
+  buildHexDump,
+  buildProtocolTree,
+  buildProtocolTreeFromLayers,
+  DEFAULT_PLUGIN_LOGS,
+} from "../core/engine";
+import type {
+  BinaryStream,
+  DecryptionConfig,
+  ExtractedObject,
+  HttpStream,
+  Packet,
+  PluginItem,
+  StreamProtocol,
+  StreamSwitchMetrics,
+  StreamSwitchStat,
+  ThreatHit,
+} from "../core/types";
+import { bridge, type TSharkStatus } from "../integrations/wailsBridge";
+
+interface SentinelContextValue {
+  packets: Packet[];
+  totalPackets: number;
+  currentPage: number;
+  totalPages: number;
+  isPreloadingCapture: boolean;
+  preloadProcessed: number;
+  preloadTotal: number;
+  filteredPackets: Packet[];
+  hasMorePackets: boolean;
+  hasPrevPackets: boolean;
+  isPageLoading: boolean;
+  loadMorePackets: () => Promise<void>;
+  loadPrevPackets: () => Promise<void>;
+  jumpToPage: (page: number) => Promise<void>;
+  locatePacketById: (packetId: number) => Promise<void>;
+  selectedPacket: Packet | null;
+  selectedPacketRawHex: string;
+  selectedPacketId: number | null;
+  displayFilter: string;
+  setDisplayFilter: (value: string) => void;
+  applyFilter: (value?: string) => void;
+  clearFilter: () => void;
+  selectPacket: (id: number) => void;
+  protocolTree: ReturnType<typeof buildProtocolTree>;
+  hexDump: string;
+  threatHits: ThreatHit[];
+  extractedObjects: ExtractedObject[];
+  httpStream: HttpStream;
+  tcpStream: BinaryStream;
+  udpStream: BinaryStream;
+  streamIds: { http: number[]; tcp: number[]; udp: number[] };
+  setActiveStream: (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => Promise<void>;
+  streamSwitchMetrics: StreamSwitchMetrics;
+  plugins: PluginItem[];
+  pluginLogs: string[];
+  addPlugin: (plugin: PluginItem) => Promise<void>;
+  deletePlugin: (id: number | string) => Promise<void>;
+  togglePlugin: (id: number | string) => void;
+  setPluginsEnabled: (ids: (number | string)[], enabled: boolean) => void;
+  refreshPlugins: () => void;
+  decryptionConfig: DecryptionConfig;
+  updateDecryptionConfig: (patch: Partial<DecryptionConfig>) => void;
+  fileMeta: { name: string; sizeBytes: number; path: string };
+  openCapture: (filePath?: string) => Promise<void>;
+  stopCapture: () => Promise<void>;
+  backendConnected: boolean;
+  backendStatus: string;
+  tsharkStatus: TSharkStatus;
+  isTSharkChecking: boolean;
+  setTSharkPath: (path: string) => Promise<void>;
+}
+
+const SentinelContext = createContext<SentinelContextValue | null>(null);
+
+const PAGE_SIZE = 2000;
+const PRELOAD_POLL_INTERVAL_MS = 120;
+const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
+const EMPTY_TSHARK_STATUS: TSharkStatus = {
+  available: false,
+  path: "",
+  message: "",
+  customPath: "",
+  usingCustomPath: false,
+};
+
+const EMPTY_HTTP_STREAM: HttpStream = {
+  id: 1,
+  client: "",
+  server: "",
+  request: "",
+  response: "",
+  chunks: [],
+};
+
+const EMPTY_BINARY_STREAM: BinaryStream = {
+  id: 1,
+  protocol: "TCP",
+  from: "",
+  to: "",
+  chunks: [],
+};
+
+const EMPTY_SWITCH_STAT: StreamSwitchStat = {
+  count: 0,
+  lastMs: 0,
+  p50Ms: 0,
+  p95Ms: 0,
+  cacheHitRate: 0,
+};
+
+const EMPTY_SWITCH_METRICS: StreamSwitchMetrics = {
+  overall: { ...EMPTY_SWITCH_STAT },
+  byProtocol: {
+    HTTP: { ...EMPTY_SWITCH_STAT },
+    TCP: { ...EMPTY_SWITCH_STAT },
+    UDP: { ...EMPTY_SWITCH_STAT },
+  },
+};
+
+const SWITCH_SAMPLE_LIMIT = 300;
+
+function calcPercentile(values: number[], percentile: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.max(0, Math.min(sorted.length - 1, Math.ceil((percentile / 100) * sorted.length) - 1));
+  return Number(sorted[idx].toFixed(1));
+}
+
+function buildSwitchStat(values: number[], hitCount: number): StreamSwitchStat {
+  const count = values.length;
+  if (count === 0) return { ...EMPTY_SWITCH_STAT };
+  const lastMs = Number(values[count - 1].toFixed(1));
+  const p50Ms = calcPercentile(values, 50);
+  const p95Ms = calcPercentile(values, 95);
+  const cacheHitRate = Number(((hitCount / count) * 100).toFixed(1));
+  return { count, lastMs, p50Ms, p95Ms, cacheHitRate };
+}
+
+function prettySize(bytes: number) {
+  const mb = bytes / 1024 / 1024;
+  return `${mb.toFixed(1)} MB`;
+}
+
+export function SentinelProvider({ children }: PropsWithChildren) {
+  const [packets, setPackets] = useState<Packet[]>([]);
+  const [totalPackets, setTotalPackets] = useState(0);
+  const [pageStart, setPageStart] = useState(0);
+  const [isPreloadingCapture, setIsPreloadingCapture] = useState(false);
+  const [preloadProcessed, setPreloadProcessed] = useState(0);
+  const [preloadTotal, setPreloadTotal] = useState(0);
+  const [hasMorePackets, setHasMorePackets] = useState(false);
+  const [hasPrevPackets, setHasPrevPackets] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(false);
+  const [displayFilter, setDisplayFilter] = useState("");
+  const [selectedPacketId, setSelectedPacketId] = useState<number | null>(null);
+  const [selectedPacketRawHex, setSelectedPacketRawHex] = useState("");
+  const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
+  const [plugins, setPlugins] = useState<PluginItem[]>([]);
+  const [pluginLogs, setPluginLogs] = useState<string[]>(DEFAULT_PLUGIN_LOGS);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [backendStatus, setBackendStatus] = useState("等待后端连接");
+  const [tsharkStatus, setTsharkStatus] = useState<TSharkStatus>(EMPTY_TSHARK_STATUS);
+  const [isTSharkChecking, setIsTSharkChecking] = useState(false);
+  const [threatHits, setThreatHits] = useState<ThreatHit[]>([]);
+  const [extractedObjects, setExtractedObjects] = useState<ExtractedObject[]>([]);
+  const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
+  const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
+  const [udpStream, setUdpStream] = useState<BinaryStream>({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
+  const [streamIds, setStreamIds] = useState<{ http: number[]; tcp: number[]; udp: number[] }>({
+    http: [],
+    tcp: [],
+    udp: [],
+  });
+  const [fileMeta, setFileMeta] = useState({
+    name: "未打开文件",
+    sizeBytes: 0,
+    path: "",
+  });
+  const [decryptionConfig, setDecryptionConfig] = useState<DecryptionConfig>({
+    sslKeyLogPath: "",
+    privateKeyPath: "",
+    privateKeyIpPort: "",
+  });
+
+  const refreshTimer = useRef<number | null>(null);
+  const pageStartRef = useRef(0);
+  const packetLoadingRef = useRef(false);
+  const hasMorePacketsRef = useRef(false);
+  const loadMoreScheduledRef = useRef<number | null>(null);
+  const backendRetryTimerRef = useRef<number | null>(null);
+  const parseFinishedRef = useRef(false);
+  const parseErrorRef = useRef("");
+  const preloadingRef = useRef(false);
+  const preloadProcessedRef = useRef(0);
+  const preloadTotalRef = useRef(0);
+  const activeCapturePathRef = useRef("");
+  const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
+  const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
+  const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
+  const httpPrefetchInFlightRef = useRef<Set<number>>(new Set());
+  const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
+  const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
+  const httpSwitchSeqRef = useRef(0);
+  const tcpSwitchSeqRef = useRef(0);
+  const udpSwitchSeqRef = useRef(0);
+  const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
+  const streamSwitchDurationsRef = useRef<Record<"ALL" | StreamProtocol, number[]>>({
+    ALL: [],
+    HTTP: [],
+    TCP: [],
+    UDP: [],
+  });
+  const streamSwitchHitsRef = useRef<Record<"ALL" | StreamProtocol, number>>({
+    ALL: 0,
+    HTTP: 0,
+    TCP: 0,
+    UDP: 0,
+  });
+
+  const recordStreamSwitchMetric = useCallback((protocol: StreamProtocol, elapsedMs: number, cacheHit: boolean) => {
+    const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
+    const appendSample = (bucket: "ALL" | StreamProtocol) => {
+      const arr = streamSwitchDurationsRef.current[bucket];
+      arr.push(elapsed);
+      if (arr.length > SWITCH_SAMPLE_LIMIT) {
+        arr.splice(0, arr.length - SWITCH_SAMPLE_LIMIT);
+      }
+      if (cacheHit) {
+        streamSwitchHitsRef.current[bucket] += 1;
+      }
+    };
+
+    appendSample("ALL");
+    appendSample(protocol);
+
+    setStreamSwitchMetrics({
+      overall: buildSwitchStat(streamSwitchDurationsRef.current.ALL, streamSwitchHitsRef.current.ALL),
+      byProtocol: {
+        HTTP: buildSwitchStat(streamSwitchDurationsRef.current.HTTP, streamSwitchHitsRef.current.HTTP),
+        TCP: buildSwitchStat(streamSwitchDurationsRef.current.TCP, streamSwitchHitsRef.current.TCP),
+        UDP: buildSwitchStat(streamSwitchDurationsRef.current.UDP, streamSwitchHitsRef.current.UDP),
+      },
+    });
+  }, []);
+
+  const loadPacketPage = useCallback(async (cursor: number, filterOverride?: string) => {
+    if (!backendConnected || packetLoadingRef.current) return;
+    packetLoadingRef.current = true;
+    setIsPageLoading(true);
+    try {
+      const safeCursor = Math.max(0, cursor);
+      const page = await bridge.listPacketsPage(safeCursor, PAGE_SIZE, filterOverride ?? displayFilter);
+      pageStartRef.current = safeCursor;
+      setPageStart(safeCursor);
+      setTotalPackets(page.total);
+      setPackets(page.items);
+      setSelectedPacketId((prev) => {
+        if (prev == null) return null;
+        return page.items.some((p) => p.id === prev) ? prev : null;
+      });
+      setSelectedPacketRawHex("");
+      setSelectedPacketLayers(null);
+      setHasPrevPackets(safeCursor > 0);
+      hasMorePacketsRef.current = page.hasMore;
+      setHasMorePackets(page.hasMore);
+    } catch {
+      setBackendStatus("数据包加载失败");
+    } finally {
+      setIsPageLoading(false);
+      packetLoadingRef.current = false;
+    }
+  }, [backendConnected, displayFilter]);
+
+  const loadMorePackets = useCallback(async () => {
+    const next = pageStartRef.current + PAGE_SIZE;
+    await loadPacketPage(next);
+  }, [loadPacketPage]);
+
+  const loadPrevPackets = useCallback(async () => {
+    const prev = Math.max(0, pageStartRef.current - PAGE_SIZE);
+    await loadPacketPage(prev);
+  }, [loadPacketPage]);
+
+  const jumpToPage = useCallback(async (page: number) => {
+    const totalPagesHint = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
+    const targetPage = Math.max(1, Math.min(Number.isFinite(page) ? Math.floor(page) : 1, totalPagesHint));
+    const cursor = (targetPage - 1) * PAGE_SIZE;
+    await loadPacketPage(cursor);
+  }, [loadPacketPage, totalPackets]);
+
+  const locatePacketById = useCallback(async (packetId: number) => {
+    const normalized = Number.isFinite(packetId) ? Math.floor(packetId) : 0;
+    if (normalized <= 0) return;
+    const located = await bridge.locatePacketPage(normalized, PAGE_SIZE, displayFilter);
+    if (!located.found) {
+      setBackendStatus(`鏈壘鍒版暟鎹寘 #${normalized}`);
+      return;
+    }
+    await loadPacketPage(located.cursor);
+    setSelectedPacketId(normalized);
+  }, [displayFilter, loadPacketPage]);
+
+  const scheduleLoadMore = useCallback((delayMs = 120) => {
+    if (loadMoreScheduledRef.current != null) return;
+    loadMoreScheduledRef.current = window.setTimeout(() => {
+      loadMoreScheduledRef.current = null;
+      void loadPacketPage(pageStartRef.current);
+    }, delayMs);
+  }, [loadPacketPage]);
+
+  const updateProgressFromStatus = useCallback((message: string): boolean => {
+    if (!message.startsWith("__progress__:")) return false;
+    const parts = message.split(":");
+    if (parts.length < 4) return true;
+    const phase = parts[1];
+    const processed = Number(parts[2]) || 0;
+    const total = Number(parts[3]) || 0;
+    if (total > 0) {
+      setPreloadTotal(total);
+      preloadTotalRef.current = total;
+      setTotalPackets(total);
+    }
+    if (phase === "counting") {
+      setPreloadProcessed(0);
+      preloadProcessedRef.current = 0;
+      return true;
+    }
+    const normalized = Math.max(0, processed);
+    setPreloadProcessed(normalized);
+    preloadProcessedRef.current = normalized;
+    return true;
+  }, []);
+
+  useEffect(() => {
+    hasMorePacketsRef.current = hasMorePackets;
+  }, [hasMorePackets]);
+
+  const setTSharkPath = useCallback(async (path: string) => {
+    const nextPath = path.trim();
+    if (!backendConnected) {
+      if (typeof window !== "undefined") {
+        if (nextPath) {
+          window.localStorage.setItem(TSHARK_PATH_STORAGE_KEY, nextPath);
+        } else {
+          window.localStorage.removeItem(TSHARK_PATH_STORAGE_KEY);
+        }
+      }
+      setTsharkStatus((prev) => ({
+        ...prev,
+        customPath: nextPath,
+        usingCustomPath: nextPath.length > 0,
+      }));
+      return;
+    }
+
+    const status = await bridge.setTSharkPath(nextPath);
+    setTsharkStatus(status);
+
+    if (typeof window !== "undefined") {
+      if (nextPath) {
+        window.localStorage.setItem(TSHARK_PATH_STORAGE_KEY, nextPath);
+      } else {
+        window.localStorage.removeItem(TSHARK_PATH_STORAGE_KEY);
+      }
+    }
+
+    if (status.available) {
+      if (status.message && status.message !== "ok") {
+        setBackendStatus(status.message);
+      } else {
+        setBackendStatus(status.usingCustomPath ? `tshark ready: ${status.path}` : "tshark ready");
+      }
+      return;
+    }
+    setBackendStatus(status.message || "tshark is unavailable");
+    throw new Error(status.message || "tshark is unavailable");
+  }, [backendConnected]);
+
+  const filteredPackets = useMemo(() => packets, [packets]);
+
+  const selectedPacket = useMemo(() => {
+    if (selectedPacketId == null) return filteredPackets[0] ?? null;
+    return filteredPackets.find((p) => p.id === selectedPacketId) ?? null;
+  }, [filteredPackets, selectedPacketId]);
+
+  const refreshAnalysisResult = useCallback(async () => {
+    if (!backendConnected) return;
+    try {
+      const [hits, objects] = await Promise.all([
+        bridge.listThreatHits(["flag{", "ctf{"]),
+        bridge.listObjects(),
+      ]);
+      setThreatHits(hits);
+      setExtractedObjects(objects);
+    } catch {
+      setBackendStatus("分析结果刷新失败");
+    }
+  }, [backendConnected]);
+
+  const loadStreams = useCallback(async (streamId: number) => {
+    if (!backendConnected) return;
+    try {
+      const [http, tcp, udp] = await Promise.all([
+        bridge.getHttpStream(streamId),
+        bridge.getRawStream("TCP", streamId),
+        bridge.getRawStream("UDP", streamId),
+      ]);
+      httpStreamCacheRef.current.set(http.id, http);
+      tcpStreamCacheRef.current.set(tcp.id, tcp);
+      udpStreamCacheRef.current.set(udp.id, udp);
+      setHttpStream(http);
+      setTcpStream(tcp);
+      setUdpStream(udp);
+    } catch {
+      setBackendStatus("流重组失败");
+    }
+  }, [backendConnected]);
+
+  const refreshStreamIndex = useCallback(async () => {
+    if (!backendConnected) return;
+    try {
+      const [httpIds, tcpIds, udpIds] = await Promise.all([
+        bridge.listStreamIds("HTTP"),
+        bridge.listStreamIds("TCP"),
+        bridge.listStreamIds("UDP"),
+      ]);
+      setStreamIds({ http: httpIds, tcp: tcpIds, udp: udpIds });
+    } catch {
+      setBackendStatus("流索引刷新失败");
+    }
+  }, [backendConnected]);
+
+  const prefetchAdjacentStreams = useCallback((protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {
+    if (!backendConnected || currentStreamId <= 0) return;
+
+    const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
+    const idx = ids.findIndex((id) => id === currentStreamId);
+    if (idx < 0) return;
+
+    const neighbors = [ids[idx - 1], ids[idx + 1]].filter((id): id is number => Number.isFinite(id) && id > 0);
+    for (const targetId of neighbors) {
+      if (protocol === "HTTP") {
+        if (httpStreamCacheRef.current.has(targetId) || httpPrefetchInFlightRef.current.has(targetId)) continue;
+        if (httpPrefetchInFlightRef.current.size >= 2) continue;
+        httpPrefetchInFlightRef.current.add(targetId);
+        void bridge
+          .getHttpStream(targetId)
+          .then((http) => {
+            httpStreamCacheRef.current.set(http.id, http);
+          })
+          .finally(() => {
+            httpPrefetchInFlightRef.current.delete(targetId);
+          });
+        continue;
+      }
+
+      if (protocol === "TCP") {
+        if (tcpStreamCacheRef.current.has(targetId) || tcpPrefetchInFlightRef.current.has(targetId)) continue;
+        if (tcpPrefetchInFlightRef.current.size >= 2) continue;
+        tcpPrefetchInFlightRef.current.add(targetId);
+        void bridge
+          .getRawStream("TCP", targetId)
+          .then((raw) => {
+            tcpStreamCacheRef.current.set(raw.id, raw);
+          })
+          .finally(() => {
+            tcpPrefetchInFlightRef.current.delete(targetId);
+          });
+        continue;
+      }
+
+      if (udpStreamCacheRef.current.has(targetId) || udpPrefetchInFlightRef.current.has(targetId)) continue;
+      if (udpPrefetchInFlightRef.current.size >= 2) continue;
+      udpPrefetchInFlightRef.current.add(targetId);
+      void bridge
+        .getRawStream("UDP", targetId)
+        .then((raw) => {
+          udpStreamCacheRef.current.set(raw.id, raw);
+        })
+        .finally(() => {
+          udpPrefetchInFlightRef.current.delete(targetId);
+        });
+    }
+  }, [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp]);
+
+  const setActiveStream = useCallback(async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
+    if (!backendConnected || streamId <= 0) return;
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    let cacheHit = false;
+
+    const requestSeq = protocol === "HTTP"
+      ? ++httpSwitchSeqRef.current
+      : protocol === "TCP"
+        ? ++tcpSwitchSeqRef.current
+        : ++udpSwitchSeqRef.current;
+
+    const isLatest = () => {
+      if (protocol === "HTTP") return requestSeq === httpSwitchSeqRef.current;
+      if (protocol === "TCP") return requestSeq === tcpSwitchSeqRef.current;
+      return requestSeq === udpSwitchSeqRef.current;
+    };
+
+    try {
+      if (protocol === "HTTP") {
+        const cached = httpStreamCacheRef.current.get(streamId);
+        if (cached) {
+          if (!isLatest()) return;
+          cacheHit = true;
+          setHttpStream(cached);
+          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+          recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
+          prefetchAdjacentStreams("HTTP", streamId);
+          return;
+        }
+        const http = await bridge.getHttpStream(streamId);
+        if (!isLatest()) return;
+        httpStreamCacheRef.current.set(http.id, http);
+        setHttpStream(http);
+        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+        recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
+        prefetchAdjacentStreams("HTTP", streamId);
+        return;
+      }
+      if (protocol === "TCP") {
+        const cached = tcpStreamCacheRef.current.get(streamId);
+        if (cached) {
+          if (!isLatest()) return;
+          cacheHit = true;
+          setTcpStream(cached);
+          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+          recordStreamSwitchMetric("TCP", elapsed, cacheHit);
+          prefetchAdjacentStreams("TCP", streamId);
+          return;
+        }
+      }
+      if (protocol === "UDP") {
+        const cached = udpStreamCacheRef.current.get(streamId);
+        if (cached) {
+          if (!isLatest()) return;
+          cacheHit = true;
+          setUdpStream(cached);
+          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+          recordStreamSwitchMetric("UDP", elapsed, cacheHit);
+          prefetchAdjacentStreams("UDP", streamId);
+          return;
+        }
+      }
+      const raw = await bridge.getRawStream(protocol, streamId);
+      if (!isLatest()) return;
+      if (protocol === "TCP") {
+        tcpStreamCacheRef.current.set(raw.id, raw);
+        setTcpStream(raw);
+        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+        recordStreamSwitchMetric("TCP", elapsed, cacheHit);
+        prefetchAdjacentStreams("TCP", streamId);
+      } else {
+        udpStreamCacheRef.current.set(raw.id, raw);
+        setUdpStream(raw);
+        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+        recordStreamSwitchMetric("UDP", elapsed, cacheHit);
+        prefetchAdjacentStreams("UDP", streamId);
+      }
+    } catch {
+      if (!isLatest()) return;
+      setBackendStatus("流切换失败");
+    }
+  }, [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric]);
+
+  useEffect(() => {
+    let dispose: (() => void) | null = null;
+    let cancelled = false;
+
+    const clearBackendRetryTimer = () => {
+      if (backendRetryTimerRef.current != null) {
+        window.clearTimeout(backendRetryTimerRef.current);
+        backendRetryTimerRef.current = null;
+      }
+    };
+
+    const scheduleBackendRetry = (delayMs = 2000) => {
+      clearBackendRetryTimer();
+      backendRetryTimerRef.current = window.setTimeout(() => {
+        void setup();
+      }, delayMs);
+    };
+
+    const setup = async () => {
+      if (cancelled) return;
+      const available = await bridge.isAvailable();
+      if (cancelled) return;
+      if (!available) {
+        setBackendConnected(false);
+        setBackendStatus("后端未连接，请先启动 backend 服务");
+        scheduleBackendRetry();
+        return;
+      }
+
+      clearBackendRetryTimer();
+      setBackendConnected(true);
+      setBackendStatus("后端已连接，等待打开文件");
+      setIsTSharkChecking(true);
+
+      try {
+        const savedTSharkPath =
+          typeof window !== "undefined" ? window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY)?.trim() ?? "" : "";
+        const tshark = await bridge.setTSharkPath(savedTSharkPath);
+        setTsharkStatus(tshark);
+        if (!cancelled && tshark.available && tshark.message && tshark.message !== "ok") {
+          setBackendStatus(tshark.message);
+        }
+        if (!cancelled && !tshark.available) {
+          setBackendStatus(tshark.message || "未检测到 tshark，请先配置路径");
+        }
+      } catch {
+        // Ignore tool-check errors to avoid blocking app startup.
+      } finally {
+        if (!cancelled) {
+          setIsTSharkChecking(false);
+        }
+      }
+
+      try {
+        const [backendPlugins, tls] = await Promise.all([
+          bridge.listPlugins(),
+          bridge.getTLSConfig(),
+        ]);
+
+        setPlugins(backendPlugins);
+        if (tls) {
+          setDecryptionConfig(tls);
+        }
+      } catch {
+        setBackendStatus("后端初始化失败");
+      }
+
+      dispose = bridge.subscribeEvents({
+        packet: (packet) => {
+          setSelectedPacketId((prev) => prev ?? packet.id);
+          if (preloadingRef.current) {
+            return;
+          }
+          scheduleLoadMore();
+
+          if (refreshTimer.current) {
+            window.clearTimeout(refreshTimer.current);
+          }
+          refreshTimer.current = window.setTimeout(() => {
+            void refreshAnalysisResult();
+          }, 500);
+        },
+        status: (message) => {
+          const msg = message || "后端运行中";
+          if (updateProgressFromStatus(msg)) {
+            return;
+          }
+          if (msg.toLowerCase().includes("plugin")) {
+            setPluginLogs((logs) => [
+              `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [DEBUG] ${msg}`,
+              ...logs,
+            ].slice(0, 120));
+          }
+          if (msg.includes("解析完成") || msg.includes("解析失败") || msg.includes("解析被取消")) {
+            parseFinishedRef.current = true;
+          }
+          setBackendStatus(msg);
+        },
+        error: (message) => setBackendStatus(message || "后端事件异常"),
+      });
+    };
+
+    void setup();
+
+    return () => {
+      cancelled = true;
+      clearBackendRetryTimer();
+      if (dispose) dispose();
+      if (loadMoreScheduledRef.current != null) {
+        window.clearTimeout(loadMoreScheduledRef.current);
+      }
+      if (refreshTimer.current) {
+        window.clearTimeout(refreshTimer.current);
+      }
+    };
+  }, [refreshAnalysisResult, scheduleLoadMore, updateProgressFromStatus]);
+
+  useEffect(() => {
+    if (selectedPacketId == null || !selectedPacket || selectedPacket.streamId == null) return;
+    void loadStreams(selectedPacket.streamId);
+  }, [selectedPacketId, selectedPacket?.streamId, loadStreams]);
+
+  useEffect(() => {
+    if (selectedPacketId == null || !selectedPacket) {
+      setSelectedPacketRawHex("");
+      return;
+    }
+
+    let cancelled = false;
+    void bridge.getPacketRawHex(selectedPacket.id)
+      .then((raw) => {
+        if (!cancelled) {
+          setSelectedPacketRawHex(raw);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedPacketRawHex("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPacketId, selectedPacket?.id]);
+
+  useEffect(() => {
+    if (selectedPacketId == null || !selectedPacket) {
+      setSelectedPacketLayers(null);
+      return;
+    }
+
+    let cancelled = false;
+    void bridge.getPacketLayers(selectedPacket.id)
+      .then((layers) => {
+        if (!cancelled) {
+          setSelectedPacketLayers(layers);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedPacketLayers(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPacketId, selectedPacket?.id]);
+
+  const startCapture = useCallback(async (filePath?: string, filterOverride?: string) => {
+    if (!backendConnected) {
+      setBackendStatus("后端未连接，无法打开文件");
+      return;
+    }
+
+    const effectiveFilter = filterOverride ?? displayFilter;
+
+    try {
+      const opened =
+        filePath && filePath.trim()
+          ? { filePath: filePath.trim(), fileSize: 0, fileName: filePath.trim().split(/[\\/]/).pop() ?? "capture.pcapng" }
+          : await bridge.openPcapFile();
+
+      setPackets([]);
+      setTotalPackets(0);
+      setPageStart(0);
+      setPreloadProcessed(0);
+      setPreloadTotal(0);
+      preloadProcessedRef.current = 0;
+      preloadTotalRef.current = 0;
+      setIsPreloadingCapture(true);
+      pageStartRef.current = 0;
+      setHasPrevPackets(false);
+      hasMorePacketsRef.current = true;
+      parseFinishedRef.current = false;
+      parseErrorRef.current = "";
+      preloadingRef.current = true;
+      setHasMorePackets(true);
+      setSelectedPacketId(null);
+      setSelectedPacketRawHex("");
+      setSelectedPacketLayers(null);
+      httpStreamCacheRef.current.clear();
+      tcpStreamCacheRef.current.clear();
+      udpStreamCacheRef.current.clear();
+      httpPrefetchInFlightRef.current.clear();
+      tcpPrefetchInFlightRef.current.clear();
+      udpPrefetchInFlightRef.current.clear();
+      httpSwitchSeqRef.current = 0;
+      tcpSwitchSeqRef.current = 0;
+      udpSwitchSeqRef.current = 0;
+      streamSwitchDurationsRef.current = {
+        ALL: [],
+        HTTP: [],
+        TCP: [],
+        UDP: [],
+      };
+      streamSwitchHitsRef.current = {
+        ALL: 0,
+        HTTP: 0,
+        TCP: 0,
+        UDP: 0,
+      };
+      setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
+      setThreatHits([]);
+      setExtractedObjects([]);
+      setFileMeta({
+        name: opened.fileName,
+        sizeBytes: Number(opened.fileSize ?? 0),
+        path: opened.filePath,
+      });
+      activeCapturePathRef.current = opened.filePath;
+
+      await bridge.startStreamingPackets(opened.filePath, "");
+      setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
+
+      const waitDeadline = Date.now() + 120000;
+      while (true) {
+        if (parseFinishedRef.current) {
+          break;
+        }
+
+        const firstPage = await bridge.listPacketsPage(0, 1);
+        if (firstPage.total > 0) {
+          break;
+        }
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 300);
+        });
+
+        if (Date.now() >= waitDeadline) {
+          break;
+        }
+      }
+
+      const probePage = await bridge.listPacketsPage(0, 1, effectiveFilter);
+      if (probePage.total === 0 && parseFinishedRef.current) {
+        throw new Error(parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility");
+      }
+      if (probePage.total === 0 && Date.now() >= waitDeadline) {
+        throw new Error("capture parsing timed out before packets were loaded");
+      }
+
+      await loadPacketPage(0, effectiveFilter);
+      await refreshStreamIndex();
+      await refreshAnalysisResult();
+      setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
+    } catch (error) {
+      setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
+    } finally {
+      preloadingRef.current = false;
+      setIsPreloadingCapture(false);
+    }
+  }, [backendConnected, displayFilter, loadPacketPage, refreshAnalysisResult, refreshStreamIndex]);
+
+  const applyFilter = useCallback((value?: string) => {
+    const nextFilter = value ?? displayFilter;
+    if (value !== undefined) {
+      setDisplayFilter(nextFilter);
+    }
+    setSelectedPacketId(null);
+
+    if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
+      void loadPacketPage(0, nextFilter);
+    }
+  }, [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage]);
+
+  const clearFilter = useCallback(() => {
+    setDisplayFilter("");
+    setSelectedPacketId(null);
+
+    if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
+      void loadPacketPage(0, "");
+    }
+  }, [backendConnected, isPreloadingCapture, loadPacketPage]);
+
+  const selectPacket = useCallback((id: number) => {
+    setSelectedPacketId(id);
+  }, []);
+
+  const togglePlugin = useCallback((id: number | string) => {
+    if (!backendConnected) {
+      setBackendStatus("后端未连接，无法切换插件");
+      return;
+    }
+
+    void bridge
+      .togglePlugin(String(id))
+      .then((updated) => {
+        setPlugins((prev) => prev.map((plugin) => (String(plugin.id) === String(updated.id) ? updated : plugin)));
+        setPluginLogs((logs) => [
+          `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] ${updated.name} ${updated.enabled ? "已启用" : "已禁用"}`,
+          ...logs,
+        ].slice(0, 120));
+      })
+      .catch(() => setBackendStatus("插件切换失败"));
+  }, [backendConnected]);
+
+  const addPlugin = useCallback(async (plugin: PluginItem) => {
+    if (!backendConnected) {
+      setBackendStatus("后端未连接，无法新增插件");
+      return;
+    }
+    try {
+      const added = await bridge.addPlugin(plugin);
+      setPlugins((prev) => {
+        const existingIndex = prev.findIndex((p) => String(p.id) === String(added.id));
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = added;
+          return next;
+        }
+        return [added, ...prev];
+      });
+      setPluginLogs((logs) => [
+        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] 已新增插件 ${added.name} (${added.id})`,
+        ...logs,
+      ].slice(0, 120));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "新增插件失败";
+      setBackendStatus(message);
+      setPluginLogs((logs) => [
+        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [WARN] 新增插件失败: ${message}`,
+        ...logs,
+      ].slice(0, 120));
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }, [backendConnected]);
+
+  const deletePlugin = useCallback(async (id: number | string) => {
+    if (!backendConnected) {
+      setBackendStatus("后端未连接，无法删除插件");
+      return;
+    }
+    try {
+      await bridge.deletePlugin(String(id));
+      setPlugins((prev) => prev.filter((p) => String(p.id) !== String(id)));
+      setPluginLogs((logs) => [
+        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] 已删除插件 ${id}`,
+        ...logs,
+      ].slice(0, 120));
+    } catch {
+      setBackendStatus("删除插件失败");
+    }
+  }, [backendConnected]);
+
+  const setPluginsEnabled = useCallback((ids: (number | string)[], enabled: boolean) => {
+    if (!backendConnected) {
+      setBackendStatus("后端未连接，无法批量设置插件");
+      return;
+    }
+
+    void bridge
+      .setPluginsEnabled(ids.map((id) => String(id)), enabled)
+      .then((updated) => {
+        if (ids.length === 0) {
+          setPlugins(updated);
+        } else {
+          const map = new Map(updated.map((p) => [String(p.id), p]));
+          setPlugins((prev) => prev.map((p) => map.get(String(p.id)) ?? p));
+        }
+
+        const scope = ids.length === 0 ? "全部插件" : `${ids.length} 个插件`;
+        setPluginLogs((logs) => [
+          `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] ${scope}${enabled ? "已启用" : "已禁用"}`,
+          ...logs,
+        ].slice(0, 120));
+      })
+      .catch(() => setBackendStatus("批量插件设置失败"));
+  }, [backendConnected]);
+
+  const refreshPlugins = useCallback(() => {
+    if (!backendConnected) return;
+    void bridge
+      .listPlugins()
+      .then((items) => {
+        setPlugins(items);
+      })
+      .catch(() => setBackendStatus("插件列表刷新失败"));
+  }, [backendConnected]);
+
+  const updateDecryptionConfig = useCallback((patch: Partial<DecryptionConfig>) => {
+    setDecryptionConfig((prev) => {
+      const next = { ...prev, ...patch };
+      if (backendConnected) {
+        void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
+      }
+      return next;
+    });
+  }, [backendConnected]);
+
+  const openCapture = useCallback(async (filePath?: string) => {
+    setDisplayFilter("");
+    await startCapture(filePath, "");
+  }, [startCapture]);
+
+  const stopCapture = useCallback(async () => {
+    if (!backendConnected) return;
+    await bridge.stopStreamingPackets();
+    setBackendStatus("解析已停止");
+  }, [backendConnected]);
+
+  const protocolTree = useMemo(
+    () => (selectedPacketLayers ? buildProtocolTreeFromLayers(selectedPacketLayers, selectedPacket) : buildProtocolTree(selectedPacket)),
+    [selectedPacketLayers, selectedPacket],
+  );
+  const hexDump = useMemo(() => buildHexDump(selectedPacket), [selectedPacket]);
+  const currentPage = useMemo(() => Math.floor(pageStart / PAGE_SIZE) + 1, [pageStart]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPackets / PAGE_SIZE)), [totalPackets]);
+
+  const value = useMemo<SentinelContextValue>(
+    () => ({
+      packets,
+      totalPackets,
+      currentPage,
+      totalPages,
+      isPreloadingCapture,
+      preloadProcessed,
+      preloadTotal,
+      filteredPackets,
+      hasMorePackets,
+      hasPrevPackets,
+      isPageLoading,
+      loadMorePackets,
+      loadPrevPackets,
+      jumpToPage,
+      locatePacketById,
+      selectedPacket,
+      selectedPacketRawHex,
+      selectedPacketId,
+      displayFilter,
+      setDisplayFilter,
+      applyFilter,
+      clearFilter,
+      selectPacket,
+      protocolTree,
+      hexDump,
+      threatHits,
+      extractedObjects,
+      httpStream,
+      tcpStream,
+      udpStream,
+      streamIds,
+      setActiveStream,
+      streamSwitchMetrics,
+      plugins,
+      pluginLogs,
+      addPlugin,
+      deletePlugin,
+      togglePlugin,
+      setPluginsEnabled,
+      refreshPlugins,
+      decryptionConfig,
+      updateDecryptionConfig,
+      fileMeta,
+      openCapture,
+      stopCapture,
+      backendConnected,
+      backendStatus,
+      tsharkStatus,
+      isTSharkChecking,
+      setTSharkPath,
+    }),
+    [
+      packets,
+      totalPackets,
+      currentPage,
+      totalPages,
+      isPreloadingCapture,
+      preloadProcessed,
+      preloadTotal,
+      filteredPackets,
+      hasMorePackets,
+      hasPrevPackets,
+      isPageLoading,
+      loadMorePackets,
+      loadPrevPackets,
+      jumpToPage,
+      locatePacketById,
+      selectedPacket,
+      selectedPacketRawHex,
+      selectedPacketId,
+      displayFilter,
+      applyFilter,
+      clearFilter,
+      selectPacket,
+      protocolTree,
+      hexDump,
+      threatHits,
+      extractedObjects,
+      httpStream,
+      tcpStream,
+      udpStream,
+      streamIds,
+      setActiveStream,
+      streamSwitchMetrics,
+      plugins,
+      pluginLogs,
+      addPlugin,
+      deletePlugin,
+      togglePlugin,
+      setPluginsEnabled,
+      refreshPlugins,
+      decryptionConfig,
+      updateDecryptionConfig,
+      fileMeta,
+      openCapture,
+      stopCapture,
+      backendConnected,
+      backendStatus,
+      tsharkStatus,
+      isTSharkChecking,
+      setTSharkPath,
+    ],
+  );
+
+  return <SentinelContext.Provider value={value}>{children}</SentinelContext.Provider>;
+}
+
+export function useSentinel() {
+  const ctx = useContext(SentinelContext);
+  if (!ctx) {
+    throw new Error("useSentinel must be used inside SentinelProvider");
+  }
+  return ctx;
+}
+
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return prettySize(bytes);
+}

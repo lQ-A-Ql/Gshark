@@ -1,0 +1,1 @@
+powershell ./scripts/start-wails-dev.ps1

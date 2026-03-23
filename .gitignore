@@ -1,0 +1,42 @@
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+.tmp_*
+tmp/
+temp/
+
+# Node / frontend build
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+
+# Go / binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# Wails / build output
+build/
+
+# Local captures / analysis artifacts
+*.pcap
+*.pcapng
+*.cap
+*.dmp
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+
