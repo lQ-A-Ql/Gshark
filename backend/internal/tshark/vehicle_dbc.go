@@ -2,26 +2,26 @@ package tshark
 
 import "github.com/gshark/sentinel/backend/internal/model"
 
+var dbcDecodedMessageFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"_ws.col.Info",
+	"can.bus_id",
+	"can.id",
+	"can.len",
+	"data.data",
+}
+
 func scanDBCDecodedMessages(filePath string, databases []*DBCDatabase) ([]model.TrafficBucket, []model.TrafficBucket, []model.CANDBCMessage, error) {
 	if len(databases) == 0 {
 		return nil, nil, nil, nil
-	}
-
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"_ws.col.Info",
-		"can.bus_id",
-		"can.id",
-		"can.len",
-		"data.data",
 	}
 
 	messageMap := make(map[string]int)
 	signalMap := make(map[string]int)
 	records := make([]model.CANDBCMessage, 0, 128)
 
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, dbcDecodedMessageFields, func(parts []string) {
 		canID := parseCANIdentifier(safeTrim(parts, 4))
 		if canID == 0 {
 			return

@@ -29,20 +29,24 @@ type Service struct {
 	tlsConf            model.TLSConfig
 	runID              int64
 	pcap               string
+	displayFilterCache map[string]*filteredPacketIndex
 	globalTrafficStats *model.GlobalTrafficStats
 	industrialAnalysis *model.IndustrialAnalysis
 	vehicleAnalysis    *model.VehicleAnalysis
+	mediaAnalysis      *model.MediaAnalysis
 	vehicleDBCDefs     []*tshark.DBCDatabase
 	streamCache        map[string]model.ReassembledStream
 	streamCacheOrder   []string
 
-	exportDir     string
-	objectsLoaded bool
-	objects       []model.ObjectFile
-	objMu         sync.Mutex
-	yaraLoaded    bool
-	yaraHits      []model.ThreatHit
-	yaraMu        sync.Mutex
+	exportDir      string
+	mediaExportDir string
+	objectsLoaded  bool
+	objects        []model.ObjectFile
+	mediaArtifacts map[string]string
+	objMu          sync.Mutex
+	yaraLoaded     bool
+	yaraHits       []model.ThreatHit
+	yaraMu         sync.Mutex
 
 	huntMu          sync.RWMutex
 	huntingPrefixes []string
@@ -52,8 +56,14 @@ type Service struct {
 
 const streamCacheLimit = 256
 
+type filteredPacketIndex struct {
+	ids       []int64
+	positions map[int64]int
+}
+
 var (
 	estimatePacketsFn     = tshark.EstimatePackets
+	filterFrameIDsFn      = tshark.FilterFrameIDs
 	streamPacketsFn       = tshark.StreamPackets
 	streamPacketsFastFn   = tshark.StreamPacketsFast
 	streamPacketsCompatFn = tshark.StreamPacketsCompat
@@ -68,10 +78,12 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 		panic(err)
 	}
 	return &Service{
-		emitter:      emitter,
-		pluginManger: pm,
-		packetStore:  store,
-		streamCache:  map[string]model.ReassembledStream{},
+		emitter:            emitter,
+		pluginManger:       pm,
+		packetStore:        store,
+		displayFilterCache: map[string]*filteredPacketIndex{},
+		streamCache:        map[string]model.ReassembledStream{},
+		mediaArtifacts:     map[string]string{},
 		huntingPrefixes: []string{
 			"flag{",
 			"ctf{",
@@ -88,6 +100,14 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	currentRunID := atomic.AddInt64(&s.runID, 1)
 	runCtx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
+
+	s.mu.RLock()
+	oldPCAP := s.pcap
+	s.mu.RUnlock()
+	if oldPCAP != "" {
+		tshark.ClearFieldScanCache(oldPCAP)
+	}
+	tshark.ClearFieldScanCache(opts.FilePath)
 
 	s.objMu.Lock()
 	if s.exportDir != "" {
@@ -110,10 +130,17 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	}
 
 	s.mu.Lock()
+	if s.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaExportDir)
+		s.mediaExportDir = ""
+	}
 	s.pcap = opts.FilePath
+	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.globalTrafficStats = nil
 	s.industrialAnalysis = nil
 	s.vehicleAnalysis = nil
+	s.mediaAnalysis = nil
+	s.mediaArtifacts = map[string]string{}
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	// Inject current TLS config into parse options
@@ -320,10 +347,23 @@ func (s *Service) PacketsPage(cursor, limit int, filter string) ([]model.Packet,
 	if s.packetStore == nil {
 		return nil, 0, 0
 	}
+	filtered, filterErr := s.filteredPacketIndex(filter)
+	if filterErr == nil && filtered != nil {
+		out, next, total, err := s.packetStore.PageByIDs(filtered.ids, cursor, limit)
+		if err != nil {
+			s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
+			return []model.Packet{}, 0, 0
+		}
+		return out, next, total
+	}
+	if strings.TrimSpace(filter) != "" && s.hasCapturePath() {
+		return []model.Packet{}, 0, 0
+	}
+
 	predicate := compilePacketFilter(filter)
 	out, next, total, err := s.packetStore.Page(cursor, limit, predicate)
 	if err != nil {
-		s.emitter.EmitStatus("鏁版嵁鍖呭垎椤垫煡璇㈠け璐? " + err.Error())
+		s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
 		return []model.Packet{}, 0, 0
 	}
 	return out, next, total
@@ -336,6 +376,19 @@ func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (in
 	if limit <= 0 {
 		limit = 1000
 	}
+	filtered, err := s.filteredPacketIndex(filter)
+	if err == nil && filtered != nil {
+		matchIndex, ok := filtered.positions[packetID]
+		if !ok {
+			return 0, len(filtered.ids), false
+		}
+		cursor := (matchIndex / limit) * limit
+		return cursor, len(filtered.ids), true
+	}
+	if strings.TrimSpace(filter) != "" && s.hasCapturePath() {
+		return 0, 0, false
+	}
+
 	predicate := compilePacketFilter(filter)
 	matchIndex := -1
 	total := 0
@@ -843,6 +896,9 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 	if strings.TrimSpace(pcap) == "" {
 		return model.IndustrialAnalysis{}, errors.New("no capture loaded")
 	}
+	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+		log.Printf("engine: specialized field cache warm failed for industrial analysis: %v", err)
+	}
 
 	analysis, err := tshark.BuildIndustrialAnalysisFromFile(pcap)
 	if err != nil {
@@ -870,6 +926,9 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 	if strings.TrimSpace(pcap) == "" {
 		return model.VehicleAnalysis{}, errors.New("no capture loaded")
 	}
+	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+		log.Printf("engine: specialized field cache warm failed for vehicle analysis: %v", err)
+	}
 
 	s.mu.RLock()
 	dbcDefs := append([]*tshark.DBCDatabase(nil), s.vehicleDBCDefs...)
@@ -887,6 +946,72 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 	out := *s.vehicleAnalysis
 	s.mu.Unlock()
 	return out, nil
+}
+
+func (s *Service) MediaAnalysis() (model.MediaAnalysis, error) {
+	s.mu.RLock()
+	pcap := s.pcap
+	cached := s.mediaAnalysis
+	s.mu.RUnlock()
+
+	if cached != nil {
+		return *cached, nil
+	}
+	if strings.TrimSpace(pcap) == "" {
+		return model.MediaAnalysis{}, errors.New("no capture loaded")
+	}
+	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+		log.Printf("engine: specialized field cache warm failed for media analysis: %v", err)
+	}
+
+	tempDir, err := os.MkdirTemp("", "gshark-media-")
+	if err != nil {
+		return model.MediaAnalysis{}, err
+	}
+
+	analysis, artifacts, err := tshark.BuildMediaAnalysisFromFile(pcap, tempDir)
+	if err != nil {
+		_ = os.RemoveAll(tempDir)
+		return model.MediaAnalysis{}, err
+	}
+
+	s.mu.Lock()
+	if s.mediaAnalysis == nil {
+		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
+			_ = os.RemoveAll(s.mediaExportDir)
+		}
+		s.mediaAnalysis = &analysis
+		s.mediaExportDir = tempDir
+		s.mediaArtifacts = artifacts
+	} else {
+		_ = os.RemoveAll(tempDir)
+	}
+	out := *s.mediaAnalysis
+	s.mu.Unlock()
+	return out, nil
+}
+
+func (s *Service) MediaArtifact(token string) (string, string, error) {
+	s.mu.RLock()
+	path := s.mediaArtifacts[token]
+	analysis := s.mediaAnalysis
+	s.mu.RUnlock()
+
+	if strings.TrimSpace(path) == "" {
+		return "", "", errors.New("media artifact not found")
+	}
+
+	name := filepath.Base(path)
+	if analysis != nil {
+		for _, session := range analysis.Sessions {
+			if session.Artifact != nil && session.Artifact.Token == token && strings.TrimSpace(session.Artifact.Name) != "" {
+				name = session.Artifact.Name
+				break
+			}
+		}
+	}
+
+	return path, name, nil
 }
 
 func (s *Service) VehicleDBCProfiles() []model.DBCProfile {
@@ -958,4 +1083,57 @@ func buildDBCProfilesForService(databases []*tshark.DBCDatabase) []model.DBCProf
 		out = append(out, db.Profile())
 	}
 	return out
+}
+
+func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, error) {
+	filter = strings.TrimSpace(filter)
+	if filter == "" {
+		return nil, nil
+	}
+
+	s.mu.RLock()
+	if cached, ok := s.displayFilterCache[filter]; ok {
+		s.mu.RUnlock()
+		return cached, nil
+	}
+	pcap := s.pcap
+	tlsConf := s.tlsConf
+	s.mu.RUnlock()
+	if strings.TrimSpace(pcap) == "" || s.packetStore == nil {
+		return nil, nil
+	}
+
+	ids, err := filterFrameIDsFn(context.Background(), model.ParseOptions{
+		FilePath:      pcap,
+		DisplayFilter: filter,
+		TLS:           tlsConf,
+	})
+	if err != nil {
+		s.emitter.EmitStatus("显示过滤器执行失败: " + err.Error())
+		return nil, err
+	}
+
+	ids = s.packetStore.ExistingIDs(ids)
+	index := &filteredPacketIndex{
+		ids:       ids,
+		positions: make(map[int64]int, len(ids)),
+	}
+	for i, id := range ids {
+		index.positions[id] = i
+	}
+
+	s.mu.Lock()
+	if existing, ok := s.displayFilterCache[filter]; ok {
+		s.mu.Unlock()
+		return existing, nil
+	}
+	s.displayFilterCache[filter] = index
+	s.mu.Unlock()
+	return index, nil
+}
+
+func (s *Service) hasCapturePath() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return strings.TrimSpace(s.pcap) != ""
 }

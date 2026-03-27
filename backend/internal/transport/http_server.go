@@ -82,6 +82,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/industrial", s.handleIndustrialAnalysis)
 	mux.HandleFunc("/api/analysis/vehicle", s.handleVehicleAnalysis)
 	mux.HandleFunc("/api/analysis/vehicle/dbc", s.handleVehicleDBC)
+	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
+	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/tls", s.handleTLS)
 	mux.HandleFunc("/api/plugins", s.handlePlugins)
 	mux.HandleFunc("/api/plugins/add", s.handleAddPlugin)
@@ -408,6 +410,57 @@ func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, analysis)
+}
+
+func (s *Server) handleMediaAnalysis(w http.ResponseWriter, _ *http.Request) {
+	analysis, err := s.svc.MediaAnalysis()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, analysis)
+}
+
+func (s *Server) handleMediaArtifactDownload(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "missing media artifact token")
+		return
+	}
+
+	path, name, err := s.svc.MediaArtifact(token)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	header := make([]byte, 512)
+	readBytes, _ := file.Read(header)
+	_, _ = file.Seek(0, io.SeekStart)
+	contentType := http.DetectContentType(header[:readBytes])
+	if strings.HasSuffix(strings.ToLower(name), ".h264") || strings.HasSuffix(strings.ToLower(name), ".264") {
+		contentType = "video/h264"
+	}
+	if strings.HasSuffix(strings.ToLower(name), ".h265") || strings.HasSuffix(strings.ToLower(name), ".hevc") {
+		contentType = "video/h265"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
+	http.ServeContent(w, r, name, info.ModTime(), file)
 }
 
 func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Activity, LayoutDashboard, ShieldAlert, FileDown, KeyRound, Puzzle, Box, FolderOpen, Save, Upload, Hexagon, BarChart3, Factory, Car } from "lucide-react";
+import { Activity, LayoutDashboard, ShieldAlert, FileDown, KeyRound, Puzzle, Box, FolderOpen, Save, Upload, Hexagon, BarChart3, Factory, Car, Clapperboard } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useEffect } from "react";
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { path: "/traffic-graph", icon: BarChart3, label: "流量图" },
   { path: "/industrial-analysis", icon: Factory, label: "工控分析" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析" },
+  { path: "/media-analysis", icon: Clapperboard, label: "视频流还原" },
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心" },
   { path: "/objects", icon: FileDown, label: "附件提取" },
   { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
@@ -188,6 +189,7 @@ export function MainLayout() {
                   </div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/industrial-analysis")}>工控分析</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/vehicle-analysis")}>车机分析</div>
+                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/media-analysis")}>视频流还原</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={followSelectedStream}>追踪流</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/hunting")}>专家信息</div>
                 </div>
@@ -198,6 +200,7 @@ export function MainLayout() {
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/traffic-graph")}>流量图</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/industrial-analysis")}>工控分析</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/vehicle-analysis")}>车机分析</div>
+                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/media-analysis")}>视频流还原</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={exportEndpointStats}>端点统计导出</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={exportProtocolStats}>协议统计导出</div>
                 </div>

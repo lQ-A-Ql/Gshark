@@ -7,6 +7,183 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+var s7CommDetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"s7comm.header.rosctr",
+	"s7comm.header.errcls",
+	"s7comm.header.errcod",
+	"s7comm.param.func",
+	"s7comm.param.item.db",
+	"s7comm.param.item.area",
+	"s7comm.param.item.address.byte",
+}
+
+var dnp3DetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"dnp3.src",
+	"dnp3.dst",
+	"dnp3.ctl.prifunc",
+	"dnp3.ctl.secfunc",
+	"dnp3.al.func",
+	"dnp3.al.obj",
+	"dnp3.al.point_index",
+	"dnp3.al.count",
+	"dnp3.al.ana.int",
+	"dnp3.al.ana.float",
+	"dnp3.al.cnt",
+	"dnp3.al.bit",
+	"dnp3.al.ctrlstatus",
+	"dnp3.al.iin",
+}
+
+var cipDetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"enip.command",
+	"cip.service",
+	"cip.class",
+	"cip.instance",
+	"cip.attribute",
+	"cip.genstat",
+	"cip.symbol",
+	"cip.id.vendor_id",
+	"cip.id.product_name",
+}
+
+var bacnetDetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"bacnet.mesgtyp",
+	"bacapp.confirmed_service",
+	"bacapp.unconfirmed_service",
+	"bacapp.object_name",
+	"bacapp.objectIdentifier",
+	"bacapp.property_identifier",
+	"bacapp.error_code",
+	"bacapp.present_value.char_string",
+	"bacapp.present_value.real",
+	"bacapp.present_value.uint",
+	"bacapp.invoke_id",
+}
+
+var iec104DetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"iec60870_asdu.addr",
+	"iec60870_asdu.typeid",
+	"iec60870_asdu.causetx",
+	"iec60870_asdu.ioa",
+	"iec60870_asdu.float",
+	"iec60870_asdu.normval",
+	"iec60870_asdu.scalval",
+	"iec60870_asdu.rawdata",
+}
+
+var opcuaDetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"opcua.servicenodeid.numeric",
+	"opcua.ApplicationUri",
+	"opcua.DiscoveryUrl",
+	"opcua.EndpointUrl",
+	"opcua.ServerUri",
+	"opcua.SessionName",
+	"opcua.ServiceResult",
+	"opcua.StatusCode",
+}
+
+var profinetDetailFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"eth.src",
+	"ip.src",
+	"ipv6.src",
+	"eth.dst",
+	"ip.dst",
+	"ipv6.dst",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"pn_rt.frame_id",
+	"pn_rt.cycle_counter",
+	"pn_rt.ds_frame_info_type",
+	"pn_dcp.service_id",
+	"pn_dcp.service_type",
+	"pn_dcp.suboption_device_devicevendorvalue",
+	"pn_dcp.suboption_device_nameofstation",
+	"pn_dcp.suboption_vendor_id",
+	"pn_dcp.suboption_device_id",
+	"pn_dcp.suboption_ip_ip",
+	"pn_io.opnum",
+	"pn_io.artype_req",
+	"pn_io.cminitiator_station_name",
+	"pn_io.cmresponder_station_name",
+	"pn_io.parameter_server_station_name",
+	"pn_io.iocr_type",
+	"pn_io.iocr_reference",
+	"pn_io.number_of_iocrs",
+	"pn_io.error_code",
+	"pn_io.error_decode",
+	"pn_io.error_code1",
+	"pn_io.error_code2",
+}
+
 type industrialDetailBuilder struct {
 	name          string
 	opMap         map[string]int
@@ -65,28 +242,7 @@ func (b *industrialDetailBuilder) Build() (model.IndustrialProtocolDetail, map[s
 
 func scanS7CommDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("S7comm")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"s7comm.header.rosctr",
-		"s7comm.header.errcls",
-		"s7comm.header.errcod",
-		"s7comm.param.func",
-		"s7comm.param.item.db",
-		"s7comm.param.item.area",
-		"s7comm.param.item.address.byte",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, s7CommDetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "S7comm" {
@@ -120,35 +276,7 @@ func scanS7CommDetail(filePath string) (model.IndustrialProtocolDetail, map[stri
 
 func scanDNP3Detail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("DNP3")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"dnp3.src",
-		"dnp3.dst",
-		"dnp3.ctl.prifunc",
-		"dnp3.ctl.secfunc",
-		"dnp3.al.func",
-		"dnp3.al.obj",
-		"dnp3.al.point_index",
-		"dnp3.al.count",
-		"dnp3.al.ana.int",
-		"dnp3.al.ana.float",
-		"dnp3.al.cnt",
-		"dnp3.al.bit",
-		"dnp3.al.ctrlstatus",
-		"dnp3.al.iin",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, dnp3DetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "DNP3" {
@@ -189,30 +317,7 @@ func scanDNP3Detail(filePath string) (model.IndustrialProtocolDetail, map[string
 
 func scanCIPDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("EtherNet/IP / CIP")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"enip.command",
-		"cip.service",
-		"cip.class",
-		"cip.instance",
-		"cip.attribute",
-		"cip.genstat",
-		"cip.symbol",
-		"cip.id.vendor_id",
-		"cip.id.product_name",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, cipDetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "EtherNet/IP / CIP" {
@@ -249,32 +354,7 @@ func scanCIPDetail(filePath string) (model.IndustrialProtocolDetail, map[string]
 
 func scanBACnetDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("BACnet")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"bacnet.mesgtyp",
-		"bacapp.confirmed_service",
-		"bacapp.unconfirmed_service",
-		"bacapp.object_name",
-		"bacapp.objectIdentifier",
-		"bacapp.property_identifier",
-		"bacapp.error_code",
-		"bacapp.present_value.char_string",
-		"bacapp.present_value.real",
-		"bacapp.present_value.uint",
-		"bacapp.invoke_id",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, bacnetDetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "BACnet" {
@@ -316,29 +396,7 @@ func scanBACnetDetail(filePath string) (model.IndustrialProtocolDetail, map[stri
 
 func scanIEC104Detail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("IEC 104")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"iec60870_asdu.addr",
-		"iec60870_asdu.typeid",
-		"iec60870_asdu.causetx",
-		"iec60870_asdu.ioa",
-		"iec60870_asdu.float",
-		"iec60870_asdu.normval",
-		"iec60870_asdu.scalval",
-		"iec60870_asdu.rawdata",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, iec104DetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "IEC 104" {
@@ -376,29 +434,7 @@ func scanIEC104Detail(filePath string) (model.IndustrialProtocolDetail, map[stri
 
 func scanOPCUADetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("OPC UA")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"opcua.servicenodeid.numeric",
-		"opcua.ApplicationUri",
-		"opcua.DiscoveryUrl",
-		"opcua.EndpointUrl",
-		"opcua.ServerUri",
-		"opcua.SessionName",
-		"opcua.ServiceResult",
-		"opcua.StatusCode",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, opcuaDetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "OPC UA" {
@@ -435,43 +471,7 @@ func scanOPCUADetail(filePath string) (model.IndustrialProtocolDetail, map[strin
 
 func scanPROFINETDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("PROFINET")
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"eth.src",
-		"ip.src",
-		"ipv6.src",
-		"eth.dst",
-		"ip.dst",
-		"ipv6.dst",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"pn_rt.frame_id",
-		"pn_rt.cycle_counter",
-		"pn_rt.ds_frame_info_type",
-		"pn_dcp.service_id",
-		"pn_dcp.service_type",
-		"pn_dcp.suboption_device_devicevendorvalue",
-		"pn_dcp.suboption_device_nameofstation",
-		"pn_dcp.suboption_vendor_id",
-		"pn_dcp.suboption_device_id",
-		"pn_dcp.suboption_ip_ip",
-		"pn_io.opnum",
-		"pn_io.artype_req",
-		"pn_io.cminitiator_station_name",
-		"pn_io.cmresponder_station_name",
-		"pn_io.parameter_server_station_name",
-		"pn_io.iocr_type",
-		"pn_io.iocr_reference",
-		"pn_io.number_of_iocrs",
-		"pn_io.error_code",
-		"pn_io.error_decode",
-		"pn_io.error_code1",
-		"pn_io.error_code2",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, profinetDetailFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 3), safeTrim(parts, 4), safeTrim(parts, 2))
 		dst := firstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7), safeTrim(parts, 5))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "PROFINET" {

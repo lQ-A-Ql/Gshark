@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -99,5 +101,96 @@ func TestThreatHuntStreamsFromPacketStore(t *testing.T) {
 	}
 	if hits[1].PacketID != 0 {
 		t.Fatalf("expected anomaly hit aggregated at capture level, got %+v", hits[1])
+	}
+}
+
+func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
+	oldFilter := filterFrameIDsFn
+	t.Cleanup(func() {
+		filterFrameIDsFn = oldFilter
+	})
+
+	filterCalls := 0
+	filterFrameIDsFn = func(_ context.Context, opts model.ParseOptions) ([]int64, error) {
+		filterCalls++
+		if opts.FilePath != "demo.pcap" {
+			t.Fatalf("unexpected file path: %q", opts.FilePath)
+		}
+		if opts.DisplayFilter != "tcp.port == 443" {
+			t.Fatalf("unexpected display filter: %q", opts.DisplayFilter)
+		}
+		return []int64{2, 4}, nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "TCP", DestPort: 80, Info: "HTTP"},
+		{ID: 2, Protocol: "TLS", DestPort: 443, Info: "Client Hello"},
+		{ID: 3, Protocol: "UDP", DestPort: 53, Info: "DNS"},
+		{ID: 4, Protocol: "TLS", DestPort: 443, Info: "Application Data"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	page, next, total := svc.PacketsPage(0, 1, "tcp.port == 443")
+	if total != 2 {
+		t.Fatalf("expected 2 filtered packets, got %d", total)
+	}
+	if next != 1 {
+		t.Fatalf("expected next cursor 1, got %d", next)
+	}
+	if len(page) != 1 || page[0].ID != 2 {
+		t.Fatalf("expected packet #2, got %+v", page)
+	}
+
+	page, next, total = svc.PacketsPage(1, 1, "tcp.port == 443")
+	if total != 2 || next != 2 {
+		t.Fatalf("unexpected second page meta: total=%d next=%d", total, next)
+	}
+	if len(page) != 1 || page[0].ID != 4 {
+		t.Fatalf("expected packet #4, got %+v", page)
+	}
+
+	cursor, total, found := svc.PacketPageCursor(4, 1, "tcp.port == 443")
+	if !found {
+		t.Fatal("expected packet #4 to be found")
+	}
+	if total != 2 {
+		t.Fatalf("expected 2 filtered packets, got %d", total)
+	}
+	if cursor != 1 {
+		t.Fatalf("expected cursor 1 for packet #4, got %d", cursor)
+	}
+
+	if filterCalls != 1 {
+		t.Fatalf("expected tshark filter to be cached after first lookup, got %d calls", filterCalls)
+	}
+}
+
+func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testing.T) {
+	oldFilter := filterFrameIDsFn
+	t.Cleanup(func() {
+		filterFrameIDsFn = oldFilter
+	})
+
+	filterFrameIDsFn = func(context.Context, model.ParseOptions) ([]int64, error) {
+		return nil, errors.New("invalid display filter")
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
+		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	page, next, total := svc.PacketsPage(0, 10, "http")
+	if len(page) != 0 || next != 0 || total != 0 {
+		t.Fatalf("expected tshark failure to return an empty page, got page=%+v next=%d total=%d", page, next, total)
 	}
 }

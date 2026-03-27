@@ -239,6 +239,7 @@ export interface CANFrameSummary {
   identifier: string;
   busId: string;
   length: number;
+  rawData?: string;
   isExtended: boolean;
   isRTR: boolean;
   isError: boolean;
@@ -415,4 +416,43 @@ export interface VehicleAnalysis {
   doip: DoIPAnalysis;
   uds: UDSAnalysis;
   recommendations: string[];
+}
+
+export interface MediaArtifact {
+  token: string;
+  name: string;
+  codec?: string;
+  format?: string;
+  sizeBytes: number;
+}
+
+export interface MediaSession {
+  id: string;
+  family: string;
+  application: string;
+  source: string;
+  sourcePort: number;
+  destination: string;
+  destinationPort: number;
+  transport: string;
+  ssrc?: string;
+  payloadType?: string;
+  codec?: string;
+  clockRate?: number;
+  startTime?: string;
+  endTime?: string;
+  packetCount: number;
+  gapCount: number;
+  controlSummary?: string;
+  tags: string[];
+  notes: string[];
+  artifact?: MediaArtifact;
+}
+
+export interface MediaAnalysis {
+  totalMediaPackets: number;
+  protocols: TrafficBucket[];
+  applications: TrafficBucket[];
+  sessions: MediaSession[];
+  notes: string[];
 }

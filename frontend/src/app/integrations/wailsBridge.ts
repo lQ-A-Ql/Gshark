@@ -5,6 +5,7 @@ import type {
   ExtractedObject,
   HttpStream,
   IndustrialAnalysis,
+  MediaAnalysis,
   Packet,
   PluginItem,
   ThreatHit,
@@ -138,6 +139,8 @@ export interface BackendBridge {
   getGlobalTrafficStats(): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(): Promise<VehicleAnalysis>;
+  getMediaAnalysis(): Promise<MediaAnalysis>;
+  downloadMediaArtifact(token: string, filename: string): Promise<void>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
   addVehicleDBC(path: string): Promise<DBCProfile[]>;
   removeVehicleDBC(path: string): Promise<DBCProfile[]>;
@@ -313,6 +316,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail || `backend request failed: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as T;
+}
+
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, init);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const payload = await res.json();
+      if (payload && typeof payload.error === "string") {
+        detail = payload.error;
+      }
+    } catch {
+      // ignore invalid json error payload
+    }
+    throw new Error(detail || `backend request failed: ${res.status} ${res.statusText}`);
+  }
+  return await res.blob();
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function getDesktopAppBinding(): DesktopAppBinding | undefined {
@@ -708,18 +737,19 @@ export const bridge: BackendBridge = {
                 : [],
             }))
           : [],
-        frames: Array.isArray(payload.can?.frames)
-          ? payload.can.frames.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              identifier: String(item.identifier ?? ""),
-              busId: String(item.bus_id ?? ""),
-              length: Number(item.length ?? 0),
-              isExtended: Boolean(item.is_extended),
-              isRTR: Boolean(item.is_rtr),
-              isError: Boolean(item.is_error),
-              errorFlags: String(item.error_flags ?? "") || undefined,
-              summary: String(item.summary ?? ""),
+          frames: Array.isArray(payload.can?.frames)
+            ? payload.can.frames.map((item: any) => ({
+                packetId: Number(item.packet_id ?? 0),
+                time: String(item.time ?? ""),
+                identifier: String(item.identifier ?? ""),
+                busId: String(item.bus_id ?? ""),
+                length: Number(item.length ?? 0),
+                rawData: String(item.raw_data ?? "") || undefined,
+                isExtended: Boolean(item.is_extended),
+                isRTR: Boolean(item.is_rtr),
+                isError: Boolean(item.is_error),
+                errorFlags: String(item.error_flags ?? "") || undefined,
+                summary: String(item.summary ?? ""),
             }))
           : [],
       },
@@ -813,6 +843,53 @@ export const bridge: BackendBridge = {
         ? payload.recommendations.map((item: unknown) => String(item ?? ""))
         : [],
     };
+  },
+
+  async getMediaAnalysis() {
+    const payload = await request<any>("/api/analysis/media");
+    return {
+      totalMediaPackets: Number(payload.total_media_packets ?? 0),
+      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
+      applications: Array.isArray(payload.applications) ? payload.applications.map(asBucket) : [],
+      sessions: Array.isArray(payload.sessions)
+        ? payload.sessions.map((item: any) => ({
+            id: String(item.id ?? ""),
+            family: String(item.family ?? ""),
+            application: String(item.application ?? ""),
+            source: String(item.source ?? ""),
+            sourcePort: Number(item.source_port ?? 0),
+            destination: String(item.destination ?? ""),
+            destinationPort: Number(item.destination_port ?? 0),
+            transport: String(item.transport ?? ""),
+            ssrc: String(item.ssrc ?? "") || undefined,
+            payloadType: String(item.payload_type ?? "") || undefined,
+            codec: String(item.codec ?? "") || undefined,
+            clockRate: Number(item.clock_rate ?? 0) || undefined,
+            startTime: String(item.start_time ?? "") || undefined,
+            endTime: String(item.end_time ?? "") || undefined,
+            packetCount: Number(item.packet_count ?? 0),
+            gapCount: Number(item.gap_count ?? 0),
+            controlSummary: String(item.control_summary ?? "") || undefined,
+            tags: Array.isArray(item.tags) ? item.tags.map((tag: unknown) => String(tag ?? "")) : [],
+            notes: Array.isArray(item.notes) ? item.notes.map((note: unknown) => String(note ?? "")) : [],
+            artifact: item.artifact
+              ? {
+                  token: String(item.artifact.token ?? ""),
+                  name: String(item.artifact.name ?? ""),
+                  codec: String(item.artifact.codec ?? "") || undefined,
+                  format: String(item.artifact.format ?? "") || undefined,
+                  sizeBytes: Number(item.artifact.size_bytes ?? 0),
+                }
+              : undefined,
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
+    };
+  },
+
+  async downloadMediaArtifact(token: string, filename: string) {
+    const blob = await requestBlob(`/api/analysis/media/export?token=${encodeURIComponent(token)}`);
+    downloadBlob(filename, blob);
   },
 
   async listVehicleDBCProfiles() {

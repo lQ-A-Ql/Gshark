@@ -7,6 +7,48 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+var modbusAnalysisFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"tcp.srcport",
+	"udp.srcport",
+	"tcp.dstport",
+	"udp.dstport",
+	"mbtcp.trans_id",
+	"mbtcp.unit_id",
+	"modbus.func_code",
+	"modbus.request_frame",
+	"modbus.response_time",
+	"modbus.exception",
+	"modbus.exception_code",
+	"modbus.reference_num",
+	"modbus.reference_num_32",
+	"modbus.read_reference_num",
+	"modbus.write_reference_num",
+	"modbus.word_cnt",
+	"modbus.read_word_cnt",
+	"modbus.write_word_cnt",
+	"modbus.bit_cnt",
+	"modbus.byte_cnt",
+	"modbus.regnum16",
+	"modbus.regnum32",
+	"modbus.regval_uint16",
+	"modbus.regval_int16",
+	"modbus.regval_uint32",
+	"modbus.regval_int32",
+	"modbus.regval_float",
+	"modbus.object_str_value",
+}
+
 func BuildIndustrialAnalysisFromFile(filePath string) (model.IndustrialAnalysis, error) {
 	stats := model.IndustrialAnalysis{}
 	protocolMap := make(map[string]int)
@@ -60,49 +102,7 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 	referenceMap := make(map[string]int)
 	exceptionMap := make(map[string]int)
 
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"tcp.srcport",
-		"udp.srcport",
-		"tcp.dstport",
-		"udp.dstport",
-		"mbtcp.trans_id",
-		"mbtcp.unit_id",
-		"modbus.func_code",
-		"modbus.request_frame",
-		"modbus.response_time",
-		"modbus.exception",
-		"modbus.exception_code",
-		"modbus.reference_num",
-		"modbus.reference_num_32",
-		"modbus.read_reference_num",
-		"modbus.write_reference_num",
-		"modbus.word_cnt",
-		"modbus.read_word_cnt",
-		"modbus.write_word_cnt",
-		"modbus.bit_cnt",
-		"modbus.byte_cnt",
-		"modbus.regnum16",
-		"modbus.regnum32",
-		"modbus.regval_uint16",
-		"modbus.regval_int16",
-		"modbus.regval_uint32",
-		"modbus.regval_int32",
-		"modbus.regval_float",
-		"modbus.object_str_value",
-	}
-
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, modbusAnalysisFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		protoPath := safeTrim(parts, 8)
@@ -325,6 +325,24 @@ func industrialNotes(stats model.IndustrialAnalysis) []string {
 	if stats.Modbus.Exceptions > 0 {
 		notes = append(notes, "存在 Modbus 异常响应，建议优先核对异常码与对应寄存器地址。")
 	}
+	if hasBucketPrefix(stats.Modbus.FunctionCodes, "05 ") || hasBucketPrefix(stats.Modbus.FunctionCodes, "06 ") || hasBucketPrefix(stats.Modbus.FunctionCodes, "15 ") || hasBucketPrefix(stats.Modbus.FunctionCodes, "16 ") || hasBucketPrefix(stats.Modbus.FunctionCodes, "22 ") || hasBucketPrefix(stats.Modbus.FunctionCodes, "23 ") {
+		notes = append(notes, "已出现 Modbus 写类功能码，CTF 里常对应灯控、阀门、寄存器改值和自动模式切换。")
+	}
+	if hasDetailOperation(stats.Details, "S7comm", "Write Var") || hasDetailOperation(stats.Details, "S7comm", "Download") || hasDetailOperation(stats.Details, "S7comm", "Upload") {
+		notes = append(notes, "S7comm 已命中写块/下载/上传类操作，建议继续围绕 DB 块、偏移地址和十六进制负载找隐藏数据。")
+	}
+	if hasDetailOperation(stats.Details, "DNP3", "Operate") || hasDetailOperation(stats.Details, "DNP3", "Direct Operate") || hasDetailOperation(stats.Details, "DNP3", "Restart") {
+		notes = append(notes, "DNP3 已出现控制或重启语义，优先核对对象索引、控制状态和值字段，判断是否在模拟遥控命令。")
+	}
+	if hasDetailOperation(stats.Details, "BACnet", "Write Property") || hasDetailOperation(stats.Details, "BACnet", "Reinitialize Device") {
+		notes = append(notes, "BACnet 已出现写属性或设备重初始化，CTF 里常用来埋设备名、对象值或状态切换题。")
+	}
+	if hasDetailOperation(stats.Details, "IEC 104", "C_SC_NA_1") || hasDetailOperation(stats.Details, "IEC 104", "C_DC_NA_1") || hasDetailOperation(stats.Details, "IEC 104", "C_SE_NC_1") || hasDetailOperation(stats.Details, "IEC 104", "Clock Sync") {
+		notes = append(notes, "IEC 104 已出现控制/设点/时钟同步类 ASDU，建议重点核对 CauseTx、IOA 和取值是否构成异常调度。")
+	}
+	if hasDetailOperation(stats.Details, "PROFINET", "DCP Set") {
+		notes = append(notes, "PROFINET 已出现 DCP Set，建议重点看 station name、IP 配置或设备标识是否被重配。")
+	}
 	for _, detail := range stats.Details {
 		if detail.Name == "IEC 104" || detail.Name == "DNP3" {
 			notes = append(notes, "对遥测/遥控协议建议重点核对 CauseTx、对象地址、取值与否定位，识别误操作或伪造控制。")
@@ -335,6 +353,29 @@ func industrialNotes(stats model.IndustrialAnalysis) []string {
 		notes = append(notes, "当前抓包未识别到常见工控协议。")
 	}
 	return notes
+}
+
+func hasBucketPrefix(items []model.TrafficBucket, prefix string) bool {
+	for _, item := range items {
+		if strings.HasPrefix(item.Label, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDetailOperation(details []model.IndustrialProtocolDetail, protocolName, keyword string) bool {
+	for _, detail := range details {
+		if detail.Name != protocolName {
+			continue
+		}
+		for _, op := range detail.Operations {
+			if strings.Contains(strings.ToLower(op.Label), strings.ToLower(keyword)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func addConversationCount(target map[string]conversationCount, protocol, label string) {

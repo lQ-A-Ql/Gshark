@@ -7,73 +7,74 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+var vehicleAnalysisFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"can.id",
+	"can.len",
+	"can.bus_id",
+	"can.flags.rtr",
+	"can.flags.xtd",
+	"can.flags.err",
+	"can.err.ack",
+	"can.err.busoff",
+	"can.err.buserror",
+	"can.err.restarted",
+	"can.err.ctrl",
+	"can.err.prot",
+	"j1939.can_id",
+	"j1939.pgn",
+	"j1939.priority",
+	"j1939.src_addr",
+	"j1939.dst_addr",
+	"j1939.data",
+	"doip.type",
+	"doip.vin",
+	"doip.logical_address",
+	"doip.logical_address_name",
+	"doip.source_address",
+	"doip.source_address_name",
+	"doip.target_address",
+	"doip.target_address_name",
+	"doip.tester_logical_address",
+	"doip.tester_logical_address_name",
+	"doip.response_code",
+	"doip.diag_ack_code",
+	"doip.diag_nack_code",
+	"uds.sid",
+	"uds.reply",
+	"uds.subfunction",
+	"uds.diag_addr",
+	"uds.diag_addr_name",
+	"uds.diag_addr_source",
+	"uds.diag_addr_source_name",
+	"uds.diag_addr_target",
+	"uds.diag_addr_target_name",
+	"uds.err.sid",
+	"uds.err.code",
+	"uds.did_f190.vin",
+	"uds.rdtci.dtc_id",
+	"uds.rdtci.dtc_status",
+	"uds.rdbi.data_identifier",
+	"tcp.srcport",
+	"udp.srcport",
+	"tcp.dstport",
+	"udp.dstport",
+	"obdii.padding",
+	"data.data",
+}
+
 func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (model.VehicleAnalysis, error) {
 	stats := model.VehicleAnalysis{}
-
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"ip.src",
-		"ipv6.src",
-		"arp.src.proto_ipv4",
-		"ip.dst",
-		"ipv6.dst",
-		"arp.dst.proto_ipv4",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"can.id",
-		"can.len",
-		"can.bus_id",
-		"can.flags.rtr",
-		"can.flags.xtd",
-		"can.flags.err",
-		"can.err.ack",
-		"can.err.busoff",
-		"can.err.buserror",
-		"can.err.restarted",
-		"can.err.ctrl",
-		"can.err.prot",
-		"j1939.can_id",
-		"j1939.pgn",
-		"j1939.priority",
-		"j1939.src_addr",
-		"j1939.dst_addr",
-		"j1939.data",
-		"doip.type",
-		"doip.vin",
-		"doip.logical_address",
-		"doip.logical_address_name",
-		"doip.source_address",
-		"doip.source_address_name",
-		"doip.target_address",
-		"doip.target_address_name",
-		"doip.tester_logical_address",
-		"doip.tester_logical_address_name",
-		"doip.response_code",
-		"doip.diag_ack_code",
-		"doip.diag_nack_code",
-		"uds.sid",
-		"uds.reply",
-		"uds.subfunction",
-		"uds.diag_addr",
-		"uds.diag_addr_name",
-		"uds.diag_addr_source",
-		"uds.diag_addr_source_name",
-		"uds.diag_addr_target",
-		"uds.diag_addr_target_name",
-		"uds.err.sid",
-		"uds.err.code",
-		"uds.did_f190.vin",
-		"uds.rdtci.dtc_id",
-		"uds.rdtci.dtc_status",
-		"uds.rdbi.data_identifier",
-		"tcp.srcport",
-		"udp.srcport",
-		"tcp.dstport",
-		"udp.dstport",
-		"obdii.padding",
-	}
 
 	protocolMap := make(map[string]int)
 	conversationMap := make(map[string]conversationCount)
@@ -91,7 +92,7 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 	udsVINMap := make(map[string]int)
 	udsEvents := make([]udsEvent, 0, 128)
 
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, vehicleAnalysisFields, func(parts []string) {
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		protoPath := safeTrim(parts, 8)
@@ -102,6 +103,7 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 		tcpDstPort := safeTrim(parts, 59)
 		udpDstPort := safeTrim(parts, 60)
 		obdPadding := safeTrim(parts, 61)
+		rawCANData := normalizeHexBytes(safeTrim(parts, 62))
 
 		protocols := detectVehicleProtocols(
 			protoPath,
@@ -158,6 +160,7 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 				Identifier: messageID,
 				BusID:      busID,
 				Length:     parseInt(safeTrim(parts, 12)),
+				RawData:    rawCANData,
 				IsExtended: parseTruthy(safeTrim(parts, 15)),
 				IsRTR:      parseTruthy(safeTrim(parts, 14)),
 				IsError:    parseTruthy(safeTrim(parts, 16)),
@@ -336,8 +339,14 @@ func detectVehicleProtocols(protoPath, displayProto, canID, j1939PGN, doipType, 
 	if doipType != "" || strings.Contains(all, "doip") || srcPort == "13400" || dstPort == "13400" {
 		add("DoIP")
 	}
+	if strings.Contains(all, "xcp") {
+		add("XCP")
+	}
 	if udsSID != "" || strings.Contains(all, "uds") {
 		add("UDS")
+	}
+	if strings.Contains(all, "kwp") || strings.Contains(all, "kwp2000") {
+		add("KWP2000")
 	}
 	if obdPadding != "" || strings.Contains(all, "obdii") {
 		add("OBD-II")
@@ -477,8 +486,26 @@ func vehicleRecommendations(stats model.VehicleAnalysis) []string {
 	if stats.UDS.TotalMessages > 0 {
 		recommendations = append(recommendations, "UDS 场景优先关注 SID 0x10/0x27/0x31/0x34/0x36/0x37 以及负响应码，识别会话切换、鉴权、刷写与例程调用。")
 	}
+	if containsBucketPrefix(stats.UDS.ServiceIDs, "0X22 ") {
+		recommendations = append(recommendations, "已看到 ReadDataByIdentifier，CTF 里经常会把 VIN、隐藏 DID、密钥材料或 flag 放在特定 DID 里。")
+	}
+	if containsBucketPrefix(stats.UDS.ServiceIDs, "0X27 ") {
+		recommendations = append(recommendations, "已命中 Security Access，建议重点核对 GET SEED / SEND KEY 顺序、种子长度和失败后的负响应码。")
+	}
+	if containsBucketPrefix(stats.UDS.ServiceIDs, "0X2E ") || containsBucketPrefix(stats.UDS.ServiceIDs, "0X2F ") {
+		recommendations = append(recommendations, "存在 UDS 写类或 IO 控制类服务，优先判断是否在修改车辆状态位、执行器或诊断配置。")
+	}
+	if containsBucketPrefix(stats.UDS.ServiceIDs, "0X34 ") || containsBucketPrefix(stats.UDS.ServiceIDs, "0X36 ") || containsBucketPrefix(stats.UDS.ServiceIDs, "0X37 ") {
+		recommendations = append(recommendations, "已出现刷写链路相关服务，请继续围绕下载请求、分块传输和传输结束定位固件、脚本或 flag。")
+	}
 	if containsBucket(stats.Protocols, "OBD-II") {
 		recommendations = append(recommendations, "若存在 OBD-II，可继续补 PID 级解析，区分排放监测、实时参数读取与故障码读取。")
+	}
+	if containsBucket(stats.Protocols, "XCP") {
+		recommendations = append(recommendations, "已命中 XCP，CTF 中常考 GET_SEED / UNLOCK、标定区读写、DAQ 采集和 DOWNLOAD/UPLOAD。")
+	}
+	if containsBucket(stats.Protocols, "KWP2000") {
+		recommendations = append(recommendations, "已命中 KWP2000，建议沿着会话切换、Security Access、ReadDataByIdentifier 和 Routine Control 继续展开。")
 	}
 	if containsBucket(stats.CAN.PayloadProtocols, "CANopen") {
 		recommendations = append(recommendations, "CANopen 已命中，建议优先看 PDO/SDO/EMCY，核对对象字典索引与节点状态切换。")
@@ -501,6 +528,15 @@ func vehicleRecommendations(stats model.VehicleAnalysis) []string {
 func containsBucket(items []model.TrafficBucket, label string) bool {
 	for _, item := range items {
 		if item.Label == label {
+			return true
+		}
+	}
+	return false
+}
+
+func containsBucketPrefix(items []model.TrafficBucket, prefix string) bool {
+	for _, item := range items {
+		if strings.HasPrefix(item.Label, prefix) {
 			return true
 		}
 	}

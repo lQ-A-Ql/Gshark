@@ -386,7 +386,7 @@ export default function Workspace() {
               if (event.key === "Enter") applyFilterWithHistory();
             }}
             className="flex-1 border-none bg-transparent px-3 py-1 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
-            placeholder="例如: http and http.request.method == POST"
+            placeholder={'例如: http.request.method == "POST" and ip.addr == 192.168.1.10'}
           />
           <datalist id="gshark-filter-suggestions">
             {filterSuggestions.map((item) => (
@@ -422,7 +422,7 @@ export default function Workspace() {
         </button>
       </div>
       <div className="border-b border-border bg-accent/20 px-3 py-1 text-[11px] text-muted-foreground shrink-0">
-        过滤提示范围: 协议(http/tcp/udp/dns/tls/arp/icmp) | 字段(ip.src/ip.dst/ip.addr/tcp.port/udp.port/http.*) | 比较(==, !=, gt, lt, contains) | 组合(and/or/not)
+        {'过滤器已切换为 tshark display filter 原生语法，支持 "http.request"、"tcp.stream eq 3"、"frame.number >= 100"、"ip.addr == 192.168.1.10" 等表达式。'}
       </div>
 
       {isPreloadingCapture && (

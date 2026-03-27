@@ -233,6 +233,7 @@ type CANFrameSummary struct {
 	Identifier string `json:"identifier"`
 	BusID      string `json:"bus_id"`
 	Length     int    `json:"length"`
+	RawData    string `json:"raw_data,omitempty"`
 	IsExtended bool   `json:"is_extended"`
 	IsRTR      bool   `json:"is_rtr"`
 	IsError    bool   `json:"is_error"`
@@ -409,4 +410,43 @@ type VehicleAnalysis struct {
 	DoIP                DoIPAnalysis           `json:"doip"`
 	UDS                 UDSAnalysis            `json:"uds"`
 	Recommendations     []string               `json:"recommendations"`
+}
+
+type MediaArtifact struct {
+	Token     string `json:"token"`
+	Name      string `json:"name"`
+	Codec     string `json:"codec,omitempty"`
+	Format    string `json:"format,omitempty"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+type MediaSession struct {
+	ID              string         `json:"id"`
+	Family          string         `json:"family"`
+	Application     string         `json:"application"`
+	Source          string         `json:"source"`
+	SourcePort      int            `json:"source_port"`
+	Destination     string         `json:"destination"`
+	DestinationPort int            `json:"destination_port"`
+	Transport       string         `json:"transport"`
+	SSRC            string         `json:"ssrc,omitempty"`
+	PayloadType     string         `json:"payload_type,omitempty"`
+	Codec           string         `json:"codec,omitempty"`
+	ClockRate       int            `json:"clock_rate,omitempty"`
+	StartTime       string         `json:"start_time,omitempty"`
+	EndTime         string         `json:"end_time,omitempty"`
+	PacketCount     int            `json:"packet_count"`
+	GapCount        int            `json:"gap_count"`
+	ControlSummary  string         `json:"control_summary,omitempty"`
+	Tags            []string       `json:"tags,omitempty"`
+	Notes           []string       `json:"notes,omitempty"`
+	Artifact        *MediaArtifact `json:"artifact,omitempty"`
+}
+
+type MediaAnalysis struct {
+	TotalMediaPackets int             `json:"total_media_packets"`
+	Protocols         []TrafficBucket `json:"protocols"`
+	Applications      []TrafficBucket `json:"applications"`
+	Sessions          []MediaSession  `json:"sessions"`
+	Notes             []string        `json:"notes"`
 }

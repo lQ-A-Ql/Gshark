@@ -16,6 +16,7 @@ type packetStore struct {
 	mu      sync.RWMutex
 	path    string
 	offsets []int64
+	byID    map[int64]int64
 	size    int64
 }
 
@@ -34,6 +35,7 @@ func (s *packetStore) Reset() error {
 	oldPath := s.path
 	s.path = ""
 	s.offsets = nil
+	s.byID = make(map[int64]int64)
 	s.size = 0
 
 	tmp, err := os.CreateTemp("", "gshark-packets-*.jsonl")
@@ -60,6 +62,7 @@ func (s *packetStore) Close() error {
 	path := s.path
 	s.path = ""
 	s.offsets = nil
+	s.byID = nil
 	s.size = 0
 	if path == "" {
 		return nil
@@ -103,6 +106,7 @@ func (s *packetStore) Append(packets []model.Packet) error {
 			return fmt.Errorf("marshal packet: %w", err)
 		}
 		s.offsets = append(s.offsets, pos)
+		s.byID[packet.ID] = pos
 
 		n, err := writer.Write(row)
 		if err != nil {
@@ -231,6 +235,69 @@ func (s *packetStore) directPage(cursor, limit int) ([]model.Packet, int, int, e
 	return items, end, total, nil
 }
 
+func (s *packetStore) PageByIDs(ids []int64, cursor, limit int) ([]model.Packet, int, int, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > 5000 {
+		limit = 5000
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+
+	path, byID := s.snapshotByID()
+	total := len(ids)
+	if path == "" || total == 0 {
+		return []model.Packet{}, 0, 0, nil
+	}
+	if cursor >= total {
+		return []model.Packet{}, total, total, nil
+	}
+
+	end := cursor + limit
+	if end > total {
+		end = total
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("open packet store reader: %w", err)
+	}
+	defer f.Close()
+
+	items := make([]model.Packet, 0, end-cursor)
+	for _, id := range ids[cursor:end] {
+		offset, ok := byID[id]
+		if !ok {
+			continue
+		}
+		packet, err := readStoredPacket(f, offset)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		items = append(items, packet)
+	}
+	return items, end, total, nil
+}
+
+func (s *packetStore) ExistingIDs(ids []int64) []int64 {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, byID := s.snapshotByID()
+	if len(byID) == 0 {
+		return nil
+	}
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := byID[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func (s *packetStore) snapshot() (string, []int64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -238,6 +305,17 @@ func (s *packetStore) snapshot() (string, []int64) {
 	offsets := make([]int64, len(s.offsets))
 	copy(offsets, s.offsets)
 	return s.path, offsets
+}
+
+func (s *packetStore) snapshotByID() (string, map[int64]int64) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	byID := make(map[int64]int64, len(s.byID))
+	for id, offset := range s.byID {
+		byID[id] = offset
+	}
+	return s.path, byID
 }
 
 func readStoredPacket(file *os.File, offset int64) (model.Packet, error) {

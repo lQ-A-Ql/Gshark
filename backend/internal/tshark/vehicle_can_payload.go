@@ -8,52 +8,52 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
-func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CANPayloadRecord, error) {
-	fields := []string{
-		"frame.number",
-		"frame.time_epoch",
-		"frame.protocols",
-		"_ws.col.Protocol",
-		"_ws.col.Info",
-		"can.bus_id",
-		"can.id",
-		"can.len",
-		"data.data",
-		"iso15765.address",
-		"iso15765.target_address",
-		"iso15765.source_address",
-		"iso15765.message_type",
-		"iso15765.data_length_8bit",
-		"iso15765.data_length_4bit",
-		"iso15765.frame_length_32bit",
-		"iso15765.frame_length_12bit",
-		"iso15765.sequence_number",
-		"iso15765.flow_status",
-		"iso15765.flow_control.bs",
-		"iso15765.flow_control.stmin",
-		"iso15765.segment_data",
-		"uds.sid",
-		"uds.subfunction",
-		"uds.reply",
-		"uds.err.code",
-		"uds.rdbi.data_identifier",
-		"uds.rdtci.dtc_id",
-		"obdii.padding",
-		"canopen.cob_id",
-		"canopen.function_code",
-		"canopen.node_id",
-		"canopen.pdo.data.bytes",
-		"canopen.sdo.main_idx",
-		"canopen.sdo.sub_idx",
-		"canopen.sdo.data.bytes",
-		"canopen.em.err_code",
-		"canopen.sdo.abort_code",
-	}
+var canPayloadAnalysisFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"frame.protocols",
+	"_ws.col.Protocol",
+	"_ws.col.Info",
+	"can.bus_id",
+	"can.id",
+	"can.len",
+	"data.data",
+	"iso15765.address",
+	"iso15765.target_address",
+	"iso15765.source_address",
+	"iso15765.message_type",
+	"iso15765.data_length_8bit",
+	"iso15765.data_length_4bit",
+	"iso15765.frame_length_32bit",
+	"iso15765.frame_length_12bit",
+	"iso15765.sequence_number",
+	"iso15765.flow_status",
+	"iso15765.flow_control.bs",
+	"iso15765.flow_control.stmin",
+	"iso15765.segment_data",
+	"uds.sid",
+	"uds.subfunction",
+	"uds.reply",
+	"uds.err.code",
+	"uds.rdbi.data_identifier",
+	"uds.rdtci.dtc_id",
+	"obdii.padding",
+	"canopen.cob_id",
+	"canopen.function_code",
+	"canopen.node_id",
+	"canopen.pdo.data.bytes",
+	"canopen.sdo.main_idx",
+	"canopen.sdo.sub_idx",
+	"canopen.sdo.data.bytes",
+	"canopen.em.err_code",
+	"canopen.sdo.abort_code",
+}
 
+func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CANPayloadRecord, error) {
 	protocolMap := make(map[string]int)
 	records := make([]model.CANPayloadRecord, 0, 128)
 
-	err := scanFieldRows(filePath, fields, func(parts []string) {
+	err := scanFieldRows(filePath, canPayloadAnalysisFields, func(parts []string) {
 		protoPath := strings.ToLower(safeTrim(parts, 2))
 		displayProto := strings.ToLower(safeTrim(parts, 3))
 		info := safeTrim(parts, 4)

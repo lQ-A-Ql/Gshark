@@ -134,6 +134,17 @@ func TestParsePacketFromEK_PreservesDisplayProtocol(t *testing.T) {
 	}
 }
 
+func TestParsePacketFromEK_UsesFrameNumberWhenAvailable(t *testing.T) {
+	line := `{"layers":{"frame":{"frame_number":"42","frame_protocols":"eth:ip:tcp","frame_len":"96","frame_time_epoch":"1700000000.123"},"ip":{"ip_src":"192.168.1.10","ip_dst":"10.0.0.5"},"tcp":{"tcp_srcport":"50000","tcp_dstport":"443"},"_ws":{"col":{"Protocol":"TCP","info":"Client Hello"}}}}`
+	pkt, err := ParsePacketFromEK(line, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pkt.ID != 42 {
+		t.Fatalf("expected packet ID 42 from frame.number, got %d", pkt.ID)
+	}
+}
+
 func TestParseFastListLine_PreservesDisplayProtocol(t *testing.T) {
 	parts := make([]string, 64)
 	parts[0] = "5"

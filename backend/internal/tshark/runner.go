@@ -223,6 +223,10 @@ func ParsePacketFromEK(line string, id int64) (model.Packet, error) {
 		findIntByPath(node, "layers.frame.frame_len"),
 		findIntBySuffix(layers, "framelen"),
 	)
+	frameNumber := pickFirstInt(
+		findIntByPath(node, "layers.frame.frame_number"),
+		findIntBySuffix(layers, "framenumber"),
+	)
 
 	timestamp := normalizeTimestamp(pickFirstString(
 		findStringByPath(node, "layers.frame.frame_time_epoch"),
@@ -274,7 +278,7 @@ func ParsePacketFromEK(line string, id int64) (model.Packet, error) {
 	}
 
 	packet := model.Packet{
-		ID:              id,
+		ID:              firstNonZeroInt64(int64(frameNumber), id),
 		Timestamp:       timestamp,
 		SourceIP:        sourceIP,
 		SourcePort:      sourcePort,
@@ -380,6 +384,15 @@ func ParsePacketFromEK(line string, id int64) (model.Packet, error) {
 		},
 	}
 	return packet, nil
+}
+
+func firstNonZeroInt64(values ...int64) int64 {
+	for _, v := range values {
+		if v != 0 {
+			return v
+		}
+	}
+	return 0
 }
 
 func StreamPackets(ctx context.Context, opts model.ParseOptions, onPacket func(model.Packet) error, onProgress func(processed int)) error {
