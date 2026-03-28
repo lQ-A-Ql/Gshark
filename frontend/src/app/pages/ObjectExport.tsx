@@ -3,7 +3,7 @@ import { FileDown, FileText, Image as ImageIcon, Archive, FileQuestion, Download
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
-import { bridge } from "../integrations/wailsBridge";
+import { bridge, getBackendAuthHeaders } from "../integrations/wailsBridge";
 import type { ExtractedObject } from "../core/types";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -90,10 +90,12 @@ export default function ObjectExport() {
   const downloadZip = async (ids: number[]) => {
     if (ids.length === 0) return;
     try {
+      const body = JSON.stringify({ ids });
+      const headers = await getBackendAuthHeaders("/api/objects/download", { "Content-Type": "application/json" }, body);
       const resp = await fetch(`${BACKEND_URL}/api/objects/download`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        headers,
+        body,
       });
       if (!resp.ok) throw new Error("Download failed");
       const blob = await resp.blob();

@@ -133,3 +133,102 @@ func TestReassembleRawStream(t *testing.T) {
 		t.Errorf("expected second chunk direction 'server', got %q", stream.Chunks[1].Direction)
 	}
 }
+
+func TestReassembleHTTPStreamFromIterate(t *testing.T) {
+	packets := []model.Packet{
+		{ID: 1, StreamID: 7, Protocol: "HTTP", SourceIP: "192.168.1.2", SourcePort: 54321, DestIP: "10.0.0.9", DestPort: 80, Info: "GET / HTTP/1.1", Payload: "GET / HTTP/1.1"},
+		{ID: 2, StreamID: 7, Protocol: "HTTP", SourceIP: "10.0.0.9", SourcePort: 80, DestIP: "192.168.1.2", DestPort: 54321, Info: "HTTP/1.1 200 OK", Payload: "HTTP/1.1 200 OK"},
+	}
+
+	stream := ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
+		for _, packet := range packets {
+			if err := fn(packet); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, 7)
+
+	if len(stream.Chunks) != 2 {
+		t.Fatalf("expected 2 http chunks, got %d", len(stream.Chunks))
+	}
+	if stream.Chunks[0].Direction != "client" || stream.Chunks[1].Direction != "server" {
+		t.Fatalf("unexpected http chunk directions: %+v", stream.Chunks)
+	}
+}
+
+func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
+	previous := rawStreamFromFileFn
+	t.Cleanup(func() {
+		rawStreamFromFileFn = previous
+	})
+
+	svc := NewService(nil, nil)
+	svc.pcap = "capture.pcapng"
+
+	called := 0
+	rawStreamFromFileFn = func(filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
+		called++
+		return model.ReassembledStream{
+			StreamID: streamID,
+			Protocol: protocol,
+			From:     "192.168.1.10",
+			To:       "10.0.0.5",
+			Chunks: []model.StreamChunk{
+				{PacketID: 42, Direction: "client", Body: "61:62:63"},
+			},
+		}, nil
+	}
+
+	stream := svc.RawStream("TCP", 7)
+	if called != 1 {
+		t.Fatalf("expected follow-stream fallback to be called once, got %d", called)
+	}
+	if len(stream.Chunks) != 1 {
+		t.Fatalf("expected 1 chunk from follow-stream result, got %d", len(stream.Chunks))
+	}
+	if stream.Chunks[0].Body != "61:62:63" {
+		t.Fatalf("unexpected stream chunk body: %q", stream.Chunks[0].Body)
+	}
+}
+
+func TestExtractPacketTransportPayloadFromRawIPv4TCP(t *testing.T) {
+	packet := model.Packet{
+		SourceIP:    "192.168.1.10",
+		DestIP:      "10.0.0.5",
+		Protocol:    "TCP",
+		IPHeaderLen: 20,
+		L4HeaderLen: 20,
+		RawHex:      "00112233445566778899aabb08004500002d0001000040060000c0a8010a0a000005c35000500000000100000001501820000000000068656c6c6f",
+	}
+
+	got := extractPacketTransportPayload(packet)
+	if got != "68:65:6c:6c:6f" {
+		t.Fatalf("expected tcp payload hex, got %q", got)
+	}
+}
+
+func TestRawStreamPageSlicesIndexedStream(t *testing.T) {
+	svc := NewService(nil, nil)
+	svc.rawStreamIndex = map[string]model.ReassembledStream{
+		"TCP:7": {
+			StreamID: 7,
+			Protocol: "TCP",
+			From:     "192.168.1.10",
+			To:       "10.0.0.5",
+			Chunks: []model.StreamChunk{
+				{PacketID: 1, Direction: "client", Body: "61"},
+				{PacketID: 2, Direction: "server", Body: "62"},
+				{PacketID: 3, Direction: "client", Body: "63"},
+			},
+		},
+	}
+
+	stream, next, total := svc.RawStreamPage("TCP", 7, 1, 1)
+	if total != 3 || next != 2 {
+		t.Fatalf("unexpected page metadata total=%d next=%d", total, next)
+	}
+	if len(stream.Chunks) != 1 || stream.Chunks[0].PacketID != 2 {
+		t.Fatalf("unexpected paged chunks: %+v", stream.Chunks)
+	}
+}

@@ -185,3 +185,240 @@ func TestUpdateSourcePersistsEntryAndLogic(t *testing.T) {
 		t.Fatalf("expected updated logic content, got %q", source.LogicContent)
 	}
 }
+
+func TestUpdateSourcePersistsCapabilities(t *testing.T) {
+	dir := t.TempDir()
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	updated, err := manager.UpdateSource(model.PluginSource{
+		ID:            "capability-demo",
+		ConfigContent: `{"id":"capability-demo","name":"Capability Demo","version":"1.0.1","tag":"custom","author":"tester","enabled":true,"entry":"capability-demo.js","capabilities":["logging","packet.read","packet.read","unknown"]}`,
+		LogicContent:  "export function onPacket() {}\n",
+		Entry:         "capability-demo.js",
+	})
+	if err != nil {
+		t.Fatalf("UpdateSource() error = %v", err)
+	}
+	if updated.Entry != "capability-demo.js" {
+		t.Fatalf("unexpected updated source: %+v", updated)
+	}
+
+	plugins := manager.List()
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+	if got := strings.Join(plugins[0].Capabilities, ","); got != "logging,packet.read" {
+		t.Fatalf("unexpected capabilities %q", got)
+	}
+
+	source, err := manager.Source("capability-demo")
+	if err != nil {
+		t.Fatalf("Source() error = %v", err)
+	}
+	if !strings.Contains(source.ConfigContent, `"capabilities": [`) {
+		t.Fatalf("expected capabilities to be persisted, got %q", source.ConfigContent)
+	}
+}
+
+func TestAddRejectsEscapingEntry(t *testing.T) {
+	dir := t.TempDir()
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	_, err := manager.Add(RulePlugin{
+		ID:      "unsafe-demo",
+		Name:    "Unsafe Demo",
+		Version: "1.0.0",
+		Tag:     "custom",
+		Author:  "tester",
+		Enabled: true,
+		Entry:   "../escape.py",
+	})
+	if err == nil {
+		t.Fatal("expected Add() to reject escaping entry")
+	}
+}
+
+func TestUpdateSourceRejectsEscapingPaths(t *testing.T) {
+	dir := t.TempDir()
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	outside := filepath.Join(filepath.Dir(dir), "escape.py")
+	_, err := manager.UpdateSource(model.PluginSource{
+		ID:            "unsafe-editor",
+		ConfigContent: `{"id":"unsafe-editor","name":"Unsafe","version":"1.0.0","tag":"custom","author":"tester","enabled":true,"entry":"unsafe-editor.py"}`,
+		LogicPath:     outside,
+		LogicContent:  "print('escape')\n",
+		Entry:         "unsafe-editor.py",
+	})
+	if err == nil {
+		t.Fatal("expected UpdateSource() to reject escaping logic path")
+	}
+	if _, statErr := os.Stat(outside); !os.IsNotExist(statErr) {
+		t.Fatalf("expected outside file to stay untouched, stat error = %v", statErr)
+	}
+}
+
+func TestRunEnabledPacketPluginsTimesOutHungJS(t *testing.T) {
+	t.Setenv("GSHARK_PLUGIN_TIMEOUT_MS", "50")
+
+	dir := t.TempDir()
+	logicPath := filepath.Join(dir, "hung.js")
+	source := `export function onPacket() {
+  while (true) {}
+}`
+	if err := os.WriteFile(logicPath, []byte(source), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	runner := manager.NewPacketPluginRunner()
+	if runner == nil {
+		t.Fatal("expected runner to be created")
+	}
+	runner.ProcessBatch([]model.Packet{{ID: 1, Info: "test"}})
+	hits := runner.Close(1)
+	if len(hits) != 0 {
+		t.Fatalf("expected no hits from timed out plugin, got %+v", hits)
+	}
+	if warnings := strings.Join(runner.Warnings(), "\n"); !strings.Contains(warnings, "exceeded timeout") {
+		t.Fatalf("expected timeout warning, got %q", warnings)
+	}
+}
+
+func TestRunEnabledPacketPluginsTimesOutHungPython(t *testing.T) {
+	if _, err := resolvePythonCommand(); err != nil {
+		t.Skip("python is not available in test environment")
+	}
+	t.Setenv("GSHARK_PLUGIN_TIMEOUT_MS", "50")
+
+	dir := t.TempDir()
+	logicPath := filepath.Join(dir, "hung.py")
+	source := `import sys
+import time
+
+for _ in sys.stdin:
+    pass
+
+time.sleep(1)
+`
+	if err := os.WriteFile(logicPath, []byte(source), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	runner := manager.NewPacketPluginRunner()
+	if runner == nil {
+		t.Fatal("expected runner to be created")
+	}
+	runner.ProcessBatch([]model.Packet{{ID: 1, Info: "test"}})
+	hits := runner.Close(1)
+	if len(hits) != 0 {
+		t.Fatalf("expected no hits from timed out plugin, got %+v", hits)
+	}
+	if warnings := strings.Join(runner.Warnings(), "\n"); !strings.Contains(warnings, "exceeded timeout") {
+		t.Fatalf("expected timeout warning, got %q", warnings)
+	}
+}
+
+func TestRunEnabledPacketPluginsEnforcesThreatEmitCapability(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "limited.json")
+	logicPath := filepath.Join(dir, "limited.js")
+
+	if err := os.WriteFile(configPath, []byte(`{
+  "id": "limited",
+  "name": "Limited",
+  "version": "1.0.0",
+  "tag": "custom",
+  "author": "tester",
+  "enabled": true,
+  "entry": "limited.js",
+  "capabilities": ["packet.read"]
+}
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	if err := os.WriteFile(logicPath, []byte(`export function onPacket(packet, ctx) {
+  ctx.emitHit({
+    packetId: packet.id,
+    category: "CTF",
+    rule: "limited",
+    level: "high",
+    preview: "blocked",
+    match: "blocked"
+  });
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile(logic) error = %v", err)
+	}
+
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	runner := manager.NewPacketPluginRunner()
+	if runner == nil {
+		t.Fatal("expected runner to be created")
+	}
+	runner.ProcessBatch([]model.Packet{{ID: 1, Info: "flag{test}"}})
+	hits := runner.Close(1)
+	if len(hits) != 0 {
+		t.Fatalf("expected capability-gated plugin to emit no hits, got %+v", hits)
+	}
+	if warnings := strings.Join(runner.Warnings(), "\n"); !strings.Contains(warnings, "threat.emit") {
+		t.Fatalf("expected capability warning, got %q", warnings)
+	}
+}
+
+func TestRunEnabledPacketPluginsRequiresPacketReadCapability(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "broken.json")
+	logicPath := filepath.Join(dir, "broken.js")
+
+	if err := os.WriteFile(configPath, []byte(`{
+  "id": "broken",
+  "name": "Broken",
+  "version": "1.0.0",
+  "tag": "custom",
+  "author": "tester",
+  "enabled": true,
+  "entry": "broken.js",
+  "capabilities": ["threat.emit"]
+}
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	if err := os.WriteFile(logicPath, []byte(`export function onPacket() {}`), 0o644); err != nil {
+		t.Fatalf("WriteFile(logic) error = %v", err)
+	}
+
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	runner := manager.NewPacketPluginRunner()
+	if runner == nil {
+		t.Fatal("expected runner to be created with warning")
+	}
+	if warnings := strings.Join(runner.Warnings(), "\n"); !strings.Contains(warnings, "packet.read") {
+		t.Fatalf("expected missing packet.read warning, got %q", warnings)
+	}
+}

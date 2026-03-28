@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -33,7 +35,7 @@ func main() {
 }
 
 func runServe(args []string) {
-	addr := ":17891"
+	addr := "127.0.0.1:17891"
 	if len(args) > 0 && args[0] != "" {
 		addr = args[0]
 	}
@@ -47,6 +49,11 @@ func runServe(args []string) {
 
 	svc := engine.NewService(hub, pm)
 	server := transport.NewServer(svc, hub)
+	token, err := resolveBackendAuthToken()
+	if err != nil {
+		log.Fatal(err)
+	}
+	server.SetAuthToken(token)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -105,4 +112,19 @@ func usage() {
 func printJSON(name string, v any) {
 	payload, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Printf("%s:\n%s\n", name, string(payload))
+}
+
+func resolveBackendAuthToken() (string, error) {
+	token := os.Getenv("GSHARK_BACKEND_TOKEN")
+	if token != "" {
+		return token, nil
+	}
+
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate backend auth token: %w", err)
+	}
+	token = hex.EncodeToString(buf)
+	log.Printf("sentinel backend auth token generated for this session")
+	return token, nil
 }

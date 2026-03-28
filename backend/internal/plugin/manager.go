@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -13,13 +14,14 @@ import (
 )
 
 type RulePlugin struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Tag     string `json:"tag"`
-	Author  string `json:"author"`
-	Enabled bool   `json:"enabled"`
-	Entry   string `json:"entry,omitempty"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Tag          string   `json:"tag"`
+	Author       string   `json:"author"`
+	Enabled      bool     `json:"enabled"`
+	Entry        string   `json:"entry,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 type Manager struct {
@@ -30,6 +32,18 @@ type Manager struct {
 	entries     map[string]string
 	baseDir     string
 }
+
+var pluginIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
+var allowedPluginCapabilities = map[string]struct{}{
+	"packet.read":   {},
+	"threat.emit":   {},
+	"logging":       {},
+	"finish.hook":   {},
+	"metadata.read": {},
+}
+
+var defaultPluginCapabilities = []string{"finish.hook", "logging", "packet.read", "threat.emit"}
 
 func NewManager() *Manager {
 	return &Manager{
@@ -46,9 +60,14 @@ func (m *Manager) LoadFromDir(dir string) error {
 		return fmt.Errorf("read plugins dir: %w", err)
 	}
 
+	baseDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve plugins dir: %w", err)
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.baseDir = dir
+	m.baseDir = baseDir
 	m.plugins = map[string]model.Plugin{}
 	m.pluginFiles = map[string]string{}
 	m.logicFiles = map[string]string{}
@@ -74,7 +93,7 @@ func (m *Manager) LoadFromDir(dir string) error {
 		if rule.ID == "" {
 			rule.ID = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		}
-		if rule.ID == "" {
+		if err := validatePluginID(rule.ID); err != nil {
 			continue
 		}
 		configs[rule.ID] = normalizeRulePlugin(rule)
@@ -88,7 +107,7 @@ func (m *Manager) LoadFromDir(dir string) error {
 
 		id := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		logicPath := filepath.Join(dir, entry.Name())
-		if id == "" {
+		if err := validatePluginID(id); err != nil {
 			continue
 		}
 
@@ -109,14 +128,15 @@ func (m *Manager) LoadFromDir(dir string) error {
 		}
 
 		m.plugins[id] = model.Plugin{
-			ID:      rule.ID,
-			Name:    rule.Name,
-			Version: rule.Version,
-			Tag:     rule.Tag,
-			Author:  rule.Author,
-			Enabled: rule.Enabled,
-			Entry:   rule.Entry,
-			Runtime: pluginRuntimeFromPaths(rule.Entry, logicPath),
+			ID:           rule.ID,
+			Name:         rule.Name,
+			Version:      rule.Version,
+			Tag:          rule.Tag,
+			Author:       rule.Author,
+			Enabled:      rule.Enabled,
+			Entry:        rule.Entry,
+			Runtime:      pluginRuntimeFromPaths(rule.Entry, logicPath),
+			Capabilities: normalizePluginCapabilities(rule.Capabilities),
 		}
 		m.logicFiles[id] = logicPath
 		m.entries[id] = rule.Entry
@@ -127,14 +147,15 @@ func (m *Manager) LoadFromDir(dir string) error {
 			continue
 		}
 		m.plugins[id] = model.Plugin{
-			ID:      rule.ID,
-			Name:    rule.Name,
-			Version: rule.Version,
-			Tag:     rule.Tag,
-			Author:  rule.Author,
-			Enabled: rule.Enabled,
-			Entry:   rule.Entry,
-			Runtime: pluginRuntimeFromPaths(rule.Entry, m.logicFiles[id]),
+			ID:           rule.ID,
+			Name:         rule.Name,
+			Version:      rule.Version,
+			Tag:          rule.Tag,
+			Author:       rule.Author,
+			Enabled:      rule.Enabled,
+			Entry:        rule.Entry,
+			Runtime:      pluginRuntimeFromPaths(rule.Entry, m.logicFiles[id]),
+			Capabilities: normalizePluginCapabilities(rule.Capabilities),
 		}
 		m.entries[id] = rule.Entry
 	}
@@ -147,8 +168,8 @@ func (m *Manager) Add(rule RulePlugin) (model.Plugin, error) {
 	defer m.mu.Unlock()
 
 	id := strings.TrimSpace(rule.ID)
-	if id == "" {
-		return model.Plugin{}, fmt.Errorf("plugin id is required")
+	if err := validatePluginID(id); err != nil {
+		return model.Plugin{}, err
 	}
 	if _, exists := m.plugins[id]; exists {
 		return model.Plugin{}, fmt.Errorf("plugin %s already exists", id)
@@ -161,19 +182,22 @@ func (m *Manager) Add(rule RulePlugin) (model.Plugin, error) {
 	if strings.TrimSpace(rule.ID) == "" {
 		rule.ID = id
 	}
-	if strings.TrimSpace(rule.Entry) == "" {
-		rule.Entry = id + ".js"
+	entry, err := sanitizePluginEntry(rule.Entry, id+".js")
+	if err != nil {
+		return model.Plugin{}, err
 	}
+	rule.Entry = entry
 
 	plugin := model.Plugin{
-		ID:      id,
-		Name:    rule.Name,
-		Version: rule.Version,
-		Tag:     rule.Tag,
-		Author:  rule.Author,
-		Enabled: rule.Enabled,
-		Entry:   rule.Entry,
-		Runtime: pluginRuntimeFromPaths(rule.Entry, rule.Entry),
+		ID:           id,
+		Name:         rule.Name,
+		Version:      rule.Version,
+		Tag:          rule.Tag,
+		Author:       rule.Author,
+		Enabled:      rule.Enabled,
+		Entry:        rule.Entry,
+		Runtime:      pluginRuntimeFromPaths(rule.Entry, rule.Entry),
+		Capabilities: normalizePluginCapabilities(rule.Capabilities),
 	}
 
 	filePath := filepath.Join(m.baseDir, id+".json")
@@ -181,12 +205,15 @@ func (m *Manager) Add(rule RulePlugin) (model.Plugin, error) {
 		return model.Plugin{}, err
 	}
 
-	logicPath := filepath.Join(m.baseDir, rule.Entry)
-	if !filepath.IsAbs(rule.Entry) {
-		logicPath = filepath.Join(filepath.Dir(filePath), rule.Entry)
+	logicPath, err := resolveManagedPath(m.baseDir, rule.Entry)
+	if err != nil {
+		return model.Plugin{}, err
 	}
 	if _, err := os.Stat(logicPath); os.IsNotExist(err) {
 		tpl := defaultLogicTemplateForEntry(id, rule.Entry)
+		if mkErr := os.MkdirAll(filepath.Dir(logicPath), 0o755); mkErr != nil {
+			return model.Plugin{}, fmt.Errorf("create plugin logic dir: %w", mkErr)
+		}
 		if writeErr := os.WriteFile(logicPath, []byte(tpl), 0o644); writeErr != nil {
 			return model.Plugin{}, fmt.Errorf("write plugin logic file: %w", writeErr)
 		}
@@ -205,20 +232,28 @@ func (m *Manager) Delete(id string) error {
 	defer m.mu.Unlock()
 
 	id = strings.TrimSpace(id)
-	if id == "" {
-		return fmt.Errorf("plugin id is required")
+	if err := validatePluginID(id); err != nil {
+		return err
 	}
 	if _, exists := m.plugins[id]; !exists {
 		return fmt.Errorf("plugin %s not found", id)
 	}
 
 	if path := strings.TrimSpace(m.pluginFiles[id]); path != "" {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		safePath, err := resolveManagedPath(m.baseDir, path)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(safePath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("delete plugin file: %w", err)
 		}
 	}
 	if path := strings.TrimSpace(m.logicFiles[id]); path != "" {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		safePath, err := resolveManagedPath(m.baseDir, path)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(safePath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("delete plugin logic file: %w", err)
 		}
 	}
@@ -235,8 +270,8 @@ func (m *Manager) Source(id string) (model.PluginSource, error) {
 	defer m.mu.RUnlock()
 
 	id = strings.TrimSpace(id)
-	if id == "" {
-		return model.PluginSource{}, fmt.Errorf("plugin id is required")
+	if err := validatePluginID(id); err != nil {
+		return model.PluginSource{}, err
 	}
 
 	return m.sourceLocked(id)
@@ -247,8 +282,8 @@ func (m *Manager) UpdateSource(source model.PluginSource) (model.PluginSource, e
 	defer m.mu.Unlock()
 
 	id := strings.TrimSpace(source.ID)
-	if id == "" {
-		return model.PluginSource{}, fmt.Errorf("plugin id is required")
+	if err := validatePluginID(id); err != nil {
+		return model.PluginSource{}, err
 	}
 	if m.baseDir == "" {
 		return model.PluginSource{}, fmt.Errorf("plugin directory not initialized")
@@ -274,15 +309,20 @@ func (m *Manager) UpdateSource(source model.PluginSource) (model.PluginSource, e
 	if configPath == "" {
 		configPath = filepath.Join(m.baseDir, id+".json")
 	}
+	configPath, err := resolveManagedPath(m.baseDir, configPath)
+	if err != nil {
+		return model.PluginSource{}, err
+	}
 
 	rule := RulePlugin{
-		ID:      id,
-		Name:    current.Name,
-		Version: current.Version,
-		Tag:     current.Tag,
-		Author:  current.Author,
-		Enabled: current.Enabled,
-		Entry:   current.Entry,
+		ID:           id,
+		Name:         current.Name,
+		Version:      current.Version,
+		Tag:          current.Tag,
+		Author:       current.Author,
+		Enabled:      current.Enabled,
+		Entry:        current.Entry,
+		Capabilities: append([]string(nil), current.Capabilities...),
 	}
 	if content := strings.TrimSpace(source.ConfigContent); content != "" {
 		if err := json.Unmarshal([]byte(content), &rule); err != nil {
@@ -296,8 +336,9 @@ func (m *Manager) UpdateSource(source model.PluginSource) (model.PluginSource, e
 	if strings.TrimSpace(rule.ID) == "" {
 		rule.ID = id
 	}
-	if strings.TrimSpace(rule.Entry) == "" {
-		rule.Entry = id + ".js"
+	rule.Entry, err = sanitizePluginEntry(rule.Entry, id+".js")
+	if err != nil {
+		return model.PluginSource{}, err
 	}
 
 	logicPath := strings.TrimSpace(source.LogicPath)
@@ -305,24 +346,30 @@ func (m *Manager) UpdateSource(source model.PluginSource) (model.PluginSource, e
 		logicPath = strings.TrimSpace(m.logicFiles[id])
 	}
 	if logicPath == "" {
-		logicPath = filepath.Join(filepath.Dir(configPath), rule.Entry)
-	} else if !filepath.IsAbs(logicPath) {
-		logicPath = filepath.Join(filepath.Dir(configPath), logicPath)
+		logicPath = rule.Entry
+	}
+	logicPath, err = resolveManagedPath(m.baseDir, logicPath)
+	if err != nil {
+		return model.PluginSource{}, err
 	}
 
 	plugin := model.Plugin{
-		ID:      rule.ID,
-		Name:    rule.Name,
-		Version: rule.Version,
-		Tag:     rule.Tag,
-		Author:  rule.Author,
-		Enabled: rule.Enabled,
-		Entry:   rule.Entry,
-		Runtime: pluginRuntimeFromPaths(rule.Entry, logicPath),
+		ID:           rule.ID,
+		Name:         rule.Name,
+		Version:      rule.Version,
+		Tag:          rule.Tag,
+		Author:       rule.Author,
+		Enabled:      rule.Enabled,
+		Entry:        rule.Entry,
+		Runtime:      pluginRuntimeFromPaths(rule.Entry, logicPath),
+		Capabilities: normalizePluginCapabilities(rule.Capabilities),
 	}
 
 	if err := writePluginConfig(configPath, plugin, rule.Entry); err != nil {
 		return model.PluginSource{}, err
+	}
+	if mkErr := os.MkdirAll(filepath.Dir(logicPath), 0o755); mkErr != nil {
+		return model.PluginSource{}, fmt.Errorf("create plugin logic dir: %w", mkErr)
 	}
 	if writeErr := os.WriteFile(logicPath, []byte(source.LogicContent), 0o644); writeErr != nil {
 		return model.PluginSource{}, fmt.Errorf("write plugin logic file: %w", writeErr)
@@ -356,14 +403,15 @@ func (m *Manager) sourceLocked(id string) (model.PluginSource, error) {
 		configContent = string(raw)
 	} else {
 		raw, _ := json.MarshalIndent(map[string]any{
-			"id":      plugin.ID,
-			"name":    plugin.Name,
-			"version": plugin.Version,
-			"tag":     plugin.Tag,
-			"author":  plugin.Author,
-			"enabled": plugin.Enabled,
-			"entry":   entry,
-			"runtime": pluginRuntimeFromPaths(entry, logicPath),
+			"id":           plugin.ID,
+			"name":         plugin.Name,
+			"version":      plugin.Version,
+			"tag":          plugin.Tag,
+			"author":       plugin.Author,
+			"enabled":      plugin.Enabled,
+			"entry":        entry,
+			"runtime":      pluginRuntimeFromPaths(entry, logicPath),
+			"capabilities": normalizePluginCapabilities(plugin.Capabilities),
 		}, "", "  ")
 		configContent = string(append(raw, '\n'))
 	}
@@ -466,8 +514,10 @@ func (m *Manager) persistLocked(id string, plugin model.Plugin, entry string) er
 		path = filepath.Join(m.baseDir, id+".json")
 		m.pluginFiles[id] = path
 	}
-	if strings.TrimSpace(entry) == "" {
-		entry = id + ".js"
+	var err error
+	entry, err = sanitizePluginEntry(entry, id+".js")
+	if err != nil {
+		return err
 	}
 	plugin.Entry = entry
 	plugin.Runtime = pluginRuntimeFromPaths(entry, m.logicFiles[id])
@@ -478,15 +528,19 @@ func (m *Manager) persistLocked(id string, plugin model.Plugin, entry string) er
 }
 
 func writePluginConfig(path string, plugin model.Plugin, entry string) error {
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o755); mkErr != nil {
+		return fmt.Errorf("create plugin config dir: %w", mkErr)
+	}
 	node := map[string]any{
-		"id":      plugin.ID,
-		"name":    plugin.Name,
-		"version": plugin.Version,
-		"tag":     plugin.Tag,
-		"author":  plugin.Author,
-		"enabled": plugin.Enabled,
-		"entry":   entry,
-		"runtime": pluginRuntimeFromPaths(entry, ""),
+		"id":           plugin.ID,
+		"name":         plugin.Name,
+		"version":      plugin.Version,
+		"tag":          plugin.Tag,
+		"author":       plugin.Author,
+		"enabled":      plugin.Enabled,
+		"entry":        entry,
+		"runtime":      pluginRuntimeFromPaths(entry, ""),
+		"capabilities": normalizePluginCapabilities(plugin.Capabilities),
 	}
 	out, err := json.MarshalIndent(node, "", "  ")
 	if err != nil {
@@ -506,6 +560,7 @@ func normalizeRulePlugin(rule RulePlugin) RulePlugin {
 	rule.Tag = strings.TrimSpace(rule.Tag)
 	rule.Author = strings.TrimSpace(rule.Author)
 	rule.Entry = strings.TrimSpace(rule.Entry)
+	rule.Capabilities = normalizePluginCapabilities(rule.Capabilities)
 
 	if rule.Name == "" {
 		rule.Name = humanizePluginName(rule.ID)
@@ -520,6 +575,106 @@ func normalizeRulePlugin(rule RulePlugin) RulePlugin {
 		rule.Author = "User"
 	}
 	return rule
+}
+
+func normalizePluginCapabilities(capabilities []string) []string {
+	if len(capabilities) == 0 {
+		out := make([]string, len(defaultPluginCapabilities))
+		copy(out, defaultPluginCapabilities)
+		return out
+	}
+
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(capabilities))
+	for _, capability := range capabilities {
+		value := strings.ToLower(strings.TrimSpace(capability))
+		if value == "" {
+			continue
+		}
+		if _, allowed := allowedPluginCapabilities[value]; !allowed {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		out = append(out, defaultPluginCapabilities...)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func validatePluginID(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("plugin id is required")
+	}
+	if !pluginIDPattern.MatchString(id) {
+		return fmt.Errorf("invalid plugin id %q", id)
+	}
+	return nil
+}
+
+func sanitizePluginEntry(entry string, fallback string) (string, error) {
+	entry = strings.TrimSpace(entry)
+	if entry == "" {
+		entry = fallback
+	}
+	if entry == "" {
+		return "", fmt.Errorf("plugin entry is required")
+	}
+
+	cleaned := filepath.Clean(filepath.FromSlash(entry))
+	if cleaned == "." || cleaned == "" {
+		return "", fmt.Errorf("plugin entry is required")
+	}
+	if filepath.IsAbs(cleaned) || filepath.VolumeName(cleaned) != "" {
+		return "", fmt.Errorf("plugin entry must stay inside plugins dir")
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("plugin entry must stay inside plugins dir")
+	}
+	if !isLogicFile(cleaned) {
+		return "", fmt.Errorf("unsupported plugin entry %q", entry)
+	}
+	return filepath.ToSlash(cleaned), nil
+}
+
+func resolveManagedPath(baseDir, requested string) (string, error) {
+	baseAbs, err := filepath.Abs(strings.TrimSpace(baseDir))
+	if err != nil {
+		return "", fmt.Errorf("resolve plugin base dir: %w", err)
+	}
+	if baseAbs == "" {
+		return "", fmt.Errorf("plugin directory not initialized")
+	}
+
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		return "", fmt.Errorf("managed path is required")
+	}
+
+	cleaned := filepath.Clean(filepath.FromSlash(requested))
+	candidate := cleaned
+	if filepath.VolumeName(cleaned) == "" && !filepath.IsAbs(cleaned) {
+		candidate = filepath.Join(baseAbs, cleaned)
+	}
+
+	candidateAbs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve managed path: %w", err)
+	}
+	rel, err := filepath.Rel(baseAbs, candidateAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve managed path: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q escapes managed plugin dir", requested)
+	}
+	return candidateAbs, nil
 }
 
 func humanizePluginName(id string) string {

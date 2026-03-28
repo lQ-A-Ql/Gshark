@@ -113,6 +113,9 @@ export interface BinaryStream {
   from: string;
   to: string;
   chunks: StreamChunk[];
+  nextCursor?: number;
+  totalChunks?: number;
+  hasMore?: boolean;
 }
 
 export type StreamProtocol = "HTTP" | "TCP" | "UDP";
@@ -139,6 +142,19 @@ export interface PluginItem {
   enabled: boolean;
   entry?: string;
   runtime?: string;
+  capabilities?: string[];
+}
+
+export interface AuditEntry {
+  time: string;
+  method: string;
+  path: string;
+  action: string;
+  risk: string;
+  origin?: string;
+  remoteAddr?: string;
+  status: number;
+  authenticated: boolean;
 }
 
 export interface DecryptionConfig {

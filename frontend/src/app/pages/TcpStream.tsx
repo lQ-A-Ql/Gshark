@@ -1,29 +1,116 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
+import { bridge } from "../integrations/wailsBridge";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+type RawViewMode = "ascii" | "hex" | "raw";
+type RawChunk = { packetId: number; direction: string; body: string };
+
+const STREAM_PAGE_SIZE = 96;
+const MAX_PREVIEW_BYTES = 4096;
+const ROW_HEIGHT = 172;
+const BUFFER = 6;
+
 export default function TcpStream() {
-  const [viewMode, setViewMode] = useState("ascii");
+  const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
-  const [renderLimit, setRenderLimit] = useState(200);
+  const [streamView, setStreamView] = useState(() => ({
+    id: 1,
+    protocol: "TCP" as const,
+    from: "",
+    to: "",
+    chunks: [] as RawChunk[],
+    nextCursor: 0,
+    totalChunks: 0,
+    hasMore: false,
+  }));
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedChunk, setSelectedChunk] = useState<RawChunk | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(360);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const { tcpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
-  const currentIndex = streamIds.tcp.findIndex((id) => id === tcpStream.id);
+
+  useEffect(() => {
+    setStreamView({
+      id: tcpStream.id,
+      protocol: tcpStream.protocol,
+      from: tcpStream.from,
+      to: tcpStream.to,
+      chunks: tcpStream.chunks,
+      nextCursor: tcpStream.nextCursor ?? tcpStream.chunks.length,
+      totalChunks: tcpStream.totalChunks ?? tcpStream.chunks.length,
+      hasMore: tcpStream.hasMore ?? false,
+    });
+  }, [tcpStream]);
+
+  useEffect(() => {
+    setStreamInput(String(tcpStream.id || ""));
+    setSelectedChunk(null);
+    setScrollTop(0);
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = 0;
+    }
+  }, [tcpStream.id]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setViewportHeight(Math.max(160, Math.floor(entry.contentRect.height)));
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  const currentIndex = streamIds.tcp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.tcp.length || 1}` : `-- / ${streamIds.tcp.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.tcp.length - 1;
-  const visibleChunks = useMemo(() => tcpStream.chunks.slice(0, renderLimit), [tcpStream.chunks, renderLimit]);
 
-  useEffect(() => {
-    setRenderLimit(200);
-  }, [tcpStream.id]);
+  const totalHeight = Math.max(streamView.chunks.length * ROW_HEIGHT, viewportHeight);
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  const endIndex = Math.min(
+    Math.max(streamView.chunks.length - 1, 0),
+    Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER,
+  );
+  const visibleChunks = useMemo(
+    () => streamView.chunks.slice(startIndex, endIndex + 1),
+    [streamView.chunks, startIndex, endIndex],
+  );
+
+  async function loadMore() {
+    if (loadingMore || !streamView.hasMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await bridge.getRawStreamPage("TCP", streamView.id, streamView.nextCursor ?? streamView.chunks.length, STREAM_PAGE_SIZE);
+      setStreamView((prev) => {
+        if (prev.id !== page.id) return prev;
+        return {
+          ...prev,
+          from: page.from,
+          to: page.to,
+          chunks: [...prev.chunks, ...page.chunks],
+          nextCursor: page.nextCursor ?? prev.chunks.length + page.chunks.length,
+          totalChunks: page.totalChunks ?? prev.totalChunks,
+          hasMore: page.hasMore ?? false,
+        };
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
@@ -34,45 +121,52 @@ export default function TcpStream() {
           </button>
           <div className="h-4 w-px bg-border" />
           <h1 className="flex items-center gap-2 font-semibold text-foreground">
-            追踪 TCP 流 (Stream eq {tcpStream.id})
+            追踪 TCP 流 (Stream eq {streamView.id})
             <span className="ml-2 flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {tcpStream.from} <ArrowLeftRight className="h-3 w-3" /> {tcpStream.to}
+              {streamView.from} <ArrowLeftRight className="h-3 w-3" /> {streamView.to}
             </span>
           </h1>
         </div>
         <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><Minimize2 className="h-4 w-4" /></button>
       </div>
 
-      <div className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-relaxed">
-        <div className="flex max-w-4xl flex-col gap-1">
-          {visibleChunks.map((chunk) => (
-            <div
-              key={chunk.packetId}
-              className={cn(
-                "rounded-md border px-3 py-2",
-                chunk.direction === "client" ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400" : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
-              )}
-            >
-              <span className="mr-2 select-none text-xs font-semibold opacity-60">
-                {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
-              </span>
-              <pre className="whitespace-pre-wrap break-all text-xs leading-5">
-                {renderStreamChunk(chunk.body, viewMode)}
-              </pre>
+      <div
+        ref={viewportRef}
+        className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-relaxed"
+        onScroll={(event) => {
+          const nextScrollTop = event.currentTarget.scrollTop;
+          setScrollTop(nextScrollTop);
+          const nearBottom = nextScrollTop + event.currentTarget.clientHeight >= event.currentTarget.scrollHeight - ROW_HEIGHT * 3;
+          if (nearBottom) {
+            void loadMore();
+          }
+        }}
+      >
+        <div className="relative max-w-4xl" style={{ height: totalHeight }}>
+          {visibleChunks.map((chunk, index) => {
+            const absoluteIndex = startIndex + index;
+            const top = absoluteIndex * ROW_HEIGHT;
+            return (
+              <div key={chunk.packetId} style={{ position: "absolute", top, left: 0, right: 0, height: ROW_HEIGHT - 8 }}>
+                <RawStreamChunkCard
+                  chunk={chunk}
+                  mode={viewMode}
+                  clientTone="border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                  serverTone="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                  onOpen={() => setSelectedChunk(chunk)}
+                />
+              </div>
+            );
+          })}
+          {(loadingMore || streamView.hasMore) && (
+            <div className="absolute left-0 right-0 flex justify-center pt-2 text-xs text-muted-foreground" style={{ top: streamView.chunks.length * ROW_HEIGHT }}>
+              {loadingMore ? "正在加载更多流片段..." : "继续下滚可加载更多"}
             </div>
-          ))}
-          {renderLimit < tcpStream.chunks.length && (
-            <button
-              className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-              onClick={() => setRenderLimit((prev) => Math.min(prev + 400, tcpStream.chunks.length))}
-            >
-              加载更多 ({renderLimit}/{tcpStream.chunks.length})
-            </button>
           )}
         </div>
       </div>
 
-      <div className="grid shrink-0 grid-cols-[250px_280px_420px_minmax(120px,1fr)] items-center gap-4 border-t border-border bg-card px-4 py-3 shadow-sm">
+      <div className="grid shrink-0 grid-cols-[260px_280px_460px_minmax(140px,1fr)] items-center gap-4 border-t border-border bg-card px-4 py-3 shadow-sm">
         <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
           切流 last {streamSwitchMetrics.byProtocol.TCP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.TCP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.TCP.p95Ms}ms / cache {streamSwitchMetrics.byProtocol.TCP.cacheHitRate}%
         </div>
@@ -88,7 +182,7 @@ export default function TcpStream() {
             <input type="radio" name="viewMode" checked={viewMode === "raw"} onChange={() => setViewMode("raw")} className="accent-blue-600" /> Raw
           </label>
         </div>
-        <div className="grid h-full grid-cols-[auto_28px_minmax(220px,1fr)_28px_72px] items-center gap-2">
+        <div className="grid h-full grid-cols-[auto_28px_minmax(220px,1fr)_28px_72px_120px] items-center gap-2">
           <span className="text-xs text-muted-foreground">流切换:</span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
@@ -102,7 +196,7 @@ export default function TcpStream() {
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="px-2 text-center font-mono text-xs text-foreground" title={`TCP 流总数: ${streamIds.tcp.length}`}>
-            第 {ordinalLabel} 条 · stream eq {tcpStream.id}
+            第 {ordinalLabel} 条 · stream eq {streamView.id}
           </span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
@@ -129,6 +223,9 @@ export default function TcpStream() {
             placeholder="stream"
             title={`TCP 流总数: ${streamIds.tcp.length}`}
           />
+          <span className="text-right text-[11px] text-muted-foreground">
+            已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
+          </span>
         </div>
         <div className="justify-self-end">
           <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
@@ -136,21 +233,80 @@ export default function TcpStream() {
           </button>
         </div>
       </div>
+
+      {selectedChunk && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 px-6 py-8">
+          <div className="flex h-full max-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="text-sm font-semibold text-foreground">
+                载荷详情 #{selectedChunk.packetId} · {selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
+              </div>
+              <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => setSelectedChunk(null)}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 font-mono text-xs leading-5 text-foreground">
+              <pre className="whitespace-pre-wrap break-all">{renderStreamChunk(selectedChunk.body, viewMode, true)}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function parseChunkBytes(body: string): number[] {
+const RawStreamChunkCard = memo(function RawStreamChunkCard({
+  chunk,
+  mode,
+  clientTone,
+  serverTone,
+  onOpen,
+}: {
+  chunk: RawChunk;
+  mode: RawViewMode;
+  clientTone: string;
+  serverTone: string;
+  onOpen: () => void;
+}) {
+  const rendered = useMemo(() => renderStreamChunk(chunk.body, mode, false), [chunk.body, mode]);
+  const tone = chunk.direction === "client" ? clientTone : serverTone;
+  const truncated = isChunkTruncated(chunk.body, mode);
+
+  return (
+    <div className={cn("flex h-full flex-col rounded-md border px-3 py-2", tone)}>
+      <span className="mr-2 select-none text-xs font-semibold opacity-60">
+        {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
+      </span>
+      <pre className="mt-1 flex-1 overflow-hidden whitespace-pre-wrap break-all text-xs leading-5">{rendered}</pre>
+      <div className="mt-2 flex items-center justify-between text-[11px] opacity-80">
+        <span>packet #{chunk.packetId}</span>
+        {truncated && (
+          <button className="rounded border border-current/20 px-2 py-1 hover:opacity-100" onClick={onOpen}>
+            查看完整载荷
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
+function parseChunkBytes(body: string, limit = Number.POSITIVE_INFINITY): number[] {
   const raw = (body ?? "").trim();
   if (!raw) return [];
   const isHex = /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw);
   if (!isHex) {
-    return Array.from(new TextEncoder().encode(raw));
+    return Array.from(new TextEncoder().encode(raw.slice(0, Number.isFinite(limit) ? limit : undefined)));
   }
-  return raw
-    .split(":")
-    .map((part) => Number.parseInt(part, 16))
-    .filter((v) => Number.isFinite(v));
+  const parts = raw.split(":");
+  const size = Math.min(parts.length, Number.isFinite(limit) ? limit : parts.length);
+  const bytes: number[] = [];
+  for (let i = 0; i < size; i += 1) {
+    const value = Number.parseInt(parts[i], 16);
+    if (Number.isFinite(value)) {
+      bytes.push(value);
+    }
+  }
+  return bytes;
 }
 
 function bytesToAscii(bytes: number[]): string {
@@ -170,14 +326,42 @@ function bytesToHexDump(bytes: number[]): string {
   return lines.join("\n");
 }
 
-function renderStreamChunk(body: string, mode: string): string {
+function isHexPayload(body: string): boolean {
+  return /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test((body ?? "").trim());
+}
+
+function isChunkTruncated(body: string, mode: RawViewMode): boolean {
+  const raw = (body ?? "").trim();
+  if (!raw) return false;
   if (mode === "raw") {
-    return body || "(empty payload)";
+    return raw.length > MAX_PREVIEW_BYTES * 3;
+  }
+  if (isHexPayload(raw)) {
+    return raw.split(":").length > MAX_PREVIEW_BYTES;
+  }
+  return raw.length > MAX_PREVIEW_BYTES;
+}
+
+function renderStreamChunk(body: string, mode: RawViewMode, expanded = false): string {
+  const raw = body || "";
+  if (mode === "raw") {
+    if (!raw) return "(empty payload)";
+    if (expanded || raw.length <= MAX_PREVIEW_BYTES * 3) {
+      return raw;
+    }
+    return `${raw.slice(0, MAX_PREVIEW_BYTES * 3)}\n\n... 已截断，点击查看完整载荷`;
   }
 
-  const bytes = parseChunkBytes(body);
+  const bytes = parseChunkBytes(raw, expanded ? Number.POSITIVE_INFINITY : MAX_PREVIEW_BYTES);
   if (mode === "hex") {
-    return bytesToHexDump(bytes);
+    const rendered = bytesToHexDump(bytes);
+    return expanded || !isChunkTruncated(raw, mode)
+      ? rendered
+      : `${rendered}\n\n... 已截断，点击查看完整载荷`;
   }
-  return bytesToAscii(bytes);
+
+  const rendered = bytesToAscii(bytes);
+  return expanded || !isChunkTruncated(raw, mode)
+    ? rendered
+    : `${rendered}\n\n... 已截断，点击查看完整载荷`;
 }

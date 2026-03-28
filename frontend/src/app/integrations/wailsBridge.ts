@@ -1,4 +1,5 @@
 import type {
+  AuditEntry,
   BinaryStream,
   DBCProfile,
   DecryptionConfig,
@@ -22,6 +23,7 @@ export interface OpenFileResult {
 
 interface DesktopAppBinding {
   BackendStatus?: () => Promise<string>;
+  GetBackendAuthToken?: () => Promise<string | null | undefined>;
   OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
   OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
 }
@@ -133,6 +135,7 @@ export interface BackendBridge {
   listObjects(): Promise<ExtractedObject[]>;
   getHttpStream(streamId: number): Promise<HttpStream>;
   getRawStream(protocol: "TCP" | "UDP", streamId: number): Promise<BinaryStream>;
+  getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number): Promise<BinaryStream>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
   getPacketRawHex(packetId: number): Promise<string>;
   getPacketLayers(packetId: number): Promise<Record<string, unknown> | null>;
@@ -154,6 +157,7 @@ export interface BackendBridge {
   setPluginsEnabled(ids: string[], enabled: boolean): Promise<PluginItem[]>;
   getTLSConfig(): Promise<DecryptionConfig | null>;
   updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
+  listAuditLogs(): Promise<AuditEntry[]>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }
 
@@ -278,26 +282,28 @@ function asHttpStream(input: any): HttpStream {
 }
 
 function asBinaryStream(input: any, protocol: "TCP" | "UDP"): BinaryStream {
+  const chunks = Array.isArray(input.chunks)
+    ? input.chunks.map((chunk: any) => ({
+        packetId: Number(chunk.packet_id ?? 0),
+        direction: chunk.direction === "server" ? "server" : "client",
+        body: String(chunk.body ?? ""),
+      }))
+    : [];
+
   return {
     id: Number(input.stream_id ?? 1),
     protocol,
     from: String(input.from ?? ""),
     to: String(input.to ?? ""),
-    chunks: Array.isArray(input.chunks)
-      ? input.chunks.map((chunk: any) => ({
-          packetId: Number(chunk.packet_id ?? 0),
-          direction: chunk.direction === "server" ? "server" : "client",
-          body: String(chunk.body ?? ""),
-        }))
-      : [],
+    chunks,
+    nextCursor: Number(input.next_cursor ?? chunks.length),
+    totalChunks: Number(input.total ?? chunks.length),
+    hasMore: Boolean(input.has_more),
   };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers ?? {});
-  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
+  const headers = await buildAuthorizedHeaders(path, init?.headers, init?.body);
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -319,7 +325,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const headers = await buildAuthorizedHeaders(path, init?.headers, init?.body);
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers,
+  });
   if (!res.ok) {
     let detail = "";
     try {
@@ -349,6 +359,51 @@ function getDesktopAppBinding(): DesktopAppBinding | undefined {
     return undefined;
   }
   return (window as any)?.go?.main?.DesktopApp as DesktopAppBinding | undefined;
+}
+
+let backendAuthTokenPromise: Promise<string> | null = null;
+
+async function getBackendAuthToken(): Promise<string> {
+  if (backendAuthTokenPromise) {
+    return backendAuthTokenPromise;
+  }
+
+  backendAuthTokenPromise = (async () => {
+    const envToken = String(import.meta.env.VITE_BACKEND_TOKEN ?? "").trim();
+    if (envToken) {
+      return envToken;
+    }
+
+    const desktopApp = getDesktopAppBinding();
+    if (desktopApp?.GetBackendAuthToken) {
+      const token = await desktopApp.GetBackendAuthToken();
+      return String(token ?? "").trim();
+    }
+
+    return "";
+  })();
+
+  return backendAuthTokenPromise;
+}
+
+async function buildAuthorizedHeaders(path: string, headersInit?: HeadersInit, body?: BodyInit | null): Promise<Headers> {
+  const headers = new Headers(headersInit ?? {});
+  if (!(body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (path !== "/health" && !headers.has("Authorization")) {
+    const token = await getBackendAuthToken();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  return headers;
+}
+
+export async function getBackendAuthHeaders(path: string, headersInit?: HeadersInit, body?: BodyInit | null): Promise<Headers> {
+  return buildAuthorizedHeaders(path, headersInit, body);
 }
 
 export const bridge: BackendBridge = {
@@ -538,6 +593,13 @@ export const bridge: BackendBridge = {
 
   async getRawStream(protocol: "TCP" | "UDP", streamId: number) {
     const stream = await request<any>(`/api/streams/raw?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}`);
+    return asBinaryStream(stream, protocol);
+  },
+
+  async getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number) {
+    const stream = await request<any>(
+      `/api/streams/raw/page?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}&cursor=${encodeURIComponent(String(cursor))}&limit=${encodeURIComponent(String(limit))}`,
+    );
     return asBinaryStream(stream, protocol);
   },
 
@@ -938,6 +1000,7 @@ export const bridge: BackendBridge = {
       enabled: item.enabled,
       entry: item.entry || "",
       runtime: item.runtime || "",
+      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
     }));
   },
 
@@ -986,6 +1049,7 @@ export const bridge: BackendBridge = {
         author: plugin.author,
         enabled: plugin.enabled,
         entry: plugin.entry || "",
+        capabilities: Array.isArray(plugin.capabilities) ? plugin.capabilities : [],
       }),
     });
     return {
@@ -997,6 +1061,7 @@ export const bridge: BackendBridge = {
       enabled: item.enabled,
       entry: item.entry || "",
       runtime: item.runtime || "",
+      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
     };
   },
 
@@ -1015,6 +1080,7 @@ export const bridge: BackendBridge = {
       enabled: item.enabled,
       entry: item.entry || "",
       runtime: item.runtime || "",
+      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
     };
   },
 
@@ -1032,6 +1098,7 @@ export const bridge: BackendBridge = {
       enabled: item.enabled,
       entry: item.entry || "",
       runtime: item.runtime || "",
+      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
     }));
   },
 
@@ -1059,6 +1126,21 @@ export const bridge: BackendBridge = {
     });
   },
 
+  async listAuditLogs() {
+    const rows = await request<any[]>("/api/audit/logs");
+    return rows.map((item) => ({
+      time: String(item.time ?? ""),
+      method: String(item.method ?? ""),
+      path: String(item.path ?? ""),
+      action: String(item.action ?? ""),
+      risk: String(item.risk ?? "low"),
+      origin: String(item.origin ?? "") || undefined,
+      remoteAddr: String(item.remote_addr ?? "") || undefined,
+      status: Number(item.status ?? 0),
+      authenticated: Boolean(item.authenticated),
+    }));
+  },
+
   subscribeEvents(handlers: EventHandlers) {
     let disposed = false;
     let retryMs = 1000;
@@ -1067,44 +1149,55 @@ export const bridge: BackendBridge = {
 
     function connect() {
       if (disposed) return;
-      source = new EventSource(`${API_BASE}/api/events`);
 
-      source.addEventListener("ready", () => {
-        retryMs = 1000; // reset backoff on successful connection
-      });
+      void getBackendAuthToken().then((token) => {
+        if (disposed) return;
+        const url = token
+          ? `${API_BASE}/api/events?access_token=${encodeURIComponent(token)}`
+          : `${API_BASE}/api/events`;
+        source = new EventSource(url);
 
-      source.addEventListener("packet", (event) => {
-        try {
-          handlers.packet?.(asPacket(JSON.parse((event as MessageEvent).data)));
-        } catch {
-          return;
-        }
-      });
-      source.addEventListener("status", (event) => {
-        try {
-          const payload = JSON.parse((event as MessageEvent).data);
-          handlers.status?.(String(payload.message ?? ""));
-        } catch {
-          return;
-        }
-      });
-      source.addEventListener("error", (event) => {
-        try {
-          const payload = JSON.parse((event as MessageEvent).data);
-          handlers.error?.(String(payload.message ?? ""));
-        } catch {
-          // connection lost – attempt reconnect with exponential backoff
-          if (source) {
-            source.close();
-            source = null;
+        source.addEventListener("ready", () => {
+          retryMs = 1000; // reset backoff on successful connection
+        });
+
+        source.addEventListener("packet", (event) => {
+          try {
+            handlers.packet?.(asPacket(JSON.parse((event as MessageEvent).data)));
+          } catch {
+            return;
           }
-          if (!disposed) {
-            handlers.error?.(`后端连接断开，${(retryMs / 1000).toFixed(0)}s 后重连...`);
-            retryTimer = setTimeout(() => {
-              retryMs = Math.min(retryMs * 2, 30000);
-              connect();
-            }, retryMs);
+        });
+        source.addEventListener("status", (event) => {
+          try {
+            const payload = JSON.parse((event as MessageEvent).data);
+            handlers.status?.(String(payload.message ?? ""));
+          } catch {
+            return;
           }
+        });
+        source.addEventListener("error", (event) => {
+          try {
+            const payload = JSON.parse((event as MessageEvent).data);
+            handlers.error?.(String(payload.message ?? ""));
+          } catch {
+            // connection lost – attempt reconnect with exponential backoff
+            if (source) {
+              source.close();
+              source = null;
+            }
+            if (!disposed) {
+              handlers.error?.(`后端连接断开，${(retryMs / 1000).toFixed(0)}s 后重连...`);
+              retryTimer = setTimeout(() => {
+                retryMs = Math.min(retryMs * 2, 30000);
+                connect();
+              }, retryMs);
+            }
+          }
+        });
+      }).catch(() => {
+        if (!disposed) {
+          handlers.error?.("后端鉴权初始化失败");
         }
       });
     }

@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -18,9 +20,10 @@ import (
 )
 
 type DesktopApp struct {
-	ctx        context.Context
-	backendCmd *exec.Cmd
-	mu         sync.Mutex
+	ctx              context.Context
+	backendCmd       *exec.Cmd
+	backendAuthToken string
+	mu               sync.Mutex
 }
 
 type openCaptureDialogResult struct {
@@ -51,6 +54,12 @@ func (a *DesktopApp) BackendStatus() string {
 		return "running"
 	}
 	return "not-started"
+}
+
+func (a *DesktopApp) GetBackendAuthToken() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.backendAuthToken
 }
 
 func (a *DesktopApp) OpenCaptureDialog() (openCaptureDialogResult, error) {
@@ -148,6 +157,9 @@ func (a *DesktopApp) OpenDBCDialog() (openCaptureDialogResult, error) {
 func (a *DesktopApp) startBackendIfPossible() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.backendAuthToken == "" {
+		a.backendAuthToken = strings.TrimSpace(os.Getenv("GSHARK_BACKEND_TOKEN"))
+	}
 	if a.backendCmd != nil {
 		fmt.Fprintln(os.Stdout, "desktop startup: backend process already started in this app instance")
 		return nil
@@ -161,6 +173,14 @@ func (a *DesktopApp) startBackendIfPossible() error {
 	if err != nil {
 		return err
 	}
+	if a.backendAuthToken == "" {
+		token, tokenErr := generateBackendAuthToken()
+		if tokenErr != nil {
+			return tokenErr
+		}
+		a.backendAuthToken = token
+	}
+	cmd.Env = append(os.Environ(), "GSHARK_BACKEND_TOKEN="+a.backendAuthToken)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	fmt.Fprintf(os.Stdout, "desktop startup: launching backend command %q in %q\n", strings.Join(cmd.Args, " "), cmd.Dir)
@@ -175,7 +195,7 @@ func (a *DesktopApp) startBackendIfPossible() error {
 
 func buildBackendCommand() (*exec.Cmd, error) {
 	if binaryPath, err := resolveBundledBackendBinary(); err == nil {
-		cmd := exec.Command(binaryPath, "serve", ":17891")
+		cmd := exec.Command(binaryPath, "serve", "127.0.0.1:17891")
 		cmd.Dir = filepath.Dir(binaryPath)
 		fmt.Fprintf(os.Stdout, "desktop startup: using bundled backend binary %q\n", binaryPath)
 		return cmd, nil
@@ -186,7 +206,7 @@ func buildBackendCommand() (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command("go", "run", "./cmd/sentinel", "serve", ":17891")
+	cmd := exec.Command("go", "run", "./cmd/sentinel", "serve", "127.0.0.1:17891")
 	cmd.Dir = backendDir
 	fmt.Fprintf(os.Stdout, "desktop startup: using go run backend from %q\n", backendDir)
 	return cmd, nil
@@ -331,4 +351,12 @@ func terminateProcessTree(pid int) {
 		return
 	}
 	_ = exec.Command("kill", "-TERM", fmt.Sprint(pid)).Run()
+}
+
+func generateBackendAuthToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate backend auth token: %w", err)
+	}
+	return hex.EncodeToString(buf), nil
 }

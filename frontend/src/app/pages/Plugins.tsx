@@ -104,6 +104,10 @@ const configureJsonDiagnostics: BeforeMount = (monaco) => {
             enabled: { type: "boolean" },
             entry: { type: "string" },
             runtime: { type: "string" },
+            capabilities: {
+              type: "array",
+              items: { type: "string" },
+            },
           },
           required: ["id", "name", "version", "tag", "author", "enabled"],
           additionalProperties: true,
@@ -132,10 +136,35 @@ function buildDefaultConfig(pluginId: string, runtime: RuntimeOption, entry: str
       enabled: true,
       entry,
       runtime,
+      capabilities: ["finish.hook", "logging", "packet.read", "threat.emit"],
     },
     null,
     2,
   );
+}
+
+function formatCapability(capability: string) {
+  return capability.replace(/\./g, " / ");
+}
+
+function capabilityRisk(capabilities: string[]) {
+  const normalized = capabilities.map((item) => item.toLowerCase());
+  if (normalized.includes("metadata.read")) {
+    return {
+      label: "high-risk",
+      className: "border-rose-200 bg-rose-50 text-rose-700",
+    };
+  }
+  if (normalized.includes("logging") || normalized.includes("finish.hook")) {
+    return {
+      label: "medium-risk",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+  return {
+    label: "low-risk",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
 }
 
 export default function Plugins() {
@@ -402,18 +431,20 @@ export default function Plugins() {
         configContent = buildDefaultConfig(pluginId, runtime, entry);
       }
 
-      await addPlugin({
+      if (!entry) {
+        entry = runtime === "python" ? `${pluginId}.py` : `${pluginId}.js`;
+      }
+
+      await bridge.savePluginSource({
         id: pluginId,
-        name: pluginName,
-        version: "1.0.0",
-        tag: "imported",
-        author: "user",
-        enabled: true,
+        configPath: "",
+        configContent,
+        logicPath: "",
+        logicContent,
         entry,
-        runtime,
       });
 
-      setAddHint(`Plugin imported: ${pluginName}`);
+      setAddHint(`Plugin imported: ${pluginName} (${entry})`);
       refreshPlugins();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to import plugin";
@@ -560,6 +591,7 @@ export default function Plugins() {
           <div className="flex flex-1 flex-col gap-3 overflow-auto p-5">
             {filtered.map((plugin) => {
               const checked = selected.has(String(plugin.id));
+              const risk = capabilityRisk(plugin.capabilities ?? []);
               return (
                 <div
                   key={plugin.id}
@@ -583,6 +615,7 @@ export default function Plugins() {
                       <div className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
                         {plugin.name}
                         <span className="rounded-md border border-border bg-accent px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground">{plugin.tag}</span>
+                        <span className={cn("rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wide", risk.className)}>{risk.label}</span>
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs font-medium text-muted-foreground">
                         <span>v{plugin.version}</span>
@@ -590,6 +623,18 @@ export default function Plugins() {
                         {plugin.runtime && <span>{plugin.runtime}</span>}
                         {plugin.entry && <span className="font-mono">{plugin.entry}</span>}
                       </div>
+                      {plugin.capabilities && plugin.capabilities.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-slate-500">
+                          {plugin.capabilities.map((capability) => (
+                            <span
+                              key={`${plugin.id}-${capability}`}
+                              className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
+                            >
+                              {formatCapability(capability)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

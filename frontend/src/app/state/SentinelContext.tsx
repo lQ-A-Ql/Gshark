@@ -1,5 +1,6 @@
 import {
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -84,6 +85,7 @@ interface SentinelContextValue {
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
 const PAGE_SIZE = 2000;
+const RAW_STREAM_PAGE_SIZE = 96;
 const PRELOAD_POLL_INTERVAL_MS = 120;
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
 const EMPTY_TSHARK_STATUS: TSharkStatus = {
@@ -109,6 +111,9 @@ const EMPTY_BINARY_STREAM: BinaryStream = {
   from: "",
   to: "",
   chunks: [],
+  nextCursor: 0,
+  totalChunks: 0,
+  hasMore: false,
 };
 
 const EMPTY_SWITCH_STAT: StreamSwitchStat = {
@@ -304,7 +309,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     if (normalized <= 0) return;
     const located = await bridge.locatePacketPage(normalized, PAGE_SIZE, displayFilter);
     if (!located.found) {
-      setBackendStatus(`鏈壘鍒版暟鎹寘 #${normalized}`);
+      setBackendStatus(`未找到数据包 #${normalized}`);
       return;
     }
     await loadPacketPage(located.cursor);
@@ -413,8 +418,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     try {
       const [http, tcp, udp] = await Promise.all([
         bridge.getHttpStream(streamId),
-        bridge.getRawStream("TCP", streamId),
-        bridge.getRawStream("UDP", streamId),
+        bridge.getRawStreamPage("TCP", streamId, 0, RAW_STREAM_PAGE_SIZE),
+        bridge.getRawStreamPage("UDP", streamId, 0, RAW_STREAM_PAGE_SIZE),
       ]);
       httpStreamCacheRef.current.set(http.id, http);
       tcpStreamCacheRef.current.set(tcp.id, tcp);
@@ -470,7 +475,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         if (tcpPrefetchInFlightRef.current.size >= 2) continue;
         tcpPrefetchInFlightRef.current.add(targetId);
         void bridge
-          .getRawStream("TCP", targetId)
+          .getRawStreamPage("TCP", targetId, 0, RAW_STREAM_PAGE_SIZE)
           .then((raw) => {
             tcpStreamCacheRef.current.set(raw.id, raw);
           })
@@ -484,7 +489,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (udpPrefetchInFlightRef.current.size >= 2) continue;
       udpPrefetchInFlightRef.current.add(targetId);
       void bridge
-        .getRawStream("UDP", targetId)
+        .getRawStreamPage("UDP", targetId, 0, RAW_STREAM_PAGE_SIZE)
         .then((raw) => {
           udpStreamCacheRef.current.set(raw.id, raw);
         })
@@ -517,7 +522,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         if (cached) {
           if (!isLatest()) return;
           cacheHit = true;
-          setHttpStream(cached);
+          startTransition(() => {
+            setHttpStream(cached);
+          });
           const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
           recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
           prefetchAdjacentStreams("HTTP", streamId);
@@ -526,7 +533,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         const http = await bridge.getHttpStream(streamId);
         if (!isLatest()) return;
         httpStreamCacheRef.current.set(http.id, http);
-        setHttpStream(http);
+        startTransition(() => {
+          setHttpStream(http);
+        });
         const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
         recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
         prefetchAdjacentStreams("HTTP", streamId);
@@ -556,7 +565,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           return;
         }
       }
-      const raw = await bridge.getRawStream(protocol, streamId);
+      const raw = await bridge.getRawStreamPage(protocol, streamId, 0, RAW_STREAM_PAGE_SIZE);
       if (!isLatest()) return;
       if (protocol === "TCP") {
         tcpStreamCacheRef.current.set(raw.id, raw);
@@ -672,10 +681,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           }
           if (msg.includes("解析完成") || msg.includes("解析失败") || msg.includes("解析被取消")) {
             parseFinishedRef.current = true;
+            if (msg.includes("解析失败")) {
+              parseErrorRef.current = msg;
+            }
           }
           setBackendStatus(msg);
         },
-        error: (message) => setBackendStatus(message || "后端事件异常"),
+        error: (message) => {
+          const next = message || "后端事件异常";
+          if (preloadingRef.current) {
+            parseFinishedRef.current = true;
+            parseErrorRef.current = next;
+          }
+          setBackendStatus(next);
+        },
       });
     };
 

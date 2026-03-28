@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -17,20 +17,26 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+type HTTPChunk = { packetId: number; direction: "client" | "server"; body: string };
+type HTTPViewMode = "formatted" | "raw" | "hex";
+
+const INITIAL_RENDER_LIMIT = 72;
+
 export default function HttpStream() {
   const navigate = useNavigate();
   const { httpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
-  const [viewMode, setViewMode] = useState<"formatted" | "raw" | "hex">("formatted");
+  const [viewMode, setViewMode] = useState<HTTPViewMode>("formatted");
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
   const [streamInput, setStreamInput] = useState("");
-  const [renderLimit, setRenderLimit] = useState(160);
+  const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER_LIMIT);
+  const deferredSearch = useDeferredValue(search);
   const currentIndex = streamIds.http.findIndex((id) => id === httpStream.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.http.length || 1}` : `-- / ${streamIds.http.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.http.length - 1;
 
-  const displayChunks = useMemo(() => {
+  const displayChunks = useMemo<HTTPChunk[]>(() => {
     const base =
       httpStream.chunks.length > 0
         ? httpStream.chunks
@@ -39,14 +45,14 @@ export default function HttpStream() {
             ...(httpStream.response ? [{ packetId: 0, direction: "server" as const, body: httpStream.response }] : []),
           ];
 
-    if (!search.trim()) return base;
-    const query = search.toLowerCase();
+    if (!deferredSearch.trim()) return base;
+    const query = deferredSearch.toLowerCase();
     return base.filter((chunk) => chunk.body.toLowerCase().includes(query));
-  }, [httpStream.chunks, httpStream.request, httpStream.response, search]);
+  }, [deferredSearch, httpStream.chunks, httpStream.request, httpStream.response]);
 
   const matchCount = useMemo(() => {
-    if (!search.trim()) return 0;
-    const query = search.toLowerCase();
+    if (!deferredSearch.trim()) return 0;
+    const query = deferredSearch.toLowerCase();
     return displayChunks.reduce((sum, chunk) => {
       let count = 0;
       let idx = 0;
@@ -60,13 +66,15 @@ export default function HttpStream() {
       }
       return sum + count;
     }, 0);
-  }, [displayChunks, search]);
+  }, [deferredSearch, displayChunks]);
 
   const selectedIndex = Math.min(cursor, Math.max(0, displayChunks.length - 1));
   const visibleChunks = useMemo(() => displayChunks.slice(0, renderLimit), [displayChunks, renderLimit]);
+  const deferredVisibleChunks = useDeferredValue(visibleChunks);
+  const deferredSelectedIndex = useDeferredValue(selectedIndex);
 
   useEffect(() => {
-    setRenderLimit(160);
+    setRenderLimit(INITIAL_RENDER_LIMIT);
   }, [httpStream.id]);
 
   const exportAll = () => {
@@ -225,36 +233,18 @@ export default function HttpStream() {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {visibleChunks.map((chunk, index) => {
-                const selected = index === selectedIndex;
-                const isClient = chunk.direction === "client";
-                return (
-                  <div
-                    key={`${chunk.packetId}-${index}`}
-                    className={cn(
-                      "rounded-md border px-3 py-2 font-mono text-xs leading-5",
-                      isClient ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-                      selected && "ring-2 ring-blue-300",
-                    )}
-                  >
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-semibold opacity-80">
-                      <span>{isClient ? "Request ->" : "<- Response"}</span>
-                      <span>packet #{chunk.packetId}</span>
-                    </div>
-                    <pre className="whitespace-pre-wrap break-all">
-                      {viewMode === "hex"
-                        ? toHexDump(chunk.body)
-                        : viewMode === "formatted"
-                          ? formatHTTPForDisplay(chunk.body)
-                          : chunk.body}
-                    </pre>
-                  </div>
-                );
-              })}
+              {deferredVisibleChunks.map((chunk, index) => (
+                <HTTPChunkCard
+                  key={`${chunk.packetId}-${index}`}
+                  chunk={chunk}
+                  viewMode={viewMode}
+                  selected={index === deferredSelectedIndex}
+                />
+              ))}
               {renderLimit < displayChunks.length && (
                 <button
                   className="self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                  onClick={() => setRenderLimit((prev) => Math.min(prev + 240, displayChunks.length))}
+                  onClick={() => setRenderLimit((prev) => Math.min(prev + 180, displayChunks.length))}
                 >
                   加载更多 ({renderLimit}/{displayChunks.length})
                 </button>
@@ -266,6 +256,43 @@ export default function HttpStream() {
     </div>
   );
 }
+
+const HTTPChunkCard = memo(function HTTPChunkCard({
+  chunk,
+  viewMode,
+  selected,
+}: {
+  chunk: HTTPChunk;
+  viewMode: HTTPViewMode;
+  selected: boolean;
+}) {
+  const rendered = useMemo(() => {
+    if (viewMode === "hex") {
+      return toHexDump(chunk.body);
+    }
+    if (viewMode === "formatted") {
+      return formatHTTPForDisplay(chunk.body);
+    }
+    return chunk.body;
+  }, [chunk.body, viewMode]);
+
+  const isClient = chunk.direction === "client";
+  return (
+    <div
+      className={cn(
+        "rounded-md border px-3 py-2 font-mono text-xs leading-5",
+        isClient ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+        selected && "ring-2 ring-blue-300",
+      )}
+    >
+      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold opacity-80">
+        <span>{isClient ? "Request ->" : "<- Response"}</span>
+        <span>packet #{chunk.packetId}</span>
+      </div>
+      <pre className="whitespace-pre-wrap break-all">{rendered}</pre>
+    </div>
+  );
+});
 
 function toHexDump(text: string): string {
   if (!text) return "(empty)";

@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,14 +12,18 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 var pluginExportRE = regexp.MustCompile(`(?m)^\s*export\s+`)
+
+const defaultPluginRuntimeTimeout = 3 * time.Second
 
 type PacketPluginRunner struct {
 	sessions []packetPluginSession
@@ -29,6 +34,7 @@ type packetPluginSession interface {
 	ProcessBatch([]model.Packet)
 	Close() ([]model.ThreatHit, error)
 	Name() string
+	Warnings() []string
 }
 
 type runtimeCandidate struct {
@@ -79,6 +85,7 @@ func (r *PacketPluginRunner) Close(startID int64) []model.ThreatHit {
 	nextID := startID
 	for _, session := range r.sessions {
 		sessionHits, err := session.Close()
+		r.warnings = append(r.warnings, session.Warnings()...)
 		if err != nil {
 			r.warnings = append(r.warnings, fmt.Sprintf("%s: %v", session.Name(), err))
 			continue
@@ -154,9 +161,17 @@ type jsPacketSession struct {
 	onPacket goja.Callable
 	onFinish goja.Callable
 	hits     []model.ThreatHit
+	timeout  time.Duration
+	runErr   error
+	warnings []string
+	warned   map[string]struct{}
 }
 
 func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, error) {
+	if !pluginHasCapability(meta, "packet.read") {
+		return nil, fmt.Errorf("plugin %s is missing required capability packet.read", meta.ID)
+	}
+
 	source, err := os.ReadFile(logicPath)
 	if err != nil {
 		return nil, err
@@ -164,13 +179,20 @@ func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, 
 
 	vm := goja.New()
 	session := &jsPacketSession{
-		name: meta.ID,
-		vm:   vm,
-		ctx:  vm.NewObject(),
-		hits: make([]model.ThreatHit, 0, 8),
+		name:     meta.ID,
+		vm:       vm,
+		ctx:      vm.NewObject(),
+		hits:     make([]model.ThreatHit, 0, 8),
+		timeout:  pluginRuntimeTimeout(),
+		warnings: make([]string, 0, 4),
+		warned:   map[string]struct{}{},
 	}
 
 	_ = session.ctx.Set("emitHit", func(call goja.FunctionCall) goja.Value {
+		if !pluginHasCapability(meta, "threat.emit") {
+			session.warnOnce("missing capability threat.emit; emitted hits are ignored")
+			return goja.Undefined()
+		}
 		if len(call.Arguments) == 0 {
 			return goja.Undefined()
 		}
@@ -181,6 +203,9 @@ func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, 
 		return goja.Undefined()
 	})
 	_ = session.ctx.Set("log", func(goja.FunctionCall) goja.Value {
+		if !pluginHasCapability(meta, "logging") {
+			session.warnOnce("missing capability logging; ctx.log calls are ignored")
+		}
 		return goja.Undefined()
 	})
 
@@ -198,7 +223,11 @@ func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, 
 
 	if onFinishValue := vm.Get("onFinish"); onFinishValue != nil {
 		if onFinish, ok := goja.AssertFunction(onFinishValue); ok {
-			session.onFinish = onFinish
+			if pluginHasCapability(meta, "finish.hook") {
+				session.onFinish = onFinish
+			} else {
+				session.warnOnce("missing capability finish.hook; onFinish handler is skipped")
+			}
 		}
 	}
 
@@ -206,17 +235,34 @@ func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, 
 }
 
 func (s *jsPacketSession) ProcessBatch(packets []model.Packet) {
-	for _, packet := range packets {
-		_, err := s.onPacket(goja.Undefined(), s.vm.ToValue(packetForPlugin(packet)), s.ctx)
-		if err != nil {
-			continue
+	if s.runErr != nil {
+		return
+	}
+	err := s.runWithTimeout("packet batch", func() error {
+		for _, packet := range packets {
+			_, err := s.onPacket(goja.Undefined(), s.vm.ToValue(packetForPlugin(packet)), s.ctx)
+			if err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		s.runErr = err
 	}
 }
 
 func (s *jsPacketSession) Close() ([]model.ThreatHit, error) {
+	if s.runErr != nil {
+		return nil, s.runErr
+	}
 	if s.onFinish != nil {
-		_, _ = s.onFinish(goja.Undefined(), s.ctx)
+		if err := s.runWithTimeout("onFinish", func() error {
+			_, err := s.onFinish(goja.Undefined(), s.ctx)
+			return err
+		}); err != nil {
+			return nil, err
+		}
 	}
 	out := make([]model.ThreatHit, len(s.hits))
 	copy(out, s.hits)
@@ -225,6 +271,43 @@ func (s *jsPacketSession) Close() ([]model.ThreatHit, error) {
 
 func (s *jsPacketSession) Name() string {
 	return s.name
+}
+
+func (s *jsPacketSession) Warnings() []string {
+	if len(s.warnings) == 0 {
+		return nil
+	}
+	out := make([]string, len(s.warnings))
+	copy(out, s.warnings)
+	return out
+}
+
+func (s *jsPacketSession) runWithTimeout(stage string, fn func() error) error {
+	if s.timeout <= 0 {
+		return fn()
+	}
+
+	timer := time.AfterFunc(s.timeout, func() {
+		s.vm.Interrupt(fmt.Errorf("plugin %s exceeded timeout during %s", s.name, stage))
+	})
+	err := fn()
+	_ = timer.Stop()
+	s.vm.ClearInterrupt()
+	if interrupted, ok := err.(*goja.InterruptedError); ok {
+		if valueErr, ok := interrupted.Value().(error); ok {
+			return valueErr
+		}
+		return fmt.Errorf("plugin %s interrupted during %s", s.name, stage)
+	}
+	return err
+}
+
+func (s *jsPacketSession) warnOnce(message string) {
+	if _, exists := s.warned[message]; exists {
+		return
+	}
+	s.warned[message] = struct{}{}
+	s.warnings = append(s.warnings, fmt.Sprintf("%s: %s", s.name, message))
 }
 
 type pythonPacketSession struct {
@@ -237,21 +320,33 @@ type pythonPacketSession struct {
 	hits      []model.ThreatHit
 	writeErr  error
 	writeErrM sync.Mutex
+	cancel    context.CancelFunc
+	timeout   time.Duration
+	canEmit   bool
+	warnings  []string
+	warned    map[string]struct{}
 }
 
 func newPythonPacketSession(meta model.Plugin, logicPath string) (*pythonPacketSession, error) {
+	if !pluginHasCapability(meta, "packet.read") {
+		return nil, fmt.Errorf("plugin %s is missing required capability packet.read", meta.ID)
+	}
+
 	args, err := resolvePythonCommand()
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(args[0], append(args[1:], logicPath)...)
+	cmdCtx, cancel := context.WithCancel(context.Background())
+	cmd := exec.CommandContext(cmdCtx, args[0], append(args[1:], logicPath)...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	cmd.Stderr = io.Discard
@@ -263,9 +358,18 @@ func newPythonPacketSession(meta model.Plugin, logicPath string) (*pythonPacketS
 		encoder:  json.NewEncoder(stdin),
 		scanDone: make(chan error, 1),
 		hits:     make([]model.ThreatHit, 0, 8),
+		cancel:   cancel,
+		timeout:  pluginRuntimeTimeout(),
+		canEmit:  pluginHasCapability(meta, "threat.emit"),
+		warnings: make([]string, 0, 4),
+		warned:   map[string]struct{}{},
+	}
+	if !session.canEmit {
+		session.warnOnce("missing capability threat.emit; emitted hits are ignored")
 	}
 
 	if err := cmd.Start(); err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -305,6 +409,9 @@ func (s *pythonPacketSession) collectHits(meta model.Plugin, stdout io.Reader) {
 }
 
 func (s *pythonPacketSession) appendHit(hit model.ThreatHit) {
+	if !s.canEmit {
+		return
+	}
 	s.hitsMu.Lock()
 	s.hits = append(s.hits, hit)
 	s.hitsMu.Unlock()
@@ -330,7 +437,28 @@ func (s *pythonPacketSession) Close() ([]model.ThreatHit, error) {
 	if s.stdin != nil {
 		_ = s.stdin.Close()
 	}
-	waitErr := s.cmd.Wait()
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- s.cmd.Wait()
+	}()
+
+	var waitErr error
+	if s.timeout > 0 {
+		select {
+		case waitErr = <-waitDone:
+		case <-time.After(s.timeout):
+			if s.cancel != nil {
+				s.cancel()
+			}
+			if s.cmd.Process != nil {
+				_ = s.cmd.Process.Kill()
+			}
+			waitErr = <-waitDone
+			return nil, fmt.Errorf("plugin %s exceeded timeout during shutdown", s.name)
+		}
+	} else {
+		waitErr = <-waitDone
+	}
 	scanErr := <-s.scanDone
 
 	s.writeErrM.Lock()
@@ -356,6 +484,23 @@ func (s *pythonPacketSession) Close() ([]model.ThreatHit, error) {
 
 func (s *pythonPacketSession) Name() string {
 	return s.name
+}
+
+func (s *pythonPacketSession) Warnings() []string {
+	if len(s.warnings) == 0 {
+		return nil
+	}
+	out := make([]string, len(s.warnings))
+	copy(out, s.warnings)
+	return out
+}
+
+func (s *pythonPacketSession) warnOnce(message string) {
+	if _, exists := s.warned[message]; exists {
+		return
+	}
+	s.warned[message] = struct{}{}
+	s.warnings = append(s.warnings, fmt.Sprintf("%s: %s", s.name, message))
 }
 
 func packetForPlugin(packet model.Packet) map[string]any {
@@ -465,4 +610,33 @@ func int64FromAny(value any) int64 {
 	default:
 		return 0
 	}
+}
+
+func pluginRuntimeTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("GSHARK_PLUGIN_TIMEOUT_MS"))
+	if raw == "" {
+		return defaultPluginRuntimeTimeout
+	}
+	ms, err := strconv.Atoi(raw)
+	if err != nil || ms <= 0 {
+		return defaultPluginRuntimeTimeout
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
+func pluginHasCapability(meta model.Plugin, capability string) bool {
+	target := strings.ToLower(strings.TrimSpace(capability))
+	if target == "" {
+		return false
+	}
+	capabilities := meta.Capabilities
+	if len(capabilities) == 0 {
+		capabilities = defaultPluginCapabilities
+	}
+	for _, item := range capabilities {
+		if strings.EqualFold(strings.TrimSpace(item), target) {
+			return true
+		}
+	}
+	return false
 }

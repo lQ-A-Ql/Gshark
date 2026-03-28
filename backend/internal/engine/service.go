@@ -37,6 +37,7 @@ type Service struct {
 	vehicleDBCDefs     []*tshark.DBCDatabase
 	streamCache        map[string]model.ReassembledStream
 	streamCacheOrder   []string
+	rawStreamIndex     map[string]model.ReassembledStream
 
 	exportDir      string
 	mediaExportDir string
@@ -67,6 +68,8 @@ var (
 	streamPacketsFn       = tshark.StreamPackets
 	streamPacketsFastFn   = tshark.StreamPacketsFast
 	streamPacketsCompatFn = tshark.StreamPacketsCompat
+	httpStreamFromFileFn  = tshark.ReassembleHTTPStreamFromFile
+	rawStreamFromFileFn   = tshark.ReassembleRawStreamFromFile
 )
 
 func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
@@ -83,6 +86,7 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 		packetStore:        store,
 		displayFilterCache: map[string]*filteredPacketIndex{},
 		streamCache:        map[string]model.ReassembledStream{},
+		rawStreamIndex:     map[string]model.ReassembledStream{},
 		mediaArtifacts:     map[string]string{},
 		huntingPrefixes: []string{
 			"flag{",
@@ -143,6 +147,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.mediaArtifacts = map[string]string{}
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.rawStreamIndex = map[string]model.ReassembledStream{}
 	// Inject current TLS config into parse options
 	opts.TLS = s.tlsConf
 	s.mu.Unlock()
@@ -169,6 +174,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 
 	processed := 0
 	accepted := 0
+	rawStreamIndex := make(map[string]*model.ReassembledStream)
 	streamFn := streamPacketsFn
 	if opts.FastList {
 		streamFn = streamPacketsFastFn
@@ -181,7 +187,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		}
 		if s.packetStore != nil {
 			if err := s.packetStore.Append(pending); err != nil {
-				s.emitter.EmitStatus("鍐欏叆鏁版嵁鍖呭瓨鍌ㄥけ璐? " + err.Error())
+				s.emitter.EmitStatus("写入数据包存储失败: " + err.Error())
 			}
 		}
 		pending = pending[:0]
@@ -192,6 +198,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			return nil
 		}
 		accepted++
+		appendPacketToRawStreamIndex(rawStreamIndex, packet)
 		pending = append(pending, packet)
 		if len(pending) >= 1024 {
 			flushPending()
@@ -227,6 +234,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			}
 			processed = 0
 			accepted = 0
+			rawStreamIndex = make(map[string]*model.ReassembledStream)
 			streamFn = streamPacketsFn
 			pending = make([]model.Packet, 0, 1024)
 			err = streamFn(runCtx, opts, func(packet model.Packet) error {
@@ -234,6 +242,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 					return nil
 				}
 				accepted++
+				appendPacketToRawStreamIndex(rawStreamIndex, packet)
 				pending = append(pending, packet)
 				if len(pending) >= 1024 {
 					flushPending()
@@ -267,12 +276,14 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			}
 			processed = 0
 			accepted = 0
+			rawStreamIndex = make(map[string]*model.ReassembledStream)
 			pending = make([]model.Packet, 0, 1024)
 			err = streamPacketsCompatFn(runCtx, opts, func(packet model.Packet) error {
 				if atomic.LoadInt64(&s.runID) != currentRunID {
 					return nil
 				}
 				accepted++
+				appendPacketToRawStreamIndex(rawStreamIndex, packet)
 				pending = append(pending, packet)
 				if len(pending) >= 1024 {
 					flushPending()
@@ -316,6 +327,15 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 
 	switch err {
 	case nil:
+		s.mu.Lock()
+		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(rawStreamIndex))
+		for key, stream := range rawStreamIndex {
+			if stream == nil {
+				continue
+			}
+			s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+		}
+		s.mu.Unlock()
 		s.emitter.EmitStatus("解析完成")
 	case context.Canceled:
 		s.emitter.EmitStatus("解析被取消")
@@ -662,17 +682,25 @@ func (s *Service) HTTPStream(streamID int64) model.ReassembledStream {
 	}
 	s.mu.RUnlock()
 
+	if s.packetStore != nil {
+		stream := ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
+			return s.packetStore.Iterate(nil, fn)
+		}, streamID)
+		if len(stream.Chunks) > 0 || stream.Request != "" || stream.Response != "" {
+			s.cacheStream(key, stream)
+			return stream
+		}
+	}
+
 	if pcap != "" {
-		stream, err := tshark.ReassembleHTTPStreamFromFile(pcap, streamID)
+		stream, err := httpStreamFromFileFn(pcap, streamID)
 		if err == nil && (stream.Request != "" || stream.Response != "") {
 			s.cacheStream(key, stream)
 			return stream
 		}
 	}
 
-	stream := ReassembleHTTPStream(s.Packets(), streamID)
-	s.cacheStream(key, stream)
-	return stream
+	return model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
 }
 
 func (s *Service) RawStream(protocol string, streamID int64) model.ReassembledStream {
@@ -685,19 +713,37 @@ func (s *Service) RawStream(protocol string, streamID int64) model.ReassembledSt
 		s.mu.RUnlock()
 		return cloneReassembledStream(cached)
 	}
+	if indexed, ok := s.rawStreamIndex[key]; ok {
+		s.mu.RUnlock()
+		s.cacheStream(key, indexed)
+		return cloneReassembledStream(indexed)
+	}
 	s.mu.RUnlock()
 
 	if pcap != "" {
-		stream, err := tshark.ReassembleRawStreamFromFile(pcap, normalized, streamID)
+		stream, err := rawStreamFromFileFn(pcap, normalized, streamID)
 		if err == nil && len(stream.Chunks) > 0 {
 			s.cacheStream(key, stream)
 			return stream
 		}
 	}
 
-	stream := ReassembleRawStream(s.Packets(), normalized, streamID)
-	s.cacheStream(key, stream)
-	return stream
+	return model.ReassembledStream{StreamID: streamID, Protocol: normalized}
+}
+
+func (s *Service) RawStreamPage(protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int) {
+	normalized := strings.ToUpper(strings.TrimSpace(protocol))
+	key := streamCacheKey(normalized, streamID)
+
+	s.mu.RLock()
+	if indexed, ok := s.rawStreamIndex[key]; ok {
+		s.mu.RUnlock()
+		return cloneRawStreamWindow(indexed, cursor, limit)
+	}
+	s.mu.RUnlock()
+
+	stream := s.RawStream(normalized, streamID)
+	return cloneRawStreamWindow(stream, cursor, limit)
 }
 
 func (s *Service) cacheStream(key string, stream model.ReassembledStream) {
@@ -802,13 +848,14 @@ func (s *Service) AddPlugin(p model.Plugin) (model.Plugin, error) {
 		return model.Plugin{}, errors.New("plugin manager is nil")
 	}
 	return s.pluginManger.Add(plugin.RulePlugin{
-		ID:      p.ID,
-		Name:    p.Name,
-		Version: p.Version,
-		Tag:     p.Tag,
-		Author:  p.Author,
-		Enabled: p.Enabled,
-		Entry:   p.Entry,
+		ID:           p.ID,
+		Name:         p.Name,
+		Version:      p.Version,
+		Tag:          p.Tag,
+		Author:       p.Author,
+		Enabled:      p.Enabled,
+		Entry:        p.Entry,
+		Capabilities: p.Capabilities,
 	})
 }
 

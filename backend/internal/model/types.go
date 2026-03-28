@@ -97,14 +97,15 @@ type ObjectFile struct {
 }
 
 type Plugin struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Tag     string `json:"tag"`
-	Author  string `json:"author"`
-	Enabled bool   `json:"enabled"`
-	Entry   string `json:"entry,omitempty"`
-	Runtime string `json:"runtime,omitempty"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Tag          string   `json:"tag"`
+	Author       string   `json:"author"`
+	Enabled      bool     `json:"enabled"`
+	Entry        string   `json:"entry,omitempty"`
+	Runtime      string   `json:"runtime,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 type PluginSource struct {
@@ -114,6 +115,18 @@ type PluginSource struct {
 	LogicPath     string `json:"logic_path,omitempty"`
 	LogicContent  string `json:"logic_content,omitempty"`
 	Entry         string `json:"entry,omitempty"`
+}
+
+type AuditEntry struct {
+	Time          string `json:"time"`
+	Method        string `json:"method"`
+	Path          string `json:"path"`
+	Action        string `json:"action"`
+	Risk          string `json:"risk"`
+	Origin        string `json:"origin,omitempty"`
+	RemoteAddr    string `json:"remote_addr,omitempty"`
+	Status        int    `json:"status"`
+	Authenticated bool   `json:"authenticated"`
 }
 
 type ParseOptions struct {

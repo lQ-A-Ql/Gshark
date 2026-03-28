@@ -1,29 +1,81 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
+import { bridge } from "../integrations/wailsBridge";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+type RawViewMode = "ascii" | "hex" | "raw";
+type RawChunk = { packetId: number; direction: string; body: string };
+
+const STREAM_PAGE_SIZE = 96;
+const MAX_PREVIEW_BYTES = 4096;
+
 export default function UdpStream() {
-  const [viewMode, setViewMode] = useState("ascii");
+  const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
-  const [renderLimit, setRenderLimit] = useState(200);
+  const [streamView, setStreamView] = useState(() => ({
+    id: 1,
+    protocol: "UDP" as const,
+    from: "",
+    to: "",
+    chunks: [] as RawChunk[],
+    nextCursor: 0,
+    totalChunks: 0,
+    hasMore: false,
+  }));
+  const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
   const { udpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
-  const currentIndex = streamIds.udp.findIndex((id) => id === udpStream.id);
+  const currentIndex = streamIds.udp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.udp.length || 1}` : `-- / ${streamIds.udp.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.udp.length - 1;
-  const visibleChunks = useMemo(() => udpStream.chunks.slice(0, renderLimit), [udpStream.chunks, renderLimit]);
+  const visibleChunks = useMemo(() => streamView.chunks, [streamView.chunks]);
 
   useEffect(() => {
-    setRenderLimit(200);
+    setStreamView({
+      id: udpStream.id,
+      protocol: udpStream.protocol,
+      from: udpStream.from,
+      to: udpStream.to,
+      chunks: udpStream.chunks,
+      nextCursor: udpStream.nextCursor ?? udpStream.chunks.length,
+      totalChunks: udpStream.totalChunks ?? udpStream.chunks.length,
+      hasMore: udpStream.hasMore ?? false,
+    });
+  }, [udpStream]);
+
+  useEffect(() => {
+    setStreamInput(String(udpStream.id || ""));
   }, [udpStream.id]);
+
+  async function loadMore() {
+    if (loadingMore || !streamView.hasMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await bridge.getRawStreamPage("UDP", streamView.id, streamView.nextCursor ?? streamView.chunks.length, STREAM_PAGE_SIZE);
+      setStreamView((prev) => {
+        if (prev.id !== page.id) return prev;
+        return {
+          ...prev,
+          from: page.from,
+          to: page.to,
+          chunks: [...prev.chunks, ...page.chunks],
+          nextCursor: page.nextCursor ?? prev.chunks.length + page.chunks.length,
+          totalChunks: page.totalChunks ?? prev.totalChunks,
+          hasMore: page.hasMore ?? false,
+        };
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
@@ -34,9 +86,9 @@ export default function UdpStream() {
           </button>
           <div className="h-4 w-px bg-border" />
           <h1 className="flex items-center gap-2 font-semibold text-foreground">
-            追踪 UDP 流 (Stream eq {udpStream.id})
+            追踪 UDP 流 (Stream eq {streamView.id})
             <span className="ml-2 flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {udpStream.from} <ArrowLeftRight className="h-3 w-3" /> {udpStream.to}
+              {streamView.from} <ArrowLeftRight className="h-3 w-3" /> {streamView.to}
             </span>
           </h1>
         </div>
@@ -46,27 +98,21 @@ export default function UdpStream() {
       <div className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-relaxed">
         <div className="flex max-w-4xl flex-col gap-1">
           {visibleChunks.map((chunk) => (
-            <div
+            <RawStreamChunkCard
               key={chunk.packetId}
-              className={cn(
-                "rounded-md border px-3 py-2",
-                chunk.direction === "client" ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400" : "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
-              )}
-            >
-              <span className="mr-2 select-none text-xs font-semibold opacity-60">
-                {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
-              </span>
-              <pre className="whitespace-pre-wrap break-all text-xs leading-5">
-                {renderStreamChunk(chunk.body, viewMode)}
-              </pre>
-            </div>
+              chunk={chunk}
+              mode={viewMode}
+              clientTone="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              serverTone="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+            />
           ))}
-          {renderLimit < udpStream.chunks.length && (
+          {streamView.hasMore && (
             <button
-              className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-              onClick={() => setRenderLimit((prev) => Math.min(prev + 400, udpStream.chunks.length))}
+              className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
             >
-              加载更多 ({renderLimit}/{udpStream.chunks.length})
+              {loadingMore ? "正在加载..." : `加载更多 (${streamView.chunks.length}/${streamView.totalChunks || streamView.chunks.length})`}
             </button>
           )}
         </div>
@@ -88,7 +134,7 @@ export default function UdpStream() {
             <input type="radio" name="viewMode" checked={viewMode === "raw"} onChange={() => setViewMode("raw")} className="accent-blue-600" /> Raw
           </label>
         </div>
-        <div className="grid h-full grid-cols-[auto_28px_minmax(220px,1fr)_28px_72px] items-center gap-2">
+        <div className="grid h-full grid-cols-[auto_28px_minmax(220px,1fr)_28px_72px_120px] items-center gap-2">
           <span className="text-xs text-muted-foreground">流切换:</span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
@@ -102,7 +148,7 @@ export default function UdpStream() {
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="px-2 text-center font-mono text-xs text-foreground" title={`UDP 流总数: ${streamIds.udp.length}`}>
-            第 {ordinalLabel} 条 · stream eq {udpStream.id}
+            第 {ordinalLabel} 条 · stream eq {streamView.id}
           </span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
@@ -129,6 +175,9 @@ export default function UdpStream() {
             placeholder="stream"
             title={`UDP 流总数: ${streamIds.udp.length}`}
           />
+          <span className="text-right text-[11px] text-muted-foreground">
+            已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
+          </span>
         </div>
         <div className="justify-self-end">
           <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
@@ -140,17 +189,47 @@ export default function UdpStream() {
   );
 }
 
-function parseChunkBytes(body: string): number[] {
+const RawStreamChunkCard = memo(function RawStreamChunkCard({
+  chunk,
+  mode,
+  clientTone,
+  serverTone,
+}: {
+  chunk: RawChunk;
+  mode: RawViewMode;
+  clientTone: string;
+  serverTone: string;
+}) {
+  const rendered = useMemo(() => renderStreamChunk(chunk.body, mode), [chunk.body, mode]);
+  const tone = chunk.direction === "client" ? clientTone : serverTone;
+
+  return (
+    <div className={cn("rounded-md border px-3 py-2", tone)}>
+      <span className="mr-2 select-none text-xs font-semibold opacity-60">
+        {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
+      </span>
+      <pre className="whitespace-pre-wrap break-all text-xs leading-5">{rendered}</pre>
+    </div>
+  );
+});
+
+function parseChunkBytes(body: string, limit = Number.POSITIVE_INFINITY): number[] {
   const raw = (body ?? "").trim();
   if (!raw) return [];
   const isHex = /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw);
   if (!isHex) {
-    return Array.from(new TextEncoder().encode(raw));
+    return Array.from(new TextEncoder().encode(raw.slice(0, Number.isFinite(limit) ? limit : undefined)));
   }
-  return raw
-    .split(":")
-    .map((part) => Number.parseInt(part, 16))
-    .filter((v) => Number.isFinite(v));
+  const parts = raw.split(":");
+  const size = Math.min(parts.length, Number.isFinite(limit) ? limit : parts.length);
+  const bytes: number[] = [];
+  for (let i = 0; i < size; i += 1) {
+    const value = Number.parseInt(parts[i], 16);
+    if (Number.isFinite(value)) {
+      bytes.push(value);
+    }
+  }
+  return bytes;
 }
 
 function bytesToAscii(bytes: number[]): string {
@@ -170,12 +249,17 @@ function bytesToHexDump(bytes: number[]): string {
   return lines.join("\n");
 }
 
-function renderStreamChunk(body: string, mode: string): string {
+function renderStreamChunk(body: string, mode: RawViewMode): string {
+  const raw = body || "";
   if (mode === "raw") {
-    return body || "(empty payload)";
+    if (!raw) return "(empty payload)";
+    if (raw.length <= MAX_PREVIEW_BYTES * 3) {
+      return raw;
+    }
+    return `${raw.slice(0, MAX_PREVIEW_BYTES * 3)}\n\n... 已截断`;
   }
 
-  const bytes = parseChunkBytes(body);
+  const bytes = parseChunkBytes(raw, MAX_PREVIEW_BYTES);
   if (mode === "hex") {
     return bytesToHexDump(bytes);
   }

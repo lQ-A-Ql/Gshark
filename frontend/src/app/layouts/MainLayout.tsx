@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Activity, LayoutDashboard, ShieldAlert, FileDown, KeyRound, Puzzle, Box, FolderOpen, Save, Upload, Hexagon, BarChart3, Factory, Car, Clapperboard } from "lucide-react";
+import { Activity, LayoutDashboard, ShieldAlert, FileDown, KeyRound, Puzzle, Box, FolderOpen, Save, Upload, Hexagon, BarChart3, Factory, Car, Clapperboard, ScrollText } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useEffect } from "react";
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { path: "/objects", icon: FileDown, label: "附件提取" },
   { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
   { path: "/plugins", icon: Puzzle, label: "插件管理" },
+  { path: "/audit-logs", icon: ScrollText, label: "审计日志" },
 ];
 
 export function MainLayout() {
@@ -190,6 +191,7 @@ export function MainLayout() {
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/industrial-analysis")}>工控分析</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/vehicle-analysis")}>车机分析</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/media-analysis")}>视频流还原</div>
+                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/audit-logs")}>审计日志</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={followSelectedStream}>追踪流</div>
                   <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/hunting")}>专家信息</div>
                 </div>

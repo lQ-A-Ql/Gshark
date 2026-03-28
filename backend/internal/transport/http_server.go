@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,12 +41,25 @@ type Server struct {
 	svc *engine.Service
 	hub *Hub
 
-	mu      sync.Mutex
-	clients map[chan event]struct{}
+	mu        sync.Mutex
+	clients   map[chan event]struct{}
+	authToken string
+
+	auditMu   sync.Mutex
+	auditLogs []model.AuditEntry
+
+	uploadMu           sync.Mutex
+	uploadedFiles      map[string]struct{}
+	activeUploadedPCAP string
 }
 
 func NewServer(svc *engine.Service, hub *Hub) *Server {
-	s := &Server{svc: svc, hub: hub, clients: map[chan event]struct{}{}}
+	s := &Server{
+		svc:           svc,
+		hub:           hub,
+		clients:       map[chan event]struct{}{},
+		uploadedFiles: map[string]struct{}{},
+	}
 	hub.OnPacket(func(packet model.Packet) {
 		s.broadcast(event{Type: "packet", Data: packet})
 	})
@@ -56,6 +70,12 @@ func NewServer(svc *engine.Service, hub *Hub) *Server {
 		s.broadcast(event{Type: "error", Data: map[string]string{"message": message}})
 	})
 	return s
+}
+
+func (s *Server) SetAuthToken(token string) {
+	s.mu.Lock()
+	s.authToken = strings.TrimSpace(token)
+	s.mu.Unlock()
 }
 
 func (s *Server) Handler() http.Handler {
@@ -75,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/objects/download", s.handleObjectsDownload)
 	mux.HandleFunc("/api/streams/http", s.handleHTTPStream)
 	mux.HandleFunc("/api/streams/raw", s.handleRawStream)
+	mux.HandleFunc("/api/streams/raw/page", s.handleRawStreamPage)
 	mux.HandleFunc("/api/streams/index", s.handleStreamIndex)
 	mux.HandleFunc("/api/packet/raw", s.handlePacketRaw)
 	mux.HandleFunc("/api/packet/layers", s.handlePacketLayers)
@@ -85,6 +106,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/tls", s.handleTLS)
+	mux.HandleFunc("/api/audit/logs", s.handleAuditLogs)
 	mux.HandleFunc("/api/plugins", s.handlePlugins)
 	mux.HandleFunc("/api/plugins/add", s.handleAddPlugin)
 	mux.HandleFunc("/api/plugins/delete", s.handleDeletePlugin)
@@ -92,7 +114,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/plugins/toggle", s.handleTogglePlugin)
 	mux.HandleFunc("/api/plugins/bulk", s.handleBulkPlugins)
 
-	return withCORS(mux)
+	return withCORS(s.withAuth(s.withAudit(mux)))
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
@@ -100,6 +122,7 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 	go func() {
 		<-ctx.Done()
 		_ = httpServer.Shutdown(context.Background())
+		s.cleanupUploadedFiles()
 	}()
 	log.Printf("sentinel backend listening on %s", addr)
 	err := httpServer.ListenAndServe()
@@ -189,6 +212,7 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		tsharkStatus.Path,
 		tsharkStatus.UsingCustomPath,
 	)
+	s.promoteUploadedFile(options.FilePath)
 	go func() {
 		if err := s.svc.LoadPCAP(context.Background(), options); err != nil {
 			log.Printf("http: capture start failed file=%q err=%v", options.FilePath, err)
@@ -252,6 +276,7 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("http: uploaded capture saved as %q (%d bytes)", targetPath, written)
+	s.registerUploadedFile(targetPath)
 
 	writeJSON(w, http.StatusOK, openCaptureResult{
 		FilePath: targetPath,
@@ -662,6 +687,39 @@ func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.svc.RawStream(protocol, streamID))
 }
 
+type streamPageResponse struct {
+	StreamID   int64               `json:"stream_id"`
+	Protocol   string              `json:"protocol"`
+	From       string              `json:"from"`
+	To         string              `json:"to"`
+	Chunks     []model.StreamChunk `json:"chunks"`
+	NextCursor int                 `json:"next_cursor"`
+	Total      int                 `json:"total"`
+	HasMore    bool                `json:"has_more"`
+}
+
+func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
+	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
+	protocol := r.URL.Query().Get("protocol")
+	if protocol == "" {
+		protocol = "TCP"
+	}
+	cursor, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("cursor")))
+	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
+
+	stream, next, total := s.svc.RawStreamPage(protocol, streamID, cursor, limit)
+	writeJSON(w, http.StatusOK, streamPageResponse{
+		StreamID:   stream.StreamID,
+		Protocol:   stream.Protocol,
+		From:       stream.From,
+		To:         stream.To,
+		Chunks:     stream.Chunks,
+		NextCursor: next,
+		Total:      total,
+		HasMore:    next < total,
+	})
+}
+
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -677,6 +735,19 @@ func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleAuditLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	s.auditMu.Lock()
+	logs := make([]model.AuditEntry, len(s.auditLogs))
+	copy(logs, s.auditLogs)
+	s.auditMu.Unlock()
+	writeJSON(w, http.StatusOK, logs)
 }
 
 func (s *Server) handlePlugins(w http.ResponseWriter, _ *http.Request) {
@@ -783,15 +854,88 @@ func (s *Server) broadcast(ev event) {
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin != "" {
+			if !isAllowedOrigin(origin) {
+				http.Error(w, "forbidden origin", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-GShark-Auth")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) withAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		token := s.authToken
+		s.mu.Unlock()
+
+		if token == "" || r.URL.Path == "/health" || isTrustedDesktopOrigin(r.Header.Get("Origin")) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		candidate := strings.TrimSpace(r.Header.Get("Authorization"))
+		if strings.HasPrefix(strings.ToLower(candidate), "bearer ") {
+			candidate = strings.TrimSpace(candidate[7:])
+		}
+		if candidate == "" {
+			candidate = strings.TrimSpace(r.Header.Get("X-GShark-Auth"))
+		}
+		if candidate == "" {
+			candidate = strings.TrimSpace(r.URL.Query().Get("access_token"))
+		}
+		if candidate != token {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) withAudit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" || r.URL.Path == "/api/events" || r.URL.Path == "/api/audit/logs" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(recorder, r)
+
+		entry := model.AuditEntry{
+			Time:          time.Now().Format(time.RFC3339),
+			Method:        r.Method,
+			Path:          r.URL.Path,
+			Action:        classifyAuditAction(r.URL.Path, r.Method),
+			Risk:          classifyAuditRisk(r.URL.Path, r.Method),
+			Origin:        strings.TrimSpace(r.Header.Get("Origin")),
+			RemoteAddr:    strings.TrimSpace(r.RemoteAddr),
+			Status:        recorder.status,
+			Authenticated: true,
+		}
+		s.appendAuditEntry(entry)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
 }
 
 func writeJSON(w http.ResponseWriter, code int, payload any) {
@@ -813,4 +957,187 @@ func parseInt64(s string, fallback int64) int64 {
 		return fallback
 	}
 	return v
+}
+
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "127.0.0.1", "localhost", "::1", "wails.localhost":
+		return true
+	default:
+		return false
+	}
+}
+
+func isTrustedDesktopOrigin(origin string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(origin))
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(parsed.Hostname(), "wails.localhost")
+}
+
+func classifyAuditAction(path, method string) string {
+	switch path {
+	case "/api/capture/start":
+		return "capture.start"
+	case "/api/capture/stop":
+		return "capture.stop"
+	case "/api/capture/upload":
+		return "capture.upload"
+	case "/api/tools/tshark":
+		if method == http.MethodPost {
+			return "tools.tshark.configure"
+		}
+		return "tools.tshark.inspect"
+	case "/api/hunting/config":
+		if method == http.MethodPost {
+			return "hunting.configure"
+		}
+		return "hunting.inspect"
+	case "/api/tls":
+		if method == http.MethodPost {
+			return "tls.configure"
+		}
+		return "tls.inspect"
+	case "/api/analysis/vehicle/dbc":
+		if method == http.MethodDelete {
+			return "dbc.remove"
+		}
+		if method == http.MethodPost {
+			return "dbc.add"
+		}
+		return "dbc.list"
+	case "/api/plugins":
+		return "plugin.list"
+	case "/api/plugins/add":
+		return "plugin.add"
+	case "/api/plugins/delete":
+		return "plugin.delete"
+	case "/api/plugins/source":
+		if method == http.MethodPost {
+			return "plugin.source.save"
+		}
+		return "plugin.source.read"
+	case "/api/plugins/toggle":
+		return "plugin.toggle"
+	case "/api/plugins/bulk":
+		return "plugin.bulk"
+	default:
+		if strings.HasPrefix(path, "/api/analysis/") {
+			return "analysis.read"
+		}
+		if strings.HasPrefix(path, "/api/objects") || strings.HasPrefix(path, "/api/streams") || strings.HasPrefix(path, "/api/packet") || strings.HasPrefix(path, "/api/packets") {
+			return "capture.read"
+		}
+		return "api.request"
+	}
+}
+
+func classifyAuditRisk(path, method string) string {
+	switch path {
+	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls":
+		return "high"
+	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/hunting/config":
+		if method == http.MethodGet {
+			return "low"
+		}
+		return "medium"
+	default:
+		if method == http.MethodPost || method == http.MethodDelete {
+			return "medium"
+		}
+		return "low"
+	}
+}
+
+func (s *Server) appendAuditEntry(entry model.AuditEntry) {
+	s.auditMu.Lock()
+	defer s.auditMu.Unlock()
+	s.auditLogs = append(s.auditLogs, entry)
+	if len(s.auditLogs) > 200 {
+		s.auditLogs = append([]model.AuditEntry(nil), s.auditLogs[len(s.auditLogs)-200:]...)
+	}
+}
+
+func (s *Server) registerUploadedFile(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+
+	s.uploadMu.Lock()
+	s.uploadedFiles[path] = struct{}{}
+	toDelete := s.collectUploadedFilesForCleanupLocked(path, s.activeUploadedPCAP)
+	s.uploadMu.Unlock()
+	deleteFiles(toDelete)
+}
+
+func (s *Server) promoteUploadedFile(path string) {
+	path = strings.TrimSpace(path)
+
+	s.uploadMu.Lock()
+	var oldActive string
+	if s.activeUploadedPCAP != "" && s.activeUploadedPCAP != path {
+		oldActive = s.activeUploadedPCAP
+		delete(s.uploadedFiles, s.activeUploadedPCAP)
+	}
+	if _, ok := s.uploadedFiles[path]; ok {
+		s.activeUploadedPCAP = path
+	} else {
+		s.activeUploadedPCAP = ""
+	}
+	toDelete := s.collectUploadedFilesForCleanupLocked(s.activeUploadedPCAP)
+	s.uploadMu.Unlock()
+	if oldActive != "" {
+		toDelete = append(toDelete, oldActive)
+	}
+	deleteFiles(toDelete)
+}
+
+func (s *Server) cleanupUploadedFiles() {
+	s.uploadMu.Lock()
+	toDelete := make([]string, 0, len(s.uploadedFiles))
+	for path := range s.uploadedFiles {
+		toDelete = append(toDelete, path)
+	}
+	s.uploadedFiles = map[string]struct{}{}
+	s.activeUploadedPCAP = ""
+	s.uploadMu.Unlock()
+	deleteFiles(toDelete)
+}
+
+func (s *Server) collectUploadedFilesForCleanupLocked(keep ...string) []string {
+	keepSet := make(map[string]struct{}, len(keep))
+	for _, item := range keep {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			keepSet[item] = struct{}{}
+		}
+	}
+
+	var toDelete []string
+	for path := range s.uploadedFiles {
+		if _, ok := keepSet[path]; ok {
+			continue
+		}
+		toDelete = append(toDelete, path)
+		delete(s.uploadedFiles, path)
+	}
+	return toDelete
+}
+
+func deleteFiles(paths []string) {
+	for _, path := range paths {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		_ = os.Remove(path)
+	}
 }
