@@ -22,6 +22,7 @@ import type {
   HttpStream,
   Packet,
   PluginItem,
+  StreamLoadMeta,
   StreamProtocol,
   StreamSwitchMetrics,
   StreamSwitchStat,
@@ -86,6 +87,7 @@ const SentinelContext = createContext<SentinelContextValue | null>(null);
 
 const PAGE_SIZE = 2000;
 const RAW_STREAM_PAGE_SIZE = 96;
+const STREAM_PREFETCH_LIMIT = 0;
 const PRELOAD_POLL_INTERVAL_MS = 120;
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
 const EMPTY_TSHARK_STATUS: TSharkStatus = {
@@ -97,7 +99,7 @@ const EMPTY_TSHARK_STATUS: TSharkStatus = {
 };
 
 const EMPTY_HTTP_STREAM: HttpStream = {
-  id: 1,
+  id: -1,
   client: "",
   server: "",
   request: "",
@@ -106,7 +108,7 @@ const EMPTY_HTTP_STREAM: HttpStream = {
 };
 
 const EMPTY_BINARY_STREAM: BinaryStream = {
-  id: 1,
+  id: -1,
   protocol: "TCP",
   from: "",
   to: "",
@@ -150,6 +152,54 @@ function buildSwitchStat(values: number[], hitCount: number): StreamSwitchStat {
   const p95Ms = calcPercentile(values, 95);
   const cacheHitRate = Number(((hitCount / count) * 100).toFixed(1));
   return { count, lastMs, p50Ms, p95Ms, cacheHitRate };
+}
+
+function isFastPathLoad(meta?: StreamLoadMeta): boolean {
+  if (!meta) return false;
+  return Boolean(meta.cacheHit || meta.indexHit || meta.source === "memory" || meta.source === "cache");
+}
+
+function markCachedLoad<T extends HttpStream | BinaryStream>(stream: T): T {
+  return {
+    ...stream,
+    loadMeta: {
+      ...(stream.loadMeta ?? {}),
+      source: "cache",
+      cacheHit: true,
+    },
+  };
+}
+
+function buildLoadingHttpStream(streamId: number): HttpStream {
+  return {
+    id: streamId,
+    client: "",
+    server: "",
+    request: "",
+    response: "",
+    chunks: [],
+    loadMeta: {
+      source: "loading",
+      loading: true,
+    },
+  };
+}
+
+function buildLoadingBinaryStream(protocol: "TCP" | "UDP", streamId: number): BinaryStream {
+  return {
+    id: streamId,
+    protocol,
+    from: "",
+    to: "",
+    chunks: [],
+    nextCursor: 0,
+    totalChunks: 0,
+    hasMore: false,
+    loadMeta: {
+      source: "loading",
+      loading: true,
+    },
+  };
 }
 
 function prettySize(bytes: number) {
@@ -219,6 +269,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const httpSwitchSeqRef = useRef(0);
   const tcpSwitchSeqRef = useRef(0);
   const udpSwitchSeqRef = useRef(0);
+  const httpRequestAbortRef = useRef<AbortController | null>(null);
+  const tcpRequestAbortRef = useRef<AbortController | null>(null);
+  const udpRequestAbortRef = useRef<AbortController | null>(null);
   const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
   const streamSwitchDurationsRef = useRef<Record<"ALL" | StreamProtocol, number[]>>({
     ALL: [],
@@ -413,25 +466,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     }
   }, [backendConnected]);
 
-  const loadStreams = useCallback(async (streamId: number) => {
-    if (!backendConnected) return;
-    try {
-      const [http, tcp, udp] = await Promise.all([
-        bridge.getHttpStream(streamId),
-        bridge.getRawStreamPage("TCP", streamId, 0, RAW_STREAM_PAGE_SIZE),
-        bridge.getRawStreamPage("UDP", streamId, 0, RAW_STREAM_PAGE_SIZE),
-      ]);
-      httpStreamCacheRef.current.set(http.id, http);
-      tcpStreamCacheRef.current.set(tcp.id, tcp);
-      udpStreamCacheRef.current.set(udp.id, udp);
-      setHttpStream(http);
-      setTcpStream(tcp);
-      setUdpStream(udp);
-    } catch {
-      setBackendStatus("流重组失败");
-    }
-  }, [backendConnected]);
-
   const refreshStreamIndex = useCallback(async () => {
     if (!backendConnected) return;
     try {
@@ -447,13 +481,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [backendConnected]);
 
   const prefetchAdjacentStreams = useCallback((protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {
-    if (!backendConnected || currentStreamId <= 0) return;
+    if (!backendConnected || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0) return;
 
     const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
     const idx = ids.findIndex((id) => id === currentStreamId);
     if (idx < 0) return;
 
-    const neighbors = [ids[idx - 1], ids[idx + 1]].filter((id): id is number => Number.isFinite(id) && id > 0);
+    const neighbors = [ids[idx + 1], ids[idx - 1]]
+      .filter((id): id is number => Number.isFinite(id) && id > 0)
+      .slice(0, STREAM_PREFETCH_LIMIT);
     for (const targetId of neighbors) {
       if (protocol === "HTTP") {
         if (httpStreamCacheRef.current.has(targetId) || httpPrefetchInFlightRef.current.has(targetId)) continue;
@@ -500,9 +536,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp]);
 
   const setActiveStream = useCallback(async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
-    if (!backendConnected || streamId <= 0) return;
+    if (!backendConnected || streamId < 0) return;
     const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     let cacheHit = false;
+
+    const requestAbortRef =
+      protocol === "HTTP"
+        ? httpRequestAbortRef
+        : protocol === "TCP"
+          ? tcpRequestAbortRef
+          : udpRequestAbortRef;
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
 
     const requestSeq = protocol === "HTTP"
       ? ++httpSwitchSeqRef.current
@@ -521,23 +567,27 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         const cached = httpStreamCacheRef.current.get(streamId);
         if (cached) {
           if (!isLatest()) return;
+          const next = markCachedLoad(cached);
           cacheHit = true;
           startTransition(() => {
-            setHttpStream(cached);
+            setHttpStream(next);
           });
           const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
           recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
           prefetchAdjacentStreams("HTTP", streamId);
           return;
         }
-        const http = await bridge.getHttpStream(streamId);
+        startTransition(() => {
+          setHttpStream(buildLoadingHttpStream(streamId));
+        });
+        const http = await bridge.getHttpStream(streamId, abortController.signal);
         if (!isLatest()) return;
         httpStreamCacheRef.current.set(http.id, http);
         startTransition(() => {
           setHttpStream(http);
         });
         const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
+        recordStreamSwitchMetric("HTTP", elapsed, isFastPathLoad(http.loadMeta));
         prefetchAdjacentStreams("HTTP", streamId);
         return;
       }
@@ -545,44 +595,70 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         const cached = tcpStreamCacheRef.current.get(streamId);
         if (cached) {
           if (!isLatest()) return;
+          const next = markCachedLoad(cached);
           cacheHit = true;
-          setTcpStream(cached);
+          startTransition(() => {
+            setTcpStream(next);
+          });
           const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
           recordStreamSwitchMetric("TCP", elapsed, cacheHit);
           prefetchAdjacentStreams("TCP", streamId);
           return;
         }
+        startTransition(() => {
+          setTcpStream(buildLoadingBinaryStream("TCP", streamId));
+        });
       }
       if (protocol === "UDP") {
         const cached = udpStreamCacheRef.current.get(streamId);
         if (cached) {
           if (!isLatest()) return;
+          const next = markCachedLoad(cached);
           cacheHit = true;
-          setUdpStream(cached);
+          startTransition(() => {
+            setUdpStream(next);
+          });
           const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
           recordStreamSwitchMetric("UDP", elapsed, cacheHit);
           prefetchAdjacentStreams("UDP", streamId);
           return;
         }
+        startTransition(() => {
+          setUdpStream(buildLoadingBinaryStream("UDP", streamId));
+        });
       }
-      const raw = await bridge.getRawStreamPage(protocol, streamId, 0, RAW_STREAM_PAGE_SIZE);
+      const raw = await bridge.getRawStreamPage(protocol, streamId, 0, RAW_STREAM_PAGE_SIZE, abortController.signal);
       if (!isLatest()) return;
       if (protocol === "TCP") {
         tcpStreamCacheRef.current.set(raw.id, raw);
-        setTcpStream(raw);
+        startTransition(() => {
+          setTcpStream(raw);
+        });
         const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("TCP", elapsed, cacheHit);
+        recordStreamSwitchMetric("TCP", elapsed, isFastPathLoad(raw.loadMeta));
         prefetchAdjacentStreams("TCP", streamId);
       } else {
         udpStreamCacheRef.current.set(raw.id, raw);
-        setUdpStream(raw);
+        startTransition(() => {
+          setUdpStream(raw);
+        });
         const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("UDP", elapsed, cacheHit);
+        recordStreamSwitchMetric("UDP", elapsed, isFastPathLoad(raw.loadMeta));
         prefetchAdjacentStreams("UDP", streamId);
       }
-    } catch {
+    } catch (error) {
       if (!isLatest()) return;
-      setBackendStatus("流切换失败");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      setBackendStatus(error instanceof Error && error.message ? error.message : "流切换失败");
+    } finally {
+      if (requestAbortRef.current === abortController) {
+        requestAbortRef.current = null;
+      }
     }
   }, [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric]);
 
@@ -712,11 +788,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       }
     };
   }, [refreshAnalysisResult, scheduleLoadMore, updateProgressFromStatus]);
-
-  useEffect(() => {
-    if (selectedPacketId == null || !selectedPacket || selectedPacket.streamId == null) return;
-    void loadStreams(selectedPacket.streamId);
-  }, [selectedPacketId, selectedPacket?.streamId, loadStreams]);
 
   useEffect(() => {
     if (selectedPacketId == null || !selectedPacket) {

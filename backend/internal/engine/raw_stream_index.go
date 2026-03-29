@@ -11,7 +11,7 @@ import (
 )
 
 func appendPacketToRawStreamIndex(index map[string]*model.ReassembledStream, packet model.Packet) {
-	if packet.StreamID <= 0 {
+	if packet.StreamID < 0 {
 		return
 	}
 
@@ -28,11 +28,12 @@ func appendPacketToRawStreamIndex(index map[string]*model.ReassembledStream, pac
 	key := streamCacheKey(protocol, packet.StreamID)
 	stream := index[key]
 	if stream == nil {
+		from, to := selectClientServerHosts(packet.SourceIP, packet.SourcePort, packet.DestIP, packet.DestPort)
 		stream = &model.ReassembledStream{
 			StreamID: packet.StreamID,
 			Protocol: protocol,
-			From:     packet.SourceIP,
-			To:       packet.DestIP,
+			From:     from,
+			To:       to,
 		}
 		index[key] = stream
 	}
@@ -237,5 +238,35 @@ func cloneRawStreamWindow(in model.ReassembledStream, cursor, limit int) (model.
 	} else {
 		out.Chunks = nil
 	}
+	if in.LoadMeta != nil {
+		meta := *in.LoadMeta
+		out.LoadMeta = &meta
+	}
 	return out, end, total
+}
+
+func selectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {
+	if isLikelyClientPort(srcPort, dstPort) {
+		return srcIP, dstIP
+	}
+	if isLikelyClientPort(dstPort, srcPort) {
+		return dstIP, srcIP
+	}
+	return srcIP, dstIP
+}
+
+func isLikelyClientPort(candidate int, peer int) bool {
+	if candidate <= 0 {
+		return false
+	}
+	if peer <= 0 {
+		return candidate >= 49152
+	}
+	if candidate >= 49152 && peer < 49152 {
+		return true
+	}
+	if candidate > 1024 && peer <= 1024 {
+		return true
+	}
+	return false
 }

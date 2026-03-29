@@ -98,6 +98,25 @@ export interface StreamChunk {
   body: string;
 }
 
+export interface StreamLoadMeta {
+  source?: string;
+  loading?: boolean;
+  cacheHit?: boolean;
+  indexHit?: boolean;
+  fileFallback?: boolean;
+  tsharkMs?: number;
+}
+
+export type StreamDecoderKind = "base64" | "behinder" | "antsword" | "godzilla";
+
+export interface StreamDecodeResult {
+  decoder: StreamDecoderKind;
+  summary: string;
+  text: string;
+  bytesHex: string;
+  encoding: string;
+}
+
 export interface HttpStream {
   id: number;
   client: string;
@@ -105,6 +124,7 @@ export interface HttpStream {
   request: string;
   response: string;
   chunks: StreamChunk[];
+  loadMeta?: StreamLoadMeta;
 }
 
 export interface BinaryStream {
@@ -116,6 +136,7 @@ export interface BinaryStream {
   nextCursor?: number;
   totalChunks?: number;
   hasMore?: boolean;
+  loadMeta?: StreamLoadMeta;
 }
 
 export type StreamProtocol = "HTTP" | "TCP" | "UDP";

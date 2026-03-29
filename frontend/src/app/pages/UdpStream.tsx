@@ -1,10 +1,12 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
 import { bridge } from "../integrations/wailsBridge";
+import type { StreamLoadMeta } from "../core/types";
+import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -19,19 +21,23 @@ const MAX_PREVIEW_BYTES = 4096;
 export default function UdpStream() {
   const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [selectedChunk, setSelectedChunk] = useState<RawChunk | null>(null);
   const [streamView, setStreamView] = useState(() => ({
-    id: 1,
+    id: -1,
     protocol: "UDP" as const,
     from: "",
     to: "",
     chunks: [] as RawChunk[],
+    loadMeta: undefined as StreamLoadMeta | undefined,
     nextCursor: 0,
     totalChunks: 0,
     hasMore: false,
   }));
   const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
-  const { udpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const location = useLocation();
+  const { udpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
   const currentIndex = streamIds.udp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.udp.length || 1}` : `-- / ${streamIds.udp.length || 0}`;
   const hasPrev = currentIndex > 0;
@@ -45,6 +51,7 @@ export default function UdpStream() {
       from: udpStream.from,
       to: udpStream.to,
       chunks: udpStream.chunks,
+      loadMeta: udpStream.loadMeta,
       nextCursor: udpStream.nextCursor ?? udpStream.chunks.length,
       totalChunks: udpStream.totalChunks ?? udpStream.chunks.length,
       hasMore: udpStream.hasMore ?? false,
@@ -52,12 +59,40 @@ export default function UdpStream() {
   }, [udpStream]);
 
   useEffect(() => {
-    setStreamInput(String(udpStream.id || ""));
+    setStreamInput(udpStream.id >= 0 ? String(udpStream.id) : "");
+    setLoadError("");
+    setSelectedChunk(null);
   }, [udpStream.id]);
+
+  useEffect(() => {
+    if (streamView.chunks.length === 0) {
+      setSelectedChunk(null);
+      return;
+    }
+    setSelectedChunk((prev) => {
+      if (!prev) {
+        return streamView.chunks[0];
+      }
+      const current = streamView.chunks.find((chunk) => chunk.packetId === prev.packetId && chunk.direction === prev.direction);
+      return current ?? streamView.chunks[0];
+    });
+  }, [streamView.chunks]);
+
+  useEffect(() => {
+    const state = location.state as { streamId?: number } | null;
+    const routeStreamId = Number(state?.streamId ?? -1);
+    const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
+    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    if (streamId < 0 || !streamIds.udp.includes(streamId) || streamView.id >= 0) {
+      return;
+    }
+    void setActiveStream("UDP", streamId);
+  }, [location.state, selectedPacket?.streamId, setActiveStream, streamIds.udp, streamView.id]);
 
   async function loadMore() {
     if (loadingMore || !streamView.hasMore) return;
     setLoadingMore(true);
+    setLoadError("");
     try {
       const page = await bridge.getRawStreamPage("UDP", streamView.id, streamView.nextCursor ?? streamView.chunks.length, STREAM_PAGE_SIZE);
       setStreamView((prev) => {
@@ -67,11 +102,14 @@ export default function UdpStream() {
           from: page.from,
           to: page.to,
           chunks: [...prev.chunks, ...page.chunks],
+          loadMeta: page.loadMeta ?? prev.loadMeta,
           nextCursor: page.nextCursor ?? prev.chunks.length + page.chunks.length,
           totalChunks: page.totalChunks ?? prev.totalChunks,
           hasMore: page.hasMore ?? false,
         };
       });
+    } catch (error) {
+      setLoadError(error instanceof Error && error.message ? error.message : "加载更多流片段失败");
     } finally {
       setLoadingMore(false);
     }
@@ -96,6 +134,16 @@ export default function UdpStream() {
       </div>
 
       <div className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-relaxed">
+        {loadError && (
+          <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            {loadError}
+          </div>
+        )}
+        {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
+          <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+            正在解析 udp.stream eq {streamView.id}，当前只加载这一条流。
+          </div>
+        )}
         <div className="flex max-w-4xl flex-col gap-1">
           {visibleChunks.map((chunk) => (
             <RawStreamChunkCard
@@ -104,6 +152,8 @@ export default function UdpStream() {
               mode={viewMode}
               clientTone="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
               serverTone="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+              selected={selectedChunk?.packetId === chunk.packetId && selectedChunk.direction === chunk.direction}
+              onSelect={() => setSelectedChunk(chunk)}
             />
           ))}
           {streamView.hasMore && (
@@ -118,9 +168,21 @@ export default function UdpStream() {
         </div>
       </div>
 
+      <div className="shrink-0 border-t border-border bg-card/80 px-4 py-4">
+        <StreamDecoderWorkbench
+          payload={selectedChunk?.body ?? ""}
+          chunkLabel={
+            selectedChunk
+              ? `UDP 片段 #${selectedChunk.packetId} · ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
+              : `UDP 流 stream eq ${streamView.id}`
+          }
+          tone="amber"
+        />
+      </div>
+
       <div className="grid shrink-0 grid-cols-[250px_280px_420px_minmax(120px,1fr)] items-center gap-4 border-t border-border bg-card px-4 py-3 shadow-sm">
         <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-          切流 last {streamSwitchMetrics.byProtocol.UDP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.UDP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.UDP.p95Ms}ms / cache {streamSwitchMetrics.byProtocol.UDP.cacheHitRate}%
+          切流 last {streamSwitchMetrics.byProtocol.UDP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.UDP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.UDP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.UDP.cacheHitRate}%
         </div>
         <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
           显示方式:
@@ -167,7 +229,7 @@ export default function UdpStream() {
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               const id = Number(streamInput);
-              if (id > 0) {
+              if (id >= 0) {
                 void setActiveStream("UDP", id);
               }
             }}
@@ -180,13 +242,26 @@ export default function UdpStream() {
           </span>
         </div>
         <div className="justify-self-end">
-          <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
-            <Download className="h-3.5 w-3.5" /> 导出为文件
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+              {formatLoadMeta(streamView.loadMeta)}
+            </div>
+            <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
+              <Download className="h-3.5 w-3.5" /> 导出为文件
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+function formatLoadMeta(meta?: StreamLoadMeta): string {
+  if (!meta) return "来源 unknown";
+  if (meta.loading) return "正在解析当前 UDP 流...";
+  const source = meta.source || "unknown";
+  const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
+  return `来源 ${source} · cache ${meta.cacheHit ? "yes" : "no"} · index ${meta.indexHit ? "yes" : "no"} · fallback ${meta.fileFallback ? "yes" : "no"} · tshark ${tshark}`;
 }
 
 const RawStreamChunkCard = memo(function RawStreamChunkCard({
@@ -194,17 +269,21 @@ const RawStreamChunkCard = memo(function RawStreamChunkCard({
   mode,
   clientTone,
   serverTone,
+  selected,
+  onSelect,
 }: {
   chunk: RawChunk;
   mode: RawViewMode;
   clientTone: string;
   serverTone: string;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const rendered = useMemo(() => renderStreamChunk(chunk.body, mode), [chunk.body, mode]);
   const tone = chunk.direction === "client" ? clientTone : serverTone;
 
   return (
-    <div className={cn("rounded-md border px-3 py-2", tone)}>
+    <div className={cn("cursor-pointer rounded-md border px-3 py-2 transition-shadow", tone, selected && "ring-2 ring-blue-300 shadow-sm")} onClick={onSelect}>
       <span className="mr-2 select-none text-xs font-semibold opacity-60">
         {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
       </span>

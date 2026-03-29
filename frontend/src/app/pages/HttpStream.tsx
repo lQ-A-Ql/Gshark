@@ -7,11 +7,13 @@ import {
   Download,
   Search,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ungzip } from "pako";
 import { useSentinel } from "../state/SentinelContext";
+import type { StreamLoadMeta } from "../core/types";
+import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -24,7 +26,8 @@ const INITIAL_RENDER_LIMIT = 72;
 
 export default function HttpStream() {
   const navigate = useNavigate();
-  const { httpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const location = useLocation();
+  const { httpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
   const [viewMode, setViewMode] = useState<HTTPViewMode>("formatted");
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -35,6 +38,17 @@ export default function HttpStream() {
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.http.length || 1}` : `-- / ${streamIds.http.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.http.length - 1;
+
+  useEffect(() => {
+    const state = location.state as { streamId?: number } | null;
+    const routeStreamId = Number(state?.streamId ?? -1);
+    const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
+    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    if (streamId < 0 || !streamIds.http.includes(streamId) || httpStream.id >= 0) {
+      return;
+    }
+    void setActiveStream("HTTP", streamId);
+  }, [httpStream.id, location.state, selectedPacket?.streamId, setActiveStream, streamIds.http]);
 
   const displayChunks = useMemo<HTTPChunk[]>(() => {
     const base =
@@ -77,6 +91,10 @@ export default function HttpStream() {
     setRenderLimit(INITIAL_RENDER_LIMIT);
   }, [httpStream.id]);
 
+  useEffect(() => {
+    setStreamInput(httpStream.id >= 0 ? String(httpStream.id) : "");
+  }, [httpStream.id]);
+
   const exportAll = () => {
     const content = displayChunks
       .map((chunk) => `--- ${chunk.direction === "client" ? "REQUEST" : "RESPONSE"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
@@ -112,7 +130,7 @@ export default function HttpStream() {
 
         <div className="grid grid-cols-[260px_400px_220px] items-center gap-2">
           <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-            切流 last {streamSwitchMetrics.byProtocol.HTTP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.HTTP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.HTTP.p95Ms}ms / cache {streamSwitchMetrics.byProtocol.HTTP.cacheHitRate}%
+            切流 last {streamSwitchMetrics.byProtocol.HTTP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.HTTP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.HTTP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.HTTP.cacheHitRate}%
           </div>
           <div className="grid h-full grid-cols-[28px_minmax(220px,1fr)_28px_72px] items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs">
             <button
@@ -146,7 +164,7 @@ export default function HttpStream() {
               onKeyDown={(event) => {
                 if (event.key !== "Enter") return;
                 const id = Number(streamInput);
-                if (id > 0) {
+                if (id >= 0) {
                   void setActiveStream("HTTP", id);
                 }
               }}
@@ -218,6 +236,10 @@ export default function HttpStream() {
             <span className="px-2 text-xs font-medium text-muted-foreground">{matchCount} 匹配</span>
           </div>
 
+          <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+            {formatLoadMeta(httpStream.loadMeta)}
+          </div>
+
           <button
             onClick={exportAll}
             className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent"
@@ -232,13 +254,14 @@ export default function HttpStream() {
               当前流无可展示内容。
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4">
               {deferredVisibleChunks.map((chunk, index) => (
                 <HTTPChunkCard
                   key={`${chunk.packetId}-${index}`}
                   chunk={chunk}
                   viewMode={viewMode}
                   selected={index === deferredSelectedIndex}
+                  onClick={() => setCursor(index)}
                 />
               ))}
               {renderLimit < displayChunks.length && (
@@ -249,6 +272,11 @@ export default function HttpStream() {
                   加载更多 ({renderLimit}/{displayChunks.length})
                 </button>
               )}
+              <StreamDecoderWorkbench
+                payload={displayChunks[selectedIndex]?.body ?? ""}
+                chunkLabel={`HTTP 片段 #${displayChunks[selectedIndex]?.packetId ?? 0} · ${displayChunks[selectedIndex]?.direction === "server" ? "响应" : "请求"}`}
+                tone="emerald"
+              />
             </div>
           )}
         </div>
@@ -257,14 +285,24 @@ export default function HttpStream() {
   );
 }
 
+function formatLoadMeta(meta?: StreamLoadMeta): string {
+  if (!meta) return "来源 unknown";
+  if (meta.loading) return "正在解析当前 HTTP 流...";
+  const source = meta.source || "unknown";
+  const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
+  return `来源 ${source} · cache ${meta.cacheHit ? "yes" : "no"} · index ${meta.indexHit ? "yes" : "no"} · fallback ${meta.fileFallback ? "yes" : "no"} · tshark ${tshark}`;
+}
+
 const HTTPChunkCard = memo(function HTTPChunkCard({
   chunk,
   viewMode,
   selected,
+  onClick,
 }: {
   chunk: HTTPChunk;
   viewMode: HTTPViewMode;
   selected: boolean;
+  onClick: () => void;
 }) {
   const rendered = useMemo(() => {
     if (viewMode === "hex") {
@@ -279,8 +317,9 @@ const HTTPChunkCard = memo(function HTTPChunkCard({
   const isClient = chunk.direction === "client";
   return (
     <div
+      onClick={onClick}
       className={cn(
-        "rounded-md border px-3 py-2 font-mono text-xs leading-5",
+        "cursor-pointer rounded-md border px-3 py-2 font-mono text-xs leading-5",
         isClient ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
         selected && "ring-2 ring-blue-300",
       )}

@@ -9,6 +9,7 @@ import type {
   MediaAnalysis,
   Packet,
   PluginItem,
+  StreamDecodeResult,
   ThreatHit,
   VehicleAnalysis,
 } from "../core/types";
@@ -133,9 +134,10 @@ export interface BackendBridge {
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
   listObjects(): Promise<ExtractedObject[]>;
-  getHttpStream(streamId: number): Promise<HttpStream>;
-  getRawStream(protocol: "TCP" | "UDP", streamId: number): Promise<BinaryStream>;
-  getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number): Promise<BinaryStream>;
+  getHttpStream(streamId: number, signal?: AbortSignal): Promise<HttpStream>;
+  getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
+  getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
+  decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>): Promise<StreamDecodeResult>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
   getPacketRawHex(packetId: number): Promise<string>;
   getPacketLayers(packetId: number): Promise<Record<string, unknown> | null>;
@@ -278,6 +280,7 @@ function asHttpStream(input: any): HttpStream {
     request: String(input.request ?? ""),
     response: String(input.response ?? ""),
     chunks: fallbackChunks,
+    loadMeta: asStreamLoadMeta(input.load_meta),
   };
 }
 
@@ -299,6 +302,21 @@ function asBinaryStream(input: any, protocol: "TCP" | "UDP"): BinaryStream {
     nextCursor: Number(input.next_cursor ?? chunks.length),
     totalChunks: Number(input.total ?? chunks.length),
     hasMore: Boolean(input.has_more),
+    loadMeta: asStreamLoadMeta(input.load_meta),
+  };
+}
+
+function asStreamLoadMeta(input: any): HttpStream["loadMeta"] {
+  if (!input || typeof input !== "object") {
+    return undefined;
+  }
+  return {
+    source: String(input.source ?? "").trim() || undefined,
+    loading: Boolean(input.loading),
+    cacheHit: Boolean(input.cache_hit),
+    indexHit: Boolean(input.index_hit),
+    fileFallback: Boolean(input.file_fallback),
+    tsharkMs: Number(input.tshark_ms ?? 0) || 0,
   };
 }
 
@@ -586,21 +604,40 @@ export const bridge: BackendBridge = {
     return rows.map(asObject);
   },
 
-  async getHttpStream(streamId: number) {
-    const stream = await request<any>(`/api/streams/http?streamId=${encodeURIComponent(String(streamId))}`);
+  async getHttpStream(streamId: number, signal?: AbortSignal) {
+    const stream = await request<any>(`/api/streams/http?streamId=${encodeURIComponent(String(streamId))}`, { signal });
     return asHttpStream(stream);
   },
 
-  async getRawStream(protocol: "TCP" | "UDP", streamId: number) {
-    const stream = await request<any>(`/api/streams/raw?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}`);
+  async getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal) {
+    const stream = await request<any>(`/api/streams/raw?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}`, { signal });
     return asBinaryStream(stream, protocol);
   },
 
-  async getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number) {
+  async getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal) {
     const stream = await request<any>(
       `/api/streams/raw/page?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}&cursor=${encodeURIComponent(String(cursor))}&limit=${encodeURIComponent(String(limit))}`,
+      { signal },
     );
     return asBinaryStream(stream, protocol);
+  },
+
+  async decodeStreamPayload(decoder: string, payload: string, options: Record<string, unknown> = {}) {
+    const result = await request<any>("/api/streams/decode", {
+      method: "POST",
+      body: JSON.stringify({
+        decoder,
+        payload,
+        options,
+      }),
+    });
+    return {
+      decoder: String(result.decoder ?? decoder) as StreamDecodeResult["decoder"],
+      summary: String(result.summary ?? ""),
+      text: String(result.text ?? ""),
+      bytesHex: String(result.bytes_hex ?? ""),
+      encoding: String(result.encoding ?? ""),
+    };
   },
 
   async listStreamIds(protocol: "HTTP" | "TCP" | "UDP") {
@@ -608,7 +645,7 @@ export const bridge: BackendBridge = {
     const ids = Array.isArray(payload.ids) ? payload.ids : [];
     return ids
       .map((id: unknown) => Number(id))
-      .filter((id: number) => Number.isFinite(id) && id > 0)
+      .filter((id: number) => Number.isFinite(id) && id >= 0)
       .sort((a: number, b: number) => a - b);
   },
 

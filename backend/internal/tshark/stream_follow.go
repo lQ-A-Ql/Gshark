@@ -2,8 +2,11 @@ package tshark
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -13,7 +16,12 @@ import (
 // ReassembleHTTPStreamFromFile rebuilds HTTP request/response bodies from the raw
 // TCP payload of a stream, independent from current display filter.
 func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.ReassembledStream, error) {
+	return ReassembleHTTPStreamFromFileContext(context.Background(), filePath, streamID)
+}
+
+func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, streamID int64) (model.ReassembledStream, error) {
 	stream := model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
+	log.Printf("tshark: follow http stream start file=%q stream=%d", filePath, streamID)
 
 	filter := fmt.Sprintf("tcp.stream==%d && tcp.payload", streamID)
 	args := []string{
@@ -31,7 +39,7 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 		"-e", "tcp.payload",
 	}
 
-	cmd, err := Command(args...)
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return stream, fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -39,6 +47,8 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 	if err != nil {
 		return stream, fmt.Errorf("create stdout pipe: %w", err)
 	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
 		return stream, fmt.Errorf("start tshark: %w", err)
@@ -49,6 +59,7 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 
 	clientIP := ""
 	clientPort := 0
+	loggedChunks := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -64,6 +75,7 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 		srcIP := strings.TrimSpace(parts[1])
 		srcPort, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
 		dstIP := strings.TrimSpace(parts[3])
+		dstPort, _ := strconv.Atoi(strings.TrimSpace(parts[4]))
 		payloadHex := strings.TrimSpace(parts[5])
 
 		if payloadHex == "" {
@@ -76,10 +88,14 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 		}
 
 		if clientIP == "" {
-			clientIP = srcIP
-			clientPort = srcPort
-			stream.From = srcIP
-			stream.To = dstIP
+			clientIP, stream.To = selectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
+			if clientIP == srcIP {
+				clientPort = srcPort
+				stream.From = srcIP
+			} else {
+				clientPort = dstPort
+				stream.From = dstIP
+			}
 		}
 
 		if packetID <= 0 {
@@ -88,9 +104,17 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 		if srcIP == clientIP && (clientPort == 0 || srcPort == clientPort) {
 			appendStreamChunk(&stream, packetID, "client", payloadText)
 			stream.Request += payloadText
+			if loggedChunks < 8 {
+				log.Printf("tshark: follow http stream=%d packet=%d dir=client bytes=%d", streamID, packetID, len(payloadText))
+				loggedChunks++
+			}
 		} else {
 			appendStreamChunk(&stream, packetID, "server", payloadText)
 			stream.Response += payloadText
+			if loggedChunks < 8 {
+				log.Printf("tshark: follow http stream=%d packet=%d dir=server bytes=%d", streamID, packetID, len(payloadText))
+				loggedChunks++
+			}
 		}
 	}
 
@@ -100,8 +124,13 @@ func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.Reasse
 	}
 
 	if err := cmd.Wait(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail != "" {
+			return stream, fmt.Errorf("wait tshark: %w: %s", err, detail)
+		}
 		return stream, fmt.Errorf("wait tshark: %w", err)
 	}
+	log.Printf("tshark: follow http stream done stream=%d chunks=%d request_bytes=%d response_bytes=%d", streamID, len(stream.Chunks), len(stream.Request), len(stream.Response))
 
 	return stream, nil
 }
@@ -138,7 +167,12 @@ func decodeHexPayloadToText(payloadHex string) string {
 }
 
 func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
+	return ReassembleRawStreamFromFileContext(context.Background(), filePath, protocol, streamID)
+}
+
+func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
 	stream := model.ReassembledStream{StreamID: streamID, Protocol: strings.ToUpper(strings.TrimSpace(protocol))}
+	log.Printf("tshark: follow raw stream start file=%q protocol=%s stream=%d", filePath, stream.Protocol, streamID)
 
 	upperProto := strings.ToUpper(strings.TrimSpace(protocol))
 	streamField := ""
@@ -177,7 +211,7 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 		"-e", payloadField,
 	}
 
-	cmd, err := Command(args...)
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return stream, fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -185,6 +219,8 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 	if err != nil {
 		return stream, fmt.Errorf("create stdout pipe: %w", err)
 	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
 		return stream, fmt.Errorf("start tshark: %w", err)
@@ -195,6 +231,7 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 
 	clientIP := ""
 	clientPort := 0
+	loggedChunks := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -210,16 +247,21 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 		srcIP := strings.TrimSpace(parts[1])
 		srcPort, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
 		dstIP := strings.TrimSpace(parts[3])
+		dstPort, _ := strconv.Atoi(strings.TrimSpace(parts[4]))
 		payloadHex := normalizePayloadHex(parts[5])
 		if payloadHex == "" {
 			continue
 		}
 
 		if clientIP == "" {
-			clientIP = srcIP
-			clientPort = srcPort
-			stream.From = srcIP
-			stream.To = dstIP
+			clientIP, stream.To = selectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
+			if clientIP == srcIP {
+				clientPort = srcPort
+				stream.From = srcIP
+			} else {
+				clientPort = dstPort
+				stream.From = dstIP
+			}
 		}
 
 		direction := "server"
@@ -230,6 +272,14 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 			packetID = int64(len(stream.Chunks) + 1)
 		}
 		stream.Chunks = append(stream.Chunks, model.StreamChunk{PacketID: packetID, Direction: direction, Body: payloadHex})
+		if loggedChunks < 8 {
+			byteCount := 0
+			if payloadHex != "" {
+				byteCount = len(strings.Split(payloadHex, ":"))
+			}
+			log.Printf("tshark: follow raw stream=%d protocol=%s packet=%d dir=%s payload_bytes=%d", streamID, stream.Protocol, packetID, direction, byteCount)
+			loggedChunks++
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -238,8 +288,13 @@ func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (mod
 	}
 
 	if err := cmd.Wait(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail != "" {
+			return stream, fmt.Errorf("wait tshark: %w: %s", err, detail)
+		}
 		return stream, fmt.Errorf("wait tshark: %w", err)
 	}
+	log.Printf("tshark: follow raw stream done protocol=%s stream=%d chunks=%d", stream.Protocol, streamID, len(stream.Chunks))
 
 	return stream, nil
 }
@@ -261,4 +316,30 @@ func normalizePayloadHex(payloadHex string) string {
 		}
 	}
 	return strings.Join(bytesOut, ":")
+}
+
+func selectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {
+	if isLikelyClientPort(srcPort, dstPort) {
+		return srcIP, dstIP
+	}
+	if isLikelyClientPort(dstPort, srcPort) {
+		return dstIP, srcIP
+	}
+	return srcIP, dstIP
+}
+
+func isLikelyClientPort(candidate int, peer int) bool {
+	if candidate <= 0 {
+		return false
+	}
+	if peer <= 0 {
+		return candidate >= 49152
+	}
+	if candidate >= 49152 && peer < 49152 {
+		return true
+	}
+	if candidate > 1024 && peer <= 1024 {
+		return true
+	}
+	return false
 }

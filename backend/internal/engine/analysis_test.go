@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -167,7 +168,7 @@ func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
 	svc.pcap = "capture.pcapng"
 
 	called := 0
-	rawStreamFromFileFn = func(filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
+	rawStreamFromFileFn = func(_ context.Context, filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
 		called++
 		return model.ReassembledStream{
 			StreamID: streamID,
@@ -180,7 +181,7 @@ func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
 		}, nil
 	}
 
-	stream := svc.RawStream("TCP", 7)
+	stream := svc.RawStream(context.Background(), "TCP", 7)
 	if called != 1 {
 		t.Fatalf("expected follow-stream fallback to be called once, got %d", called)
 	}
@@ -189,6 +190,9 @@ func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
 	}
 	if stream.Chunks[0].Body != "61:62:63" {
 		t.Fatalf("unexpected stream chunk body: %q", stream.Chunks[0].Body)
+	}
+	if stream.LoadMeta == nil || !stream.LoadMeta.FileFallback || stream.LoadMeta.Source != "file" {
+		t.Fatalf("expected file fallback load meta, got %+v", stream.LoadMeta)
 	}
 }
 
@@ -224,11 +228,14 @@ func TestRawStreamPageSlicesIndexedStream(t *testing.T) {
 		},
 	}
 
-	stream, next, total := svc.RawStreamPage("TCP", 7, 1, 1)
+	stream, next, total := svc.RawStreamPage(context.Background(), "TCP", 7, 1, 1)
 	if total != 3 || next != 2 {
 		t.Fatalf("unexpected page metadata total=%d next=%d", total, next)
 	}
 	if len(stream.Chunks) != 1 || stream.Chunks[0].PacketID != 2 {
 		t.Fatalf("unexpected paged chunks: %+v", stream.Chunks)
+	}
+	if stream.LoadMeta == nil || !stream.LoadMeta.IndexHit || stream.LoadMeta.Source != "index" {
+		t.Fatalf("expected index load meta, got %+v", stream.LoadMeta)
 	}
 }

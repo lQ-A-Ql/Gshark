@@ -144,14 +144,24 @@ type StreamChunk struct {
 	Body      string `json:"body"`
 }
 
+type StreamLoadMeta struct {
+	Source       string `json:"source,omitempty"`
+	Loading      bool   `json:"loading,omitempty"`
+	CacheHit     bool   `json:"cache_hit,omitempty"`
+	IndexHit     bool   `json:"index_hit,omitempty"`
+	FileFallback bool   `json:"file_fallback,omitempty"`
+	TSharkMS     int64  `json:"tshark_ms,omitempty"`
+}
+
 type ReassembledStream struct {
-	StreamID int64         `json:"stream_id"`
-	Protocol string        `json:"protocol"`
-	From     string        `json:"from"`
-	To       string        `json:"to"`
-	Chunks   []StreamChunk `json:"chunks"`
-	Request  string        `json:"request,omitempty"`
-	Response string        `json:"response,omitempty"`
+	StreamID int64           `json:"stream_id"`
+	Protocol string          `json:"protocol"`
+	From     string          `json:"from"`
+	To       string          `json:"to"`
+	Chunks   []StreamChunk   `json:"chunks"`
+	Request  string          `json:"request,omitempty"`
+	Response string          `json:"response,omitempty"`
+	LoadMeta *StreamLoadMeta `json:"load_meta,omitempty"`
 }
 
 type TrafficBucket struct {

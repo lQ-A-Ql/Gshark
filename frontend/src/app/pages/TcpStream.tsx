@@ -1,10 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft, X } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
 import { bridge } from "../integrations/wailsBridge";
+import type { StreamLoadMeta } from "../core/types";
+import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -22,22 +24,26 @@ export default function TcpStream() {
   const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
   const [streamView, setStreamView] = useState(() => ({
-    id: 1,
+    id: -1,
     protocol: "TCP" as const,
     from: "",
     to: "",
     chunks: [] as RawChunk[],
+    loadMeta: undefined as StreamLoadMeta | undefined,
     nextCursor: 0,
     totalChunks: 0,
     hasMore: false,
   }));
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [selectedChunk, setSelectedChunk] = useState<RawChunk | null>(null);
+  const [expandedChunk, setExpandedChunk] = useState<RawChunk | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(360);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const { tcpStream, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const location = useLocation();
+  const { tcpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
 
   useEffect(() => {
     setStreamView({
@@ -46,6 +52,7 @@ export default function TcpStream() {
       from: tcpStream.from,
       to: tcpStream.to,
       chunks: tcpStream.chunks,
+      loadMeta: tcpStream.loadMeta,
       nextCursor: tcpStream.nextCursor ?? tcpStream.chunks.length,
       totalChunks: tcpStream.totalChunks ?? tcpStream.chunks.length,
       hasMore: tcpStream.hasMore ?? false,
@@ -53,13 +60,29 @@ export default function TcpStream() {
   }, [tcpStream]);
 
   useEffect(() => {
-    setStreamInput(String(tcpStream.id || ""));
+    setStreamInput(tcpStream.id >= 0 ? String(tcpStream.id) : "");
+    setLoadError("");
     setSelectedChunk(null);
+    setExpandedChunk(null);
     setScrollTop(0);
     if (viewportRef.current) {
       viewportRef.current.scrollTop = 0;
     }
   }, [tcpStream.id]);
+
+  useEffect(() => {
+    if (streamView.chunks.length === 0) {
+      setSelectedChunk(null);
+      return;
+    }
+    setSelectedChunk((prev) => {
+      if (!prev) {
+        return streamView.chunks[0];
+      }
+      const current = streamView.chunks.find((chunk) => chunk.packetId === prev.packetId && chunk.direction === prev.direction);
+      return current ?? streamView.chunks[0];
+    });
+  }, [streamView.chunks]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -73,6 +96,17 @@ export default function TcpStream() {
     observer.observe(viewport);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const state = location.state as { streamId?: number } | null;
+    const routeStreamId = Number(state?.streamId ?? -1);
+    const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
+    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    if (streamId < 0 || !streamIds.tcp.includes(streamId) || streamView.id >= 0) {
+      return;
+    }
+    void setActiveStream("TCP", streamId);
+  }, [location.state, selectedPacket?.streamId, setActiveStream, streamIds.tcp, streamView.id]);
 
   const currentIndex = streamIds.tcp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.tcp.length || 1}` : `-- / ${streamIds.tcp.length || 0}`;
@@ -93,6 +127,7 @@ export default function TcpStream() {
   async function loadMore() {
     if (loadingMore || !streamView.hasMore) return;
     setLoadingMore(true);
+    setLoadError("");
     try {
       const page = await bridge.getRawStreamPage("TCP", streamView.id, streamView.nextCursor ?? streamView.chunks.length, STREAM_PAGE_SIZE);
       setStreamView((prev) => {
@@ -102,11 +137,14 @@ export default function TcpStream() {
           from: page.from,
           to: page.to,
           chunks: [...prev.chunks, ...page.chunks],
+          loadMeta: page.loadMeta ?? prev.loadMeta,
           nextCursor: page.nextCursor ?? prev.chunks.length + page.chunks.length,
           totalChunks: page.totalChunks ?? prev.totalChunks,
           hasMore: page.hasMore ?? false,
         };
       });
+    } catch (error) {
+      setLoadError(error instanceof Error && error.message ? error.message : "加载更多流片段失败");
     } finally {
       setLoadingMore(false);
     }
@@ -142,6 +180,16 @@ export default function TcpStream() {
           }
         }}
       >
+        {loadError && (
+          <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            {loadError}
+          </div>
+        )}
+        {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
+          <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+            正在解析 tcp.stream eq {streamView.id}，当前只加载这一条流。
+          </div>
+        )}
         <div className="relative max-w-4xl" style={{ height: totalHeight }}>
           {visibleChunks.map((chunk, index) => {
             const absoluteIndex = startIndex + index;
@@ -153,7 +201,9 @@ export default function TcpStream() {
                   mode={viewMode}
                   clientTone="border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
                   serverTone="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                  onOpen={() => setSelectedChunk(chunk)}
+                  selected={selectedChunk?.packetId === chunk.packetId && selectedChunk.direction === chunk.direction}
+                  onSelect={() => setSelectedChunk(chunk)}
+                  onOpen={() => setExpandedChunk(chunk)}
                 />
               </div>
             );
@@ -166,9 +216,21 @@ export default function TcpStream() {
         </div>
       </div>
 
+      <div className="shrink-0 border-t border-border bg-card/80 px-4 py-4">
+        <StreamDecoderWorkbench
+          payload={selectedChunk?.body ?? ""}
+          chunkLabel={
+            selectedChunk
+              ? `TCP 片段 #${selectedChunk.packetId} · ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
+              : `TCP 流 stream eq ${streamView.id}`
+          }
+          tone="blue"
+        />
+      </div>
+
       <div className="grid shrink-0 grid-cols-[260px_280px_460px_minmax(140px,1fr)] items-center gap-4 border-t border-border bg-card px-4 py-3 shadow-sm">
         <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-          切流 last {streamSwitchMetrics.byProtocol.TCP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.TCP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.TCP.p95Ms}ms / cache {streamSwitchMetrics.byProtocol.TCP.cacheHitRate}%
+          切流 last {streamSwitchMetrics.byProtocol.TCP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.TCP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.TCP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.TCP.cacheHitRate}%
         </div>
         <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
           显示方式:
@@ -215,7 +277,7 @@ export default function TcpStream() {
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               const id = Number(streamInput);
-              if (id > 0) {
+              if (id >= 0) {
                 void setActiveStream("TCP", id);
               }
             }}
@@ -228,25 +290,30 @@ export default function TcpStream() {
           </span>
         </div>
         <div className="justify-self-end">
-          <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
-            <Download className="h-3.5 w-3.5" /> 导出为文件
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+              {formatLoadMeta(streamView.loadMeta)}
+            </div>
+            <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
+              <Download className="h-3.5 w-3.5" /> 导出为文件
+            </button>
+          </div>
         </div>
       </div>
 
-      {selectedChunk && (
+      {expandedChunk && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 px-6 py-8">
           <div className="flex h-full max-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="text-sm font-semibold text-foreground">
-                载荷详情 #{selectedChunk.packetId} · {selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
+                载荷详情 #{expandedChunk.packetId} · {expandedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
               </div>
-              <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => setSelectedChunk(null)}>
+              <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => setExpandedChunk(null)}>
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4 font-mono text-xs leading-5 text-foreground">
-              <pre className="whitespace-pre-wrap break-all">{renderStreamChunk(selectedChunk.body, viewMode, true)}</pre>
+              <pre className="whitespace-pre-wrap break-all">{renderStreamChunk(expandedChunk.body, viewMode, true)}</pre>
             </div>
           </div>
         </div>
@@ -255,17 +322,29 @@ export default function TcpStream() {
   );
 }
 
+function formatLoadMeta(meta?: StreamLoadMeta): string {
+  if (!meta) return "来源 unknown";
+  if (meta.loading) return "正在解析当前 TCP 流...";
+  const source = meta.source || "unknown";
+  const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
+  return `来源 ${source} · cache ${meta.cacheHit ? "yes" : "no"} · index ${meta.indexHit ? "yes" : "no"} · fallback ${meta.fileFallback ? "yes" : "no"} · tshark ${tshark}`;
+}
+
 const RawStreamChunkCard = memo(function RawStreamChunkCard({
   chunk,
   mode,
   clientTone,
   serverTone,
+  selected,
+  onSelect,
   onOpen,
 }: {
   chunk: RawChunk;
   mode: RawViewMode;
   clientTone: string;
   serverTone: string;
+  selected: boolean;
+  onSelect: () => void;
   onOpen: () => void;
 }) {
   const rendered = useMemo(() => renderStreamChunk(chunk.body, mode, false), [chunk.body, mode]);
@@ -273,7 +352,10 @@ const RawStreamChunkCard = memo(function RawStreamChunkCard({
   const truncated = isChunkTruncated(chunk.body, mode);
 
   return (
-    <div className={cn("flex h-full flex-col rounded-md border px-3 py-2", tone)}>
+    <div
+      className={cn("flex h-full cursor-pointer flex-col rounded-md border px-3 py-2 transition-shadow", tone, selected && "ring-2 ring-blue-300 shadow-sm")}
+      onClick={onSelect}
+    >
       <span className="mr-2 select-none text-xs font-semibold opacity-60">
         {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
       </span>
@@ -281,7 +363,13 @@ const RawStreamChunkCard = memo(function RawStreamChunkCard({
       <div className="mt-2 flex items-center justify-between text-[11px] opacity-80">
         <span>packet #{chunk.packetId}</span>
         {truncated && (
-          <button className="rounded border border-current/20 px-2 py-1 hover:opacity-100" onClick={onOpen}>
+          <button
+            className="rounded border border-current/20 px-2 py-1 hover:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+          >
             查看完整载荷
           </button>
         )}

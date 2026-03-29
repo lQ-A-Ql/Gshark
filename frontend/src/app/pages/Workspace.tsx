@@ -37,6 +37,7 @@ export default function Workspace() {
     fileMeta,
     openCapture,
     stopCapture,
+    setActiveStream,
     backendConnected,
     tsharkStatus,
   } = useSentinel();
@@ -219,14 +220,17 @@ export default function Workspace() {
     selectPacket(packet.id);
 
     if (target === "http") {
-      navigate("/http-stream");
+      void setActiveStream("HTTP", packet.streamId);
+      navigate("/http-stream", { state: { streamId: packet.streamId } });
       return;
     }
     if (target === "udp") {
-      navigate("/udp-stream");
+      void setActiveStream("UDP", packet.streamId);
+      navigate("/udp-stream", { state: { streamId: packet.streamId } });
       return;
     }
-    navigate("/tcp-stream");
+    void setActiveStream("TCP", packet.streamId);
+    navigate("/tcp-stream", { state: { streamId: packet.streamId } });
   };
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;

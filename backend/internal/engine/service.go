@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 	"github.com/gshark/sentinel/backend/internal/plugin"
@@ -55,7 +56,7 @@ type Service struct {
 	cancel context.CancelFunc
 }
 
-const streamCacheLimit = 256
+const defaultStreamCacheLimit = 256
 
 type filteredPacketIndex struct {
 	ids       []int64
@@ -68,8 +69,8 @@ var (
 	streamPacketsFn       = tshark.StreamPackets
 	streamPacketsFastFn   = tshark.StreamPacketsFast
 	streamPacketsCompatFn = tshark.StreamPacketsCompat
-	httpStreamFromFileFn  = tshark.ReassembleHTTPStreamFromFile
-	rawStreamFromFileFn   = tshark.ReassembleRawStreamFromFile
+	httpStreamFromFileFn  = tshark.ReassembleHTTPStreamFromFileContext
+	rawStreamFromFileFn   = tshark.ReassembleRawStreamFromFileContext
 )
 
 func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
@@ -672,13 +673,20 @@ func (s *Service) packetObjectNameIndex() map[string]int64 {
 	})
 }
 
-func (s *Service) HTTPStream(streamID int64) model.ReassembledStream {
+func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.ReassembledStream {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := streamCacheKey("HTTP", streamID)
+	log.Printf("engine: http stream request stream=%d", streamID)
 	s.mu.RLock()
 	pcap := s.pcap
 	if cached, ok := s.streamCache[key]; ok {
 		s.mu.RUnlock()
-		return cloneReassembledStream(cached)
+		stream := cloneReassembledStream(cached)
+		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
+		log.Printf("engine: http stream stream=%d source=cache chunks=%d", streamID, len(stream.Chunks))
+		return stream
 	}
 	s.mu.RUnlock()
 
@@ -687,63 +695,108 @@ func (s *Service) HTTPStream(streamID int64) model.ReassembledStream {
 			return s.packetStore.Iterate(nil, fn)
 		}, streamID)
 		if len(stream.Chunks) > 0 || stream.Request != "" || stream.Response != "" {
+			stream.LoadMeta = newStreamLoadMeta("memory", false, false, false, 0)
 			s.cacheStream(key, stream)
+			log.Printf("engine: http stream stream=%d source=memory chunks=%d request_bytes=%d response_bytes=%d", streamID, len(stream.Chunks), len(stream.Request), len(stream.Response))
 			return stream
 		}
 	}
 
 	if pcap != "" {
-		stream, err := httpStreamFromFileFn(pcap, streamID)
+		log.Printf("engine: http stream stream=%d source=file-fallback start", streamID)
+		ctx, cancel := context.WithTimeout(ctx, streamFollowTimeout())
+		startedAt := time.Now()
+		stream, err := httpStreamFromFileFn(ctx, pcap, streamID)
+		cancel()
 		if err == nil && (stream.Request != "" || stream.Response != "") {
+			stream.LoadMeta = newStreamLoadMeta("file", false, false, true, time.Since(startedAt))
 			s.cacheStream(key, stream)
+			log.Printf("engine: http stream stream=%d source=file-fallback chunks=%d tshark_ms=%d", streamID, len(stream.Chunks), stream.LoadMeta.TSharkMS)
 			return stream
+		}
+		if err != nil {
+			log.Printf("engine: http stream stream=%d source=file-fallback failed err=%v", streamID, err)
 		}
 	}
 
+	log.Printf("engine: http stream stream=%d source=empty", streamID)
 	return model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
 }
 
-func (s *Service) RawStream(protocol string, streamID int64) model.ReassembledStream {
+func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64) model.ReassembledStream {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	key := streamCacheKey(normalized, streamID)
+	log.Printf("engine: raw stream request protocol=%s stream=%d", normalized, streamID)
 
 	s.mu.RLock()
 	pcap := s.pcap
 	if cached, ok := s.streamCache[key]; ok {
 		s.mu.RUnlock()
-		return cloneReassembledStream(cached)
+		stream := cloneReassembledStream(cached)
+		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
+		log.Printf("engine: raw stream protocol=%s stream=%d source=cache chunks=%d", normalized, streamID, len(stream.Chunks))
+		return stream
 	}
 	if indexed, ok := s.rawStreamIndex[key]; ok {
+		stream := cloneReassembledStream(indexed)
+		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.mu.RUnlock()
-		s.cacheStream(key, indexed)
-		return cloneReassembledStream(indexed)
+		s.cacheStream(key, stream)
+		log.Printf("engine: raw stream protocol=%s stream=%d source=index chunks=%d", normalized, streamID, len(stream.Chunks))
+		return stream
 	}
 	s.mu.RUnlock()
 
 	if pcap != "" {
-		stream, err := rawStreamFromFileFn(pcap, normalized, streamID)
+		log.Printf("engine: raw stream protocol=%s stream=%d source=file-fallback start", normalized, streamID)
+		ctx, cancel := context.WithTimeout(ctx, streamFollowTimeout())
+		startedAt := time.Now()
+		stream, err := rawStreamFromFileFn(ctx, pcap, normalized, streamID)
+		cancel()
 		if err == nil && len(stream.Chunks) > 0 {
+			stream.LoadMeta = newStreamLoadMeta("file", false, false, true, time.Since(startedAt))
 			s.cacheStream(key, stream)
+			log.Printf("engine: raw stream protocol=%s stream=%d source=file-fallback chunks=%d tshark_ms=%d", normalized, streamID, len(stream.Chunks), stream.LoadMeta.TSharkMS)
 			return stream
+		}
+		if err != nil {
+			log.Printf("engine: raw stream protocol=%s stream=%d source=file-fallback failed err=%v", normalized, streamID, err)
 		}
 	}
 
+	log.Printf("engine: raw stream protocol=%s stream=%d source=empty", normalized, streamID)
 	return model.ReassembledStream{StreamID: streamID, Protocol: normalized}
 }
 
-func (s *Service) RawStreamPage(protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int) {
+func (s *Service) RawStreamPage(ctx context.Context, protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	key := streamCacheKey(normalized, streamID)
+	log.Printf("engine: raw stream page request protocol=%s stream=%d cursor=%d limit=%d", normalized, streamID, cursor, limit)
 
 	s.mu.RLock()
 	if indexed, ok := s.rawStreamIndex[key]; ok {
+		stream, next, total := cloneRawStreamWindow(indexed, cursor, limit)
+		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.mu.RUnlock()
-		return cloneRawStreamWindow(indexed, cursor, limit)
+		log.Printf("engine: raw stream page protocol=%s stream=%d source=index returned=%d total=%d next=%d", normalized, streamID, len(stream.Chunks), total, next)
+		return stream, next, total
 	}
 	s.mu.RUnlock()
 
-	stream := s.RawStream(normalized, streamID)
-	return cloneRawStreamWindow(stream, cursor, limit)
+	stream := s.RawStream(ctx, normalized, streamID)
+	window, next, total := cloneRawStreamWindow(stream, cursor, limit)
+	source := "unknown"
+	if window.LoadMeta != nil && window.LoadMeta.Source != "" {
+		source = window.LoadMeta.Source
+	}
+	log.Printf("engine: raw stream page protocol=%s stream=%d source=%s returned=%d total=%d next=%d", normalized, streamID, source, len(window.Chunks), total, next)
+	return window, next, total
 }
 
 func (s *Service) cacheStream(key string, stream model.ReassembledStream) {
@@ -759,7 +812,8 @@ func (s *Service) cacheStream(key string, stream model.ReassembledStream) {
 	s.streamCache[key] = cloneReassembledStream(stream)
 	s.streamCacheOrder = append(s.streamCacheOrder, key)
 
-	for len(s.streamCacheOrder) > streamCacheLimit {
+	limit := streamCacheLimitValue()
+	for len(s.streamCacheOrder) > limit {
 		oldest := s.streamCacheOrder[0]
 		s.streamCacheOrder = s.streamCacheOrder[1:]
 		delete(s.streamCache, oldest)
@@ -785,7 +839,24 @@ func cloneReassembledStream(in model.ReassembledStream) model.ReassembledStream 
 		out.Chunks = make([]model.StreamChunk, len(in.Chunks))
 		copy(out.Chunks, in.Chunks)
 	}
+	if in.LoadMeta != nil {
+		meta := *in.LoadMeta
+		out.LoadMeta = &meta
+	}
 	return out
+}
+
+func newStreamLoadMeta(source string, cacheHit, indexHit, fileFallback bool, elapsed time.Duration) *model.StreamLoadMeta {
+	meta := &model.StreamLoadMeta{
+		Source:       source,
+		CacheHit:     cacheHit,
+		IndexHit:     indexHit,
+		FileFallback: fileFallback,
+	}
+	if elapsed > 0 {
+		meta.TSharkMS = elapsed.Milliseconds()
+	}
+	return meta
 }
 
 func (s *Service) SetTLSConfig(cfg model.TLSConfig) {
@@ -883,9 +954,20 @@ func (s *Service) UpdatePluginSource(source model.PluginSource) (model.PluginSou
 func (s *Service) StreamIDs(protocol string) []int64 {
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	ids := make(map[int64]struct{})
+
+	s.mu.RLock()
+	if len(s.rawStreamIndex) > 0 {
+		for _, stream := range s.rawStreamIndex {
+			if strings.EqualFold(stream.Protocol, normalized) && stream.StreamID >= 0 {
+				ids[stream.StreamID] = struct{}{}
+			}
+		}
+	}
+	s.mu.RUnlock()
+
 	if s.packetStore != nil {
 		_ = s.packetStore.Iterate(nil, func(p model.Packet) error {
-			if p.StreamID <= 0 {
+			if p.StreamID < 0 {
 				return nil
 			}
 			proto := strings.ToUpper(strings.TrimSpace(p.Protocol))
@@ -1183,4 +1265,34 @@ func (s *Service) hasCapturePath() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return strings.TrimSpace(s.pcap) != ""
+}
+
+func streamCacheLimitValue() int {
+	raw := strings.TrimSpace(os.Getenv("GSHARK_STREAM_CACHE_LIMIT"))
+	if raw == "" {
+		return defaultStreamCacheLimit
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed < 64 {
+		return defaultStreamCacheLimit
+	}
+	if parsed > 4096 {
+		return 4096
+	}
+	return parsed
+}
+
+func streamFollowTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("GSHARK_STREAM_FOLLOW_TIMEOUT_MS"))
+	if raw == "" {
+		return 20 * time.Second
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return 20 * time.Second
+	}
+	if parsed > 60000 {
+		parsed = 60000
+	}
+	return time.Duration(parsed) * time.Millisecond
 }

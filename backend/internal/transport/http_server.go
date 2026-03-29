@@ -96,6 +96,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/streams/http", s.handleHTTPStream)
 	mux.HandleFunc("/api/streams/raw", s.handleRawStream)
 	mux.HandleFunc("/api/streams/raw/page", s.handleRawStreamPage)
+	mux.HandleFunc("/api/streams/decode", s.handleStreamDecode)
 	mux.HandleFunc("/api/streams/index", s.handleStreamIndex)
 	mux.HandleFunc("/api/packet/raw", s.handlePacketRaw)
 	mux.HandleFunc("/api/packet/layers", s.handlePacketLayers)
@@ -675,7 +676,7 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHTTPStream(w http.ResponseWriter, r *http.Request) {
 	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
-	writeJSON(w, http.StatusOK, s.svc.HTTPStream(streamID))
+	writeJSON(w, http.StatusOK, s.svc.HTTPStream(r.Context(), streamID))
 }
 
 func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
@@ -684,18 +685,19 @@ func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
 	if protocol == "" {
 		protocol = "TCP"
 	}
-	writeJSON(w, http.StatusOK, s.svc.RawStream(protocol, streamID))
+	writeJSON(w, http.StatusOK, s.svc.RawStream(r.Context(), protocol, streamID))
 }
 
 type streamPageResponse struct {
-	StreamID   int64               `json:"stream_id"`
-	Protocol   string              `json:"protocol"`
-	From       string              `json:"from"`
-	To         string              `json:"to"`
-	Chunks     []model.StreamChunk `json:"chunks"`
-	NextCursor int                 `json:"next_cursor"`
-	Total      int                 `json:"total"`
-	HasMore    bool                `json:"has_more"`
+	StreamID   int64                 `json:"stream_id"`
+	Protocol   string                `json:"protocol"`
+	From       string                `json:"from"`
+	To         string                `json:"to"`
+	Chunks     []model.StreamChunk   `json:"chunks"`
+	LoadMeta   *model.StreamLoadMeta `json:"load_meta,omitempty"`
+	NextCursor int                   `json:"next_cursor"`
+	Total      int                   `json:"total"`
+	HasMore    bool                  `json:"has_more"`
 }
 
 func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
@@ -707,17 +709,36 @@ func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
 	cursor, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("cursor")))
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 
-	stream, next, total := s.svc.RawStreamPage(protocol, streamID, cursor, limit)
+	stream, next, total := s.svc.RawStreamPage(r.Context(), protocol, streamID, cursor, limit)
 	writeJSON(w, http.StatusOK, streamPageResponse{
 		StreamID:   stream.StreamID,
 		Protocol:   stream.Protocol,
 		From:       stream.From,
 		To:         stream.To,
 		Chunks:     stream.Chunks,
+		LoadMeta:   stream.LoadMeta,
 		NextCursor: next,
 		Total:      total,
 		HasMore:    next < total,
 	})
+}
+
+func (s *Server) handleStreamDecode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var payload engine.StreamDecodeRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	result, err := engine.DecodeStreamPayload(payload)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
