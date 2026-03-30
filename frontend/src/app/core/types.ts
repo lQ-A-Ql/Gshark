@@ -511,8 +511,37 @@ export interface USBPacketRecord {
   summary: string;
 }
 
+export interface USBKeyboardEvent {
+  packetId: number;
+  time: string;
+  device: string;
+  endpoint: string;
+  modifiers: string[];
+  keys: string[];
+  text?: string;
+  summary: string;
+}
+
+export interface USBMouseEvent {
+  packetId: number;
+  time: string;
+  device: string;
+  endpoint: string;
+  buttons: string[];
+  xDelta: number;
+  yDelta: number;
+  wheelVertical: number;
+  wheelHorizontal: number;
+  positionX: number;
+  positionY: number;
+  summary: string;
+}
+
 export interface USBAnalysis {
   totalUSBPackets: number;
+  keyboardPackets: number;
+  mousePackets: number;
+  otherUSBPackets: number;
   protocols: TrafficBucket[];
   transferTypes: TrafficBucket[];
   directions: TrafficBucket[];
@@ -520,5 +549,8 @@ export interface USBAnalysis {
   endpoints: TrafficBucket[];
   setupRequests: TrafficBucket[];
   records: USBPacketRecord[];
+  keyboardEvents: USBKeyboardEvent[];
+  mouseEvents: USBMouseEvent[];
+  otherRecords: USBPacketRecord[];
   notes: string[];
 }

@@ -40,6 +40,32 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		"-e", "usb.frame.data",
 		"-e", "usb.control.Response",
 		"-e", "usb.capdata",
+		"-e", "usbhid.boot_report.keyboard.keycode_1",
+		"-e", "usbhid.boot_report.keyboard.keycode_2",
+		"-e", "usbhid.boot_report.keyboard.keycode_3",
+		"-e", "usbhid.boot_report.keyboard.keycode_4",
+		"-e", "usbhid.boot_report.keyboard.keycode_5",
+		"-e", "usbhid.boot_report.keyboard.keycode_6",
+		"-e", "usbhid.boot_report.keyboard.modifier.left_ctrl",
+		"-e", "usbhid.boot_report.keyboard.modifier.left_shift",
+		"-e", "usbhid.boot_report.keyboard.modifier.left_alt",
+		"-e", "usbhid.boot_report.keyboard.modifier.left_gui",
+		"-e", "usbhid.boot_report.keyboard.modifier.right_ctrl",
+		"-e", "usbhid.boot_report.keyboard.modifier.right_shift",
+		"-e", "usbhid.boot_report.keyboard.modifier.right_alt",
+		"-e", "usbhid.boot_report.keyboard.modifier.right_gui",
+		"-e", "usbhid.boot_report.mouse.button.left",
+		"-e", "usbhid.boot_report.mouse.button.right",
+		"-e", "usbhid.boot_report.mouse.button.middle",
+		"-e", "usbhid.boot_report.mouse.button.4",
+		"-e", "usbhid.boot_report.mouse.button.5",
+		"-e", "usbhid.boot_report.mouse.button.6",
+		"-e", "usbhid.boot_report.mouse.button.7",
+		"-e", "usbhid.boot_report.mouse.button.8",
+		"-e", "usbhid.boot_report.mouse.x_displacement",
+		"-e", "usbhid.boot_report.mouse.y_displacement",
+		"-e", "usbhid.boot_report.mouse.scroll_wheel.vertical",
+		"-e", "usbhid.boot_report.mouse.scroll_wheel.horizontal",
 		"-e", "_ws.col.Info",
 	}
 
@@ -62,6 +88,8 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	endpointMap := make(map[string]int)
 	setupMap := make(map[string]int)
 	statusMap := make(map[string]int)
+	keyboardSignatureByDevice := make(map[string]string)
+	mousePositionByDevice := make(map[string][2]int)
 
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
@@ -73,7 +101,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		}
 
 		parts := strings.Split(line, "\t")
-		if len(parts) < 18 {
+		if len(parts) < 46 {
 			continue
 		}
 
@@ -91,7 +119,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		setupIndex := safeTrim(parts, 14)
 		setupLength := safeTrim(parts, 15)
 		payloadRaw := firstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 17), safeTrim(parts, 18))
-		info := safeTrim(parts, 19)
+		info := safeTrim(parts, 45)
 
 		if !looksLikeUSBRecord(protocol, busID, deviceAddress, endpointRaw, transferType, urbType) {
 			continue
@@ -105,6 +133,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		if transferType != "" {
 			transferMap[transferType]++
 		}
+
 		direction := normalizeUSBDirection(endpointDirection, endpointRaw)
 		if direction != "" {
 			directionMap[direction]++
@@ -125,11 +154,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 			statusMap[status]++
 		}
 
-		if len(analysis.Records) >= usbRecordLimit {
-			continue
-		}
-
-		analysis.Records = append(analysis.Records, model.USBPacketRecord{
+		record := model.USBPacketRecord{
 			PacketID:       parseUSBInt64(safeTrim(parts, 0)),
 			Time:           normalizeTimestamp(safeTrim(parts, 1)),
 			Protocol:       protocol,
@@ -144,7 +169,32 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 			SetupRequest:   buildUSBSetupSummary(setupRequest, setupValue, setupIndex, setupLength),
 			PayloadPreview: previewUSBPayload(payloadRaw),
 			Summary:        firstNonEmpty(info, transferType, protocol, "USB packet"),
-		})
+		}
+
+		if len(analysis.Records) < usbRecordLimit {
+			analysis.Records = append(analysis.Records, record)
+		}
+
+		if keyboardEvent, ok := buildUSBKeyboardEvent(record, parts, keyboardSignatureByDevice); ok {
+			analysis.KeyboardPackets++
+			if len(analysis.KeyboardEvents) < usbRecordLimit {
+				analysis.KeyboardEvents = append(analysis.KeyboardEvents, keyboardEvent)
+			}
+			continue
+		}
+
+		if mouseEvent, ok := buildUSBMouseEvent(record, parts, mousePositionByDevice); ok {
+			analysis.MousePackets++
+			if len(analysis.MouseEvents) < usbRecordLimit {
+				analysis.MouseEvents = append(analysis.MouseEvents, mouseEvent)
+			}
+			continue
+		}
+
+		analysis.OtherUSBPackets++
+		if len(analysis.OtherRecords) < usbRecordLimit {
+			analysis.OtherRecords = append(analysis.OtherRecords, record)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -163,6 +213,395 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	analysis.SetupRequests = topBuckets(setupMap, 0)
 	analysis.Notes = buildUSBAnalysisNotes(analysis, statusMap)
 	return analysis, nil
+}
+
+func buildUSBKeyboardEvent(record model.USBPacketRecord, parts []string, signatureByDevice map[string]string) (model.USBKeyboardEvent, bool) {
+	modifiers := buildKeyboardModifiers(parts)
+	keys := buildKeyboardKeys(parts)
+	deviceKey := record.Endpoint
+	if deviceKey == "" {
+		deviceKey = buildUSBDeviceLabel(record.BusID, record.DeviceAddress)
+	}
+
+	if len(modifiers) == 0 && len(keys) == 0 {
+		signatureByDevice[deviceKey] = ""
+		return model.USBKeyboardEvent{}, false
+	}
+
+	signature := buildKeyboardSignature(modifiers, keys)
+	if signatureByDevice[deviceKey] == signature {
+		return model.USBKeyboardEvent{}, false
+	}
+	signatureByDevice[deviceKey] = signature
+
+	text := buildKeyboardText(modifiers, keys)
+	summary := buildKeyboardSummary(modifiers, keys, text)
+
+	return model.USBKeyboardEvent{
+		PacketID:  record.PacketID,
+		Time:      record.Time,
+		Device:    buildUSBDeviceLabel(record.BusID, record.DeviceAddress),
+		Endpoint:  record.Endpoint,
+		Modifiers: modifiers,
+		Keys:      keys,
+		Text:      text,
+		Summary:   summary,
+	}, true
+}
+
+func buildUSBMouseEvent(record model.USBPacketRecord, parts []string, positionByDevice map[string][2]int) (model.USBMouseEvent, bool) {
+	buttons := buildMouseButtons(parts)
+	xDelta := parseUSBSignedInt(safeTrim(parts, 41))
+	yDelta := parseUSBSignedInt(safeTrim(parts, 42))
+	wheelVertical := parseUSBSignedInt(safeTrim(parts, 43))
+	wheelHorizontal := parseUSBSignedInt(safeTrim(parts, 44))
+
+	if len(buttons) == 0 && xDelta == 0 && yDelta == 0 && wheelVertical == 0 && wheelHorizontal == 0 {
+		return model.USBMouseEvent{}, false
+	}
+
+	deviceKey := record.Endpoint
+	if deviceKey == "" {
+		deviceKey = buildUSBDeviceLabel(record.BusID, record.DeviceAddress)
+	}
+
+	position := positionByDevice[deviceKey]
+	position[0] += xDelta
+	position[1] += yDelta
+	positionByDevice[deviceKey] = position
+
+	return model.USBMouseEvent{
+		PacketID:        record.PacketID,
+		Time:            record.Time,
+		Device:          buildUSBDeviceLabel(record.BusID, record.DeviceAddress),
+		Endpoint:        record.Endpoint,
+		Buttons:         buttons,
+		XDelta:          xDelta,
+		YDelta:          yDelta,
+		WheelVertical:   wheelVertical,
+		WheelHorizontal: wheelHorizontal,
+		PositionX:       position[0],
+		PositionY:       position[1],
+		Summary:         buildMouseSummary(buttons, xDelta, yDelta, wheelVertical, wheelHorizontal),
+	}, true
+}
+
+func buildKeyboardModifiers(parts []string) []string {
+	modifiers := make([]string, 0, 8)
+	specs := []struct {
+		index int
+		label string
+	}{
+		{25, "Left Ctrl"},
+		{26, "Left Shift"},
+		{27, "Left Alt"},
+		{28, "Left GUI"},
+		{29, "Right Ctrl"},
+		{30, "Right Shift"},
+		{31, "Right Alt"},
+		{32, "Right GUI"},
+	}
+	for _, spec := range specs {
+		if parseUSBBool(safeTrim(parts, spec.index)) {
+			modifiers = append(modifiers, spec.label)
+		}
+	}
+	return modifiers
+}
+
+func buildKeyboardKeys(parts []string) []string {
+	keys := make([]string, 0, 6)
+	seen := make(map[string]struct{})
+	for i := 19; i <= 24; i++ {
+		label := keyboardKeyLabel(parseUSBInt(safeTrim(parts, i)))
+		if label == "" {
+			continue
+		}
+		if _, ok := seen[label]; ok {
+			continue
+		}
+		seen[label] = struct{}{}
+		keys = append(keys, label)
+	}
+	return keys
+}
+
+func buildKeyboardSignature(modifiers, keys []string) string {
+	if len(modifiers) == 0 && len(keys) == 0 {
+		return ""
+	}
+	all := make([]string, 0, len(modifiers)+len(keys))
+	all = append(all, modifiers...)
+	all = append(all, keys...)
+	return strings.Join(all, "|")
+}
+
+func buildKeyboardSummary(modifiers, keys []string, text string) string {
+	combo := append([]string{}, modifiers...)
+	combo = append(combo, keys...)
+	if len(combo) == 0 {
+		return "Keyboard event"
+	}
+	if text != "" && text != strings.Join(keys, " ") {
+		return strings.Join(combo, " + ") + " => " + text
+	}
+	return strings.Join(combo, " + ")
+}
+
+func buildKeyboardText(modifiers, keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	shift := false
+	for _, modifier := range modifiers {
+		if strings.Contains(modifier, "Shift") {
+			shift = true
+			break
+		}
+	}
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		rendered := keyboardTextToken(key, shift)
+		if rendered == "" {
+			continue
+		}
+		parts = append(parts, rendered)
+	}
+	return strings.Join(parts, "")
+}
+
+func keyboardTextToken(key string, shift bool) string {
+	if len(key) == 1 && key[0] >= 'A' && key[0] <= 'Z' {
+		if shift {
+			return key
+		}
+		return strings.ToLower(key)
+	}
+
+	if len(key) == 1 && key[0] >= '0' && key[0] <= '9' {
+		if !shift {
+			return key
+		}
+		shiftedDigits := map[string]string{
+			"1": "!",
+			"2": "@",
+			"3": "#",
+			"4": "$",
+			"5": "%",
+			"6": "^",
+			"7": "&",
+			"8": "*",
+			"9": "(",
+			"0": ")",
+		}
+		return shiftedDigits[key]
+	}
+
+	switch key {
+	case "Space":
+		return " "
+	case "Tab":
+		return "\t"
+	case "Enter":
+		return "\n"
+	case "-":
+		if shift {
+			return "_"
+		}
+		return "-"
+	case "=":
+		if shift {
+			return "+"
+		}
+		return "="
+	case "[":
+		if shift {
+			return "{"
+		}
+		return "["
+	case "]":
+		if shift {
+			return "}"
+		}
+		return "]"
+	case "\\":
+		if shift {
+			return "|"
+		}
+		return "\\"
+	case ";":
+		if shift {
+			return ":"
+		}
+		return ";"
+	case "'":
+		if shift {
+			return "\""
+		}
+		return "'"
+	case ",":
+		if shift {
+			return "<"
+		}
+		return ","
+	case ".":
+		if shift {
+			return ">"
+		}
+		return "."
+	case "/":
+		if shift {
+			return "?"
+		}
+		return "/"
+	case "`":
+		if shift {
+			return "~"
+		}
+		return "`"
+	default:
+		return ""
+	}
+}
+
+func keyboardKeyLabel(code int) string {
+	switch {
+	case code >= 4 && code <= 29:
+		return string(rune('A' + code - 4))
+	case code >= 30 && code <= 38:
+		return strconv.Itoa(code - 29)
+	case code == 39:
+		return "0"
+	}
+
+	switch code {
+	case 0:
+		return ""
+	case 40:
+		return "Enter"
+	case 41:
+		return "Esc"
+	case 42:
+		return "Backspace"
+	case 43:
+		return "Tab"
+	case 44:
+		return "Space"
+	case 45:
+		return "-"
+	case 46:
+		return "="
+	case 47:
+		return "["
+	case 48:
+		return "]"
+	case 49:
+		return "\\"
+	case 51:
+		return ";"
+	case 52:
+		return "'"
+	case 53:
+		return "`"
+	case 54:
+		return ","
+	case 55:
+		return "."
+	case 56:
+		return "/"
+	case 57:
+		return "CapsLock"
+	case 58:
+		return "F1"
+	case 59:
+		return "F2"
+	case 60:
+		return "F3"
+	case 61:
+		return "F4"
+	case 62:
+		return "F5"
+	case 63:
+		return "F6"
+	case 64:
+		return "F7"
+	case 65:
+		return "F8"
+	case 66:
+		return "F9"
+	case 67:
+		return "F10"
+	case 68:
+		return "F11"
+	case 69:
+		return "F12"
+	case 79:
+		return "Right"
+	case 80:
+		return "Left"
+	case 81:
+		return "Down"
+	case 82:
+		return "Up"
+	default:
+		return fmt.Sprintf("Keycode(%d)", code)
+	}
+}
+
+func buildMouseButtons(parts []string) []string {
+	buttons := make([]string, 0, 8)
+	specs := []struct {
+		index int
+		label string
+	}{
+		{33, "Left"},
+		{34, "Right"},
+		{35, "Middle"},
+		{36, "Button4"},
+		{37, "Button5"},
+		{38, "Button6"},
+		{39, "Button7"},
+		{40, "Button8"},
+	}
+	for _, spec := range specs {
+		if parseUSBBool(safeTrim(parts, spec.index)) {
+			buttons = append(buttons, spec.label)
+		}
+	}
+	return buttons
+}
+
+func buildMouseSummary(buttons []string, xDelta, yDelta, wheelVertical, wheelHorizontal int) string {
+	parts := make([]string, 0, 4)
+	if xDelta != 0 || yDelta != 0 {
+		parts = append(parts, fmt.Sprintf("move (%+d, %+d)", xDelta, yDelta))
+	}
+	if wheelVertical != 0 || wheelHorizontal != 0 {
+		parts = append(parts, fmt.Sprintf("wheel (v=%+d, h=%+d)", wheelVertical, wheelHorizontal))
+	}
+	if len(buttons) > 0 {
+		parts = append(parts, "buttons="+strings.Join(buttons, ", "))
+	}
+	if len(parts) == 0 {
+		return "Mouse event"
+	}
+	return strings.Join(parts, " / ")
+}
+
+func parseUSBBool(raw string) bool {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	return value == "1" || value == "true" || value == "yes"
+}
+
+func parseUSBSignedInt(raw string) int {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0
+	}
+	if parsed, err := strconv.Atoi(value); err == nil {
+		return parsed
+	}
+	return 0
 }
 
 func looksLikeUSBRecord(protocol, busID, deviceAddress, endpointRaw, transferType, urbType string) bool {
@@ -231,10 +670,8 @@ func normalizeUSBStatus(raw string) string {
 	if value == "" {
 		return "unknown"
 	}
-	if parsed, err := strconv.Atoi(value); err == nil {
-		if parsed == 0 {
-			return "ok"
-		}
+	if parsed, err := strconv.Atoi(value); err == nil && parsed == 0 {
+		return "ok"
 	}
 	return value
 }
@@ -313,7 +750,7 @@ func buildUSBEndpointLabel(busID, deviceAddress, endpointRaw, direction string) 
 	if direction != "" {
 		return fmt.Sprintf("%sEP %s (%s)", label, endpoint, direction)
 	}
-	return "EP " + endpoint
+	return label + "EP " + endpoint
 }
 
 func buildUSBSetupSummary(request, value, index, length string) string {
@@ -379,12 +816,21 @@ func decodeLooseHexToText(raw string) string {
 }
 
 func buildUSBAnalysisNotes(analysis model.USBAnalysis, statusMap map[string]int) []string {
-	notes := make([]string, 0, 6)
+	notes := make([]string, 0, 8)
 	if analysis.TotalUSBPackets == 0 {
 		return []string{"当前抓包中未检测到 USB 相关流量。"}
 	}
+	if analysis.KeyboardPackets > 0 {
+		notes = append(notes, fmt.Sprintf("检测到 %d 条键盘 HID 输入事件，可在“键盘”标签页查看按键序列。", analysis.KeyboardPackets))
+	}
+	if analysis.MousePackets > 0 {
+		notes = append(notes, fmt.Sprintf("检测到 %d 条鼠标 HID 事件，可在“鼠标”标签页查看轨迹与按钮活动。", analysis.MousePackets))
+	}
+	if analysis.OtherUSBPackets > 0 {
+		notes = append(notes, fmt.Sprintf("其余 USB 事件共 %d 条，集中展示在“其余 USB”标签页。", analysis.OtherUSBPackets))
+	}
 	if len(analysis.Devices) > 0 {
-		notes = append(notes, fmt.Sprintf("共识别到 %d 个活跃 USB 设备视角，最活跃对象为 %s。", len(analysis.Devices), analysis.Devices[0].Label))
+		notes = append(notes, fmt.Sprintf("当前最活跃的 USB 设备是 %s。", analysis.Devices[0].Label))
 	}
 	if len(analysis.TransferTypes) > 0 {
 		notes = append(notes, fmt.Sprintf("主要传输类型为 %s，共 %d 条。", analysis.TransferTypes[0].Label, analysis.TransferTypes[0].Count))
@@ -394,13 +840,10 @@ func buildUSBAnalysisNotes(analysis model.USBAnalysis, statusMap map[string]int)
 	}
 	errorCount := analysis.TotalUSBPackets - statusMap["ok"] - statusMap["unknown"]
 	if errorCount > 0 {
-		notes = append(notes, fmt.Sprintf("检测到 %d 条非正常 USB 传输状态，建议优先审计异常 URB。", errorCount))
-	}
-	if len(analysis.SetupRequests) > 0 {
-		notes = append(notes, fmt.Sprintf("控制请求中最常见的是 %s。", analysis.SetupRequests[0].Label))
+		notes = append(notes, fmt.Sprintf("检测到 %d 条非正常 USB 传输状态，建议优先检查异常 URB。", errorCount))
 	}
 	if analysis.TotalUSBPackets > len(analysis.Records) {
-		notes = append(notes, fmt.Sprintf("明细表已截断为前 %d 条 USB 记录，顶部统计仍覆盖全部 USB 包。", len(analysis.Records)))
+		notes = append(notes, fmt.Sprintf("通用记录列表已截断为前 %d 条，但顶部统计覆盖全部 USB 包。", len(analysis.Records)))
 	}
 	return notes
 }

@@ -496,14 +496,46 @@ type USBPacketRecord struct {
 	Summary        string `json:"summary"`
 }
 
+type USBKeyboardEvent struct {
+	PacketID  int64    `json:"packet_id"`
+	Time      string   `json:"time"`
+	Device    string   `json:"device"`
+	Endpoint  string   `json:"endpoint"`
+	Modifiers []string `json:"modifiers,omitempty"`
+	Keys      []string `json:"keys,omitempty"`
+	Text      string   `json:"text,omitempty"`
+	Summary   string   `json:"summary"`
+}
+
+type USBMouseEvent struct {
+	PacketID        int64    `json:"packet_id"`
+	Time            string   `json:"time"`
+	Device          string   `json:"device"`
+	Endpoint        string   `json:"endpoint"`
+	Buttons         []string `json:"buttons,omitempty"`
+	XDelta          int      `json:"x_delta"`
+	YDelta          int      `json:"y_delta"`
+	WheelVertical   int      `json:"wheel_vertical"`
+	WheelHorizontal int      `json:"wheel_horizontal"`
+	PositionX       int      `json:"position_x"`
+	PositionY       int      `json:"position_y"`
+	Summary         string   `json:"summary"`
+}
+
 type USBAnalysis struct {
-	TotalUSBPackets int               `json:"total_usb_packets"`
-	Protocols       []TrafficBucket   `json:"protocols"`
-	TransferTypes   []TrafficBucket   `json:"transfer_types"`
-	Directions      []TrafficBucket   `json:"directions"`
-	Devices         []TrafficBucket   `json:"devices"`
-	Endpoints       []TrafficBucket   `json:"endpoints"`
-	SetupRequests   []TrafficBucket   `json:"setup_requests"`
-	Records         []USBPacketRecord `json:"records"`
-	Notes           []string          `json:"notes"`
+	TotalUSBPackets int                `json:"total_usb_packets"`
+	KeyboardPackets int                `json:"keyboard_packets"`
+	MousePackets    int                `json:"mouse_packets"`
+	OtherUSBPackets int                `json:"other_usb_packets"`
+	Protocols       []TrafficBucket    `json:"protocols"`
+	TransferTypes   []TrafficBucket    `json:"transfer_types"`
+	Directions      []TrafficBucket    `json:"directions"`
+	Devices         []TrafficBucket    `json:"devices"`
+	Endpoints       []TrafficBucket    `json:"endpoints"`
+	SetupRequests   []TrafficBucket    `json:"setup_requests"`
+	Records         []USBPacketRecord  `json:"records"`
+	KeyboardEvents  []USBKeyboardEvent `json:"keyboard_events"`
+	MouseEvents     []USBMouseEvent    `json:"mouse_events"`
+	OtherRecords    []USBPacketRecord  `json:"other_records"`
+	Notes           []string           `json:"notes"`
 }

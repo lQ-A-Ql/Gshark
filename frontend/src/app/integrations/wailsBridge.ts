@@ -1006,6 +1006,9 @@ export const bridge: BackendBridge = {
     const payload = await request<any>("/api/analysis/usb");
     return {
       totalUSBPackets: Number(payload.total_usb_packets ?? 0),
+      keyboardPackets: Number(payload.keyboard_packets ?? 0),
+      mousePackets: Number(payload.mouse_packets ?? 0),
+      otherUSBPackets: Number(payload.other_usb_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
       transferTypes: Array.isArray(payload.transfer_types) ? payload.transfer_types.map(asBucket) : [],
       directions: Array.isArray(payload.directions) ? payload.directions.map(asBucket) : [],
@@ -1014,6 +1017,52 @@ export const bridge: BackendBridge = {
       setupRequests: Array.isArray(payload.setup_requests) ? payload.setup_requests.map(asBucket) : [],
       records: Array.isArray(payload.records)
         ? payload.records.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            time: String(item.time ?? ""),
+            protocol: String(item.protocol ?? ""),
+            busId: String(item.bus_id ?? ""),
+            deviceAddress: String(item.device_address ?? ""),
+            endpoint: String(item.endpoint ?? ""),
+            direction: String(item.direction ?? ""),
+            transferType: String(item.transfer_type ?? ""),
+            urbType: String(item.urb_type ?? ""),
+            status: String(item.status ?? ""),
+            dataLength: Number(item.data_length ?? 0),
+            setupRequest: String(item.setup_request ?? "") || undefined,
+            payloadPreview: String(item.payload_preview ?? "") || undefined,
+            summary: String(item.summary ?? ""),
+          }))
+        : [],
+      keyboardEvents: Array.isArray(payload.keyboard_events)
+        ? payload.keyboard_events.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            time: String(item.time ?? ""),
+            device: String(item.device ?? ""),
+            endpoint: String(item.endpoint ?? ""),
+            modifiers: Array.isArray(item.modifiers) ? item.modifiers.map((value: unknown) => String(value ?? "")) : [],
+            keys: Array.isArray(item.keys) ? item.keys.map((value: unknown) => String(value ?? "")) : [],
+            text: String(item.text ?? "") || undefined,
+            summary: String(item.summary ?? ""),
+          }))
+        : [],
+      mouseEvents: Array.isArray(payload.mouse_events)
+        ? payload.mouse_events.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            time: String(item.time ?? ""),
+            device: String(item.device ?? ""),
+            endpoint: String(item.endpoint ?? ""),
+            buttons: Array.isArray(item.buttons) ? item.buttons.map((value: unknown) => String(value ?? "")) : [],
+            xDelta: Number(item.x_delta ?? 0),
+            yDelta: Number(item.y_delta ?? 0),
+            wheelVertical: Number(item.wheel_vertical ?? 0),
+            wheelHorizontal: Number(item.wheel_horizontal ?? 0),
+            positionX: Number(item.position_x ?? 0),
+            positionY: Number(item.position_y ?? 0),
+            summary: String(item.summary ?? ""),
+          }))
+        : [],
+      otherRecords: Array.isArray(payload.other_records)
+        ? payload.other_records.map((item: any) => ({
             packetId: Number(item.packet_id ?? 0),
             time: String(item.time ?? ""),
             protocol: String(item.protocol ?? ""),
