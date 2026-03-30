@@ -1,4 +1,4 @@
-export type Protocol = "TCP" | "UDP" | "HTTP" | "HTTPS" | "DNS" | "SSHv2" | "TLS" | "ARP" | "ICMP" | "ICMPV6" | "OTHER";
+export type Protocol = "TCP" | "UDP" | "HTTP" | "HTTPS" | "DNS" | "SSHv2" | "TLS" | "ARP" | "ICMP" | "ICMPV6" | "USB" | "OTHER";
 
 export interface PacketColorFeatures {
   tcpAnalysisFlags?: boolean;
@@ -491,5 +491,34 @@ export interface MediaAnalysis {
   protocols: TrafficBucket[];
   applications: TrafficBucket[];
   sessions: MediaSession[];
+  notes: string[];
+}
+
+export interface USBPacketRecord {
+  packetId: number;
+  time: string;
+  protocol: string;
+  busId: string;
+  deviceAddress: string;
+  endpoint: string;
+  direction: string;
+  transferType: string;
+  urbType: string;
+  status: string;
+  dataLength: number;
+  setupRequest?: string;
+  payloadPreview?: string;
+  summary: string;
+}
+
+export interface USBAnalysis {
+  totalUSBPackets: number;
+  protocols: TrafficBucket[];
+  transferTypes: TrafficBucket[];
+  directions: TrafficBucket[];
+  devices: TrafficBucket[];
+  endpoints: TrafficBucket[];
+  setupRequests: TrafficBucket[];
+  records: USBPacketRecord[];
   notes: string[];
 }

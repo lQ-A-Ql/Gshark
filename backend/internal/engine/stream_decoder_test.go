@@ -22,6 +22,19 @@ func TestDecodeStreamPayloadBase64(t *testing.T) {
 	}
 }
 
+func TestDecodeStreamPayloadBase64FromColonHexASCII(t *testing.T) {
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "base64",
+		Payload: "53:47:56:73:62:47:38:67:52:31:4e:6f:59:58:4a:72",
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload() error = %v", err)
+	}
+	if result.Text != "Hello GShark" {
+		t.Fatalf("unexpected decoded text from colon hex: %q", result.Text)
+	}
+}
+
 func TestDecodeStreamPayloadAntSword(t *testing.T) {
 	payload := "pass=" + url.QueryEscape(base64.StdEncoding.EncodeToString([]byte("echo('ok');")))
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
@@ -38,6 +51,25 @@ func TestDecodeStreamPayloadAntSword(t *testing.T) {
 	}
 	if result.Text != "echo('ok');" {
 		t.Fatalf("unexpected antsword text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadAntSwordFromColonHexASCII(t *testing.T) {
+	payload := "70:61:73:73:3d:5a:57:4e:6f:62:79:67:6e:62:32:73:6e:4b:54:73:3d"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "antsword",
+		Payload: payload,
+		Options: map[string]any{
+			"pass":            "pass",
+			"extractParam":    true,
+			"urlDecodeRounds": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload() error = %v", err)
+	}
+	if result.Text != "echo('ok');" {
+		t.Fatalf("unexpected antsword text from colon hex: %q", result.Text)
 	}
 }
 

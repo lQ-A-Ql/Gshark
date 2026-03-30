@@ -63,6 +63,7 @@ interface SentinelContextValue {
   udpStream: BinaryStream;
   streamIds: { http: number[]; tcp: number[]; udp: number[] };
   setActiveStream: (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => Promise<void>;
+  persistStreamPayloads: (protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>) => Promise<void>;
   streamSwitchMetrics: StreamSwitchMetrics;
   plugins: PluginItem[];
   pluginLogs: string[];
@@ -205,6 +206,38 @@ function buildLoadingBinaryStream(protocol: "TCP" | "UDP", streamId: number): Bi
 function prettySize(bytes: number) {
   const mb = bytes / 1024 / 1024;
   return `${mb.toFixed(1)} MB`;
+}
+
+function applyStreamChunkPatches<T extends HttpStream | BinaryStream>(
+  stream: T,
+  patches: Array<{ index: number; body: string }>,
+): T {
+  if (patches.length === 0 || stream.chunks.length === 0) return stream;
+
+  const patchMap = new Map<number, string>();
+  for (const patch of patches) {
+    if (patch.index < 0) continue;
+    patchMap.set(patch.index, patch.body);
+  }
+  if (patchMap.size === 0) return stream;
+
+  const nextChunks = stream.chunks.map((chunk, index) => (
+    patchMap.has(index) ? { ...chunk, body: patchMap.get(index) ?? chunk.body } : chunk
+  ));
+
+  if ("request" in stream && "response" in stream) {
+    return {
+      ...stream,
+      chunks: nextChunks,
+      request: nextChunks.filter((chunk) => chunk.direction === "client").map((chunk) => chunk.body).join(""),
+      response: nextChunks.filter((chunk) => chunk.direction === "server").map((chunk) => chunk.body).join(""),
+    };
+  }
+
+  return {
+    ...stream,
+    chunks: nextChunks,
+  };
 }
 
 export function SentinelProvider({ children }: PropsWithChildren) {
@@ -662,6 +695,41 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     }
   }, [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric]);
 
+  const persistStreamPayloads = useCallback(async (
+    protocol: "HTTP" | "TCP" | "UDP",
+    streamId: number,
+    patches: Array<{ index: number; body: string }>,
+  ) => {
+    if (!backendConnected || streamId < 0 || patches.length === 0) return;
+    await bridge.updateStreamPayloads(protocol, streamId, patches);
+
+    startTransition(() => {
+      if (protocol === "HTTP") {
+        setHttpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
+        const cached = httpStreamCacheRef.current.get(streamId);
+        if (cached) {
+          httpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
+        }
+        return;
+      }
+
+      if (protocol === "TCP") {
+        setTcpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
+        const cached = tcpStreamCacheRef.current.get(streamId);
+        if (cached) {
+          tcpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
+        }
+        return;
+      }
+
+      setUdpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
+      const cached = udpStreamCacheRef.current.get(streamId);
+      if (cached) {
+        udpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
+      }
+    });
+  }, [backendConnected]);
+
   useEffect(() => {
     let dispose: (() => void) | null = null;
     let cancelled = false;
@@ -904,34 +972,37 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
 
       const waitDeadline = Date.now() + 120000;
-      while (true) {
+      let firstPageLoaded = false;
+      while (Date.now() < waitDeadline) {
+        if (!firstPageLoaded) {
+          const firstPage = await bridge.listPacketsPage(0, 1, effectiveFilter);
+          if (firstPage.total > 0) {
+            await loadPacketPage(0, effectiveFilter);
+            firstPageLoaded = true;
+          }
+        } else if (!packetLoadingRef.current) {
+          await loadPacketPage(0, effectiveFilter);
+        }
+
         if (parseFinishedRef.current) {
           break;
         }
 
-        const firstPage = await bridge.listPacketsPage(0, 1);
-        if (firstPage.total > 0) {
-          break;
-        }
-
         await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, 300);
+          window.setTimeout(resolve, firstPageLoaded ? PRELOAD_POLL_INTERVAL_MS : 300);
         });
-
-        if (Date.now() >= waitDeadline) {
-          break;
-        }
       }
 
       const probePage = await bridge.listPacketsPage(0, 1, effectiveFilter);
       if (probePage.total === 0 && parseFinishedRef.current) {
         throw new Error(parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility");
       }
-      if (probePage.total === 0 && Date.now() >= waitDeadline) {
-        throw new Error("capture parsing timed out before packets were loaded");
+      if (!parseFinishedRef.current && Date.now() >= waitDeadline) {
+        throw new Error("capture parsing timed out before preloading finished");
       }
-
-      await loadPacketPage(0, effectiveFilter);
+      if (!firstPageLoaded && probePage.total > 0) {
+        await loadPacketPage(0, effectiveFilter);
+      }
       await refreshStreamIndex();
       await refreshAnalysisResult();
       setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
@@ -1132,6 +1203,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       udpStream,
       streamIds,
       setActiveStream,
+      persistStreamPayloads,
       streamSwitchMetrics,
       plugins,
       pluginLogs,
@@ -1183,6 +1255,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       udpStream,
       streamIds,
       setActiveStream,
+      persistStreamPayloads,
       streamSwitchMetrics,
       plugins,
       pluginLogs,

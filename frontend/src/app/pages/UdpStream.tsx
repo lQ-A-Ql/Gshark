@@ -22,7 +22,7 @@ export default function UdpStream() {
   const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [selectedChunk, setSelectedChunk] = useState<RawChunk | null>(null);
+  const [selectedChunkIndex, setSelectedChunkIndex] = useState(0);
   const [streamView, setStreamView] = useState(() => ({
     id: -1,
     protocol: "UDP" as const,
@@ -37,12 +37,13 @@ export default function UdpStream() {
   const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { udpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const { udpStream, selectedPacket, streamIds, setActiveStream, persistStreamPayloads, streamSwitchMetrics } = useSentinel();
   const currentIndex = streamIds.udp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.udp.length || 1}` : `-- / ${streamIds.udp.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.udp.length - 1;
   const visibleChunks = useMemo(() => streamView.chunks, [streamView.chunks]);
+  const selectedChunk = streamView.chunks[selectedChunkIndex] ?? null;
 
   useEffect(() => {
     setStreamView({
@@ -61,21 +62,15 @@ export default function UdpStream() {
   useEffect(() => {
     setStreamInput(udpStream.id >= 0 ? String(udpStream.id) : "");
     setLoadError("");
-    setSelectedChunk(null);
+    setSelectedChunkIndex(0);
   }, [udpStream.id]);
 
   useEffect(() => {
     if (streamView.chunks.length === 0) {
-      setSelectedChunk(null);
+      setSelectedChunkIndex(0);
       return;
     }
-    setSelectedChunk((prev) => {
-      if (!prev) {
-        return streamView.chunks[0];
-      }
-      const current = streamView.chunks.find((chunk) => chunk.packetId === prev.packetId && chunk.direction === prev.direction);
-      return current ?? streamView.chunks[0];
-    });
+    setSelectedChunkIndex((prev) => Math.min(prev, streamView.chunks.length - 1));
   }, [streamView.chunks]);
 
   useEffect(() => {
@@ -115,6 +110,17 @@ export default function UdpStream() {
     }
   }
 
+  function applyLocalPatches(patches: Array<{ index: number; body: string }>) {
+    if (patches.length === 0) return;
+    const patchMap = new Map<number, string>(patches.map((patch) => [patch.index, patch.body]));
+    setStreamView((prev) => ({
+      ...prev,
+      chunks: prev.chunks.map((chunk, index) => (
+        patchMap.has(index) ? { ...chunk, body: patchMap.get(index) ?? chunk.body } : chunk
+      )),
+    }));
+  }
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
@@ -124,7 +130,7 @@ export default function UdpStream() {
           </button>
           <div className="h-4 w-px bg-border" />
           <h1 className="flex items-center gap-2 font-semibold text-foreground">
-            追踪 UDP 流 (Stream eq {streamView.id})
+            UDP 流追踪 (stream eq {streamView.id})
             <span className="ml-2 flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {streamView.from} <ArrowLeftRight className="h-3 w-3" /> {streamView.to}
             </span>
@@ -141,19 +147,19 @@ export default function UdpStream() {
         )}
         {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
           <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
-            正在解析 udp.stream eq {streamView.id}，当前只加载这一条流。
+            正在解析 udp.stream eq {streamView.id}，当前只先加载这一条流。
           </div>
         )}
         <div className="flex max-w-4xl flex-col gap-1">
-          {visibleChunks.map((chunk) => (
+          {visibleChunks.map((chunk, index) => (
             <RawStreamChunkCard
-              key={chunk.packetId}
+              key={`${chunk.packetId}-${chunk.direction}-${index}`}
               chunk={chunk}
               mode={viewMode}
               clientTone="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
               serverTone="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
-              selected={selectedChunk?.packetId === chunk.packetId && selectedChunk.direction === chunk.direction}
-              onSelect={() => setSelectedChunk(chunk)}
+              selected={selectedChunkIndex === index}
+              onSelect={() => setSelectedChunkIndex(index)}
             />
           ))}
           {streamView.hasMore && (
@@ -173,10 +179,20 @@ export default function UdpStream() {
           payload={selectedChunk?.body ?? ""}
           chunkLabel={
             selectedChunk
-              ? `UDP 片段 #${selectedChunk.packetId} · ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
+              ? `UDP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
               : `UDP 流 stream eq ${streamView.id}`
           }
           tone="amber"
+          batchItems={streamView.chunks.map((chunk, index) => ({
+            index,
+            payload: chunk.body,
+            label: `#${chunk.packetId} ${chunk.direction === "client" ? "client->server" : "server->client"}`,
+          }))}
+          selectedBatchIndex={selectedChunkIndex}
+          onApplyDecodedBatch={async (patches) => {
+            await persistStreamPayloads("UDP", streamView.id, patches);
+            applyLocalPatches(patches);
+          }}
         />
       </div>
 
@@ -197,7 +213,7 @@ export default function UdpStream() {
           </label>
         </div>
         <div className="grid h-full grid-cols-[auto_28px_minmax(220px,1fr)_28px_72px_120px] items-center gap-2">
-          <span className="text-xs text-muted-foreground">流切换:</span>
+          <span className="text-xs text-muted-foreground">流切换</span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
             onClick={() => {
@@ -210,7 +226,7 @@ export default function UdpStream() {
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="px-2 text-center font-mono text-xs text-foreground" title={`UDP 流总数: ${streamIds.udp.length}`}>
-            第 {ordinalLabel} 条 · stream eq {streamView.id}
+            第 {ordinalLabel} 条 / stream eq {streamView.id}
           </span>
           <button
             className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
@@ -261,7 +277,7 @@ function formatLoadMeta(meta?: StreamLoadMeta): string {
   if (meta.loading) return "正在解析当前 UDP 流...";
   const source = meta.source || "unknown";
   const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
-  return `来源 ${source} · cache ${meta.cacheHit ? "yes" : "no"} · index ${meta.indexHit ? "yes" : "no"} · fallback ${meta.fileFallback ? "yes" : "no"} · tshark ${tshark}`;
+  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}`;
 }
 
 const RawStreamChunkCard = memo(function RawStreamChunkCard({

@@ -1,8 +1,26 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Activity, LayoutDashboard, ShieldAlert, FileDown, KeyRound, Puzzle, Box, FolderOpen, Save, Upload, Hexagon, BarChart3, Factory, Car, Clapperboard, ScrollText } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Box,
+  Car,
+  Clapperboard,
+  Factory,
+  FileDown,
+  FolderOpen,
+  Hexagon,
+  KeyRound,
+  LayoutDashboard,
+  Puzzle,
+  Save,
+  ScrollText,
+  ShieldAlert,
+  Upload,
+  Usb,
+} from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -15,6 +33,7 @@ const NAV_ITEMS = [
   { path: "/industrial-analysis", icon: Factory, label: "工控分析" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析" },
   { path: "/media-analysis", icon: Clapperboard, label: "视频流还原" },
+  { path: "/usb-analysis", icon: Usb, label: "USB 分析" },
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心" },
   { path: "/objects", icon: FileDown, label: "附件提取" },
   { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
@@ -50,7 +69,11 @@ export function MainLayout() {
   };
 
   const exportPacketsJson = () => {
-    downloadText(`packets-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`, JSON.stringify(filteredPackets, null, 2), "application/json;charset=utf-8");
+    downloadText(
+      `packets-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`,
+      JSON.stringify(filteredPackets, null, 2),
+      "application/json;charset=utf-8",
+    );
   };
 
   const copySelectedPacket = async () => {
@@ -64,7 +87,7 @@ export function MainLayout() {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // no-op
+      // ignore clipboard failures
     }
   };
 
@@ -98,7 +121,7 @@ export function MainLayout() {
     const rows = Object.entries(stats)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 200)
-      .map(([k, v]) => `${k},${v}`)
+      .map(([key, value]) => `${key},${value}`)
       .join("\n");
     downloadText("endpoint-stats.csv", `endpoint,count\n${rows}`);
   };
@@ -129,104 +152,82 @@ export function MainLayout() {
   }, [navigate, openCapture]);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-background text-foreground font-sans overflow-hidden selection:bg-blue-200 selection:text-blue-900">
-      {/* Top Title Bar */}
-      <header className="flex flex-col border-b border-border bg-card shrink-0 shadow-sm relative z-50">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
+      <header className="relative z-50 flex shrink-0 flex-col border-b border-border bg-card shadow-sm">
         <div className="flex h-12 items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-blue-600 font-semibold tracking-wide">
+            <div className="flex items-center gap-2 font-semibold tracking-wide text-blue-600">
               <Hexagon className="h-6 w-6" />
               <span className="text-lg">GShark-Sentinel</span>
             </div>
-            
-            {/* Top Dropdown Menu Bar */}
-            <nav className="flex items-center gap-1 text-sm font-medium text-muted-foreground ml-6">
-              <div className="relative group">
-                <button className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors cursor-default">文件 (F)</button>
-                <div className="absolute top-full left-0 min-w-[160px] bg-card border border-border rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div
-                    className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer flex items-center gap-2"
-                    onClick={() => void openCapture()}
-                  ><FolderOpen className="w-4 h-4"/> 打开</div>
-                  <div
-                    className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer flex items-center gap-2"
-                    onClick={exportPacketsJson}
-                  ><Save className="w-4 h-4"/> 导出当前列表</div>
-                  <div
-                    className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer flex items-center gap-2"
-                    onClick={() => void openCapture()}
-                  ><Upload className="w-4 h-4"/> 导入...</div>
-                  <div className="h-px bg-border my-1"></div>
-                  <div className="px-3 py-1.5 hover:bg-destructive/10 hover:text-destructive cursor-pointer" onClick={() => window.close()}>退出</div>
-                </div>
-              </div>
-              <div className="relative group">
-                <button className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors cursor-default">编辑 (E)</button>
-                <div className="absolute top-full left-0 min-w-[160px] bg-card border border-border rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => void copySelectedPacket()}>复制所选数据包</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>查找数据包...</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/plugins")}>首选项</div>
-                </div>
-              </div>
-              <div className="relative group">
-                <button className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors cursor-default">视图 (V)</button>
-                <div className="absolute top-full left-0 min-w-[180px] bg-card border border-border rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/")}>返回主工作区</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/decryption")}>名称解析 / TLS</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</div>
-                </div>
-              </div>
-              <div className="relative group">
-                <button className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors cursor-default">分析 (A)</button>
-                <div className="absolute top-full left-0 min-w-[160px] bg-card border border-border rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div
-                    className="px-3 py-1.5 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
-                    onClick={() => {
-                      setDisplayFilter("http");
-                      applyFilter("http");
-                    }}
-                  >
-                    应用过滤器: http
-                  </div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/industrial-analysis")}>工控分析</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/vehicle-analysis")}>车机分析</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/media-analysis")}>视频流还原</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/audit-logs")}>审计日志</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={followSelectedStream}>追踪流</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/hunting")}>专家信息</div>
-                </div>
-              </div>
-              <div className="relative group">
-                <button className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors cursor-default">统计 (S)</button>
-                <div className="absolute top-full left-0 min-w-[160px] bg-card border border-border rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/traffic-graph")}>流量图</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/industrial-analysis")}>工控分析</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/vehicle-analysis")}>车机分析</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={() => navigate("/media-analysis")}>视频流还原</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={exportEndpointStats}>端点统计导出</div>
-                  <div className="px-3 py-1.5 hover:bg-accent hover:text-accent-foreground cursor-pointer" onClick={exportProtocolStats}>协议统计导出</div>
-                </div>
-              </div>
+
+            <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
+              <MenuGroup label="文件">
+                <MenuItem onClick={() => void openCapture()} icon={<FolderOpen className="h-4 w-4" />}>打开</MenuItem>
+                <MenuItem onClick={exportPacketsJson} icon={<Save className="h-4 w-4" />}>导出当前列表</MenuItem>
+                <MenuItem onClick={() => void openCapture()} icon={<Upload className="h-4 w-4" />}>导入...</MenuItem>
+                <MenuDivider />
+                <MenuItem danger onClick={() => window.close()}>退出</MenuItem>
+              </MenuGroup>
+
+              <MenuGroup label="编辑">
+                <MenuItem onClick={() => void copySelectedPacket()}>复制所选数据包</MenuItem>
+                <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>查找数据包...</MenuItem>
+                <MenuItem onClick={() => navigate("/plugins")}>首选项</MenuItem>
+              </MenuGroup>
+
+              <MenuGroup label="视图">
+                <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
+                <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
+                <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
+              </MenuGroup>
+
+              <MenuGroup label="分析">
+                <MenuItem
+                  onClick={() => {
+                    setDisplayFilter("http");
+                    applyFilter("http");
+                  }}
+                >
+                  应用过滤器 http
+                </MenuItem>
+                <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
+                <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
+                <MenuItem onClick={() => navigate("/media-analysis")}>视频流还原</MenuItem>
+                <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
+                <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
+                <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
+                <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
+              </MenuGroup>
+
+              <MenuGroup label="统计">
+                <MenuItem onClick={() => navigate("/traffic-graph")}>流量图</MenuItem>
+                <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
+                <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
+                <MenuItem onClick={() => navigate("/media-analysis")}>视频流还原</MenuItem>
+                <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
+                <MenuItem onClick={exportEndpointStats}>端点统计导出</MenuItem>
+                <MenuItem onClick={exportProtocolStats}>协议统计导出</MenuItem>
+              </MenuGroup>
             </nav>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="flex items-center gap-1 rounded-md bg-rose-50 px-2.5 py-1.5 text-rose-600 border border-rose-200">
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-medium">
+            <span className="flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600">
               <ShieldAlert className="h-3.5 w-3.5" /> OWASP
             </span>
-            <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1.5 text-emerald-600 border border-emerald-200">
+            <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600">
               <Activity className="h-3.5 w-3.5" /> CTF
             </span>
-            <span className="flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1.5 text-amber-600 border border-amber-200">
+            <span className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600">
               <KeyRound className="h-3.5 w-3.5" /> 解密
             </span>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar Navigation */}
-        <aside className="w-16 flex-col border-r border-border bg-card flex items-center py-4 gap-4 shrink-0 shadow-sm z-40">
+        <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-border bg-card py-4 shadow-sm">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -236,19 +237,18 @@ export function MainLayout() {
                 to={item.path}
                 title={item.label}
                 className={cn(
-                  "p-3 rounded-xl transition-all relative group",
-                  isActive 
-                    ? "bg-blue-50 text-blue-600 shadow-sm" 
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  "group relative rounded-xl p-3 transition-all",
+                  isActive
+                    ? "bg-blue-50 text-blue-600 shadow-sm"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
                 <Icon className="h-5 w-5" />
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
+                  <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
                 )}
-                
-                {/* Tooltip */}
-                <div className="absolute left-full ml-3 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-md">
+
+                <div className="invisible absolute left-full z-50 ml-3 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100">
                   {item.label}
                 </div>
               </Link>
@@ -256,14 +256,12 @@ export function MainLayout() {
           })}
         </aside>
 
-        {/* Dynamic View Content */}
-        <main className="flex-1 min-w-0 bg-background flex flex-col relative overflow-hidden">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <Outlet />
         </main>
       </div>
 
-      {/* Global Status Bar */}
-      <footer className="h-7 flex items-center justify-between border-t border-border bg-card px-4 text-[11px] text-muted-foreground font-medium tracking-wider shrink-0 z-40">
+      <footer className="z-40 flex h-7 shrink-0 items-center justify-between border-t border-border bg-card px-4 text-[11px] font-medium tracking-wider text-muted-foreground">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})</span>
           <span className="flex items-center gap-1 text-blue-600">
@@ -279,4 +277,46 @@ export function MainLayout() {
       </footer>
     </div>
   );
+}
+
+function MenuGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="group relative">
+      <button className="cursor-default rounded-md px-3 py-1.5 transition-colors hover:bg-accent hover:text-accent-foreground">
+        {label}
+      </button>
+      <div className="invisible absolute left-0 top-full z-50 min-w-[180px] rounded-md border border-border bg-card py-1 opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  icon,
+  danger = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  icon?: ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex cursor-pointer items-center gap-2 px-3 py-1.5",
+        danger ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-accent hover:text-accent-foreground",
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function MenuDivider() {
+  return <div className="my-1 h-px bg-border" />;
 }

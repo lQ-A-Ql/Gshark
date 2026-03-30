@@ -97,6 +97,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/streams/raw", s.handleRawStream)
 	mux.HandleFunc("/api/streams/raw/page", s.handleRawStreamPage)
 	mux.HandleFunc("/api/streams/decode", s.handleStreamDecode)
+	mux.HandleFunc("/api/streams/payloads", s.handleStreamPayloads)
 	mux.HandleFunc("/api/streams/index", s.handleStreamIndex)
 	mux.HandleFunc("/api/packet/raw", s.handlePacketRaw)
 	mux.HandleFunc("/api/packet/layers", s.handlePacketLayers)
@@ -105,6 +106,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/vehicle", s.handleVehicleAnalysis)
 	mux.HandleFunc("/api/analysis/vehicle/dbc", s.handleVehicleDBC)
 	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
+	mux.HandleFunc("/api/analysis/usb", s.handleUSBAnalysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/tls", s.handleTLS)
 	mux.HandleFunc("/api/audit/logs", s.handleAuditLogs)
@@ -447,6 +449,15 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, analysis)
 }
 
+func (s *Server) handleUSBAnalysis(w http.ResponseWriter, _ *http.Request) {
+	analysis, err := s.svc.USBAnalysis()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, analysis)
+}
+
 func (s *Server) handleMediaArtifactDownload(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.URL.Query().Get("token"))
 	if token == "" {
@@ -739,6 +750,30 @@ func (s *Server) handleStreamDecode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var payload struct {
+		Protocol string                   `json:"protocol"`
+		StreamID int64                    `json:"stream_id"`
+		Patches  []model.StreamChunkPatch `json:"patches"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	stream, err := s.svc.UpdateStreamPayloads(r.Context(), payload.Protocol, payload.StreamID, payload.Patches)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, stream)
 }
 
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {

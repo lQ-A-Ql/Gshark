@@ -144,6 +144,11 @@ type StreamChunk struct {
 	Body      string `json:"body"`
 }
 
+type StreamChunkPatch struct {
+	Index int    `json:"index"`
+	Body  string `json:"body"`
+}
+
 type StreamLoadMeta struct {
 	Source       string `json:"source,omitempty"`
 	Loading      bool   `json:"loading,omitempty"`
@@ -472,4 +477,33 @@ type MediaAnalysis struct {
 	Applications      []TrafficBucket `json:"applications"`
 	Sessions          []MediaSession  `json:"sessions"`
 	Notes             []string        `json:"notes"`
+}
+
+type USBPacketRecord struct {
+	PacketID       int64  `json:"packet_id"`
+	Time           string `json:"time"`
+	Protocol       string `json:"protocol"`
+	BusID          string `json:"bus_id"`
+	DeviceAddress  string `json:"device_address"`
+	Endpoint       string `json:"endpoint"`
+	Direction      string `json:"direction"`
+	TransferType   string `json:"transfer_type"`
+	URBType        string `json:"urb_type"`
+	Status         string `json:"status"`
+	DataLength     int    `json:"data_length"`
+	SetupRequest   string `json:"setup_request,omitempty"`
+	PayloadPreview string `json:"payload_preview,omitempty"`
+	Summary        string `json:"summary"`
+}
+
+type USBAnalysis struct {
+	TotalUSBPackets int               `json:"total_usb_packets"`
+	Protocols       []TrafficBucket   `json:"protocols"`
+	TransferTypes   []TrafficBucket   `json:"transfer_types"`
+	Directions      []TrafficBucket   `json:"directions"`
+	Devices         []TrafficBucket   `json:"devices"`
+	Endpoints       []TrafficBucket   `json:"endpoints"`
+	SetupRequests   []TrafficBucket   `json:"setup_requests"`
+	Records         []USBPacketRecord `json:"records"`
+	Notes           []string          `json:"notes"`
 }

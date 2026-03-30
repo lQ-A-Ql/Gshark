@@ -1020,6 +1020,8 @@ func normalizeProto(proto string) string {
 	switch {
 	case strings.Contains(p, "http"):
 		return "HTTP"
+	case strings.Contains(p, "usb"):
+		return "USB"
 	case strings.Contains(p, "icmpv6"):
 		return "ICMPV6"
 	case strings.Contains(p, "icmp"):
@@ -1085,11 +1087,19 @@ func extractPayload(node map[string]any, layers map[string]any) string {
 		findStringByPath(node, "layers.http.http_file_data"),
 		findStringByPath(node, "layers.data.data_data"),
 		findStringByPath(node, "layers.tcp.tcp_payload"),
+		findStringByPath(node, "layers.usb.usb_frame_data"),
+		findStringByPath(node, "layers.usb.usb_control_response"),
+		findStringByPath(node, "layers.usb.usb_capdata"),
+		findStringByPath(node, "layers.usb.usb_data_fragment"),
 		findBySuffix(layers, "httprequestline"),
 		findBySuffix(layers, "httpresponseline"),
 		findBySuffix(layers, "httpfiledata"),
 		findBySuffix(layers, "datadata"),
 		findBySuffix(layers, "tcppayload"),
+		findBySuffix(layers, "usbframedata"),
+		findBySuffix(layers, "usbcontrolresponse"),
+		findBySuffix(layers, "usbcapdata"),
+		findBySuffix(layers, "usbdatafragment"),
 	); s != "" {
 		return s
 	}

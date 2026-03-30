@@ -11,6 +11,7 @@ import type {
   PluginItem,
   StreamDecodeResult,
   ThreatHit,
+  USBAnalysis,
   VehicleAnalysis,
 } from "../core/types";
 
@@ -138,6 +139,7 @@ export interface BackendBridge {
   getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
   getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
   decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>): Promise<StreamDecodeResult>;
+  updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal): Promise<HttpStream | BinaryStream>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
   getPacketRawHex(packetId: number): Promise<string>;
   getPacketLayers(packetId: number): Promise<Record<string, unknown> | null>;
@@ -145,6 +147,7 @@ export interface BackendBridge {
   getIndustrialAnalysis(): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(): Promise<VehicleAnalysis>;
   getMediaAnalysis(): Promise<MediaAnalysis>;
+  getUSBAnalysis(): Promise<USBAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
   addVehicleDBC(path: string): Promise<DBCProfile[]>;
@@ -640,6 +643,19 @@ export const bridge: BackendBridge = {
     };
   },
 
+  async updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal) {
+    const payload = await request<any>("/api/streams/payloads", {
+      method: "POST",
+      signal,
+      body: JSON.stringify({
+        protocol,
+        stream_id: streamId,
+        patches,
+      }),
+    });
+    return protocol === "HTTP" ? asHttpStream(payload) : asBinaryStream(payload, protocol);
+  },
+
   async listStreamIds(protocol: "HTTP" | "TCP" | "UDP") {
     const payload = await request<any>(`/api/streams/index?protocol=${encodeURIComponent(protocol)}`);
     const ids = Array.isArray(payload.ids) ? payload.ids : [];
@@ -980,6 +996,38 @@ export const bridge: BackendBridge = {
                   sizeBytes: Number(item.artifact.size_bytes ?? 0),
                 }
               : undefined,
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
+    };
+  },
+
+  async getUSBAnalysis() {
+    const payload = await request<any>("/api/analysis/usb");
+    return {
+      totalUSBPackets: Number(payload.total_usb_packets ?? 0),
+      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
+      transferTypes: Array.isArray(payload.transfer_types) ? payload.transfer_types.map(asBucket) : [],
+      directions: Array.isArray(payload.directions) ? payload.directions.map(asBucket) : [],
+      devices: Array.isArray(payload.devices) ? payload.devices.map(asBucket) : [],
+      endpoints: Array.isArray(payload.endpoints) ? payload.endpoints.map(asBucket) : [],
+      setupRequests: Array.isArray(payload.setup_requests) ? payload.setup_requests.map(asBucket) : [],
+      records: Array.isArray(payload.records)
+        ? payload.records.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            time: String(item.time ?? ""),
+            protocol: String(item.protocol ?? ""),
+            busId: String(item.bus_id ?? ""),
+            deviceAddress: String(item.device_address ?? ""),
+            endpoint: String(item.endpoint ?? ""),
+            direction: String(item.direction ?? ""),
+            transferType: String(item.transfer_type ?? ""),
+            urbType: String(item.urb_type ?? ""),
+            status: String(item.status ?? ""),
+            dataLength: Number(item.data_length ?? 0),
+            setupRequest: String(item.setup_request ?? "") || undefined,
+            payloadPreview: String(item.payload_preview ?? "") || undefined,
+            summary: String(item.summary ?? ""),
           }))
         : [],
       notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],

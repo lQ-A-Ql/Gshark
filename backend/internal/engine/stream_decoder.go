@@ -50,9 +50,6 @@ func DecodeStreamPayload(req StreamDecodeRequest) (StreamDecodeResult, error) {
 
 func decodeBase64Payload(raw string) (StreamDecodeResult, error) {
 	candidate := extractBasePayload(raw)
-	if looksLikeHTTPMessage(candidate) {
-		candidate = extractHTTPMessageBody(candidate)
-	}
 	decoded, err := decodeBase64Loose(extractBestBase64Candidate(candidate))
 	if err != nil {
 		return StreamDecodeResult{}, err
@@ -162,10 +159,7 @@ func buildDecodeResult(decoder, summary string, data []byte, encoding string) St
 }
 
 func extractPayloadCandidate(raw, pass string, extractParam bool) string {
-	candidate := strings.TrimSpace(raw)
-	if looksLikeHTTPMessage(candidate) {
-		candidate = extractHTTPMessageBody(candidate)
-	}
+	candidate := normalizeTransportPayload(raw)
 	if !extractParam || strings.TrimSpace(pass) == "" {
 		return candidate
 	}
@@ -178,9 +172,24 @@ func extractPayloadCandidate(raw, pass string, extractParam bool) string {
 }
 
 func extractBasePayload(raw string) string {
+	return normalizeTransportPayload(raw)
+}
+
+func normalizeTransportPayload(raw string) string {
 	candidate := strings.TrimSpace(raw)
-	if looksLikeHTTPMessage(candidate) {
-		candidate = extractHTTPMessageBody(candidate)
+	for i := 0; i < 3; i++ {
+		updated := candidate
+		if looksLikeHTTPMessage(updated) {
+			updated = strings.TrimSpace(extractHTTPMessageBody(updated))
+		}
+		if text, ok := unwrapHexEncodedText(updated); ok {
+			updated = text
+		}
+		updated = strings.TrimSpace(updated)
+		if updated == candidate {
+			break
+		}
+		candidate = updated
 	}
 	return candidate
 }
@@ -206,13 +215,44 @@ func looksLikeHTTPMessage(raw string) bool {
 func extractBestBase64Candidate(raw string) string {
 	candidate := strings.TrimSpace(raw)
 	matches := base64CandidatePattern.FindAllString(candidate, -1)
-	best := candidate
+	best := ""
 	for _, item := range matches {
 		if len(item) > len(best) {
 			best = item
 		}
 	}
+	if best == "" {
+		best = candidate
+	}
 	return best
+}
+
+func unwrapHexEncodedText(raw string) (string, bool) {
+	decoded := decodeLooseHex(raw)
+	if len(decoded) == 0 {
+		return "", false
+	}
+	trimmed := bytes.Trim(decoded, "\x00")
+	if len(trimmed) == 0 {
+		return "", false
+	}
+	if utf8.Valid(trimmed) || looksMostlyPrintable(trimmed) {
+		return string(trimmed), true
+	}
+	return "", false
+}
+
+func looksMostlyPrintable(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	printable := 0
+	for _, b := range data {
+		if b == '\r' || b == '\n' || b == '\t' || (b >= 32 && b <= 126) {
+			printable++
+		}
+	}
+	return printable*100/len(data) >= 85
 }
 
 func decodeCipherInput(raw, mode string) ([]byte, string, error) {
