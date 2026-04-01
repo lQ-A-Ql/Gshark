@@ -730,6 +730,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, [backendConnected]);
 
+  const scheduleLoadMoreRef = useRef(scheduleLoadMore);
+  const refreshAnalysisResultRef = useRef(refreshAnalysisResult);
+  const updateProgressFromStatusRef = useRef(updateProgressFromStatus);
+
+  useEffect(() => {
+    scheduleLoadMoreRef.current = scheduleLoadMore;
+  }, [scheduleLoadMore]);
+
+  useEffect(() => {
+    refreshAnalysisResultRef.current = refreshAnalysisResult;
+  }, [refreshAnalysisResult]);
+
+  useEffect(() => {
+    updateProgressFromStatusRef.current = updateProgressFromStatus;
+  }, [updateProgressFromStatus]);
+
   useEffect(() => {
     let dispose: (() => void) | null = null;
     let cancelled = false;
@@ -803,18 +819,18 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           if (preloadingRef.current) {
             return;
           }
-          scheduleLoadMore();
+          scheduleLoadMoreRef.current();
 
           if (refreshTimer.current) {
             window.clearTimeout(refreshTimer.current);
           }
           refreshTimer.current = window.setTimeout(() => {
-            void refreshAnalysisResult();
+            void refreshAnalysisResultRef.current();
           }, 500);
         },
         status: (message) => {
           const msg = message || "后端运行中";
-          if (updateProgressFromStatus(msg)) {
+          if (updateProgressFromStatusRef.current(msg)) {
             return;
           }
           if (msg.toLowerCase().includes("plugin")) {
@@ -855,7 +871,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         window.clearTimeout(refreshTimer.current);
       }
     };
-  }, [refreshAnalysisResult, scheduleLoadMore, updateProgressFromStatus]);
+  }, []);
 
   useEffect(() => {
     if (selectedPacketId == null || !selectedPacket) {

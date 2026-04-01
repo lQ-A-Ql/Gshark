@@ -95,6 +95,31 @@ func TestDecodeStreamPayloadBehinder(t *testing.T) {
 	}
 }
 
+func TestDecodeStreamPayloadBehinderWithURLDecode(t *testing.T) {
+	pass := "rebeyond"
+	keyHash := md5.Sum([]byte(pass))
+	plain := []byte("assert|behinder")
+	ciphertext := encryptAESECBForTest(plain, keyHash[:16])
+	payload := "pass=" + url.QueryEscape(base64.StdEncoding.EncodeToString(ciphertext))
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "behinder",
+		Payload: payload,
+		Options: map[string]any{
+			"pass":              pass,
+			"extractParam":      true,
+			"deriveKeyFromPass": true,
+			"urlDecodeRounds":   1,
+			"inputEncoding":     "base64",
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload() error = %v", err)
+	}
+	if result.Text != string(plain) {
+		t.Fatalf("unexpected behinder url-decoded text: %q", result.Text)
+	}
+}
+
 func TestDecodeStreamPayloadGodzillaXor(t *testing.T) {
 	key := "key123"
 	plain := []byte("godzilla")
@@ -113,6 +138,34 @@ func TestDecodeStreamPayloadGodzillaXor(t *testing.T) {
 	}
 	if result.Text != string(plain) {
 		t.Fatalf("unexpected godzilla text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadGodzillaFromMultipart(t *testing.T) {
+	key := "key123"
+	plain := []byte("godzilla")
+	cipher := xorBytes(plain, []byte(key))
+	multipartBody := "--demo\r\n" +
+		"Content-Disposition: form-data; name=\"pass\"\r\n\r\n" +
+		url.QueryEscape(base64.StdEncoding.EncodeToString(cipher)) + "\r\n" +
+		"--demo--\r\n"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "godzilla",
+		Payload: multipartBody,
+		Options: map[string]any{
+			"pass":            "pass",
+			"key":             key,
+			"extractParam":    true,
+			"urlDecodeRounds": 1,
+			"cipher":          "xor",
+			"inputEncoding":   "base64",
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload() error = %v", err)
+	}
+	if result.Text != string(plain) {
+		t.Fatalf("unexpected godzilla multipart text: %q", result.Text)
 	}
 }
 

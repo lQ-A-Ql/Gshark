@@ -30,6 +30,7 @@ type StreamDecodeResult struct {
 
 var (
 	base64CandidatePattern = regexp.MustCompile(`[A-Za-z0-9+/=_-]{12,}`)
+	multipartNamePattern   = regexp.MustCompile(`name="([^"]+)"`)
 )
 
 func DecodeStreamPayload(req StreamDecodeRequest) (StreamDecodeResult, error) {
@@ -62,6 +63,7 @@ func decodeBehinderPayload(raw string, options map[string]any) (StreamDecodeResu
 	if candidate == "" {
 		return StreamDecodeResult{}, errors.New("未提取到冰蝎密文")
 	}
+	candidate = applyURLDecodeRounds(candidate, optionsIntDefault(options, "urlDecodeRounds", 0))
 
 	key := strings.TrimSpace(optionsString(options, "key"))
 	if key == "" && optionsBoolDefault(options, "deriveKeyFromPass", true) {
@@ -116,6 +118,7 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 	if candidate == "" {
 		return StreamDecodeResult{}, errors.New("未提取到哥斯拉载荷")
 	}
+	candidate = applyURLDecodeRounds(candidate, optionsIntDefault(options, "urlDecodeRounds", 0))
 
 	if optionsBoolDefault(options, "stripMarkers", true) {
 		candidate = stripGodzillaMarkers(candidate, optionsString(options, "pass"), optionsString(options, "key"))
@@ -161,14 +164,104 @@ func buildDecodeResult(decoder, summary string, data []byte, encoding string) St
 func extractPayloadCandidate(raw, pass string, extractParam bool) string {
 	candidate := normalizeTransportPayload(raw)
 	if !extractParam || strings.TrimSpace(pass) == "" {
+		if !extractParam {
+			return candidate
+		}
+		if extracted, ok := extractPayloadParam(candidate, ""); ok {
+			return extracted
+		}
 		return candidate
 	}
-	if values, err := url.ParseQuery(strings.TrimSpace(candidate)); err == nil {
-		if value := strings.TrimSpace(values.Get(pass)); value != "" {
-			return value
-		}
+	if extracted, ok := extractPayloadParam(candidate, pass); ok {
+		return extracted
 	}
 	return candidate
+}
+
+func extractPayloadParam(candidate, pass string) (string, bool) {
+	if values, err := url.ParseQuery(strings.TrimSpace(candidate)); err == nil && len(values) > 0 {
+		if value := strings.TrimSpace(values.Get(pass)); value != "" {
+			return value, true
+		}
+		if value := longestQueryValue(values); value != "" {
+			return value, true
+		}
+	}
+	if value := extractMultipartValue(candidate, pass); value != "" {
+		return value, true
+	}
+	return "", false
+}
+
+func longestQueryValue(values url.Values) string {
+	best := ""
+	for _, items := range values {
+		for _, item := range items {
+			trimmed := strings.TrimSpace(item)
+			if len(trimmed) > len(best) {
+				best = trimmed
+			}
+		}
+	}
+	return best
+}
+
+func extractMultipartValue(candidate, pass string) string {
+	body := strings.ReplaceAll(candidate, "\r\n", "\n")
+	lines := strings.Split(body, "\n")
+	boundary := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "--") && len(trimmed) > 4 {
+			boundary = trimmed
+			break
+		}
+	}
+	if boundary == "" {
+		return ""
+	}
+
+	best := ""
+	sections := strings.Split(body, boundary)
+	for _, section := range sections {
+		section = strings.TrimSpace(section)
+		if section == "" || section == "--" {
+			continue
+		}
+		headerBody := strings.SplitN(section, "\n\n", 2)
+		if len(headerBody) != 2 {
+			continue
+		}
+		headers := headerBody[0]
+		value := strings.TrimSpace(strings.TrimSuffix(headerBody[1], "--"))
+		if value == "" {
+			continue
+		}
+		matches := multipartNamePattern.FindStringSubmatch(headers)
+		name := ""
+		if len(matches) > 1 {
+			name = strings.TrimSpace(matches[1])
+		}
+		if pass != "" && name == pass {
+			return value
+		}
+		if len(value) > len(best) {
+			best = value
+		}
+	}
+	return best
+}
+
+func applyURLDecodeRounds(candidate string, rounds int) string {
+	current := candidate
+	for i := 0; i < rounds; i++ {
+		decoded, err := url.QueryUnescape(current)
+		if err != nil {
+			break
+		}
+		current = decoded
+	}
+	return current
 }
 
 func extractBasePayload(raw string) string {

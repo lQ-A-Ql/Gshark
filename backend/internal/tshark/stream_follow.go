@@ -271,7 +271,7 @@ func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol 
 		if packetID <= 0 {
 			packetID = int64(len(stream.Chunks) + 1)
 		}
-		stream.Chunks = append(stream.Chunks, model.StreamChunk{PacketID: packetID, Direction: direction, Body: payloadHex})
+		appendRawFollowChunk(&stream, packetID, direction, payloadHex)
 		if loggedChunks < 8 {
 			byteCount := 0
 			if payloadHex != "" {
@@ -297,6 +297,27 @@ func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol 
 	log.Printf("tshark: follow raw stream done protocol=%s stream=%d chunks=%d", stream.Protocol, streamID, len(stream.Chunks))
 
 	return stream, nil
+}
+
+func appendRawFollowChunk(stream *model.ReassembledStream, packetID int64, direction, body string) {
+	if body == "" {
+		return
+	}
+	if n := len(stream.Chunks); n > 0 && stream.Chunks[n-1].Direction == direction {
+		stream.Chunks[n-1].Body = joinFollowChunkBodies(stream.Chunks[n-1].Body, body)
+		return
+	}
+	stream.Chunks = append(stream.Chunks, model.StreamChunk{PacketID: packetID, Direction: direction, Body: body})
+}
+
+func joinFollowChunkBodies(left, right string) string {
+	if left == "" {
+		return right
+	}
+	if right == "" {
+		return left
+	}
+	return left + ":" + right
 }
 
 func normalizePayloadHex(payloadHex string) string {

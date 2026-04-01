@@ -58,7 +58,7 @@ export default function HttpStream() {
     const routeStreamId = Number(state?.streamId ?? -1);
     const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
     const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
-    if (streamId < 0 || !streamIds.http.includes(streamId) || httpStream.id >= 0) {
+    if (streamId < 0 || !streamIds.http.includes(streamId) || httpStream.id === streamId) {
       return;
     }
     void setActiveStream("HTTP", streamId);

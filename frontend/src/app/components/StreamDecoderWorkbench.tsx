@@ -9,6 +9,7 @@ type DecoderSettings = {
     key: string;
     extractParam: boolean;
     deriveKeyFromPass: boolean;
+    urlDecodeRounds: number;
     inputEncoding: "auto" | "base64" | "hex";
   };
   antsword: {
@@ -21,6 +22,7 @@ type DecoderSettings = {
     key: string;
     extractParam: boolean;
     stripMarkers: boolean;
+    urlDecodeRounds: number;
     inputEncoding: "auto" | "base64" | "hex";
     cipher: "aes_ecb" | "xor";
   };
@@ -40,6 +42,7 @@ const DEFAULT_SETTINGS: DecoderSettings = {
     key: "",
     extractParam: true,
     deriveKeyFromPass: true,
+    urlDecodeRounds: 0,
     inputEncoding: "auto",
   },
   antsword: {
@@ -52,6 +55,7 @@ const DEFAULT_SETTINGS: DecoderSettings = {
     key: "",
     extractParam: true,
     stripMarkers: true,
+    urlDecodeRounds: 0,
     inputEncoding: "auto",
     cipher: "aes_ecb",
   },
@@ -280,6 +284,19 @@ export function StreamDecoderWorkbench({
                   options={[["auto", "自动"], ["base64", "Base64"], ["hex", "Hex"]]}
                   onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, inputEncoding: value as DecoderSettings["behinder"]["inputEncoding"] } }))}
                 />
+                <LabeledInput
+                  label="URL 解码轮数"
+                  value={String(settings.behinder.urlDecodeRounds)}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      behinder: {
+                        ...prev.behinder,
+                        urlDecodeRounds: Math.max(0, Number(value.replace(/[^0-9]/g, "")) || 0),
+                      },
+                    }))
+                  }
+                />
                 <LabeledToggle
                   label="从表单中提取 pass 参数"
                   checked={settings.behinder.extractParam}
@@ -346,6 +363,19 @@ export function StreamDecoderWorkbench({
                   value={settings.godzilla.cipher}
                   options={[["aes_ecb", "AES-ECB"], ["xor", "XOR"]]}
                   onChange={(value) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, cipher: value as DecoderSettings["godzilla"]["cipher"] } }))}
+                />
+                <LabeledInput
+                  label="URL 解码轮数"
+                  value={String(settings.godzilla.urlDecodeRounds)}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      godzilla: {
+                        ...prev.godzilla,
+                        urlDecodeRounds: Math.max(0, Number(value.replace(/[^0-9]/g, "")) || 0),
+                      },
+                    }))
+                  }
                 />
                 <LabeledToggle
                   label="从表单中提取 pass 参数"

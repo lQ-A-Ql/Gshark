@@ -699,7 +699,7 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 		stream := ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
 			return s.packetStore.Iterate(nil, fn)
 		}, streamID)
-		if len(stream.Chunks) > 0 || stream.Request != "" || stream.Response != "" {
+		if len(stream.Chunks) > 0 || strings.TrimSpace(stream.Request) != "" || strings.TrimSpace(stream.Response) != "" {
 			stream = s.streamWithOverrides(key, stream)
 			stream.LoadMeta = newStreamLoadMeta("memory", false, false, false, 0)
 			s.cacheStream(key, stream)

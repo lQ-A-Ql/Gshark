@@ -96,7 +96,7 @@ export default function TcpStream() {
     const routeStreamId = Number(state?.streamId ?? -1);
     const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
     const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
-    if (streamId < 0 || !streamIds.tcp.includes(streamId) || streamView.id >= 0) {
+    if (streamId < 0 || !streamIds.tcp.includes(streamId) || streamView.id === streamId) {
       return;
     }
     void setActiveStream("TCP", streamId);

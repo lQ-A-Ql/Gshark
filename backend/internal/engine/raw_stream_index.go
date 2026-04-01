@@ -5,10 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+var colonHexPayloadPattern = regexp.MustCompile(`^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$`)
 
 func appendPacketToRawStreamIndex(index map[string]*model.ReassembledStream, packet model.Packet) {
 	if packet.StreamID < 0 {
@@ -43,11 +46,7 @@ func appendPacketToRawStreamIndex(index map[string]*model.ReassembledStream, pac
 		direction = "client"
 	}
 
-	stream.Chunks = append(stream.Chunks, model.StreamChunk{
-		PacketID:  packet.ID,
-		Direction: direction,
-		Body:      body,
-	})
+	appendMergedRawStreamChunk(stream, packet.ID, direction, body)
 }
 
 func rawStreamProtocol(packet model.Packet) string {
@@ -243,6 +242,38 @@ func cloneRawStreamWindow(in model.ReassembledStream, cursor, limit int) (model.
 		out.LoadMeta = &meta
 	}
 	return out, end, total
+}
+
+func appendMergedRawStreamChunk(stream *model.ReassembledStream, packetID int64, direction, body string) {
+	if stream == nil || strings.TrimSpace(body) == "" {
+		return
+	}
+	if n := len(stream.Chunks); n > 0 && stream.Chunks[n-1].Direction == direction {
+		stream.Chunks[n-1].Body = joinStreamChunkBodies(stream.Chunks[n-1].Body, body)
+		return
+	}
+	stream.Chunks = append(stream.Chunks, model.StreamChunk{
+		PacketID:  packetID,
+		Direction: direction,
+		Body:      body,
+	})
+}
+
+func joinStreamChunkBodies(left, right string) string {
+	if left == "" {
+		return right
+	}
+	if right == "" {
+		return left
+	}
+	if isColonHexPayload(left) && isColonHexPayload(right) {
+		return left + ":" + right
+	}
+	return left + right
+}
+
+func isColonHexPayload(raw string) bool {
+	return colonHexPayloadPattern.MatchString(strings.TrimSpace(raw))
 }
 
 func selectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {

@@ -279,6 +279,10 @@ func ReassembleHTTPStreamFromIterate(iterate func(func(model.Packet) error) erro
 		if packet.StreamID != streamID || !isHTTPLikePacket(packet) {
 			return nil
 		}
+		body := decodeHTTPPayloadText(packet.Payload)
+		if body == "" {
+			return nil
+		}
 		if stream.From == "" {
 			stream.From = packet.SourceIP
 			stream.To = packet.DestIP
@@ -287,11 +291,11 @@ func ReassembleHTTPStreamFromIterate(iterate func(func(model.Packet) error) erro
 		}
 
 		if isHTTPRequestPacket(packet, clientIP, clientPort) {
-			appendHTTPChunk(&stream, packet.ID, "client", packet.Payload)
-			stream.Request += packet.Payload + "\n"
+			appendHTTPChunk(&stream, packet.ID, "client", body)
+			stream.Request += body
 		} else {
-			appendHTTPChunk(&stream, packet.ID, "server", packet.Payload)
-			stream.Response += packet.Payload + "\n"
+			appendHTTPChunk(&stream, packet.ID, "server", body)
+			stream.Response += body
 		}
 		return nil
 	})
@@ -303,10 +307,21 @@ func appendHTTPChunk(stream *model.ReassembledStream, packetID int64, direction,
 		return
 	}
 	if n := len(stream.Chunks); n > 0 && stream.Chunks[n-1].Direction == direction {
-		stream.Chunks[n-1].Body += "\n" + body
+		stream.Chunks[n-1].Body += body
 		return
 	}
 	stream.Chunks = append(stream.Chunks, model.StreamChunk{PacketID: packetID, Direction: direction, Body: body})
+}
+
+func decodeHTTPPayloadText(payload string) string {
+	raw := strings.TrimSpace(payload)
+	if raw == "" {
+		return ""
+	}
+	if decoded := decodeLooseHex(raw); len(decoded) > 0 {
+		return string(bytes.Trim(decoded, "\x00"))
+	}
+	return payload
 }
 
 func isHTTPLikePacket(packet model.Packet) bool {
@@ -367,7 +382,6 @@ func ReassembleRawStream(packets []model.Packet, protocol string, streamID int64
 
 func ReassembleRawStreamFromIterate(iterate func(func(model.Packet) error) error, protocol string, streamID int64) model.ReassembledStream {
 	stream := model.ReassembledStream{StreamID: streamID, Protocol: protocol}
-	chunks := make([]model.StreamChunk, 0, 64)
 	clientIP := ""
 	clientPort := 0
 
@@ -385,10 +399,9 @@ func ReassembleRawStreamFromIterate(iterate func(func(model.Packet) error) error
 		if clientIP != "" && packet.SourceIP == clientIP && (clientPort == 0 || packet.SourcePort == clientPort) {
 			direction = "client"
 		}
-		chunks = append(chunks, model.StreamChunk{PacketID: packet.ID, Direction: direction, Body: packet.Payload})
+		appendMergedRawStreamChunk(&stream, packet.ID, direction, packet.Payload)
 		return nil
 	})
-	stream.Chunks = chunks
 	return stream
 }
 

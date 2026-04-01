@@ -156,6 +156,32 @@ func TestReassembleHTTPStreamFromIterate(t *testing.T) {
 	if stream.Chunks[0].Direction != "client" || stream.Chunks[1].Direction != "server" {
 		t.Fatalf("unexpected http chunk directions: %+v", stream.Chunks)
 	}
+	if stream.Request != "GET / HTTP/1.1" || stream.Response != "HTTP/1.1 200 OK" {
+		t.Fatalf("unexpected http bodies request=%q response=%q", stream.Request, stream.Response)
+	}
+}
+
+func TestReassembleHTTPStreamFromIterateSkipsEmptyPayloads(t *testing.T) {
+	packets := []model.Packet{
+		{ID: 1, StreamID: 7, Protocol: "HTTP", SourceIP: "192.168.1.2", SourcePort: 54321, DestIP: "10.0.0.9", DestPort: 80, Info: "GET / HTTP/1.1", Payload: ""},
+		{ID: 2, StreamID: 7, Protocol: "HTTP", SourceIP: "10.0.0.9", SourcePort: 80, DestIP: "192.168.1.2", DestPort: 54321, Info: "HTTP/1.1 200 OK", Payload: ""},
+	}
+
+	stream := ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
+		for _, packet := range packets {
+			if err := fn(packet); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, 7)
+
+	if len(stream.Chunks) != 0 {
+		t.Fatalf("expected empty http chunks for empty payloads, got %+v", stream.Chunks)
+	}
+	if stream.Request != "" || stream.Response != "" {
+		t.Fatalf("expected empty request/response, got request=%q response=%q", stream.Request, stream.Response)
+	}
 }
 
 func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
@@ -237,5 +263,24 @@ func TestRawStreamPageSlicesIndexedStream(t *testing.T) {
 	}
 	if stream.LoadMeta == nil || !stream.LoadMeta.IndexHit || stream.LoadMeta.Source != "index" {
 		t.Fatalf("expected index load meta, got %+v", stream.LoadMeta)
+	}
+}
+
+func TestReassembleRawStreamMergesAdjacentSameDirection(t *testing.T) {
+	packets := []model.Packet{
+		{ID: 1, StreamID: 5, Protocol: "TCP", SourceIP: "192.168.1.1", SourcePort: 50000, DestIP: "10.0.0.1", DestPort: 80, Payload: "61:62"},
+		{ID: 2, StreamID: 5, Protocol: "TCP", SourceIP: "192.168.1.1", SourcePort: 50000, DestIP: "10.0.0.1", DestPort: 80, Payload: "63:64"},
+		{ID: 3, StreamID: 5, Protocol: "TCP", SourceIP: "10.0.0.1", SourcePort: 80, DestIP: "192.168.1.1", DestPort: 50000, Payload: "65:66"},
+	}
+
+	stream := ReassembleRawStream(packets, "TCP", 5)
+	if len(stream.Chunks) != 2 {
+		t.Fatalf("expected 2 merged chunks, got %d", len(stream.Chunks))
+	}
+	if stream.Chunks[0].Body != "61:62:63:64" {
+		t.Fatalf("unexpected merged client body: %q", stream.Chunks[0].Body)
+	}
+	if stream.Chunks[1].Body != "65:66" {
+		t.Fatalf("unexpected server body: %q", stream.Chunks[1].Body)
 	}
 }
