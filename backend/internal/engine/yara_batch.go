@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +28,8 @@ var defaultYaraRuleMeta = map[string]yaraRuleMeta{
 	"SENSITIVE_CREDENTIAL": {category: "Sensitive", ruleName: "敏感凭证泄露", level: "medium"},
 }
 
+// defaultYaraRuleSource is the fallback when rules/yara/default.yar is not found on disk.
+// Keep in sync with backend/rules/yara/default.yar.
 const defaultYaraRuleSource = `rule OWASP_SQL_INJECTION {
   strings:
     $s1 = "union select" nocase
@@ -85,10 +86,11 @@ func BatchScanObjectsWithYara(objects []model.ObjectFile, packets []model.Packet
 }
 
 func BatchScanObjectsWithYaraIndex(objects []model.ObjectFile, packetByName map[string]int64) []model.ThreatHit {
-	if len(objects) == 0 {
-		return nil
-	}
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("GSHARK_YARA_ENABLED")), "false") {
+	return BatchScanObjectsWithYaraConfig(objects, packetByName, model.YaraConfig{Enabled: true, TimeoutMS: 25000})
+}
+
+func BatchScanObjectsWithYaraConfig(objects []model.ObjectFile, packetByName map[string]int64, yc model.YaraConfig) []model.ThreatHit {
+	if len(objects) == 0 || !yc.Enabled {
 		return nil
 	}
 
@@ -97,18 +99,18 @@ func BatchScanObjectsWithYaraIndex(objects []model.ObjectFile, packetByName map[
 		return nil
 	}
 
-	yaraExe, err := resolveYaraExecutable()
+	yaraExe, err := resolveYaraExecutable(yc.Bin)
 	if err != nil {
 		return nil
 	}
 
-	rulePath, cleanup, err := resolveYaraRuleFile()
+	rulePath, cleanup, err := resolveYaraRuleFile(yc.Rules)
 	if err != nil {
 		return nil
 	}
 	defer cleanup()
 
-	timeout := resolveYaraTimeout()
+	timeout := resolveYaraTimeout(yc.TimeoutMS)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -209,8 +211,8 @@ func findScanDir(objects []model.ObjectFile) string {
 	return ""
 }
 
-func resolveYaraExecutable() (string, error) {
-	if custom := strings.TrimSpace(os.Getenv("GSHARK_YARA_BIN")); custom != "" {
+func resolveYaraExecutable(customBin string) (string, error) {
+	if custom := strings.TrimSpace(customBin); custom != "" {
 		if st, err := os.Stat(custom); err == nil && !st.IsDir() {
 			return custom, nil
 		}
@@ -237,8 +239,8 @@ func resolveYaraExecutable() (string, error) {
 	return "", fmt.Errorf("yara executable not found")
 }
 
-func resolveYaraRuleFile() (string, func(), error) {
-	if custom := strings.TrimSpace(os.Getenv("GSHARK_YARA_RULES")); custom != "" {
+func resolveYaraRuleFile(customRules string) (string, func(), error) {
+	if custom := strings.TrimSpace(customRules); custom != "" {
 		if st, err := os.Stat(custom); err == nil && !st.IsDir() {
 			return custom, func() {}, nil
 		}
@@ -280,15 +282,10 @@ func resolveYaraRuleFile() (string, func(), error) {
 	return rulePath, cleanup, nil
 }
 
-func resolveYaraTimeout() time.Duration {
+func resolveYaraTimeout(timeoutMS int) time.Duration {
 	const defaultTimeout = 25 * time.Second
-	raw := strings.TrimSpace(os.Getenv("GSHARK_YARA_TIMEOUT_MS"))
-	if raw == "" {
+	if timeoutMS <= 0 {
 		return defaultTimeout
 	}
-	ms, err := strconv.Atoi(raw)
-	if err != nil || ms <= 0 {
-		return defaultTimeout
-	}
-	return time.Duration(ms) * time.Millisecond
+	return time.Duration(timeoutMS) * time.Millisecond
 }

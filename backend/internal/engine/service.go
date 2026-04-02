@@ -25,13 +25,14 @@ type Service struct {
 	emitter      EventEmitter
 	pluginManger *plugin.Manager
 
-	mu                 sync.RWMutex
-	packetStore        *packetStore
-	tlsConf            model.TLSConfig
-	runID              int64
-	pcap               string
-	displayFilterCache map[string]*filteredPacketIndex
-	globalTrafficStats *model.GlobalTrafficStats
+	mu                      sync.RWMutex
+	packetStore             *packetStore
+	tlsConf                 model.TLSConfig
+	runID                   int64
+	pcap                    string
+	displayFilterCache      map[string]*filteredPacketIndex
+	displayFilterCacheOrder []string
+	globalTrafficStats      *model.GlobalTrafficStats
 	industrialAnalysis *model.IndustrialAnalysis
 	vehicleAnalysis    *model.VehicleAnalysis
 	mediaAnalysis      *model.MediaAnalysis
@@ -54,11 +55,13 @@ type Service struct {
 
 	huntMu          sync.RWMutex
 	huntingPrefixes []string
+	yaraConf        model.YaraConfig
 
 	cancel context.CancelFunc
 }
 
 const defaultStreamCacheLimit = 256
+const displayFilterCacheLimit = 16
 
 type filteredPacketIndex struct {
 	ids       []int64
@@ -96,6 +99,10 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 			"flag{",
 			"ctf{",
 		},
+		yaraConf: model.YaraConfig{
+			Enabled:   true,
+			TimeoutMS: 25000,
+		},
 	}
 }
 
@@ -107,7 +114,9 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.StopStreaming()
 	currentRunID := atomic.AddInt64(&s.runID, 1)
 	runCtx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
 	s.cancel = cancel
+	s.mu.Unlock()
 
 	s.mu.RLock()
 	oldPCAP := s.pcap
@@ -144,6 +153,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	}
 	s.pcap = opts.FilePath
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
 	s.globalTrafficStats = nil
 	s.industrialAnalysis = nil
 	s.vehicleAnalysis = nil
@@ -352,9 +362,12 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 }
 
 func (s *Service) StopStreaming() {
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
+	s.mu.Lock()
+	cancel := s.cancel
+	s.cancel = nil
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 }
 
@@ -500,21 +513,20 @@ func (s *Service) GetHuntingRuntimeConfig() model.HuntingRuntimeConfig {
 		prefixes = []string{"flag{", "ctf{"}
 	}
 
-	yaraEnabled := !strings.EqualFold(strings.TrimSpace(os.Getenv("GSHARK_YARA_ENABLED")), "false")
-	yaraBin := strings.TrimSpace(os.Getenv("GSHARK_YARA_BIN"))
-	yaraRules := strings.TrimSpace(os.Getenv("GSHARK_YARA_RULES"))
-	yaraTimeoutMS := 25000
-	if raw := strings.TrimSpace(os.Getenv("GSHARK_YARA_TIMEOUT_MS")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-			yaraTimeoutMS = parsed
-		}
+	s.huntMu.RLock()
+	yc := s.yaraConf
+	s.huntMu.RUnlock()
+
+	yaraTimeoutMS := yc.TimeoutMS
+	if yaraTimeoutMS <= 0 {
+		yaraTimeoutMS = 25000
 	}
 
 	return model.HuntingRuntimeConfig{
 		Prefixes:      prefixes,
-		YaraEnabled:   yaraEnabled,
-		YaraBin:       yaraBin,
-		YaraRules:     yaraRules,
+		YaraEnabled:   yc.Enabled,
+		YaraBin:       yc.Bin,
+		YaraRules:     yc.Rules,
 		YaraTimeoutMS: yaraTimeoutMS,
 	}
 }
@@ -542,29 +554,14 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 		}
 	}
 
-	if cfg.YaraEnabled {
-		_ = os.Unsetenv("GSHARK_YARA_ENABLED")
-	} else {
-		_ = os.Setenv("GSHARK_YARA_ENABLED", "false")
+	s.huntMu.Lock()
+	s.yaraConf = model.YaraConfig{
+		Enabled:   cfg.YaraEnabled,
+		Bin:       strings.TrimSpace(cfg.YaraBin),
+		Rules:     strings.TrimSpace(cfg.YaraRules),
+		TimeoutMS: cfg.YaraTimeoutMS,
 	}
-
-	if strings.TrimSpace(cfg.YaraBin) == "" {
-		_ = os.Unsetenv("GSHARK_YARA_BIN")
-	} else {
-		_ = os.Setenv("GSHARK_YARA_BIN", strings.TrimSpace(cfg.YaraBin))
-	}
-
-	if strings.TrimSpace(cfg.YaraRules) == "" {
-		_ = os.Unsetenv("GSHARK_YARA_RULES")
-	} else {
-		_ = os.Setenv("GSHARK_YARA_RULES", strings.TrimSpace(cfg.YaraRules))
-	}
-
-	if cfg.YaraTimeoutMS <= 0 {
-		_ = os.Unsetenv("GSHARK_YARA_TIMEOUT_MS")
-	} else {
-		_ = os.Setenv("GSHARK_YARA_TIMEOUT_MS", strconv.Itoa(cfg.YaraTimeoutMS))
-	}
+	s.huntMu.Unlock()
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
@@ -584,7 +581,11 @@ func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
 		return out
 	}
 
-	hits := BatchScanObjectsWithYaraIndex(objects, s.packetObjectNameIndex())
+	s.huntMu.RLock()
+	yc := s.yaraConf
+	s.huntMu.RUnlock()
+
+	hits := BatchScanObjectsWithYaraConfig(objects, s.packetObjectNameIndex(), yc)
 	s.yaraHits = make([]model.ThreatHit, len(hits))
 	copy(s.yaraHits, hits)
 	s.yaraLoaded = true
@@ -1408,6 +1409,12 @@ func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, erro
 		return existing, nil
 	}
 	s.displayFilterCache[filter] = index
+	s.displayFilterCacheOrder = append(s.displayFilterCacheOrder, filter)
+	for len(s.displayFilterCacheOrder) > displayFilterCacheLimit {
+		oldest := s.displayFilterCacheOrder[0]
+		s.displayFilterCacheOrder = s.displayFilterCacheOrder[1:]
+		delete(s.displayFilterCache, oldest)
+	}
 	s.mu.Unlock()
 	return index, nil
 }

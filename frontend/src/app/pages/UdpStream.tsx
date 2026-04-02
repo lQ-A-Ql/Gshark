@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { clsx } from "clsx";
@@ -35,6 +35,7 @@ export default function UdpStream() {
     hasMore: false,
   }));
   const [loadingMore, setLoadingMore] = useState(false);
+  const consumedRouteStreamIdRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { udpStream, selectedPacket, streamIds, setActiveStream, persistStreamPayloads, streamSwitchMetrics } = useSentinel();
@@ -77,9 +78,13 @@ export default function UdpStream() {
     const state = location.state as { streamId?: number } | null;
     const routeStreamId = Number(state?.streamId ?? -1);
     const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
-    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    const hasPendingRouteStream = routeStreamId >= 0 && routeStreamId !== consumedRouteStreamIdRef.current;
+    const streamId = hasPendingRouteStream ? routeStreamId : streamView.id < 0 ? selectedStreamId : -1;
     if (streamId < 0 || !streamIds.udp.includes(streamId) || streamView.id === streamId) {
       return;
+    }
+    if (hasPendingRouteStream) {
+      consumedRouteStreamIdRef.current = routeStreamId;
     }
     void setActiveStream("UDP", streamId);
   }, [location.state, selectedPacket?.streamId, setActiveStream, streamIds.udp, streamView.id]);

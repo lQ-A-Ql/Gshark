@@ -563,28 +563,6 @@ export default function Workspace() {
   );
 }
 
-function parsePayloadBytes(payload: string): number[] {
-  const raw = (payload ?? "").trim();
-  if (!raw) return [];
-
-  if (/^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw)) {
-    return raw
-      .split(":")
-      .map((part) => Number.parseInt(part, 16))
-      .filter((v) => Number.isFinite(v));
-  }
-
-  return Array.from(new TextEncoder().encode(raw));
-}
-
-function ipv4ToBytes(ip: string): number[] {
-  const parts = ip.split(".").map((s) => Number.parseInt(s, 10));
-  if (parts.length !== 4 || parts.some((v) => Number.isNaN(v) || v < 0 || v > 255)) {
-    return [0, 0, 0, 0];
-  }
-  return parts;
-}
-
 function buildFrameBytes(packet: Packet | null, selectedRawHex?: string): number[] {
   if (!packet) return [];
 

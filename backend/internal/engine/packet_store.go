@@ -149,8 +149,9 @@ func (s *packetStore) Iterate(predicate packetPredicate, fn func(model.Packet) e
 	}
 	defer f.Close()
 
+	reader := bufio.NewReaderSize(f, 64*1024)
 	for _, offset := range offsets {
-		packet, err := readStoredPacket(f, offset)
+		packet, err := readStoredPacket(f, reader, offset)
 		if err != nil {
 			return err
 		}
@@ -224,9 +225,10 @@ func (s *packetStore) directPage(cursor, limit int) ([]model.Packet, int, int, e
 	}
 	defer f.Close()
 
+	reader := bufio.NewReaderSize(f, 64*1024)
 	items := make([]model.Packet, 0, end-cursor)
 	for _, offset := range offsets[cursor:end] {
-		packet, err := readStoredPacket(f, offset)
+		packet, err := readStoredPacket(f, reader, offset)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -266,13 +268,14 @@ func (s *packetStore) PageByIDs(ids []int64, cursor, limit int) ([]model.Packet,
 	}
 	defer f.Close()
 
+	reader := bufio.NewReaderSize(f, 64*1024)
 	items := make([]model.Packet, 0, end-cursor)
 	for _, id := range ids[cursor:end] {
 		offset, ok := byID[id]
 		if !ok {
 			continue
 		}
-		packet, err := readStoredPacket(f, offset)
+		packet, err := readStoredPacket(f, reader, offset)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -318,12 +321,12 @@ func (s *packetStore) snapshotByID() (string, map[int64]int64) {
 	return s.path, byID
 }
 
-func readStoredPacket(file *os.File, offset int64) (model.Packet, error) {
+func readStoredPacket(file *os.File, reader *bufio.Reader, offset int64) (model.Packet, error) {
 	if _, err := file.Seek(offset, io.SeekStart); err != nil {
 		return model.Packet{}, fmt.Errorf("seek packet store: %w", err)
 	}
 
-	reader := bufio.NewReader(file)
+	reader.Reset(file)
 	line, err := reader.ReadBytes('\n')
 	if err != nil && err != io.EOF {
 		return model.Packet{}, fmt.Errorf("read packet store: %w", err)

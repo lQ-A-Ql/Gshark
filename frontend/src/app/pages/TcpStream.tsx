@@ -40,6 +40,7 @@ export default function TcpStream() {
   const [expandedChunkIndex, setExpandedChunkIndex] = useState<number | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(360);
+  const consumedRouteStreamIdRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,9 +96,13 @@ export default function TcpStream() {
     const state = location.state as { streamId?: number } | null;
     const routeStreamId = Number(state?.streamId ?? -1);
     const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
-    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    const hasPendingRouteStream = routeStreamId >= 0 && routeStreamId !== consumedRouteStreamIdRef.current;
+    const streamId = hasPendingRouteStream ? routeStreamId : streamView.id < 0 ? selectedStreamId : -1;
     if (streamId < 0 || !streamIds.tcp.includes(streamId) || streamView.id === streamId) {
       return;
+    }
+    if (hasPendingRouteStream) {
+      consumedRouteStreamIdRef.current = routeStreamId;
     }
     void setActiveStream("TCP", streamId);
   }, [location.state, selectedPacket?.streamId, setActiveStream, streamIds.tcp, streamView.id]);

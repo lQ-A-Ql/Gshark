@@ -100,7 +100,7 @@ func TestDecodeStreamPayloadBehinderWithURLDecode(t *testing.T) {
 	keyHash := md5.Sum([]byte(pass))
 	plain := []byte("assert|behinder")
 	ciphertext := encryptAESECBForTest(plain, keyHash[:16])
-	payload := "pass=" + url.QueryEscape(base64.StdEncoding.EncodeToString(ciphertext))
+	payload := "pass=" + url.QueryEscape(url.QueryEscape(base64.StdEncoding.EncodeToString(ciphertext)))
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
 		Decoder: "behinder",
 		Payload: payload,

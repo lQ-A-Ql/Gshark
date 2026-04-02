@@ -86,6 +86,13 @@ type HuntingRuntimeConfig struct {
 	YaraTimeoutMS int      `json:"yara_timeout_ms"`
 }
 
+type YaraConfig struct {
+	Enabled   bool
+	Bin       string
+	Rules     string
+	TimeoutMS int
+}
+
 type ObjectFile struct {
 	ID        int64  `json:"id"`
 	PacketID  int64  `json:"packet_id"`

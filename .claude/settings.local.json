@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"func.*Test\" /mnt/c/Users/QAQ/Desktop/gshark/backend/internal/engine/*_test.go)",
+      "Bash(grep -r \"describe\\\\|it\\(\" /mnt/c/Users/QAQ/Desktop/gshark/frontend/src/app/**/*.test.ts*)",
+      "Bash(grep:*)",
+      "Bash(find /mnt/c/Users/QAQ/Desktop/gshark/backend/internal/tshark -name \"*_test.go\" -exec wc -l {} +)",
+      "Bash(go build:*)",
+      "Bash(go test:*)"
+    ]
+  }
+}

@@ -1038,18 +1038,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketId(null);
 
     if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
-      void loadPacketPage(0, nextFilter);
+      void (async () => {
+        await loadPacketPage(0, nextFilter);
+        await refreshStreamIndex();
+      })();
     }
-  }, [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage]);
+  }, [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, refreshStreamIndex]);
 
   const clearFilter = useCallback(() => {
     setDisplayFilter("");
     setSelectedPacketId(null);
 
     if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
-      void loadPacketPage(0, "");
+      void (async () => {
+        await loadPacketPage(0, "");
+        await refreshStreamIndex();
+      })();
     }
-  }, [backendConnected, isPreloadingCapture, loadPacketPage]);
+  }, [backendConnected, isPreloadingCapture, loadPacketPage, refreshStreamIndex]);
 
   const selectPacket = useCallback((id: number) => {
     setSelectedPacketId(id);

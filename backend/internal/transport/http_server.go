@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -137,29 +136,6 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func (s *Server) handleTsharkStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	path, err := exec.LookPath("tshark")
-	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"available": false,
-			"path":      "",
-			"message":   "未在 PATH 环境变量中找到 tshark，可安装 Wireshark 并将 tshark 加入 PATH",
-		})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"available": true,
-		"path":      path,
-		"message":   "ok",
-	})
 }
 
 func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {

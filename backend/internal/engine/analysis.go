@@ -8,11 +8,14 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+var httpStatusLineRE = regexp.MustCompile(`^\d{3}\s`)
 
 func HuntThreats(packets []model.Packet, customPrefixes []string) []model.ThreatHit {
 	hits := make([]model.ThreatHit, 0, 64)
@@ -345,7 +348,7 @@ func isHTTPRequestPacket(packet model.Packet, clientIP string, clientPort int) b
 		return true
 	}
 
-	if strings.HasPrefix(infoUpper, "HTTP/") || strings.HasPrefix(infoUpper, "1") || strings.HasPrefix(infoUpper, "2") || strings.HasPrefix(infoUpper, "3") || strings.HasPrefix(infoUpper, "4") || strings.HasPrefix(infoUpper, "5") {
+	if strings.HasPrefix(infoUpper, "HTTP/") || httpStatusLineRE.MatchString(strings.TrimSpace(packet.Info)) {
 		if strings.Contains(infoUpper, " OK") || strings.Contains(infoUpper, " NOT") || strings.Contains(infoUpper, " FOUND") || strings.Contains(infoUpper, " ERROR") {
 			return false
 		}

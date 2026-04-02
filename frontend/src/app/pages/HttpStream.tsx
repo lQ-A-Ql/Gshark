@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -47,6 +47,7 @@ export default function HttpStream() {
   const [cursor, setCursor] = useState(0);
   const [streamInput, setStreamInput] = useState("");
   const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER_LIMIT);
+  const consumedRouteStreamIdRef = useRef<number | null>(null);
   const deferredSearch = useDeferredValue(search);
   const currentIndex = streamIds.http.findIndex((id) => id === httpStream.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.http.length || 1}` : `-- / ${streamIds.http.length || 0}`;
@@ -57,9 +58,13 @@ export default function HttpStream() {
     const state = location.state as { streamId?: number } | null;
     const routeStreamId = Number(state?.streamId ?? -1);
     const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
-    const streamId = routeStreamId >= 0 ? routeStreamId : selectedStreamId;
+    const hasPendingRouteStream = routeStreamId >= 0 && routeStreamId !== consumedRouteStreamIdRef.current;
+    const streamId = hasPendingRouteStream ? routeStreamId : httpStream.id < 0 ? selectedStreamId : -1;
     if (streamId < 0 || !streamIds.http.includes(streamId) || httpStream.id === streamId) {
       return;
+    }
+    if (hasPendingRouteStream) {
+      consumedRouteStreamIdRef.current = routeStreamId;
     }
     void setActiveStream("HTTP", streamId);
   }, [httpStream.id, location.state, selectedPacket?.streamId, setActiveStream, streamIds.http]);

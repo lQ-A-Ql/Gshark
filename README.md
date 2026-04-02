@@ -96,10 +96,22 @@ wails build
 
 ## 测试与构建
 
+统一校验：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-all.ps1
+```
+
+说明：
+
+- 根目录 `go test ./...` 只覆盖桌面壳 module，不会替代 `backend` 目录下的后端测试
+- `check-all.ps1` 会串行执行桌面壳测试、后端格式检查、后端测试、前端测试和前端构建
+
 后端测试：
 
 ```powershell
-go test ./backend/...
+cd backend
+go test ./...
 ```
 
 前端测试：
@@ -192,7 +204,7 @@ npm run build
 
 项目已经能满足离线分析和专项协议提取的主体流程，但仍有明确边界：
 
-- 显示过滤目前是项目内置子集语法，不是完整的 tshark display filter 语义复刻
+- 显示过滤当前直接使用 tshark display filter 语义；过滤表达式无效时会按 tshark 错误处理，不再回退旧的前端子集过滤逻辑
 - Python / JavaScript 以外的插件运行时还未真正打通
 - DBC 目前优先支持常见 `BO_ / SG_` 语法，`multiplexing` 与 `ARXML` 仍未覆盖
 - 超大流和超大抓包场景下，个别专项模块仍需要继续做更细的增量化优化

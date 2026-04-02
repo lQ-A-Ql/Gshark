@@ -23,7 +23,7 @@ import (
 
 var pluginExportRE = regexp.MustCompile(`(?m)^\s*export\s+`)
 
-const defaultPluginRuntimeTimeout = 3 * time.Second
+const defaultPluginRuntimeTimeout = 10 * time.Second
 
 type PacketPluginRunner struct {
 	sessions []packetPluginSession
