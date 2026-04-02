@@ -194,3 +194,57 @@ func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testin
 		t.Fatalf("expected tshark failure to return an empty page, got page=%+v next=%d total=%d", page, next, total)
 	}
 }
+
+func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
+	oldFilter := filterFrameIDsFn
+	t.Cleanup(func() {
+		filterFrameIDsFn = oldFilter
+	})
+
+	filterCalls := map[string]int{}
+	filterFrameIDsFn = func(_ context.Context, opts model.ParseOptions) ([]int64, error) {
+		filterCalls[opts.DisplayFilter]++
+		return []int64{1}, nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{{ID: 1, Protocol: "TCP", DestPort: 443}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	for i := 0; i < displayFilterCacheLimit; i++ {
+		filter := "tcp.port == " + string(rune('A'+i))
+		if _, err := svc.filteredPacketIndex(filter); err != nil {
+			t.Fatalf("filteredPacketIndex(%q) error = %v", filter, err)
+		}
+	}
+
+	hotFilter := "tcp.port == A"
+	if _, err := svc.filteredPacketIndex(hotFilter); err != nil {
+		t.Fatalf("filteredPacketIndex(%q) error = %v", hotFilter, err)
+	}
+
+	if _, err := svc.filteredPacketIndex("tcp.port == Z1"); err != nil {
+		t.Fatalf("filteredPacketIndex(%q) error = %v", "tcp.port == Z1", err)
+	}
+	if _, err := svc.filteredPacketIndex("tcp.port == Z2"); err != nil {
+		t.Fatalf("filteredPacketIndex(%q) error = %v", "tcp.port == Z2", err)
+	}
+
+	if _, err := svc.filteredPacketIndex(hotFilter); err != nil {
+		t.Fatalf("filteredPacketIndex(%q) second access error = %v", hotFilter, err)
+	}
+	if filterCalls[hotFilter] != 1 {
+		t.Fatalf("expected hot filter to remain cached, got %d lookups", filterCalls[hotFilter])
+	}
+
+	evictedFilter := "tcp.port == B"
+	if _, err := svc.filteredPacketIndex(evictedFilter); err != nil {
+		t.Fatalf("filteredPacketIndex(%q) post-eviction error = %v", evictedFilter, err)
+	}
+	if filterCalls[evictedFilter] != 2 {
+		t.Fatalf("expected evicted filter to be recomputed, got %d lookups", filterCalls[evictedFilter])
+	}
+}

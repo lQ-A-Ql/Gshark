@@ -6,12 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	yararules "github.com/gshark/sentinel/backend/rules/yara"
 )
 
 type yaraRuleMeta struct {
@@ -27,59 +27,6 @@ var defaultYaraRuleMeta = map[string]yaraRuleMeta{
 	"OWASP_WEBSHELL":       {category: "OWASP", ruleName: "WebShell 特征", level: "critical"},
 	"SENSITIVE_CREDENTIAL": {category: "Sensitive", ruleName: "敏感凭证泄露", level: "medium"},
 }
-
-// defaultYaraRuleSource is the fallback when rules/yara/default.yar is not found on disk.
-// Keep in sync with backend/rules/yara/default.yar.
-const defaultYaraRuleSource = `rule OWASP_SQL_INJECTION {
-  strings:
-    $s1 = "union select" nocase
-    $s2 = "information_schema" nocase
-    $s3 = "' or '" nocase
-    $s4 = "sleep(" nocase
-    $s5 = "extractvalue(" nocase
-  condition:
-    any of them
-}
-
-rule OWASP_XSS {
-  strings:
-    $x1 = "<script" nocase
-    $x2 = "onerror=" nocase
-    $x3 = "javascript:" nocase
-  condition:
-    any of them
-}
-
-rule OWASP_RCE {
-  strings:
-    $r1 = "whoami" nocase
-    $r2 = "/etc/passwd" nocase
-    $r3 = "cmd.exe" nocase
-    $r4 = "powershell" nocase
-  condition:
-    any of them
-}
-
-rule OWASP_WEBSHELL {
-  strings:
-    $w1 = "eval(base64_decode" nocase
-    $w2 = "@eval($_post" nocase
-    $w3 = "assert($_post" nocase
-    $w4 = "shell_exec(" nocase
-    $w5 = "passthru(" nocase
-    $w6 = "php://input" nocase
-  condition:
-    any of them
-}
-
-rule SENSITIVE_CREDENTIAL {
-  strings:
-    $c1 = /AKIA[0-9A-Z]{16}/ nocase
-    $c2 = /eyJ[A-Za-z0-9_-]+\./ nocase
-  condition:
-    any of them
-}
-`
 
 func BatchScanObjectsWithYara(objects []model.ObjectFile, packets []model.Packet) []model.ThreatHit {
 	return BatchScanObjectsWithYaraIndex(objects, buildPacketIDByObjectName(packets))
@@ -269,17 +216,11 @@ func resolveYaraRuleFile(customRules string) (string, func(), error) {
 	}
 
 	rulePath := filepath.Join(tempDir, fileName)
-	if err := os.WriteFile(rulePath, []byte(defaultYaraRuleSource), 0o644); err != nil {
+	if err := os.WriteFile(rulePath, []byte(yararules.DefaultRuleSource), 0o644); err != nil {
 		return "", nil, err
 	}
 
-	cleanup := func() {
-		// Keep generated rule file for reuse between runs to reduce churn.
-		if runtime.GOOS != "windows" {
-			return
-		}
-	}
-	return rulePath, cleanup, nil
+	return rulePath, func() {}, nil
 }
 
 func resolveYaraTimeout(timeoutMS int) time.Duration {

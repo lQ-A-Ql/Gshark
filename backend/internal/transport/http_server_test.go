@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -193,5 +194,69 @@ func TestUploadedFileLifecycleCleansInactiveFiles(t *testing.T) {
 	server.cleanupUploadedFiles()
 	if _, err := os.Stat(third); !os.IsNotExist(err) {
 		t.Fatalf("expected cleanup to remove current upload, stat error = %v", err)
+	}
+}
+
+func TestBroadcastPrioritizesStatusEventsWhenClientBufferIsFull(t *testing.T) {
+	server := &Server{
+		clients: map[chan event]struct{}{},
+	}
+	ch := make(chan event, 4)
+	server.clients[ch] = struct{}{}
+
+	for i := 0; i < cap(ch); i++ {
+		ch <- event{Type: "packet", Data: i}
+	}
+
+	server.broadcast(event{Type: "status", Data: map[string]string{"message": "解析完成"}})
+
+	events := drainEvents(ch)
+	if len(events) == 0 {
+		t.Fatal("expected buffered events after broadcast")
+	}
+	if events[len(events)-1].Type != "status" {
+		t.Fatalf("expected latest event to be status, got %+v", events[len(events)-1])
+	}
+	for _, ev := range events {
+		if ev.Type != "packet" && ev.Type != "status" {
+			t.Fatalf("unexpected event type %q", ev.Type)
+		}
+	}
+}
+
+func TestBroadcastRetainsNewestControlEventsUnderPressure(t *testing.T) {
+	server := &Server{
+		clients: map[chan event]struct{}{},
+	}
+	ch := make(chan event, 3)
+	server.clients[ch] = struct{}{}
+
+	ch <- event{Type: "status", Data: map[string]string{"message": "old-1"}}
+	ch <- event{Type: "status", Data: map[string]string{"message": "old-2"}}
+	ch <- event{Type: "status", Data: map[string]string{"message": "old-3"}}
+
+	server.broadcast(event{Type: "error", Data: map[string]string{"message": "latest-error"}})
+
+	events := drainEvents(ch)
+	if len(events) != cap(ch) {
+		t.Fatalf("expected %d control events after rebalance, got %d", cap(ch), len(events))
+	}
+	if events[len(events)-1].Type != "error" {
+		t.Fatalf("expected latest event to be error, got %+v", events[len(events)-1])
+	}
+	if payload, ok := events[0].Data.(map[string]string); ok && strings.TrimSpace(payload["message"]) == "old-1" {
+		t.Fatalf("expected oldest control event to be dropped, events=%+v", events)
+	}
+}
+
+func drainEvents(ch chan event) []event {
+	out := make([]event, 0, cap(ch))
+	for {
+		select {
+		case ev := <-ch:
+			out = append(out, ev)
+		default:
+			return out
+		}
 	}
 }

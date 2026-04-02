@@ -36,6 +36,8 @@ type event struct {
 	Data any    `json:"data"`
 }
 
+const clientEventBufferSize = 1024
+
 type Server struct {
 	svc *engine.Service
 	hub *Hub
@@ -841,7 +843,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	ch := make(chan event, 256)
+	ch := make(chan event, clientEventBufferSize)
 	s.addClient(ch)
 	defer s.removeClient(ch)
 
@@ -877,10 +879,55 @@ func (s *Server) broadcast(ev event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for ch := range s.clients {
+		if ev.Type == "status" || ev.Type == "error" {
+			s.enqueuePriorityEventLocked(ch, ev)
+			continue
+		}
 		select {
 		case ch <- ev:
 		default:
 		}
+	}
+}
+
+func (s *Server) enqueuePriorityEventLocked(ch chan event, ev event) {
+	if trySendEvent(ch, ev) {
+		return
+	}
+
+	preserved := make([]event, 0, cap(ch))
+	for {
+		select {
+		case pending := <-ch:
+			if pending.Type == "packet" {
+				continue
+			}
+			preserved = append(preserved, pending)
+		default:
+			maxPreserved := cap(ch) - 1
+			if maxPreserved < 0 {
+				maxPreserved = 0
+			}
+			if len(preserved) > maxPreserved {
+				preserved = preserved[len(preserved)-maxPreserved:]
+			}
+			for _, pending := range preserved {
+				if !trySendEvent(ch, pending) {
+					break
+				}
+			}
+			_ = trySendEvent(ch, ev)
+			return
+		}
+	}
+}
+
+func trySendEvent(ch chan event, ev event) bool {
+	select {
+	case ch <- ev:
+		return true
+	default:
+		return false
 	}
 }
 

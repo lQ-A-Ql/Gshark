@@ -33,15 +33,15 @@ type Service struct {
 	displayFilterCache      map[string]*filteredPacketIndex
 	displayFilterCacheOrder []string
 	globalTrafficStats      *model.GlobalTrafficStats
-	industrialAnalysis *model.IndustrialAnalysis
-	vehicleAnalysis    *model.VehicleAnalysis
-	mediaAnalysis      *model.MediaAnalysis
-	usbAnalysis        *model.USBAnalysis
-	vehicleDBCDefs     []*tshark.DBCDatabase
-	streamCache        map[string]model.ReassembledStream
-	streamCacheOrder   []string
-	rawStreamIndex     map[string]model.ReassembledStream
-	streamOverrides    map[string]map[int]string
+	industrialAnalysis      *model.IndustrialAnalysis
+	vehicleAnalysis         *model.VehicleAnalysis
+	mediaAnalysis           *model.MediaAnalysis
+	usbAnalysis             *model.USBAnalysis
+	vehicleDBCDefs          []*tshark.DBCDatabase
+	streamCache             map[string]model.ReassembledStream
+	streamCacheOrder        []string
+	rawStreamIndex          map[string]model.ReassembledStream
+	streamOverrides         map[string]map[int]string
 
 	exportDir      string
 	mediaExportDir string
@@ -597,11 +597,12 @@ func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
 
 func (s *Service) Objects() []model.ObjectFile {
 	s.objMu.Lock()
-	defer s.objMu.Unlock()
-
 	if s.objectsLoaded {
-		return s.objects
+		objects := s.objects
+		s.objMu.Unlock()
+		return objects
 	}
+	s.objMu.Unlock()
 
 	s.mu.RLock()
 	pcapPath := s.pcap
@@ -615,16 +616,39 @@ func (s *Service) Objects() []model.ObjectFile {
 	if err != nil {
 		return nil
 	}
-	s.exportDir = tempDir
+
+	keepTempDir := false
+	defer func() {
+		if keepTempDir {
+			return
+		}
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	if err := tshark.ExportObjects(pcapPath, tempDir); err != nil {
-		s.objectsLoaded = true
+		s.objMu.Lock()
+		s.mu.RLock()
+		currentPCAP := s.pcap
+		s.mu.RUnlock()
+		if currentPCAP == pcapPath && !s.objectsLoaded {
+			s.objectsLoaded = true
+			s.objects = nil
+		}
+		s.objMu.Unlock()
 		return nil
 	}
 
 	entries, err := os.ReadDir(tempDir)
 	if err != nil {
-		s.objectsLoaded = true
+		s.objMu.Lock()
+		s.mu.RLock()
+		currentPCAP := s.pcap
+		s.mu.RUnlock()
+		if currentPCAP == pcapPath && !s.objectsLoaded {
+			s.objectsLoaded = true
+			s.objects = nil
+		}
+		s.objMu.Unlock()
 		return nil
 	}
 
@@ -665,8 +689,23 @@ func (s *Service) Objects() []model.ObjectFile {
 		id++
 	}
 
+	s.objMu.Lock()
+	defer s.objMu.Unlock()
+	if s.objectsLoaded {
+		return s.objects
+	}
+
+	s.mu.RLock()
+	currentPCAP := s.pcap
+	s.mu.RUnlock()
+	if currentPCAP != pcapPath {
+		return nil
+	}
+
+	s.exportDir = tempDir
 	s.objects = objects
 	s.objectsLoaded = true
+	keepTempDir = true
 	return s.objects
 }
 
@@ -1372,14 +1411,15 @@ func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, erro
 		return nil, nil
 	}
 
-	s.mu.RLock()
+	s.mu.Lock()
 	if cached, ok := s.displayFilterCache[filter]; ok {
-		s.mu.RUnlock()
+		s.touchDisplayFilterCacheLocked(filter)
+		s.mu.Unlock()
 		return cached, nil
 	}
 	pcap := s.pcap
 	tlsConf := s.tlsConf
-	s.mu.RUnlock()
+	s.mu.Unlock()
 	if strings.TrimSpace(pcap) == "" || s.packetStore == nil {
 		return nil, nil
 	}
@@ -1405,18 +1445,35 @@ func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, erro
 
 	s.mu.Lock()
 	if existing, ok := s.displayFilterCache[filter]; ok {
+		s.touchDisplayFilterCacheLocked(filter)
 		s.mu.Unlock()
 		return existing, nil
 	}
 	s.displayFilterCache[filter] = index
+	s.touchDisplayFilterCacheLocked(filter)
+	s.evictDisplayFilterCacheLocked()
+	s.mu.Unlock()
+	return index, nil
+}
+
+func (s *Service) touchDisplayFilterCacheLocked(filter string) {
+	for i, existing := range s.displayFilterCacheOrder {
+		if existing != filter {
+			continue
+		}
+		copy(s.displayFilterCacheOrder[i:], s.displayFilterCacheOrder[i+1:])
+		s.displayFilterCacheOrder = s.displayFilterCacheOrder[:len(s.displayFilterCacheOrder)-1]
+		break
+	}
 	s.displayFilterCacheOrder = append(s.displayFilterCacheOrder, filter)
+}
+
+func (s *Service) evictDisplayFilterCacheLocked() {
 	for len(s.displayFilterCacheOrder) > displayFilterCacheLimit {
 		oldest := s.displayFilterCacheOrder[0]
 		s.displayFilterCacheOrder = s.displayFilterCacheOrder[1:]
 		delete(s.displayFilterCache, oldest)
 	}
-	s.mu.Unlock()
-	return index, nil
 }
 
 func (s *Service) hasCapturePath() bool {

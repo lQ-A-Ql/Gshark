@@ -90,6 +90,7 @@ const PAGE_SIZE = 2000;
 const RAW_STREAM_PAGE_SIZE = 96;
 const STREAM_PREFETCH_LIMIT = 0;
 const PRELOAD_POLL_INTERVAL_MS = 120;
+const PRELOAD_SIGNAL_WAIT_MS = 1000;
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
 const EMPTY_TSHARK_STATUS: TSharkStatus = {
   available: false,
@@ -290,6 +291,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const parseFinishedRef = useRef(false);
   const parseErrorRef = useRef("");
   const preloadingRef = useRef(false);
+  const captureWaitersRef = useRef(new Set<() => void>());
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
@@ -432,6 +434,33 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     preloadProcessedRef.current = normalized;
     return true;
   }, []);
+
+  const wakeCaptureWaiters = useCallback(() => {
+    if (captureWaitersRef.current.size === 0) return;
+    const waiters = Array.from(captureWaitersRef.current);
+    captureWaitersRef.current.clear();
+    for (const waiter of waiters) {
+      waiter();
+    }
+  }, []);
+
+  const waitForCaptureSignal = useCallback((delayMs: number) => (
+    new Promise<void>((resolve) => {
+      let settled = false;
+      let timer = 0;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timer) {
+          window.clearTimeout(timer);
+        }
+        captureWaitersRef.current.delete(finish);
+        resolve();
+      };
+      timer = window.setTimeout(finish, delayMs);
+      captureWaitersRef.current.add(finish);
+    })
+  ), []);
 
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;
@@ -831,6 +860,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         status: (message) => {
           const msg = message || "后端运行中";
           if (updateProgressFromStatusRef.current(msg)) {
+            wakeCaptureWaiters();
             return;
           }
           if (msg.toLowerCase().includes("plugin")) {
@@ -845,6 +875,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
               parseErrorRef.current = msg;
             }
           }
+          wakeCaptureWaiters();
           setBackendStatus(msg);
         },
         error: (message) => {
@@ -853,6 +884,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
             parseFinishedRef.current = true;
             parseErrorRef.current = next;
           }
+          wakeCaptureWaiters();
           setBackendStatus(next);
         },
       });
@@ -996,17 +1028,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
             await loadPacketPage(0, effectiveFilter);
             firstPageLoaded = true;
           }
-        } else if (!packetLoadingRef.current) {
-          await loadPacketPage(0, effectiveFilter);
         }
 
         if (parseFinishedRef.current) {
           break;
         }
 
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, firstPageLoaded ? PRELOAD_POLL_INTERVAL_MS : 300);
-        });
+        await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
       }
 
       const probePage = await bridge.listPacketsPage(0, 1, effectiveFilter);
@@ -1027,8 +1055,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     } finally {
       preloadingRef.current = false;
       setIsPreloadingCapture(false);
+      wakeCaptureWaiters();
     }
-  }, [backendConnected, displayFilter, loadPacketPage, refreshAnalysisResult, refreshStreamIndex]);
+  }, [backendConnected, displayFilter, loadPacketPage, refreshAnalysisResult, refreshStreamIndex, waitForCaptureSignal, wakeCaptureWaiters]);
 
   const applyFilter = useCallback((value?: string) => {
     const nextFilter = value ?? displayFilter;
