@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -105,13 +106,13 @@ func TestThreatHuntStreamsFromPacketStore(t *testing.T) {
 }
 
 func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
-	oldFilter := filterFrameIDsFn
+	oldScan := scanFrameIDsFn
 	t.Cleanup(func() {
-		filterFrameIDsFn = oldFilter
+		scanFrameIDsFn = oldScan
 	})
 
 	filterCalls := 0
-	filterFrameIDsFn = func(_ context.Context, opts model.ParseOptions) ([]int64, error) {
+	scanFrameIDsFn = func(_ context.Context, opts model.ParseOptions, onID func(int64)) error {
 		filterCalls++
 		if opts.FilePath != "demo.pcap" {
 			t.Fatalf("unexpected file path: %q", opts.FilePath)
@@ -119,7 +120,9 @@ func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
 		if opts.DisplayFilter != "tcp.port == 443" {
 			t.Fatalf("unexpected display filter: %q", opts.DisplayFilter)
 		}
-		return []int64{2, 4}, nil
+		onID(2)
+		onID(4)
+		return nil
 	}
 
 	svc := NewService(NopEmitter{}, nil)
@@ -170,13 +173,13 @@ func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
 }
 
 func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testing.T) {
-	oldFilter := filterFrameIDsFn
+	oldScan := scanFrameIDsFn
 	t.Cleanup(func() {
-		filterFrameIDsFn = oldFilter
+		scanFrameIDsFn = oldScan
 	})
 
-	filterFrameIDsFn = func(context.Context, model.ParseOptions) ([]int64, error) {
-		return nil, errors.New("invalid display filter")
+	scanFrameIDsFn = func(context.Context, model.ParseOptions, func(int64)) error {
+		return errors.New("invalid display filter")
 	}
 
 	svc := NewService(NopEmitter{}, nil)
@@ -195,16 +198,77 @@ func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testin
 	}
 }
 
-func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
-	oldFilter := filterFrameIDsFn
+func TestPacketsPageWithErrorReturnsDisplayFilterError(t *testing.T) {
+	oldScan := scanFrameIDsFn
 	t.Cleanup(func() {
-		filterFrameIDsFn = oldFilter
+		scanFrameIDsFn = oldScan
+	})
+
+	scanFrameIDsFn = func(context.Context, model.ParseOptions, func(int64)) error {
+		return errors.New("invalid display filter")
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
+		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	page, next, total, err := svc.PacketsPageWithError(0, 10, "http.request.method == POST and")
+	if !IsDisplayFilterError(err) {
+		t.Fatalf("expected display filter error, got %v", err)
+	}
+	if err == nil || err.Error() != "invalid display filter" {
+		t.Fatalf("unexpected error text: %v", err)
+	}
+	if len(page) != 0 || next != 0 || total != 0 {
+		t.Fatalf("expected failed tshark filter to return an empty page payload, got page=%+v next=%d total=%d", page, next, total)
+	}
+}
+
+func TestPacketPageCursorWithErrorReturnsDisplayFilterError(t *testing.T) {
+	oldScan := scanFrameIDsFn
+	t.Cleanup(func() {
+		scanFrameIDsFn = oldScan
+	})
+
+	scanFrameIDsFn = func(context.Context, model.ParseOptions, func(int64)) error {
+		return errors.New("invalid display filter")
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	cursor, total, found, err := svc.PacketPageCursorWithError(1, 10, "frame.number >=")
+	if !IsDisplayFilterError(err) {
+		t.Fatalf("expected display filter error, got %v", err)
+	}
+	if cursor != 0 || total != 0 || found {
+		t.Fatalf("expected failed locate meta to remain empty, got cursor=%d total=%d found=%v", cursor, total, found)
+	}
+}
+
+func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
+	oldScan := scanFrameIDsFn
+	t.Cleanup(func() {
+		scanFrameIDsFn = oldScan
 	})
 
 	filterCalls := map[string]int{}
-	filterFrameIDsFn = func(_ context.Context, opts model.ParseOptions) ([]int64, error) {
+	scanFrameIDsFn = func(_ context.Context, opts model.ParseOptions, onID func(int64)) error {
 		filterCalls[opts.DisplayFilter]++
-		return []int64{1}, nil
+		onID(1)
+		return nil
 	}
 
 	svc := NewService(NopEmitter{}, nil)
@@ -216,35 +280,175 @@ func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
 
 	for i := 0; i < displayFilterCacheLimit; i++ {
 		filter := "tcp.port == " + string(rune('A'+i))
-		if _, err := svc.filteredPacketIndex(filter); err != nil {
+		index, err := svc.filteredPacketIndex(filter)
+		if err != nil {
 			t.Fatalf("filteredPacketIndex(%q) error = %v", filter, err)
+		}
+		if _, _, _, err := index.pageWindow(0, 1); err != nil {
+			t.Fatalf("pageWindow(%q) error = %v", filter, err)
 		}
 	}
 
 	hotFilter := "tcp.port == A"
-	if _, err := svc.filteredPacketIndex(hotFilter); err != nil {
+	index, err := svc.filteredPacketIndex(hotFilter)
+	if err != nil {
 		t.Fatalf("filteredPacketIndex(%q) error = %v", hotFilter, err)
 	}
+	if _, _, _, err := index.pageWindow(0, 1); err != nil {
+		t.Fatalf("pageWindow(%q) error = %v", hotFilter, err)
+	}
 
-	if _, err := svc.filteredPacketIndex("tcp.port == Z1"); err != nil {
+	index, err = svc.filteredPacketIndex("tcp.port == Z1")
+	if err != nil {
 		t.Fatalf("filteredPacketIndex(%q) error = %v", "tcp.port == Z1", err)
 	}
-	if _, err := svc.filteredPacketIndex("tcp.port == Z2"); err != nil {
+	if _, _, _, err := index.pageWindow(0, 1); err != nil {
+		t.Fatalf("pageWindow(%q) error = %v", "tcp.port == Z1", err)
+	}
+	index, err = svc.filteredPacketIndex("tcp.port == Z2")
+	if err != nil {
 		t.Fatalf("filteredPacketIndex(%q) error = %v", "tcp.port == Z2", err)
 	}
+	if _, _, _, err := index.pageWindow(0, 1); err != nil {
+		t.Fatalf("pageWindow(%q) error = %v", "tcp.port == Z2", err)
+	}
 
-	if _, err := svc.filteredPacketIndex(hotFilter); err != nil {
+	index, err = svc.filteredPacketIndex(hotFilter)
+	if err != nil {
 		t.Fatalf("filteredPacketIndex(%q) second access error = %v", hotFilter, err)
+	}
+	if _, _, _, err := index.pageWindow(0, 1); err != nil {
+		t.Fatalf("pageWindow(%q) second access error = %v", hotFilter, err)
 	}
 	if filterCalls[hotFilter] != 1 {
 		t.Fatalf("expected hot filter to remain cached, got %d lookups", filterCalls[hotFilter])
 	}
 
 	evictedFilter := "tcp.port == B"
-	if _, err := svc.filteredPacketIndex(evictedFilter); err != nil {
+	index, err = svc.filteredPacketIndex(evictedFilter)
+	if err != nil {
 		t.Fatalf("filteredPacketIndex(%q) post-eviction error = %v", evictedFilter, err)
+	}
+	if _, _, _, err := index.pageWindow(0, 1); err != nil {
+		t.Fatalf("pageWindow(%q) post-eviction error = %v", evictedFilter, err)
 	}
 	if filterCalls[evictedFilter] != 2 {
 		t.Fatalf("expected evicted filter to be recomputed, got %d lookups", filterCalls[evictedFilter])
+	}
+}
+
+func TestPacketsPageReturnsFirstWindowBeforeDisplayFilterScanCompletes(t *testing.T) {
+	oldScan := scanFrameIDsFn
+	t.Cleanup(func() {
+		scanFrameIDsFn = oldScan
+	})
+
+	firstWindowReady := make(chan struct{})
+	releaseScan := make(chan struct{})
+	scanFrameIDsFn = func(_ context.Context, opts model.ParseOptions, onID func(int64)) error {
+		if opts.DisplayFilter != "tcp" {
+			t.Fatalf("unexpected display filter: %q", opts.DisplayFilter)
+		}
+		onID(1)
+		onID(2)
+		onID(3)
+		close(firstWindowReady)
+		<-releaseScan
+		onID(4)
+		return nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "TCP", DestPort: 80},
+		{ID: 2, Protocol: "TCP", DestPort: 443},
+		{ID: 3, Protocol: "TCP", DestPort: 8080},
+		{ID: 4, Protocol: "TCP", DestPort: 8443},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	type result struct {
+		page  []model.Packet
+		next  int
+		total int
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() {
+		page, next, total, err := svc.PacketsPageWithError(0, 2, "tcp")
+		done <- result{page: page, next: next, total: total, err: err}
+	}()
+
+	<-firstWindowReady
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatalf("PacketsPageWithError() error = %v", got.err)
+		}
+		if got.next != 2 || got.total != 3 {
+			t.Fatalf("expected first window metadata next=2 total=3, got next=%d total=%d", got.next, got.total)
+		}
+		if len(got.page) != 2 || got.page[0].ID != 1 || got.page[1].ID != 2 {
+			t.Fatalf("unexpected first window packets: %+v", got.page)
+		}
+	default:
+		select {
+		case got := <-done:
+			if got.err != nil {
+				t.Fatalf("PacketsPageWithError() error = %v", got.err)
+			}
+			if got.next != 2 || got.total != 3 {
+				t.Fatalf("expected first window metadata next=2 total=3, got next=%d total=%d", got.next, got.total)
+			}
+			if len(got.page) != 2 || got.page[0].ID != 1 || got.page[1].ID != 2 {
+				t.Fatalf("unexpected first window packets: %+v", got.page)
+			}
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("expected first page to return before the background scan completed")
+		}
+	}
+
+	close(releaseScan)
+	page, next, total, err := svc.PacketsPageWithError(2, 2, "tcp")
+	if err != nil {
+		t.Fatalf("PacketsPageWithError() second page error = %v", err)
+	}
+	if next != 4 || total != 4 {
+		t.Fatalf("expected exact metadata after scan completion, got next=%d total=%d", next, total)
+	}
+	if len(page) != 2 || page[0].ID != 3 || page[1].ID != 4 {
+		t.Fatalf("unexpected second page packets: %+v", page)
+	}
+}
+
+func TestPacketsPageReturnsBlankWhenDisplayFilterMatchesNoPackets(t *testing.T) {
+	oldScan := scanFrameIDsFn
+	t.Cleanup(func() {
+		scanFrameIDsFn = oldScan
+	})
+
+	scanFrameIDsFn = func(context.Context, model.ParseOptions, func(int64)) error {
+		return nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.pcap = "demo.pcap"
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
+		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	page, next, total, err := svc.PacketsPageWithError(0, 10, "tcp")
+	if err != nil {
+		t.Fatalf("PacketsPageWithError() error = %v", err)
+	}
+	if len(page) != 0 || next != 0 || total != 0 {
+		t.Fatalf("expected blank page for unmatched filter, got page=%+v next=%d total=%d", page, next, total)
 	}
 }

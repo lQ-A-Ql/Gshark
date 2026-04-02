@@ -64,13 +64,43 @@ const defaultStreamCacheLimit = 256
 const displayFilterCacheLimit = 16
 
 type filteredPacketIndex struct {
+	mu        sync.Mutex
+	cond      *sync.Cond
 	ids       []int64
 	positions map[int64]int
+	complete  bool
+	err       error
+	cancel    context.CancelFunc
+}
+
+type DisplayFilterError struct {
+	Filter string
+	Err    error
+}
+
+func (e *DisplayFilterError) Error() string {
+	if e == nil || e.Err == nil {
+		return "display filter execution failed"
+	}
+	return e.Err.Error()
+}
+
+func (e *DisplayFilterError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+func IsDisplayFilterError(err error) bool {
+	var target *DisplayFilterError
+	return errors.As(err, &target)
 }
 
 var (
 	estimatePacketsFn     = tshark.EstimatePackets
 	filterFrameIDsFn      = tshark.FilterFrameIDs
+	scanFrameIDsFn        = tshark.ScanFrameIDs
 	streamPacketsFn       = tshark.StreamPackets
 	streamPacketsFastFn   = tshark.StreamPacketsFast
 	streamPacketsCompatFn = tshark.StreamPacketsCompat
@@ -151,6 +181,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		_ = os.RemoveAll(s.mediaExportDir)
 		s.mediaExportDir = ""
 	}
+	s.cancelDisplayFilterCacheLocked()
 	s.pcap = opts.FilePath
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
@@ -382,50 +413,60 @@ func (s *Service) Packets() []model.Packet {
 	return out
 }
 
-func (s *Service) PacketsPage(cursor, limit int, filter string) ([]model.Packet, int, int) {
+func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]model.Packet, int, int, error) {
 	if s.packetStore == nil {
-		return nil, 0, 0
+		return nil, 0, 0, nil
 	}
 	filtered, filterErr := s.filteredPacketIndex(filter)
 	if filterErr == nil && filtered != nil {
-		out, next, total, err := s.packetStore.PageByIDs(filtered.ids, cursor, limit)
+		ids, next, total, err := filtered.pageWindow(cursor, limit)
+		if err != nil {
+			return []model.Packet{}, 0, 0, err
+		}
+		out, err := s.packetStore.PacketsByIDs(ids)
 		if err != nil {
 			s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
-			return []model.Packet{}, 0, 0
+			return []model.Packet{}, 0, 0, err
 		}
-		return out, next, total
+		return out, next, total, nil
+	}
+	if filterErr != nil {
+		return []model.Packet{}, 0, 0, filterErr
 	}
 	if strings.TrimSpace(filter) != "" && s.hasCapturePath() {
-		return []model.Packet{}, 0, 0
+		return []model.Packet{}, 0, 0, nil
 	}
 
 	predicate := compilePacketFilter(filter)
 	out, next, total, err := s.packetStore.Page(cursor, limit, predicate)
 	if err != nil {
 		s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
-		return []model.Packet{}, 0, 0
+		return []model.Packet{}, 0, 0, err
 	}
-	return out, next, total
+	return out, next, total, nil
 }
 
-func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (int, int, bool) {
+func (s *Service) PacketsPage(cursor, limit int, filter string) ([]model.Packet, int, int) {
+	items, next, total, _ := s.PacketsPageWithError(cursor, limit, filter)
+	return items, next, total
+}
+
+func (s *Service) PacketPageCursorWithError(packetID int64, limit int, filter string) (int, int, bool, error) {
 	if packetID <= 0 || s.packetStore == nil {
-		return 0, 0, false
+		return 0, 0, false, nil
 	}
 	if limit <= 0 {
 		limit = 1000
 	}
 	filtered, err := s.filteredPacketIndex(filter)
 	if err == nil && filtered != nil {
-		matchIndex, ok := filtered.positions[packetID]
-		if !ok {
-			return 0, len(filtered.ids), false
-		}
-		cursor := (matchIndex / limit) * limit
-		return cursor, len(filtered.ids), true
+		return filtered.pageCursor(packetID, limit)
+	}
+	if err != nil {
+		return 0, 0, false, err
 	}
 	if strings.TrimSpace(filter) != "" && s.hasCapturePath() {
-		return 0, 0, false
+		return 0, 0, false, nil
 	}
 
 	predicate := compilePacketFilter(filter)
@@ -439,10 +480,15 @@ func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (in
 		return nil
 	})
 	if matchIndex < 0 {
-		return 0, total, false
+		return 0, total, false, nil
 	}
 	cursor := (matchIndex / limit) * limit
-	return cursor, total, true
+	return cursor, total, true, nil
+}
+
+func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (int, int, bool) {
+	cursor, total, found, _ := s.PacketPageCursorWithError(packetID, limit, filter)
+	return cursor, total, found
 }
 
 func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
@@ -1419,40 +1465,17 @@ func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, erro
 	}
 	pcap := s.pcap
 	tlsConf := s.tlsConf
-	s.mu.Unlock()
 	if strings.TrimSpace(pcap) == "" || s.packetStore == nil {
+		s.mu.Unlock()
 		return nil, nil
 	}
-
-	ids, err := filterFrameIDsFn(context.Background(), model.ParseOptions{
-		FilePath:      pcap,
-		DisplayFilter: filter,
-		TLS:           tlsConf,
-	})
-	if err != nil {
-		s.emitter.EmitStatus("显示过滤器执行失败: " + err.Error())
-		return nil, err
-	}
-
-	ids = s.packetStore.ExistingIDs(ids)
-	index := &filteredPacketIndex{
-		ids:       ids,
-		positions: make(map[int64]int, len(ids)),
-	}
-	for i, id := range ids {
-		index.positions[id] = i
-	}
-
-	s.mu.Lock()
-	if existing, ok := s.displayFilterCache[filter]; ok {
-		s.touchDisplayFilterCacheLocked(filter)
-		s.mu.Unlock()
-		return existing, nil
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	index := newFilteredPacketIndex(cancel)
 	s.displayFilterCache[filter] = index
 	s.touchDisplayFilterCacheLocked(filter)
 	s.evictDisplayFilterCacheLocked()
 	s.mu.Unlock()
+	go s.scanDisplayFilterIndex(ctx, filter, pcap, tlsConf, index)
 	return index, nil
 }
 
@@ -1472,7 +1495,19 @@ func (s *Service) evictDisplayFilterCacheLocked() {
 	for len(s.displayFilterCacheOrder) > displayFilterCacheLimit {
 		oldest := s.displayFilterCacheOrder[0]
 		s.displayFilterCacheOrder = s.displayFilterCacheOrder[1:]
+		if cached, ok := s.displayFilterCache[oldest]; ok {
+			cached.stop()
+		}
 		delete(s.displayFilterCache, oldest)
+	}
+}
+
+func (s *Service) cancelDisplayFilterCacheLocked() {
+	for filter, cached := range s.displayFilterCache {
+		if cached != nil {
+			cached.stop()
+		}
+		delete(s.displayFilterCache, filter)
 	}
 }
 

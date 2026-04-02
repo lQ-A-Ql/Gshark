@@ -15,6 +15,7 @@ export const router = createBrowserRouter([
     Component: MainLayout,
     children: [
       { index: true, lazy: lazyPage(() => import("./pages/Workspace")) },
+      { path: "analysis-cockpit", lazy: lazyPage(() => import("./pages/AnalysisCockpit")) },
       { path: "http-stream", lazy: lazyPage(() => import("./pages/HttpStream")) },
       { path: "tcp-stream", lazy: lazyPage(() => import("./pages/TcpStream")) },
       { path: "udp-stream", lazy: lazyPage(() => import("./pages/UdpStream")) },

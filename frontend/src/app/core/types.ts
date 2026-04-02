@@ -184,6 +184,13 @@ export interface DecryptionConfig {
   privateKeyIpPort: string;
 }
 
+export interface RecentCapture {
+  path: string;
+  name: string;
+  sizeBytes: number;
+  lastOpenedAt: string;
+}
+
 export interface TrafficBucket {
   label: string;
   count: number;

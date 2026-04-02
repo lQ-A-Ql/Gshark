@@ -129,7 +129,7 @@ export interface BackendBridge {
   startStreamingPackets(filePath: string, filter: string): Promise<void>;
   stopStreamingPackets(): Promise<void>;
   listPackets(): Promise<Packet[]>;
-  listPacketsPage(cursor: number, limit: number, filter?: string): Promise<PacketsPageResult>;
+  listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
   locatePacketPage(packetId: number, limit: number, filter?: string): Promise<PacketLocateResult>;
   listThreatHits(prefixes?: string[]): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
@@ -508,7 +508,7 @@ export const bridge: BackendBridge = {
     return rows.map(asPacket);
   },
 
-  async listPacketsPage(cursor: number, limit: number, filter = "") {
+  async listPacketsPage(cursor: number, limit: number, filter = "", signal?: AbortSignal) {
     const query = new URLSearchParams({
       cursor: String(cursor),
       limit: String(limit),
@@ -516,7 +516,7 @@ export const bridge: BackendBridge = {
     if (filter.trim()) {
       query.set("filter", filter);
     }
-    const payload = await request<any>(`/api/packets/page?${query.toString()}`);
+    const payload = await request<any>(`/api/packets/page?${query.toString()}`, { signal });
     const rows = Array.isArray(payload.items) ? payload.items : [];
     return {
       items: rows.map(asPacket),

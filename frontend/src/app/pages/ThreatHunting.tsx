@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert, Crosshair, CheckCircle2, Flag, Shield, BarChart2 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
@@ -17,7 +18,8 @@ function levelColor(level: string) {
 }
 
 export default function ThreatHunting() {
-  const { threatHits, backendConnected } = useSentinel();
+  const navigate = useNavigate();
+  const { threatHits, backendConnected, locatePacketById, preparePacketStream } = useSentinel();
   const [hits, setHits] = useState(threatHits);
   const [selectedHit, setSelectedHit] = useState<number | null>(threatHits[0]?.id ?? null);
   const [prefixText, setPrefixText] = useState("flag{,ctf{");
@@ -27,6 +29,7 @@ export default function ThreatHunting() {
   const [yaraTimeoutMs, setYaraTimeoutMs] = useState(25000);
   const [configBusy, setConfigBusy] = useState(false);
   const [huntBusy, setHuntBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState("");
   const [statusText, setStatusText] = useState("");
 
   const parsePrefixes = (value: string) =>
@@ -117,6 +120,38 @@ export default function ThreatHunting() {
   }, [hits]);
 
   const selected = hits.find((h) => h.id === selectedHit) ?? null;
+
+  const jumpToPacket = async (packetId: number) => {
+    setActionBusy(`packet:${packetId}`);
+    try {
+      await locatePacketById(packetId);
+      navigate("/");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const openRelatedStream = async (packetId: number) => {
+    setActionBusy(`stream:${packetId}`);
+    try {
+      const prepared = await preparePacketStream(packetId);
+      if (!prepared.protocol || prepared.streamId == null) {
+        navigate("/");
+        return;
+      }
+      if (prepared.protocol === "HTTP") {
+        navigate("/http-stream", { state: { streamId: prepared.streamId } });
+        return;
+      }
+      if (prepared.protocol === "UDP") {
+        navigate("/udp-stream", { state: { streamId: prepared.streamId } });
+        return;
+      }
+      navigate("/tcp-stream", { state: { streamId: prepared.streamId } });
+    } finally {
+      setActionBusy("");
+    }
+  };
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
@@ -290,6 +325,22 @@ export default function ThreatHunting() {
                   <Crosshair className="h-4 w-4 text-blue-600" /> 详细特征提取
                 </div>
                 <div className="flex-1 overflow-auto p-4 font-mono text-sm leading-relaxed text-foreground">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => void jumpToPacket(selected.packetId)}
+                      disabled={actionBusy.length > 0}
+                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {actionBusy === `packet:${selected.packetId}` ? "定位中" : `定位到包 #${selected.packetId}`}
+                    </button>
+                    <button
+                      onClick={() => void openRelatedStream(selected.packetId)}
+                      disabled={actionBusy.length > 0}
+                      className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {actionBusy === `stream:${selected.packetId}` ? "打开中" : "打开关联流"}
+                    </button>
+                  </div>
                   <div className="mb-1 font-sans text-xs text-muted-foreground">命中字符串:</div>
                   <div className="break-all rounded-md border border-border bg-accent p-3 text-rose-700 select-all">{selected.match}</div>
                 </div>

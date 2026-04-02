@@ -282,7 +282,15 @@ func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
-	items, next, total := s.svc.PacketsPage(cursor, limit, filter)
+	items, next, total, err := s.svc.PacketsPageWithError(cursor, limit, filter)
+	if err != nil {
+		if engine.IsDisplayFilterError(err) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, packetsPageResponse{
 		Items:      items,
 		NextCursor: next,
@@ -301,7 +309,15 @@ func (s *Server) handlePacketLocate(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
-	cursor, total, found := s.svc.PacketPageCursor(packetID, limit, filter)
+	cursor, total, found, err := s.svc.PacketPageCursorWithError(packetID, limit, filter)
+	if err != nil {
+		if engine.IsDisplayFilterError(err) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"packet_id": packetID,
 		"cursor":    cursor,

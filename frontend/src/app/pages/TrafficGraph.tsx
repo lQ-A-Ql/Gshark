@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Activity, BarChart3, Clock3 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { bridge, type GlobalTrafficStats } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet } from "../core/types";
@@ -27,7 +28,8 @@ const EMPTY_STATS: GlobalTrafficStats = {
 const trafficStatsCache = new Map<string, GlobalTrafficStats>();
 
 export default function TrafficGraph() {
-  const { totalPackets, backendConnected, isPreloadingCapture, fileMeta } = useSentinel();
+  const navigate = useNavigate();
+  const { totalPackets, backendConnected, isPreloadingCapture, fileMeta, setDisplayFilter, applyFilter } = useSentinel();
   const captureCacheKey = useMemo(() => {
     if (!fileMeta.path) return "";
     return `${fileMeta.path}::${totalPackets}`;
@@ -97,6 +99,13 @@ export default function TrafficGraph() {
   const topDestPorts = useMemo(() => stats.topDestPorts || [], [stats.topDestPorts]);
   const topSrcPorts = useMemo(() => stats.topSrcPorts || [], [stats.topSrcPorts]);
 
+  const jumpWithFilter = useCallback((filter: string) => {
+    if (!filter.trim()) return;
+    setDisplayFilter(filter);
+    applyFilter(filter);
+    navigate("/");
+  }, [applyFilter, navigate, setDisplayFilter]);
+
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
       <div className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -129,16 +138,16 @@ export default function TrafficGraph() {
           <SimpleBarChart data={timeline} color="bg-blue-500" />
         </Panel>
         <Panel title="协议分布">
-          <SimpleBarChart data={protocolDist} color="bg-emerald-500" />
+          <SimpleBarChart data={protocolDist} color="bg-emerald-500" onSelect={(row) => jumpWithFilter(filterForProtocolBucket(row.label))} />
         </Panel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="源 IP">
-          <SimpleBarChart data={topSrcIPs} color="bg-violet-500" />
+          <SimpleBarChart data={topSrcIPs} color="bg-violet-500" onSelect={(row) => jumpWithFilter(filterForIpBucket(row.label, "src"))} />
         </Panel>
         <Panel title="目标 IP">
-          <SimpleBarChart data={topDstIPs} color="bg-sky-500" />
+          <SimpleBarChart data={topDstIPs} color="bg-sky-500" onSelect={(row) => jumpWithFilter(filterForIpBucket(row.label, "dst"))} />
         </Panel>
       </div>
 
@@ -147,16 +156,16 @@ export default function TrafficGraph() {
           <SimpleBarChart data={topComputerNames} color="bg-fuchsia-500" />
         </Panel>
         <Panel title="域名">
-          <SimpleBarChart data={topDomains} color="bg-rose-500" />
+          <SimpleBarChart data={topDomains} color="bg-rose-500" onSelect={(row) => jumpWithFilter(filterForDomainBucket(row.label))} />
         </Panel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="目标端口">
-          <SimpleBarChart data={topDestPorts} color="bg-cyan-500" />
+          <SimpleBarChart data={topDestPorts} color="bg-cyan-500" onSelect={(row) => jumpWithFilter(filterForPortBucket(row.label))} />
         </Panel>
         <Panel title="源端口">
-          <SimpleBarChart data={topSrcPorts} color="bg-orange-500" />
+          <SimpleBarChart data={topSrcPorts} color="bg-orange-500" onSelect={(row) => jumpWithFilter(filterForPortBucket(row.label))} />
         </Panel>
       </div>
     </div>
@@ -326,7 +335,15 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function SimpleBarChart({ data, color }: { data: Bucket[]; color: string }) {
+function SimpleBarChart({
+  data,
+  color,
+  onSelect,
+}: {
+  data: Bucket[];
+  color: string;
+  onSelect?: (row: Bucket) => void;
+}) {
   const max = Math.max(1, ...data.map((x) => x.count));
 
   if (data.length === 0) {
@@ -337,15 +354,89 @@ function SimpleBarChart({ data, color }: { data: Bucket[]; color: string }) {
     <div className="max-h-[480px] overflow-auto pr-1">
       <div className="space-y-2">
         {data.map((row) => (
-          <div key={row.label} className="grid grid-cols-[180px_1fr_64px] items-center gap-2 text-xs">
+          <button
+            key={row.label}
+            type="button"
+            onClick={() => onSelect?.(row)}
+            className={`grid w-full grid-cols-[180px_1fr_64px] items-center gap-2 rounded-lg px-1 py-1 text-left text-xs ${onSelect ? "transition-colors hover:bg-accent" : ""}`}
+          >
             <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
             <div className="h-2 rounded bg-accent">
               <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
             </div>
             <div className="text-right font-mono text-foreground">{row.count}</div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
   );
+}
+
+function filterForProtocolBucket(label: string) {
+  const normalized = label.toUpperCase();
+  switch (normalized) {
+    case "HTTP":
+      return "http";
+    case "HTTPS":
+    case "TLS":
+    case "TLSV1.2":
+    case "TLSV1.3":
+      return "tls";
+    case "DNS":
+      return "dns";
+    case "TCP":
+      return "tcp";
+    case "UDP":
+      return "udp";
+    case "ARP":
+      return "arp";
+    case "ICMP":
+      return "icmp";
+    case "ICMPV6":
+      return "icmpv6";
+    case "USB":
+      return "usb";
+    case "MODBUS":
+    case "S7COMM":
+    case "DNP3":
+    case "CIP":
+    case "BACNET":
+    case "IEC104":
+    case "OPCUA":
+    case "PN_RT":
+      return "modbus or s7comm or dnp3 or cip or bacnet or iec104 or opcua or pn_rt";
+    case "CAN":
+    case "J1939":
+    case "DOIP":
+    case "UDS":
+      return "can or j1939 or doip or uds";
+    case "RTP":
+    case "RTCP":
+    case "SIP":
+    case "SDP":
+      return "rtp or rtcp or sip or sdp";
+    default:
+      return normalized.toLowerCase();
+  }
+}
+
+function filterForIpBucket(label: string, direction: "src" | "dst") {
+  const target = label.trim();
+  if (!target) return "";
+  if (target.includes(":")) {
+    return direction === "src" ? `ipv6.src == ${target}` : `ipv6.dst == ${target}`;
+  }
+  return direction === "src" ? `ip.src == ${target}` : `ip.dst == ${target}`;
+}
+
+function filterForDomainBucket(label: string) {
+  const target = label.trim();
+  if (!target) return "";
+  return `http.host contains "${target}" or dns.qry.name contains "${target}" or tls.handshake.extensions_server_name contains "${target}"`;
+}
+
+function filterForPortBucket(label: string) {
+  const port = label.trim();
+  if (!port) return "";
+  return `tcp.port == ${port} or udp.port == ${port}`;
 }

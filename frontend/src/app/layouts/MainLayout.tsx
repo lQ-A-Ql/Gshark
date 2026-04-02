@@ -12,6 +12,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Puzzle,
+  Radar,
   Save,
   ScrollText,
   ShieldAlert,
@@ -29,6 +30,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "主工作区" },
+  { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱" },
   { path: "/traffic-graph", icon: BarChart3, label: "流量图" },
   { path: "/industrial-analysis", icon: Factory, label: "工控分析" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析" },
@@ -178,11 +180,13 @@ export function MainLayout() {
 
               <MenuGroup label="视图">
                 <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
+                <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
                 <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
                 <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
               </MenuGroup>
 
               <MenuGroup label="分析">
+                <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
                 <MenuItem
                   onClick={() => {
                     setDisplayFilter("http");

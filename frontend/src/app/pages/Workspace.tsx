@@ -3,6 +3,8 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Filter, Play, RefreshCw, XCircle, Network, FileText, FolderOpen, Square } from "lucide-react";
 import { useNavigate } from "react-router";
 import { PacketVirtualTable } from "../components/PacketVirtualTable";
+import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
+import { Progress } from "../components/ui/progress";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet, ProtocolTreeNode } from "../core/types";
 
@@ -25,6 +27,7 @@ export default function Workspace() {
     hasMorePackets,
     hasPrevPackets,
     isPageLoading,
+    isFilterLoading,
     loadMorePackets,
     loadPrevPackets,
     jumpToPage,
@@ -39,6 +42,7 @@ export default function Workspace() {
     stopCapture,
     setActiveStream,
     backendConnected,
+    backendStatus,
     tsharkStatus,
   } = useSentinel();
 
@@ -48,6 +52,7 @@ export default function Workspace() {
   const [pageInput, setPageInput] = useState("1");
   const [packetIdInput, setPacketIdInput] = useState("");
   const [recentFilters, setRecentFilters] = useState<string[]>([]);
+  const [filterLoadingProgress, setFilterLoadingProgress] = useState(18);
   const filterInputRef = useRef<HTMLInputElement | null>(null);
   const treeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const hexPanelRef = useRef<HTMLDivElement | null>(null);
@@ -174,6 +179,22 @@ export default function Workspace() {
     }
   }, [selectedByteOffset]);
 
+  useEffect(() => {
+    if (!isFilterLoading || isPreloadingCapture) {
+      setFilterLoadingProgress(12);
+      return;
+    }
+    setFilterLoadingProgress(18);
+    const timer = window.setInterval(() => {
+      setFilterLoadingProgress((prev) => {
+        if (prev >= 92) return 92;
+        const step = Math.max(1, Math.round((96 - prev) * 0.18));
+        return Math.min(92, prev + step);
+      });
+    }, 180);
+    return () => window.clearInterval(timer);
+  }, [isFilterLoading, isPreloadingCapture]);
+
   const treeRangeMap = useMemo(() => {
     const map = new Map<string, [number, number]>();
     const walk = (node: ProtocolTreeNode) => {
@@ -192,6 +213,37 @@ export default function Workspace() {
     if (preloadTotal <= 0) return 0;
     return Math.max(0, Math.min(100, Math.floor((preloadProcessed / preloadTotal) * 100)));
   }, [preloadProcessed, preloadTotal]);
+  const hasOpenedCapture = Boolean(fileMeta.path);
+  const showFilterLoadingBlankState = useMemo(
+    () => isFilterLoading && !isPreloadingCapture && filteredPackets.length === 0,
+    [filteredPackets.length, isFilterLoading, isPreloadingCapture],
+  );
+  const filterLoadingTitle = useMemo(() => {
+    const message = backendStatus.trim();
+    if (message.startsWith("正在应用过滤器")) return message;
+    if (message.startsWith("正在重置过滤器")) return message;
+    return displayFilter.trim() ? `正在扫描过滤结果: ${displayFilter.trim()}` : "正在恢复全部流量";
+  }, [backendStatus, displayFilter]);
+  const filterLoadingDetail = useMemo(() => (
+    displayFilter.trim()
+      ? "旧页已清空，首屏命中结果返回前会在这里显示实时进度。"
+      : "正在重新装载未过滤的数据包第一页。"
+  ), [displayFilter]);
+  const filterErrorMessage = useMemo(() => {
+    const message = backendStatus.trim();
+    if (!message || !displayFilter.trim()) return "";
+    const normalized = message.toLowerCase();
+    if (
+      normalized.includes("filter")
+      || normalized.includes("过滤")
+      || normalized.includes("tshark")
+      || normalized.includes("unexpected")
+      || normalized.includes("invalid")
+    ) {
+      return message;
+    }
+    return "";
+  }, [backendStatus, displayFilter]);
   const pagerItems = useMemo(() => {
     const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
     return Array.from(pages)
@@ -234,6 +286,10 @@ export default function Workspace() {
   };
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
+
+  if (!hasOpenedCapture) {
+    return <CaptureWelcomePanel />;
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-card text-sm text-foreground">
@@ -428,6 +484,11 @@ export default function Workspace() {
       <div className="border-b border-border bg-accent/20 px-3 py-1 text-[11px] text-muted-foreground shrink-0">
         {'过滤器已切换为 tshark display filter 原生语法，支持 "http.request"、"tcp.stream eq 3"、"frame.number >= 100"、"ip.addr == 192.168.1.10" 等表达式。'}
       </div>
+      {filterErrorMessage && (
+        <div className="border-b border-rose-200 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700 shrink-0">
+          {filterErrorMessage}
+        </div>
+      )}
 
       {isPreloadingCapture && (
         <div className="border-b border-border bg-accent/30 px-3 py-2">
@@ -443,15 +504,29 @@ export default function Workspace() {
 
       <PanelGroup direction="vertical" className="flex min-h-0 flex-1 flex-col">
         <Panel defaultSize={50} minSize={20} className="bg-card">
-          <PacketVirtualTable
-            packets={filteredPackets}
-            selectedPacketId={selectedPacketId}
-            onSelect={selectPacket}
-            onDoubleClickHttp={() => navigate("/http-stream")}
-            onFollowStream={handleFollowStream}
-            hasMorePackets={hasMorePackets}
-            onLoadMorePackets={() => void loadMorePackets()}
-          />
+          {showFilterLoadingBlankState ? (
+            <div className="flex h-full min-h-0 items-center justify-center bg-card px-6">
+              <div className="w-full max-w-xl rounded-2xl border border-border bg-background/80 p-6 shadow-sm">
+                <div className="mb-3 text-sm font-semibold text-foreground">{filterLoadingTitle}</div>
+                <div className="mb-4 text-xs text-muted-foreground">{filterLoadingDetail}</div>
+                <Progress value={filterLoadingProgress} className="h-2.5" />
+                <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>正在读取首屏匹配结果</span>
+                  <span>{filterLoadingProgress}%</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <PacketVirtualTable
+              packets={filteredPackets}
+              selectedPacketId={selectedPacketId}
+              onSelect={selectPacket}
+              onDoubleClickHttp={() => navigate("/http-stream")}
+              onFollowStream={handleFollowStream}
+              hasMorePackets={hasMorePackets}
+              onLoadMorePackets={() => void loadMorePackets()}
+            />
+          )}
         </Panel>
 
         <PanelResizeHandle className="z-20 h-1 cursor-row-resize bg-border transition-colors hover:bg-blue-300 active:bg-blue-500" />

@@ -138,8 +138,8 @@ func (s *packetStore) All(predicate packetPredicate) ([]model.Packet, error) {
 }
 
 func (s *packetStore) Iterate(predicate packetPredicate, fn func(model.Packet) error) error {
-	path, offsets := s.snapshot()
-	if path == "" || len(offsets) == 0 {
+	path, total := s.meta()
+	if path == "" || total == 0 {
 		return nil
 	}
 
@@ -150,16 +150,19 @@ func (s *packetStore) Iterate(predicate packetPredicate, fn func(model.Packet) e
 	defer f.Close()
 
 	reader := bufio.NewReaderSize(f, 64*1024)
-	for _, offset := range offsets {
-		packet, err := readStoredPacket(f, reader, offset)
-		if err != nil {
-			return err
-		}
-		if predicate != nil && !predicate(packet) {
-			continue
-		}
-		if err := fn(packet); err != nil {
-			return err
+	for cursor := 0; cursor < total; cursor += 4096 {
+		offsets := s.offsetWindow(cursor, 4096)
+		for _, offset := range offsets {
+			packet, err := readStoredPacket(f, reader, offset)
+			if err != nil {
+				return err
+			}
+			if predicate != nil && !predicate(packet) {
+				continue
+			}
+			if err := fn(packet); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -205,8 +208,7 @@ func (s *packetStore) Page(cursor, limit int, predicate packetPredicate) ([]mode
 }
 
 func (s *packetStore) directPage(cursor, limit int) ([]model.Packet, int, int, error) {
-	path, offsets := s.snapshot()
-	total := len(offsets)
+	path, total := s.meta()
 	if path == "" || total == 0 {
 		return []model.Packet{}, 0, 0, nil
 	}
@@ -218,6 +220,7 @@ func (s *packetStore) directPage(cursor, limit int) ([]model.Packet, int, int, e
 	if end > total {
 		end = total
 	}
+	offsets := s.offsetWindow(cursor, limit)
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -248,9 +251,8 @@ func (s *packetStore) PageByIDs(ids []int64, cursor, limit int) ([]model.Packet,
 		cursor = 0
 	}
 
-	path, byID := s.snapshotByID()
 	total := len(ids)
-	if path == "" || total == 0 {
+	if total == 0 {
 		return []model.Packet{}, 0, 0, nil
 	}
 	if cursor >= total {
@@ -261,64 +263,103 @@ func (s *packetStore) PageByIDs(ids []int64, cursor, limit int) ([]model.Packet,
 	if end > total {
 		end = total
 	}
+	window := ids[cursor:end]
+	items, err := s.PacketsByIDs(window)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return items, end, total, nil
+}
+
+func (s *packetStore) PacketsByIDs(ids []int64) ([]model.Packet, error) {
+	if len(ids) == 0 {
+		return []model.Packet{}, nil
+	}
+	path, offsets := s.lookupOffsetsByIDWindow(ids)
+	if path == "" || len(offsets) == 0 {
+		return []model.Packet{}, nil
+	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("open packet store reader: %w", err)
+		return nil, fmt.Errorf("open packet store reader: %w", err)
 	}
 	defer f.Close()
 
 	reader := bufio.NewReaderSize(f, 64*1024)
-	items := make([]model.Packet, 0, end-cursor)
-	for _, id := range ids[cursor:end] {
-		offset, ok := byID[id]
-		if !ok {
-			continue
-		}
+	items := make([]model.Packet, 0, len(offsets))
+	for _, offset := range offsets {
 		packet, err := readStoredPacket(f, reader, offset)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, err
 		}
 		items = append(items, packet)
 	}
-	return items, end, total, nil
+	return items, nil
 }
 
 func (s *packetStore) ExistingIDs(ids []int64) []int64 {
 	if len(ids) == 0 {
 		return nil
 	}
-	_, byID := s.snapshotByID()
-	if len(byID) == 0 {
-		return nil
-	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
-		if _, ok := byID[id]; ok {
+		if _, ok := s.byID[id]; ok {
 			out = append(out, id)
 		}
 	}
 	return out
 }
 
-func (s *packetStore) snapshot() (string, []int64) {
+func (s *packetStore) HasID(id int64) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	offsets := make([]int64, len(s.offsets))
-	copy(offsets, s.offsets)
-	return s.path, offsets
+	_, ok := s.byID[id]
+	return ok
 }
 
-func (s *packetStore) snapshotByID() (string, map[int64]int64) {
+func (s *packetStore) meta() (string, int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.path, len(s.offsets)
+}
+
+func (s *packetStore) offsetWindow(cursor, limit int) []int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	byID := make(map[int64]int64, len(s.byID))
-	for id, offset := range s.byID {
-		byID[id] = offset
+	if s.path == "" || len(s.offsets) == 0 || cursor >= len(s.offsets) || limit <= 0 {
+		return nil
 	}
-	return s.path, byID
+	end := cursor + limit
+	if end > len(s.offsets) {
+		end = len(s.offsets)
+	}
+	out := make([]int64, end-cursor)
+	copy(out, s.offsets[cursor:end])
+	return out
+}
+
+func (s *packetStore) lookupOffsetsByIDWindow(ids []int64) (string, []int64) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.path == "" || len(ids) == 0 || len(s.byID) == 0 {
+		return "", nil
+	}
+	offsets := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		offset, ok := s.byID[id]
+		if !ok {
+			continue
+		}
+		offsets = append(offsets, offset)
+	}
+	return s.path, offsets
 }
 
 func readStoredPacket(file *os.File, reader *bufio.Reader, offset int64) (model.Packet, error) {
