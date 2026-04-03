@@ -47,6 +47,28 @@ var modbusAnalysisFields = []string{
 	"modbus.regval_int32",
 	"modbus.regval_float",
 	"modbus.object_str_value",
+	"modbus.data",
+	"modbus.bitnum",
+	"modbus.bitval",
+}
+
+const modbusBitPreviewLimit = 32
+
+type modbusBitContext struct {
+	BitType string
+	Start   int
+	Count   int
+}
+
+type modbusTransactionScratch struct {
+	FunctionCode   int
+	Kind           string
+	RawReference   string
+	RawQuantity    string
+	RawData        string
+	RawBitNumbers  string
+	RawBitValues   string
+	RequestFrameID int64
 }
 
 func BuildIndustrialAnalysisFromFile(filePath string) (model.IndustrialAnalysis, error) {
@@ -101,8 +123,11 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 	unitMap := make(map[string]int)
 	referenceMap := make(map[string]int)
 	exceptionMap := make(map[string]int)
+	requestBitContexts := make(map[int64]modbusBitContext)
+	transactionScratch := make([]modbusTransactionScratch, 0, 256)
 
 	err := scanFieldRows(filePath, modbusAnalysisFields, func(parts []string) {
+		packetID := parseInt64(safeTrim(parts, 0))
 		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
 		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		protoPath := safeTrim(parts, 8)
@@ -122,13 +147,14 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 		unitID := parseInt(safeTrim(parts, 16))
 		functionCode := parseInt(safeTrim(parts, 17))
 		requestFrame := safeTrim(parts, 18)
+		requestFrameID := parseInt64(requestFrame)
 		responseTime := safeTrim(parts, 19)
 		exceptionFlag := parseTruthy(safeTrim(parts, 20))
 		exceptionCode := parseInt(safeTrim(parts, 21))
-		reference := formatModbusReference(
-			firstNonEmpty(safeTrim(parts, 24), safeTrim(parts, 25), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 31), safeTrim(parts, 32)),
-		)
-		quantity := firstNonEmpty(safeTrim(parts, 27), safeTrim(parts, 28), safeTrim(parts, 26), safeTrim(parts, 29), safeTrim(parts, 30))
+		rawReference := firstNonEmpty(safeTrim(parts, 24), safeTrim(parts, 25), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 31), safeTrim(parts, 32))
+		reference := formatModbusReference(rawReference)
+		rawQuantity := firstNonEmpty(safeTrim(parts, 27), safeTrim(parts, 28), safeTrim(parts, 26), safeTrim(parts, 29), safeTrim(parts, 30))
+		quantity := rawQuantity
 		registerValues := compactJoin(", ",
 			safeTrim(parts, 33),
 			safeTrim(parts, 34),
@@ -137,6 +163,9 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 			safeTrim(parts, 37),
 			safeTrim(parts, 38),
 		)
+		rawBitData := safeTrim(parts, 39)
+		rawBitNumbers := safeTrim(parts, 40)
+		rawBitValues := safeTrim(parts, 41)
 
 		kind := "request"
 		if requestFrame != "" || responseTime != "" {
@@ -168,8 +197,15 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 			exceptionMap[fmt.Sprintf("0x%02X %s", exceptionCode, modbusExceptionName(exceptionCode))]++
 		}
 
+		requestCtx, hasRequestCtx := buildModbusBitContext(functionCode, rawReference, rawQuantity)
+		responseCtx := modbusBitContext{}
+		if requestFrameID > 0 {
+			responseCtx = requestBitContexts[requestFrameID]
+		}
+		bitRange := buildModbusBitRange(functionCode, kind, rawReference, rawQuantity, rawBitData, rawBitNumbers, rawBitValues, responseCtx)
+
 		stats.Transactions = append(stats.Transactions, model.ModbusTransaction{
-			PacketID:       parseInt64(safeTrim(parts, 0)),
+			PacketID:       packetID,
 			Time:           normalizeTimestamp(safeTrim(parts, 1)),
 			Source:         src,
 			Destination:    dst,
@@ -183,11 +219,49 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 			ExceptionCode:  exceptionCode,
 			ResponseTime:   responseTime,
 			RegisterValues: registerValues,
+			BitRange:       bitRange,
 			Summary:        info,
 		})
+		transactionScratch = append(transactionScratch, modbusTransactionScratch{
+			FunctionCode:   functionCode,
+			Kind:           kind,
+			RawReference:   rawReference,
+			RawQuantity:    rawQuantity,
+			RawData:        rawBitData,
+			RawBitNumbers:  rawBitNumbers,
+			RawBitValues:   rawBitValues,
+			RequestFrameID: requestFrameID,
+		})
+		if kind == "request" && hasRequestCtx {
+			requestBitContexts[packetID] = requestCtx
+		}
 	})
 	if err != nil {
 		return stats, nil, err
+	}
+
+	for idx := range stats.Transactions {
+		if stats.Transactions[idx].BitRange != nil {
+			continue
+		}
+		scratch := transactionScratch[idx]
+		if scratch.RequestFrameID <= 0 {
+			continue
+		}
+		requestCtx, ok := requestBitContexts[scratch.RequestFrameID]
+		if !ok {
+			continue
+		}
+		stats.Transactions[idx].BitRange = buildModbusBitRange(
+			scratch.FunctionCode,
+			scratch.Kind,
+			scratch.RawReference,
+			scratch.RawQuantity,
+			scratch.RawData,
+			scratch.RawBitNumbers,
+			scratch.RawBitValues,
+			requestCtx,
+		)
 	}
 
 	stats.FunctionCodes = topBuckets(functionMap, 0)
@@ -308,6 +382,250 @@ func compactJoin(sep string, values ...string) string {
 		filtered = append(filtered, value)
 	}
 	return strings.Join(filtered, sep)
+}
+
+func buildModbusBitContext(functionCode int, rawReference, rawQuantity string) (modbusBitContext, bool) {
+	bitType := modbusBitType(functionCode)
+	if bitType == "" {
+		return modbusBitContext{}, false
+	}
+	start, ok := parseOptionalFlexibleInt(rawReference)
+	if !ok {
+		return modbusBitContext{}, false
+	}
+
+	count := 0
+	switch functionCode {
+	case 1, 2, 15:
+		parsedCount, ok := parseOptionalFlexibleInt(rawQuantity)
+		if !ok || parsedCount <= 0 {
+			return modbusBitContext{}, false
+		}
+		count = parsedCount
+	case 5:
+		count = 1
+	default:
+		return modbusBitContext{}, false
+	}
+
+	return modbusBitContext{
+		BitType: bitType,
+		Start:   start,
+		Count:   count,
+	}, true
+}
+
+func buildModbusBitRange(functionCode int, kind, rawReference, rawQuantity, rawData, rawBitNumbers, rawBitValues string, requestCtx modbusBitContext) *model.ModbusBitRange {
+	defaultBitType := modbusBitType(functionCode)
+	if bitRange := buildModbusBitRangeFromFieldValues(defaultBitType, rawBitNumbers, rawBitValues, requestCtx); bitRange != nil {
+		return bitRange
+	}
+
+	switch functionCode {
+	case 1, 2:
+		if kind != "response" || requestCtx.Count <= 0 || requestCtx.BitType == "" {
+			return nil
+		}
+		return newModbusBitRange(requestCtx, decodeModbusPackedBits(rawData, requestCtx.Count))
+	case 5:
+		ctx, ok := buildModbusBitContext(functionCode, rawReference, rawQuantity)
+		if !ok {
+			return nil
+		}
+		value, ok := decodeModbusSingleBitValue(rawData)
+		if !ok {
+			return nil
+		}
+		return newModbusBitRange(ctx, []bool{value})
+	case 15:
+		if kind != "request" {
+			return nil
+		}
+		ctx, ok := buildModbusBitContext(functionCode, rawReference, rawQuantity)
+		if !ok {
+			return nil
+		}
+		return newModbusBitRange(ctx, decodeModbusPackedBits(rawData, ctx.Count))
+	default:
+		return nil
+	}
+}
+
+func buildModbusBitRangeFromFieldValues(defaultBitType, rawBitNumbers, rawBitValues string, fallbackCtx modbusBitContext) *model.ModbusBitRange {
+	valuesRaw := splitCommaSeparatedField(rawBitValues)
+	if len(valuesRaw) == 0 {
+		return nil
+	}
+
+	bitType := firstNonEmpty(fallbackCtx.BitType, defaultBitType)
+	if bitType == "" {
+		return nil
+	}
+
+	addressesRaw := splitCommaSeparatedField(rawBitNumbers)
+	values := make([]bool, 0, len(valuesRaw))
+	if len(addressesRaw) == len(valuesRaw) && len(addressesRaw) > 0 {
+		start, ok := parseOptionalFlexibleInt(addressesRaw[0])
+		if !ok {
+			return nil
+		}
+		for _, rawValue := range valuesRaw {
+			values = append(values, parseTruthy(rawValue))
+		}
+		return newModbusBitRange(modbusBitContext{
+			BitType: bitType,
+			Start:   start,
+			Count:   len(values),
+		}, values)
+	}
+
+	if fallbackCtx.Count <= 0 {
+		return nil
+	}
+	limit := len(valuesRaw)
+	if limit > fallbackCtx.Count {
+		limit = fallbackCtx.Count
+	}
+	for idx := 0; idx < limit; idx++ {
+		values = append(values, parseTruthy(valuesRaw[idx]))
+	}
+	return newModbusBitRange(modbusBitContext{
+		BitType: bitType,
+		Start:   fallbackCtx.Start,
+		Count:   len(values),
+	}, values)
+}
+
+func newModbusBitRange(ctx modbusBitContext, values []bool) *model.ModbusBitRange {
+	if ctx.BitType == "" || ctx.Count <= 0 || len(values) == 0 {
+		return nil
+	}
+	start := ctx.Start
+	count := len(values)
+	return &model.ModbusBitRange{
+		Type:    ctx.BitType,
+		Start:   intPtr(start),
+		Count:   intPtr(count),
+		Values:  append([]bool(nil), values...),
+		Preview: formatModbusBitPreview(ctx.BitType, ctx.Start, values),
+	}
+}
+
+func decodeModbusPackedBits(rawData string, count int) []bool {
+	if count <= 0 {
+		return nil
+	}
+	parts := splitHexBytes(rawData)
+	if len(parts) == 0 {
+		return nil
+	}
+	values := make([]bool, 0, count)
+	for _, part := range parts {
+		byteValue := parseFlexibleInt("0x" + part)
+		for bit := 0; bit < 8 && len(values) < count; bit++ {
+			values = append(values, byteValue&(1<<bit) != 0)
+		}
+		if len(values) >= count {
+			break
+		}
+	}
+	return values
+}
+
+func decodeModbusSingleBitValue(rawData string) (bool, bool) {
+	parts := splitHexBytes(rawData)
+	if len(parts) == 0 {
+		return false, false
+	}
+	if len(parts) >= 2 {
+		switch strings.ToUpper(parts[0] + parts[1]) {
+		case "FF00":
+			return true, true
+		case "0000":
+			return false, true
+		}
+	}
+	for _, part := range parts {
+		if parseFlexibleInt("0x"+part) != 0 {
+			return true, true
+		}
+	}
+	return false, true
+}
+
+func formatModbusBitPreview(bitType string, start int, values []bool) string {
+	if len(values) == 0 {
+		return ""
+	}
+	label := "线圈"
+	if bitType == "discrete_input" {
+		label = "离散输入"
+	}
+	if len(values) == 1 {
+		if values[0] {
+			return fmt.Sprintf("%s %d = ON", label, start)
+		}
+		return fmt.Sprintf("%s %d = OFF", label, start)
+	}
+
+	previewCount := len(values)
+	if previewCount > modbusBitPreviewLimit {
+		previewCount = modbusBitPreviewLimit
+	}
+	tokens := make([]string, 0, previewCount)
+	for idx := 0; idx < previewCount; idx++ {
+		if values[idx] {
+			tokens = append(tokens, "1")
+		} else {
+			tokens = append(tokens, "0")
+		}
+	}
+	result := fmt.Sprintf("%s %d-%d -> %s", label, start, start+len(values)-1, strings.Join(tokens, " "))
+	if len(values) > previewCount {
+		result += fmt.Sprintf(" ... (共 %d 位)", len(values))
+	}
+	return result
+}
+
+func modbusBitType(functionCode int) string {
+	switch functionCode {
+	case 1, 5, 15:
+		return "coil"
+	case 2:
+		return "discrete_input"
+	default:
+		return ""
+	}
+}
+
+func parseOptionalFlexibleInt(raw string) (int, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	return parseFlexibleInt(raw), true
+}
+
+func splitCommaSeparatedField(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
+}
+
+func intPtr(value int) *int {
+	out := value
+	return &out
 }
 
 func industrialNotes(stats model.IndustrialAnalysis) []string {

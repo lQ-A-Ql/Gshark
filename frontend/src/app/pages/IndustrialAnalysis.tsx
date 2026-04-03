@@ -199,6 +199,11 @@ export default function IndustrialAnalysis() {
                     <td className="px-3 py-2 font-mono">{item.responseTime || "--"}</td>
                     <td className="px-3 py-2">
                       <div>{item.summary || "--"}</div>
+                      {item.bitRange?.preview && (
+                        <div className="mt-1 break-all font-mono text-[11px] text-blue-700">
+                          位值解析: {item.bitRange.preview}
+                        </div>
+                      )}
                       {item.registerValues && <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">{item.registerValues}</div>}
                     </td>
                   </tr>

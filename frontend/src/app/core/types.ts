@@ -217,6 +217,14 @@ export interface AnalysisConversation {
   count: number;
 }
 
+export interface ModbusBitRange {
+  type?: string;
+  start?: number;
+  count?: number;
+  values?: boolean[];
+  preview?: string;
+}
+
 export interface ModbusTransaction {
   packetId: number;
   time: string;
@@ -232,6 +240,7 @@ export interface ModbusTransaction {
   exceptionCode: number;
   responseTime: string;
   registerValues?: string;
+  bitRange?: ModbusBitRange;
   summary: string;
 }
 

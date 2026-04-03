@@ -202,22 +202,31 @@ type AnalysisConversation struct {
 	Count    int    `json:"count"`
 }
 
+type ModbusBitRange struct {
+	Type    string `json:"type,omitempty"`
+	Start   *int   `json:"start,omitempty"`
+	Count   *int   `json:"count,omitempty"`
+	Values  []bool `json:"values,omitempty"`
+	Preview string `json:"preview,omitempty"`
+}
+
 type ModbusTransaction struct {
-	PacketID       int64  `json:"packet_id"`
-	Time           string `json:"time"`
-	Source         string `json:"source"`
-	Destination    string `json:"destination"`
-	TransactionID  int    `json:"transaction_id"`
-	UnitID         int    `json:"unit_id"`
-	FunctionCode   int    `json:"function_code"`
-	FunctionName   string `json:"function_name"`
-	Kind           string `json:"kind"`
-	Reference      string `json:"reference"`
-	Quantity       string `json:"quantity"`
-	ExceptionCode  int    `json:"exception_code"`
-	ResponseTime   string `json:"response_time"`
-	RegisterValues string `json:"register_values,omitempty"`
-	Summary        string `json:"summary"`
+	PacketID       int64           `json:"packet_id"`
+	Time           string          `json:"time"`
+	Source         string          `json:"source"`
+	Destination    string          `json:"destination"`
+	TransactionID  int             `json:"transaction_id"`
+	UnitID         int             `json:"unit_id"`
+	FunctionCode   int             `json:"function_code"`
+	FunctionName   string          `json:"function_name"`
+	Kind           string          `json:"kind"`
+	Reference      string          `json:"reference"`
+	Quantity       string          `json:"quantity"`
+	ExceptionCode  int             `json:"exception_code"`
+	ResponseTime   string          `json:"response_time"`
+	RegisterValues string          `json:"register_values,omitempty"`
+	BitRange       *ModbusBitRange `json:"bit_range,omitempty"`
+	Summary        string          `json:"summary"`
 }
 
 type ModbusAnalysis struct {
