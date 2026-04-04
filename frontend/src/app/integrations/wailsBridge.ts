@@ -1,4 +1,5 @@
 import type {
+  AppUpdateStatus,
   AuditEntry,
   BinaryStream,
   DBCProfile,
@@ -28,6 +29,8 @@ interface DesktopAppBinding {
   GetBackendAuthToken?: () => Promise<string | null | undefined>;
   OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
   OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
+  CheckAppUpdate?: () => Promise<AppUpdateStatus | null | undefined>;
+  InstallAppUpdate?: () => Promise<void>;
 }
 
 export type EventType = "packet" | "status" | "error";
@@ -123,6 +126,8 @@ function normalizePacketTime(value: unknown): string {
 
 export interface BackendBridge {
   isAvailable(): Promise<boolean>;
+  checkAppUpdate(): Promise<AppUpdateStatus>;
+  installAppUpdate(): Promise<void>;
   checkTShark(): Promise<TSharkStatus>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   openPcapFile(): Promise<OpenFileResult>;
@@ -435,6 +440,50 @@ export const bridge: BackendBridge = {
     } catch {
       return false;
     }
+  },
+
+  async checkAppUpdate() {
+    const desktopApp = getDesktopAppBinding();
+    if (!desktopApp?.CheckAppUpdate) {
+      throw new Error("当前环境不支持桌面端更新");
+    }
+    const result = await desktopApp.CheckAppUpdate();
+    if (!result) {
+      throw new Error("更新状态为空");
+    }
+    return {
+      currentVersion: String(result.currentVersion ?? ""),
+      currentVersionDisplay: String(result.currentVersionDisplay ?? ""),
+      currentVersionSource: String(result.currentVersionSource ?? ""),
+      currentExecutable: String(result.currentExecutable ?? ""),
+      repo: String(result.repo ?? ""),
+      checkedAt: String(result.checkedAt ?? ""),
+      hasUpdate: Boolean(result.hasUpdate),
+      upToDate: Boolean(result.upToDate),
+      latestTag: String(result.latestTag ?? ""),
+      latestName: String(result.latestName ?? ""),
+      latestPublishedAt: String(result.latestPublishedAt ?? ""),
+      releaseUrl: String(result.releaseUrl ?? ""),
+      releaseNotes: String(result.releaseNotes ?? ""),
+      selectedAsset: result.selectedAsset
+        ? {
+            name: String(result.selectedAsset.name ?? ""),
+            downloadUrl: String(result.selectedAsset.downloadUrl ?? ""),
+            sizeBytes: Number(result.selectedAsset.sizeBytes ?? 0),
+            contentType: String(result.selectedAsset.contentType ?? "") || undefined,
+          }
+        : undefined,
+      canInstall: Boolean(result.canInstall),
+      message: String(result.message ?? ""),
+    };
+  },
+
+  async installAppUpdate() {
+    const desktopApp = getDesktopAppBinding();
+    if (!desktopApp?.InstallAppUpdate) {
+      throw new Error("当前环境不支持桌面端更新");
+    }
+    await desktopApp.InstallAppUpdate();
   },
 
   async checkTShark() {

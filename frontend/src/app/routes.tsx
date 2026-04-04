@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "objects", lazy: lazyPage(() => import("./pages/ObjectExport")) },
       { path: "decryption", lazy: lazyPage(() => import("./pages/Decryption")) },
       { path: "plugins", lazy: lazyPage(() => import("./pages/Plugins")) },
+      { path: "updates", lazy: lazyPage(() => import("./pages/UpdateCenter")) },
       { path: "audit-logs", lazy: lazyPage(() => import("./pages/AuditLogs")) },
       { path: "traffic-graph", lazy: lazyPage(() => import("./pages/TrafficGraph")) },
       { path: "industrial-analysis", lazy: lazyPage(() => import("./pages/IndustrialAnalysis")) },

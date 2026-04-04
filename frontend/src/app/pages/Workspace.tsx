@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Filter, Play, RefreshCw, XCircle, Network, FileText, FolderOpen, Square } from "lucide-react";
+import { Filter, Play, RefreshCw, XCircle, Network, FileText, FolderOpen, Square, ChevronDown, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { PacketVirtualTable } from "../components/PacketVirtualTable";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
@@ -716,17 +716,28 @@ function TreeNode({
     <div className="flex flex-col">
       <div
         ref={(el) => registerNodeRef(node.id, el)}
-        className={`flex cursor-pointer items-center rounded px-1 py-0.5 ${selected ? "bg-blue-100 text-blue-700" : "text-foreground hover:bg-blue-50/70"}`}
-        style={{ paddingLeft: `${depth * 16}px` }}
+        className={`group flex cursor-pointer items-start rounded-sm border-l px-1.5 py-0.5 ${selected ? "border-l-blue-600 bg-blue-50 text-blue-700" : "border-l-transparent text-foreground hover:border-l-blue-300 hover:bg-accent/60"}`}
+        style={{ paddingLeft: `${depth * 14 + 4}px` }}
         onClick={() => {
           onSelect(node.id);
           if (hasChildren) setExpanded((v) => !v);
         }}
       >
-        <span className="mr-1 flex w-4 select-none justify-center font-bold text-muted-foreground">
-          {hasChildren ? (expanded ? "[-]" : "[+]") : ""}
+        <span className="mr-1 mt-0.5 flex h-4 w-4 shrink-0 select-none items-center justify-center text-muted-foreground">
+          {hasChildren ? (
+            expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <span className="h-1.5 w-1.5 rounded-full bg-border" />
+          )}
         </span>
-        <span className="break-all">{node.label}</span>
+        <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+          <span className="break-all leading-5">{node.label}</span>
+          {node.byteRange && (
+            <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] ${selected ? "border-blue-200 bg-white/80 text-blue-700" : "border-border/70 bg-background/80 text-muted-foreground"}`}>
+              {node.byteRange[0]}-{node.byteRange[1]}
+            </span>
+          )}
+        </div>
       </div>
       {expanded && hasChildren && (
         <div className="flex flex-col">

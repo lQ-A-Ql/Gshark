@@ -24,6 +24,8 @@ type DesktopApp struct {
 	backendCmd       *exec.Cmd
 	backendAuthToken string
 	mu               sync.Mutex
+	updateMu         sync.Mutex
+	updateInProgress bool
 }
 
 type openCaptureDialogResult struct {

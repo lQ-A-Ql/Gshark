@@ -191,6 +191,32 @@ export interface RecentCapture {
   lastOpenedAt: string;
 }
 
+export interface AppUpdateAsset {
+  name: string;
+  downloadUrl: string;
+  sizeBytes: number;
+  contentType?: string;
+}
+
+export interface AppUpdateStatus {
+  currentVersion: string;
+  currentVersionDisplay: string;
+  currentVersionSource: string;
+  currentExecutable: string;
+  repo: string;
+  checkedAt: string;
+  hasUpdate: boolean;
+  upToDate: boolean;
+  latestTag: string;
+  latestName: string;
+  latestPublishedAt: string;
+  releaseUrl: string;
+  releaseNotes: string;
+  selectedAsset?: AppUpdateAsset;
+  canInstall: boolean;
+  message: string;
+}
+
 export interface TrafficBucket {
   label: string;
   count: number;

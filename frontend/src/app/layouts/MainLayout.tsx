@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Puzzle,
   Radar,
+  RefreshCw,
   Save,
   ScrollText,
   ShieldAlert,
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
   { path: "/objects", icon: FileDown, label: "附件提取" },
   { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
   { path: "/plugins", icon: Puzzle, label: "插件管理" },
+  { path: "/updates", icon: RefreshCw, label: "检查更新" },
   { path: "/audit-logs", icon: ScrollText, label: "审计日志" },
 ];
 
@@ -168,6 +170,7 @@ export function MainLayout() {
                 <MenuItem onClick={() => void openCapture()} icon={<FolderOpen className="h-4 w-4" />}>打开</MenuItem>
                 <MenuItem onClick={exportPacketsJson} icon={<Save className="h-4 w-4" />}>导出当前列表</MenuItem>
                 <MenuItem onClick={() => void openCapture()} icon={<Upload className="h-4 w-4" />}>导入...</MenuItem>
+                <MenuItem onClick={() => navigate("/updates")} icon={<RefreshCw className="h-4 w-4" />}>检查更新</MenuItem>
                 <MenuDivider />
                 <MenuItem danger onClick={() => window.close()}>退出</MenuItem>
               </MenuGroup>

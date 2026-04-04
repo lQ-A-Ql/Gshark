@@ -131,6 +131,16 @@ export default function HttpStream() {
   const visibleChunks = useMemo(() => displayChunks.slice(0, renderLimit), [displayChunks, renderLimit]);
   const deferredVisibleChunks = useDeferredValue(visibleChunks);
   const deferredSelectedIndex = useDeferredValue(selectedIndex);
+  const selectedChunkRendered = useMemo(() => {
+    if (!selectedChunk) return "";
+    if (viewMode === "hex") {
+      return toHexDump(selectedChunk.body);
+    }
+    if (viewMode === "formatted") {
+      return formatHTTPForDisplay(selectedChunk.body);
+    }
+    return selectedChunk.body;
+  }, [selectedChunk, viewMode]);
 
   useEffect(() => {
     setRenderLimit(INITIAL_RENDER_LIMIT);
@@ -300,36 +310,74 @@ export default function HttpStream() {
               当前流没有可展示内容。
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {deferredVisibleChunks.map((chunk, index) => (
-                <HTTPChunkCard
-                  key={chunk.key}
-                  chunk={chunk}
-                  viewMode={viewMode}
-                  selected={index === deferredSelectedIndex}
-                  onClick={() => setCursor(index)}
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.95fr)]">
+              <div className="flex min-h-0 flex-col gap-4">
+                {deferredVisibleChunks.map((chunk, index) => (
+                  <HTTPChunkCard
+                    key={chunk.key}
+                    chunk={chunk}
+                    viewMode={viewMode}
+                    selected={index === deferredSelectedIndex}
+                    onClick={() => setCursor(index)}
+                  />
+                ))}
+                {renderLimit < displayChunks.length && (
+                  <button
+                    className="self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    onClick={() => setRenderLimit((prev) => Math.min(prev + 180, displayChunks.length))}
+                  >
+                    加载更多 ({renderLimit}/{displayChunks.length})
+                  </button>
+                )}
+              </div>
+              <div className="space-y-4 xl:sticky xl:top-0">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">当前片段</div>
+                      <div className="text-[11px] text-muted-foreground">按当前视图模式同步预览选中的 HTTP 请求/响应</div>
+                    </div>
+                    {selectedChunk && (
+                      <span className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                        selectedChunk.direction === "client"
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      )}>
+                        {selectedChunk.direction === "client" ? "请求" : "响应"}
+                      </span>
+                    )}
+                  </div>
+                  {selectedChunk ? (
+                    <>
+                      <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">packet #{selectedChunk.packetId}</span>
+                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">stream-index {selectedChunk.streamIndex}</span>
+                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">{estimateTextBytes(selectedChunk.body)} bytes</span>
+                      </div>
+                      <div className="max-h-[360px] overflow-auto rounded-lg border border-border bg-background/80 p-3">
+                        <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-5 text-foreground">{selectedChunkRendered || "(empty)"}</pre>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                      选择左侧片段后，可在这里固定查看详情。
+                    </div>
+                  )}
+                </div>
+                <StreamDecoderWorkbench
+                  payload={selectedChunk?.body ?? ""}
+                  chunkLabel={selectedChunk ? `HTTP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "server" ? "响应" : "请求"}` : `HTTP 流 stream eq ${httpStream.id}`}
+                  tone="emerald"
+                  batchItems={allChunks.map((chunk) => ({
+                    index: chunk.streamIndex,
+                    payload: chunk.body,
+                    label: `#${chunk.packetId || chunk.streamIndex + 1} ${chunk.direction === "server" ? "response" : "request"}`,
+                  }))}
+                  selectedBatchIndex={selectedChunk?.streamIndex ?? 0}
+                  onApplyDecodedBatch={(patches) => persistStreamPayloads("HTTP", httpStream.id, patches)}
                 />
-              ))}
-              {renderLimit < displayChunks.length && (
-                <button
-                  className="self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                  onClick={() => setRenderLimit((prev) => Math.min(prev + 180, displayChunks.length))}
-                >
-                  加载更多 ({renderLimit}/{displayChunks.length})
-                </button>
-              )}
-              <StreamDecoderWorkbench
-                payload={selectedChunk?.body ?? ""}
-                chunkLabel={selectedChunk ? `HTTP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "server" ? "响应" : "请求"}` : `HTTP 流 stream eq ${httpStream.id}`}
-                tone="emerald"
-                batchItems={allChunks.map((chunk) => ({
-                  index: chunk.streamIndex,
-                  payload: chunk.body,
-                  label: `#${chunk.packetId || chunk.streamIndex + 1} ${chunk.direction === "server" ? "response" : "request"}`,
-                }))}
-                selectedBatchIndex={selectedChunk?.streamIndex ?? 0}
-                onApplyDecodedBatch={(patches) => persistStreamPayloads("HTTP", httpStream.id, patches)}
-              />
+              </div>
             </div>
           )}
         </div>
@@ -397,6 +445,10 @@ function toHexDump(text: string): string {
     lines.push(`${i.toString(16).padStart(4, "0")}  ${hex.padEnd(47, " ")}  ${ascii}`);
   }
   return lines.join("\n");
+}
+
+function estimateTextBytes(text: string): number {
+  return new TextEncoder().encode(text || "").length;
 }
 
 function formatHTTPForDisplay(text: string): string {

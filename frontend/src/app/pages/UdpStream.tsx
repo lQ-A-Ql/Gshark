@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Download, Minimize2, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { ArrowLeftRight, Download, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -45,6 +45,10 @@ export default function UdpStream() {
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.udp.length - 1;
   const visibleChunks = useMemo(() => streamView.chunks, [streamView.chunks]);
   const selectedChunk = streamView.chunks[selectedChunkIndex] ?? null;
+  const selectedChunkRendered = useMemo(
+    () => renderStreamChunk(selectedChunk?.body ?? "", viewMode),
+    [selectedChunk, viewMode],
+  );
 
   useEffect(() => {
     setStreamView({
@@ -126,6 +130,19 @@ export default function UdpStream() {
     }));
   }
 
+  function exportAll() {
+    const content = streamView.chunks
+      .map((chunk) => `--- ${chunk.direction === "client" ? "CLIENT -> SERVER" : "SERVER -> CLIENT"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
+      .join("\n\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `udp-stream-${streamView.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
@@ -141,64 +158,106 @@ export default function UdpStream() {
             </span>
           </h1>
         </div>
-        <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><Minimize2 className="h-4 w-4" /></button>
-      </div>
-
-      <div className="flex-1 overflow-auto bg-card p-4 font-mono text-sm leading-relaxed">
-        {loadError && (
-          <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-            {loadError}
-          </div>
-        )}
-        {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
-          <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
-            正在解析 udp.stream eq {streamView.id}，当前只先加载这一条流。
-          </div>
-        )}
-        <div className="flex max-w-4xl flex-col gap-1">
-          {visibleChunks.map((chunk, index) => (
-            <RawStreamChunkCard
-              key={`${chunk.packetId}-${chunk.direction}-${index}`}
-              chunk={chunk}
-              mode={viewMode}
-              clientTone="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-              serverTone="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
-              selected={selectedChunkIndex === index}
-              onSelect={() => setSelectedChunkIndex(index)}
-            />
-          ))}
-          {streamView.hasMore && (
-            <button
-              className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
-              onClick={() => void loadMore()}
-              disabled={loadingMore}
-            >
-              {loadingMore ? "正在加载..." : `加载更多 (${streamView.chunks.length}/${streamView.totalChunks || streamView.chunks.length})`}
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+            已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
+          </span>
+          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+            {formatLoadMeta(streamView.loadMeta)}
+          </span>
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border bg-card/80 px-4 py-4">
-        <StreamDecoderWorkbench
-          payload={selectedChunk?.body ?? ""}
-          chunkLabel={
-            selectedChunk
-              ? `UDP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
-              : `UDP 流 stream eq ${streamView.id}`
-          }
-          tone="amber"
-          batchItems={streamView.chunks.map((chunk, index) => ({
-            index,
-            payload: chunk.body,
-            label: `#${chunk.packetId} ${chunk.direction === "client" ? "client->server" : "server->client"}`,
-          }))}
-          selectedBatchIndex={selectedChunkIndex}
-          onApplyDecodedBatch={async (patches) => {
-            await persistStreamPayloads("UDP", streamView.id, patches);
-            applyLocalPatches(patches);
-          }}
-        />
+      <div className="grid min-h-0 flex-1 gap-4 bg-card p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
+        <div className="min-h-0 overflow-auto rounded-xl border border-border bg-background p-4 font-mono text-sm leading-relaxed shadow-sm">
+          {loadError && (
+            <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              {loadError}
+            </div>
+          )}
+          {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
+            <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              正在解析 udp.stream eq {streamView.id}，当前只先加载这一条流。
+            </div>
+          )}
+          <div className="flex max-w-4xl flex-col gap-2">
+            {visibleChunks.map((chunk, index) => (
+              <RawStreamChunkCard
+                key={`${chunk.packetId}-${chunk.direction}-${index}`}
+                chunk={chunk}
+                mode={viewMode}
+                clientTone="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                serverTone="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+                selected={selectedChunkIndex === index}
+                onSelect={() => setSelectedChunkIndex(index)}
+              />
+            ))}
+            {streamView.hasMore && (
+              <button
+                className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "正在加载..." : `加载更多 (${streamView.chunks.length}/${streamView.totalChunks || streamView.chunks.length})`}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="space-y-4 xl:sticky xl:top-0">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-foreground">当前片段</div>
+                <div className="text-[11px] text-muted-foreground">固定查看当前 UDP payload，便于快速对照解码结果</div>
+              </div>
+              {selectedChunk && (
+                <span className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                  selectedChunk.direction === "client"
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-cyan-200 bg-cyan-50 text-cyan-700",
+                )}>
+                  {selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
+                </span>
+              )}
+            </div>
+            {selectedChunk ? (
+              <>
+                <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">packet #{selectedChunk.packetId}</span>
+                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">{estimatePayloadBytes(selectedChunk.body)} bytes</span>
+                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">chunk #{selectedChunkIndex + 1}</span>
+                </div>
+                <div className="max-h-[360px] overflow-auto rounded-lg border border-border bg-background/80 p-3">
+                  <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-5 text-foreground">{selectedChunkRendered || "(empty payload)"}</pre>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                选择左侧片段后，可在这里固定查看详情。
+              </div>
+            )}
+          </div>
+          <StreamDecoderWorkbench
+            payload={selectedChunk?.body ?? ""}
+            chunkLabel={
+              selectedChunk
+                ? `UDP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
+                : `UDP 流 stream eq ${streamView.id}`
+            }
+            tone="amber"
+            batchItems={streamView.chunks.map((chunk, index) => ({
+              index,
+              payload: chunk.body,
+              label: `#${chunk.packetId} ${chunk.direction === "client" ? "client->server" : "server->client"}`,
+            }))}
+            selectedBatchIndex={selectedChunkIndex}
+            onApplyDecodedBatch={async (patches) => {
+              await persistStreamPayloads("UDP", streamView.id, patches);
+              applyLocalPatches(patches);
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid shrink-0 grid-cols-[250px_280px_420px_minmax(120px,1fr)] items-center gap-4 border-t border-border bg-card px-4 py-3 shadow-sm">
@@ -264,10 +323,7 @@ export default function UdpStream() {
         </div>
         <div className="justify-self-end">
           <div className="flex items-center gap-3">
-            <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-              {formatLoadMeta(streamView.loadMeta)}
-            </div>
-            <button className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
+            <button onClick={exportAll} className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
               <Download className="h-3.5 w-3.5" /> 导出为文件
             </button>
           </div>
@@ -364,4 +420,13 @@ function renderStreamChunk(body: string, mode: RawViewMode): string {
     return bytesToHexDump(bytes);
   }
   return bytesToAscii(bytes);
+}
+
+function estimatePayloadBytes(body: string): number {
+  const raw = (body ?? "").trim();
+  if (!raw) return 0;
+  if (/^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw)) {
+    return raw.split(":").length;
+  }
+  return new TextEncoder().encode(raw).length;
 }
