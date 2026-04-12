@@ -48,6 +48,7 @@ type Service struct {
 	objectsLoaded  bool
 	objects        []model.ObjectFile
 	mediaArtifacts map[string]string
+	mediaPlayback  map[string]string
 	objMu          sync.Mutex
 	yaraLoaded     bool
 	yaraHits       []model.ThreatHit
@@ -125,6 +126,7 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 		rawStreamIndex:     map[string]model.ReassembledStream{},
 		streamOverrides:    map[string]map[int]string{},
 		mediaArtifacts:     map[string]string{},
+		mediaPlayback:      map[string]string{},
 		huntingPrefixes: []string{
 			"flag{",
 			"ctf{",
@@ -191,6 +193,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
+	s.mediaPlayback = map[string]string{}
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = map[string]model.ReassembledStream{}
@@ -1285,12 +1288,20 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 }
 
 func (s *Service) MediaAnalysis() (model.MediaAnalysis, error) {
+	return s.mediaAnalysisWithForce(false)
+}
+
+func (s *Service) RefreshMediaAnalysis() (model.MediaAnalysis, error) {
+	return s.mediaAnalysisWithForce(true)
+}
+
+func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error) {
 	s.mu.RLock()
 	pcap := s.pcap
 	cached := s.mediaAnalysis
 	s.mu.RUnlock()
 
-	if cached != nil {
+	if !force && cached != nil {
 		return *cached, nil
 	}
 	if strings.TrimSpace(pcap) == "" {
@@ -1312,13 +1323,22 @@ func (s *Service) MediaAnalysis() (model.MediaAnalysis, error) {
 	}
 
 	s.mu.Lock()
-	if s.mediaAnalysis == nil {
+	if force {
 		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
 			_ = os.RemoveAll(s.mediaExportDir)
 		}
 		s.mediaAnalysis = &analysis
 		s.mediaExportDir = tempDir
 		s.mediaArtifacts = artifacts
+		s.mediaPlayback = map[string]string{}
+	} else if s.mediaAnalysis == nil {
+		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
+			_ = os.RemoveAll(s.mediaExportDir)
+		}
+		s.mediaAnalysis = &analysis
+		s.mediaExportDir = tempDir
+		s.mediaArtifacts = artifacts
+		s.mediaPlayback = map[string]string{}
 	} else {
 		_ = os.RemoveAll(tempDir)
 	}

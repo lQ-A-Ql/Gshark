@@ -5,5 +5,5 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("Use cmd/sentinel for CLI/API mode, or build with -tags wails for desktop mode")
+	fmt.Println("Use cmd/sentinel for CLI/API mode. Desktop mode is built from the repository root with Wails.")
 }

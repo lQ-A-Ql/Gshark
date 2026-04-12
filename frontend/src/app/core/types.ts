@@ -203,10 +203,14 @@ export interface AppUpdateStatus {
   currentVersionDisplay: string;
   currentVersionSource: string;
   currentExecutable: string;
+  localHash: string;
   repo: string;
+  authMode: string;
   checkedAt: string;
+  apiUrl: string;
   hasUpdate: boolean;
   upToDate: boolean;
+  hashMismatch: boolean;
   latestTag: string;
   latestName: string;
   latestPublishedAt: string;
@@ -535,6 +539,7 @@ export interface MediaArtifact {
 
 export interface MediaSession {
   id: string;
+  mediaType: string;
   family: string;
   application: string;
   source: string;

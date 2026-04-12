@@ -1,8 +1,10 @@
 package tshark
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,6 +42,7 @@ type rtpPacketRecord struct {
 
 type mediaSessionBuilder struct {
 	ID              string
+	MediaType       string
 	Family          string
 	Application     string
 	Source          string
@@ -108,6 +111,20 @@ var mediaRTPFields = []string{
 	"h265.nal_unit_type",
 }
 
+var mediaGameStreamUDPFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"ip.dst",
+	"ipv6.dst",
+	"udp.srcport",
+	"udp.dstport",
+	"udp.payload",
+}
+
+const gameStreamRTPPayloadOffset = 16
+
 func BuildMediaAnalysisFromFile(filePath, exportDir string) (model.MediaAnalysis, map[string]string, error) {
 	stats := model.MediaAnalysis{}
 	artifacts := map[string]string{}
@@ -140,7 +157,14 @@ func BuildMediaAnalysisFromFile(filePath, exportDir string) (model.MediaAnalysis
 		if builder == nil || builder.PacketCount == 0 {
 			continue
 		}
-		if builder.Codec == "" {
+		if isGameStreamSession(builder) {
+			builder.MediaType = firstNonEmpty(builder.MediaType, inferGameStreamMediaType(builder.SourcePort, builder.DestinationPort))
+			if strings.EqualFold(builder.MediaType, "audio") {
+				builder.Codec = ""
+			} else {
+				builder.Codec = inferSessionCodec(builder)
+			}
+		} else if builder.Codec == "" {
 			builder.Codec = inferSessionCodec(builder)
 		}
 		if builder.Application == "" {
@@ -163,8 +187,21 @@ func BuildMediaAnalysisFromFile(filePath, exportDir string) (model.MediaAnalysis
 	})
 
 	for _, builder := range builders {
+		// Default MediaType: if we have a video codec, it's video; if from SDP audio hint, it's audio; otherwise "video"
+		mediaType := builder.MediaType
+		if mediaType == "" {
+			codec := strings.ToUpper(strings.TrimSpace(builder.Codec))
+			if codec == "H264" || codec == "H265" || codec == "HEVC" || codec == "AVC" {
+				mediaType = "video"
+			} else if codec == "OPUS" || codec == "AAC" || codec == "PCMA" || codec == "PCMU" || codec == "G711" || codec == "G722" {
+				mediaType = "audio"
+			} else {
+				mediaType = "video"
+			}
+		}
 		session := model.MediaSession{
 			ID:              builder.ID,
+			MediaType:       mediaType,
 			Family:          firstNonEmpty(builder.Family, "RTP"),
 			Application:     firstNonEmpty(builder.Application, "RTP"),
 			Source:          builder.Source,
@@ -185,25 +222,27 @@ func BuildMediaAnalysisFromFile(filePath, exportDir string) (model.MediaAnalysis
 			Notes:           dedupeStrings(builder.Notes),
 		}
 
-		if payload, ext, err := reconstructVideoElementaryStream(builder); err == nil && len(payload) > 0 {
-			name := buildMediaArtifactName(builder, ext)
-			token := shortMediaToken(builder.ID)
-			targetPath := filepath.Join(exportDir, name)
-			if writeErr := os.WriteFile(targetPath, payload, 0o644); writeErr == nil {
-				info, _ := os.Stat(targetPath)
-				size := int64(len(payload))
-				if info != nil {
-					size = info.Size()
+		if strings.EqualFold(mediaType, "video") {
+			if payload, ext, err := reconstructVideoElementaryStream(builder); err == nil && len(payload) > 0 {
+				name := buildMediaArtifactName(builder, ext)
+				token := shortMediaToken(builder.ID)
+				targetPath := filepath.Join(exportDir, name)
+				if writeErr := os.WriteFile(targetPath, payload, 0o644); writeErr == nil {
+					info, _ := os.Stat(targetPath)
+					size := int64(len(payload))
+					if info != nil {
+						size = info.Size()
+					}
+					artifacts[token] = targetPath
+					session.Artifact = &model.MediaArtifact{
+						Token:     token,
+						Name:      name,
+						Codec:     builder.Codec,
+						Format:    strings.TrimPrefix(ext, "."),
+						SizeBytes: size,
+					}
+					session.Notes = append(session.Notes, "已生成可下载的视频裸流文件")
 				}
-				artifacts[token] = targetPath
-				session.Artifact = &model.MediaArtifact{
-					Token:     token,
-					Name:      name,
-					Codec:     builder.Codec,
-					Format:    strings.TrimPrefix(ext, "."),
-					SizeBytes: size,
-				}
-				session.Notes = append(session.Notes, "已生成可下载的视频裸流文件")
 			}
 		}
 
@@ -266,7 +305,8 @@ func scanMediaControlHints(filePath string, controlHints map[int][]mediaTrackHin
 		mediaPorts := splitAggregatedField(safeTrim(parts, 18))
 		for idx, entry := range mediaEntries {
 			mediaType, port, payloadTypes := parseSDPMediaEntry(entry, pickByIndex(mediaPorts, idx))
-			if !strings.EqualFold(mediaType, "video") || port <= 0 {
+			normalizedMediaType := strings.ToLower(strings.TrimSpace(mediaType))
+			if (normalizedMediaType != "video" && normalizedMediaType != "audio") || port <= 0 {
 				continue
 			}
 			hints := make(map[string]mediaCodecHint)
@@ -276,7 +316,7 @@ func scanMediaControlHints(filePath string, controlHints map[int][]mediaTrackHin
 				}
 			}
 			addMediaTrackHint(controlHints, port, mediaTrackHint{
-				MediaType:      "video",
+				MediaType:      normalizedMediaType,
 				Application:    app,
 				ControlSummary: controlSummary,
 				Tags:           sliceToSet(tags),
@@ -313,6 +353,7 @@ func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint
 				ID:              key,
 				Family:          "RTP",
 				Application:     inferApplicationFromPorts(srcPort, dstPort),
+				MediaType:       inferGameStreamMediaType(srcPort, dstPort),
 				Source:          src,
 				SourcePort:      srcPort,
 				Destination:     dst,
@@ -321,6 +362,9 @@ func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint
 				SSRC:            ssrc,
 				PayloadType:     payloadType,
 				Tags:            map[string]struct{}{"RTP": {}},
+			}
+			if isMoonlightGameStreamPort(srcPort, dstPort) {
+				builder.Tags["GameStream"] = struct{}{}
 			}
 			applyMediaTrackHints(builder, controlHints[srcPort], payloadType)
 			applyMediaTrackHints(builder, controlHints[dstPort], payloadType)
@@ -372,11 +416,180 @@ func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint
 			builder.Codec = detectPacketCodec(codecHints, payload)
 		}
 	})
+	if err != nil {
+		return count, err
+	}
+	if hasGameStreamSession(sessions) {
+		return count, nil
+	}
+	gameStreamCount, err := scanGameStreamUDPSessions(filePath, controlHints, sessions, protocolMap, applicationMap)
+	if err != nil {
+		return count, err
+	}
+	return count + gameStreamCount, nil
+}
+
+func hasGameStreamSession(sessions map[string]*mediaSessionBuilder) bool {
+	for _, builder := range sessions {
+		if builder == nil || builder.PacketCount == 0 {
+			continue
+		}
+		if isGameStreamSession(builder) {
+			return true
+		}
+	}
+	return false
+}
+
+func scanGameStreamUDPSessions(filePath string, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int) (int, error) {
+	count := 0
+	err := scanFieldRowsWithOptions(filePath, mediaGameStreamUDPFields, fieldScanOptions{
+		DisplayFilter: gameStreamPortDisplayFilter(),
+	}, func(parts []string) {
+		raw := parseHexPayload(safeTrim(parts, 8))
+		payload, seq, timestamp, ssrc, marker, ok := parseGameStreamUDPPayload(raw)
+		if !ok {
+			return
+		}
+
+		count++
+		protocolMap["GameStream UDP"]++
+
+		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3))
+		dst := firstNonEmpty(safeTrim(parts, 4), safeTrim(parts, 5))
+		srcPort := parseFlexibleInt(safeTrim(parts, 6))
+		dstPort := parseFlexibleInt(safeTrim(parts, 7))
+		payloadType := fmt.Sprintf("%d", raw[1]&0x7F)
+		key := fmt.Sprintf("%s:%d>%s:%d|%s|pt=%s", src, srcPort, dst, dstPort, ssrc, payloadType)
+
+		builder, exists := sessions[key]
+		if !exists {
+			builder = &mediaSessionBuilder{
+				ID:              key,
+				Family:          "RTP",
+				Application:     inferApplicationFromPorts(srcPort, dstPort),
+				MediaType:       inferGameStreamMediaType(srcPort, dstPort),
+				Source:          src,
+				SourcePort:      srcPort,
+				Destination:     dst,
+				DestinationPort: dstPort,
+				Transport:       "UDP",
+				SSRC:            ssrc,
+				PayloadType:     payloadType,
+				Tags:            map[string]struct{}{"RTP": {}, "GameStream": {}},
+				Notes:           []string{"使用 GameStream UDP 回退解析：抓包未被 tshark 识别为 RTP。"},
+			}
+			applyMediaTrackHints(builder, controlHints[srcPort], payloadType)
+			applyMediaTrackHints(builder, controlHints[dstPort], payloadType)
+			if builder.Application == "" {
+				builder.Application = "Moonlight / GameStream"
+			}
+			applicationMap[builder.Application]++
+			sessions[key] = builder
+		}
+
+		packetTime := normalizeTimestamp(safeTrim(parts, 1))
+		builder.PacketCount++
+		if builder.StartTime == "" {
+			builder.StartTime = packetTime
+		}
+		builder.EndTime = packetTime
+
+		if n := len(builder.Packets); n > 0 {
+			prev := builder.Packets[n-1].Sequence
+			if prev >= 0 && seq >= 0 {
+				diff := (seq - prev + 65536) % 65536
+				if diff > 1 {
+					builder.GapCount += diff - 1
+				}
+			}
+		}
+
+		builder.Packets = append(builder.Packets, rtpPacketRecord{
+			PacketID:   parseInt64(safeTrim(parts, 0)),
+			Time:       packetTime,
+			Epoch:      parseEpochSeconds(safeTrim(parts, 1)),
+			Sequence:   seq,
+			Timestamp:  timestamp,
+			Marker:     marker,
+			Payload:    payload,
+			CodecHints: nil,
+		})
+	})
 	return count, err
 }
 
+func gameStreamPortDisplayFilter() string {
+	ports := []int{47984, 47989, 47990, 47998, 47999, 48000, 48002, 48010}
+	clauses := make([]string, 0, len(ports))
+	for _, port := range ports {
+		clauses = append(clauses, fmt.Sprintf("udp.port==%d", port))
+	}
+	return strings.Join(clauses, " || ")
+}
+
+func parseGameStreamUDPPayload(raw []byte) ([]byte, int, uint32, string, bool, bool) {
+	if len(raw) <= gameStreamRTPPayloadOffset {
+		return nil, 0, 0, "", false, false
+	}
+	if raw[0]&0xC0 != 0x80 {
+		return nil, 0, 0, "", false, false
+	}
+
+	payload := raw[gameStreamRTPPayloadOffset:]
+	if len(payload) < 16 {
+		return nil, 0, 0, "", false, false
+	}
+	flags := payload[8]
+	extraFlags := payload[9]
+	if flags&^byte(0x07) != 0 {
+		return nil, 0, 0, "", false, false
+	}
+	if extraFlags&^byte(0x01) != 0 {
+		return nil, 0, 0, "", false, false
+	}
+
+	seq := int(binary.BigEndian.Uint16(raw[2:4]))
+	timestamp := binary.BigEndian.Uint32(raw[4:8])
+	ssrc := fmt.Sprintf("0x%X", binary.BigEndian.Uint32(raw[8:12]))
+	marker := raw[1]&0x80 != 0
+
+	trimmed := make([]byte, len(payload))
+	copy(trimmed, payload)
+	return trimmed, seq, timestamp, ssrc, marker, true
+}
+
 func reconstructVideoElementaryStream(builder *mediaSessionBuilder) ([]byte, string, error) {
+	// For Moonlight / GameStream sessions, pre-process RTP payloads:
+	// 1. Filter out FEC redundancy packets
+	// 2. Strip NV proprietary headers (16 or 24 bytes) to expose raw H.264/H.265 data
+	if isGameStreamSession(builder) {
+		builder = preprocessGameStreamPackets(builder)
+	}
+
 	codec := strings.ToUpper(strings.TrimSpace(builder.Codec))
+
+	// Defensive fallback: after NV header stripping the payloads are now bare
+	// NAL data, so re-detect codec from the processed packets when still unknown.
+	if codec == "" && isGameStreamSession(builder) {
+		for _, pkt := range builder.Packets {
+			if len(pkt.Payload) > 0 {
+				if detected := detectPacketCodec(nil, pkt.Payload); detected != "" {
+					codec = strings.ToUpper(detected)
+					builder.Codec = detected
+					break
+				}
+			}
+		}
+	}
+
+	if isGameStreamSession(builder) {
+		if payload, ext, err := reconstructGameStreamBytestream(builder, codec); err == nil && len(payload) > 0 {
+			return payload, ext, nil
+		}
+		return nil, "", fmt.Errorf("unsupported GameStream video payload")
+	}
+
 	switch codec {
 	case "H264":
 		return reconstructH264Stream(builder)
@@ -385,6 +598,93 @@ func reconstructVideoElementaryStream(builder *mediaSessionBuilder) ([]byte, str
 	default:
 		return nil, "", fmt.Errorf("unsupported codec: %s", builder.Codec)
 	}
+}
+
+// isGameStreamSession returns true if the session is identified as Moonlight / GameStream.
+func isGameStreamSession(builder *mediaSessionBuilder) bool {
+	if builder == nil {
+		return false
+	}
+	lowerFamily := strings.ToLower(builder.Family)
+	lowerApp := strings.ToLower(builder.Application)
+	if strings.Contains(lowerFamily, "gamestream") || strings.Contains(lowerFamily, "moonlight") {
+		return true
+	}
+	if strings.Contains(lowerApp, "gamestream") || strings.Contains(lowerApp, "moonlight") {
+		return true
+	}
+	return isMoonlightGameStreamPort(builder.SourcePort, builder.DestinationPort)
+}
+
+// nvIsDataPacket checks the NV FEC info field at RTP payload offset 12.
+// Returns true if this is a data packet (index < data_pts), false if FEC redundancy.
+// If the payload is too short to contain the FEC info, it returns true (pass through).
+func nvIsDataPacket(payload []byte) bool {
+	if len(payload) < 16 {
+		return true // too short to have NV header, pass through
+	}
+	fecInfo := binary.LittleEndian.Uint32(payload[12:16])
+	dataPts := (fecInfo & 0xFFC00000) >> 22
+	index := (fecInfo & 0x003FF000) >> 12
+	return index < dataPts
+}
+
+// nvVideoHeaderSize returns the NV proprietary header size to strip.
+// When the RTP timestamp changes (new frame), the header is 24 bytes (16 + 8).
+// For continuation packets with the same timestamp, the header is 16 bytes.
+func nvVideoHeaderSize(prevTimestamp, currentTimestamp uint32, isFirst bool) int {
+	if isFirst || prevTimestamp != currentTimestamp {
+		return 24 // 16-byte NV header + 8-byte frame header
+	}
+	return 16 // 16-byte NV header only
+}
+
+// preprocessGameStreamPackets creates a shallow copy of the builder with packets
+// that have been filtered (FEC removed) and had their NV headers stripped.
+func preprocessGameStreamPackets(builder *mediaSessionBuilder) *mediaSessionBuilder {
+	filtered := make([]rtpPacketRecord, 0, len(builder.Packets))
+
+	var prevTimestamp uint32
+	isFirst := true
+
+	for _, pkt := range builder.Packets {
+		if len(pkt.Payload) < 16 {
+			continue // too short for NV header
+		}
+
+		// Step 1: FEC filter — discard redundancy packets
+		if !nvIsDataPacket(pkt.Payload) {
+			continue
+		}
+
+		// Step 2: Strip NV proprietary header
+		headerSize := nvVideoHeaderSize(prevTimestamp, pkt.Timestamp, isFirst)
+		prevTimestamp = pkt.Timestamp
+		isFirst = false
+
+		if headerSize >= len(pkt.Payload) {
+			continue // nothing left after stripping header
+		}
+
+		stripped := make([]byte, len(pkt.Payload)-headerSize)
+		copy(stripped, pkt.Payload[headerSize:])
+
+		filtered = append(filtered, rtpPacketRecord{
+			PacketID:   pkt.PacketID,
+			Time:       pkt.Time,
+			Epoch:      pkt.Epoch,
+			Sequence:   pkt.Sequence,
+			Timestamp:  pkt.Timestamp,
+			Marker:     pkt.Marker,
+			Payload:    stripped,
+			CodecHints: pkt.CodecHints,
+		})
+	}
+
+	// Return a shallow copy with the processed packets
+	result := *builder
+	result.Packets = filtered
+	return &result
 }
 
 func reconstructH264Stream(builder *mediaSessionBuilder) ([]byte, string, error) {
@@ -491,6 +791,9 @@ func reconstructH265Stream(builder *mediaSessionBuilder) ([]byte, string, error)
 
 func applyMediaTrackHints(builder *mediaSessionBuilder, hints []mediaTrackHint, payloadType string) {
 	for _, hint := range hints {
+		if builder.MediaType == "" {
+			builder.MediaType = hint.MediaType
+		}
 		if builder.Application == "" {
 			builder.Application = hint.Application
 		}
@@ -651,8 +954,13 @@ func detectPacketCodec(hints []string, payload []byte) string {
 	if len(payload) == 0 {
 		return ""
 	}
+
+	if codec := detectAnnexBCodec(payload); codec != "" {
+		return codec
+	}
+
 	nalType := payload[0] & 0x1F
-	if (nalType > 0 && nalType < 24) || nalType == 24 || nalType == 28 {
+	if nalType == 24 || nalType == 28 {
 		return "H264"
 	}
 	if len(payload) >= 2 {
@@ -664,10 +972,70 @@ func detectPacketCodec(hints []string, payload []byte) string {
 	return ""
 }
 
+func detectAnnexBCodec(payload []byte) string {
+	offset, prefixLen, ok := findAnnexBStartCode(payload)
+	if !ok {
+		return ""
+	}
+	headerOffset := offset + prefixLen
+	if headerOffset >= len(payload) {
+		return ""
+	}
+
+	h264Type := int(payload[headerOffset] & 0x1F)
+	if h264Type > 0 && h264Type < 24 {
+		return "H264"
+	}
+	if headerOffset+1 < len(payload) {
+		h265Type := int((payload[headerOffset] >> 1) & 0x3F)
+		if h265Type >= 0 && h265Type < 48 {
+			return "H265"
+		}
+	}
+	return ""
+}
+
+func findAnnexBStartCode(payload []byte) (int, int, bool) {
+	if len(payload) < 4 {
+		return 0, 0, false
+	}
+	if idx := bytes.Index(payload, []byte{0x00, 0x00, 0x00, 0x01}); idx >= 0 {
+		return idx, 4, true
+	}
+	if idx := bytes.Index(payload, []byte{0x00, 0x00, 0x01}); idx >= 0 {
+		return idx, 3, true
+	}
+	return 0, 0, false
+}
+
 func inferSessionCodec(builder *mediaSessionBuilder) string {
+	if isGameStreamSession(builder) {
+		processed := preprocessGameStreamPackets(builder)
+		for _, packet := range processed.Packets {
+			if codec := detectPacketCodec(packet.CodecHints, packet.Payload); codec != "" {
+				return codec
+			}
+		}
+		return ""
+	}
+
+	// First pass: try detecting codec from raw payload (works for standard RTP)
 	for _, packet := range builder.Packets {
 		if codec := detectPacketCodec(packet.CodecHints, packet.Payload); codec != "" {
 			return codec
+		}
+	}
+
+	return ""
+}
+
+func inferGameStreamMediaType(ports ...int) string {
+	for _, port := range ports {
+		switch port {
+		case 47998:
+			return "video"
+		case 48000:
+			return "audio"
 		}
 	}
 	return ""
@@ -706,6 +1074,60 @@ func isMoonlightGameStreamPort(ports ...int) bool {
 		}
 	}
 	return false
+}
+
+func reconstructGameStreamBytestream(builder *mediaSessionBuilder, codec string) ([]byte, string, error) {
+	if builder == nil || len(builder.Packets) == 0 {
+		return nil, "", fmt.Errorf("empty GameStream session")
+	}
+	if len(builder.Packets) < 8 {
+		return nil, "", fmt.Errorf("gamestream packet window too small")
+	}
+
+	detectedCodec := strings.ToUpper(strings.TrimSpace(codec))
+	if detectedCodec == "" {
+		for _, packet := range builder.Packets {
+			if codec := detectAnnexBCodec(packet.Payload); codec != "" {
+				detectedCodec = strings.ToUpper(codec)
+				break
+			}
+		}
+	}
+	if detectedCodec == "" {
+		return nil, "", fmt.Errorf("gamestream bytestream codec unknown")
+	}
+
+	sawAnnexB := false
+	total := 0
+	for _, packet := range builder.Packets {
+		if len(packet.Payload) == 0 {
+			continue
+		}
+		total += len(packet.Payload)
+		if !sawAnnexB && strings.EqualFold(detectedCodec, detectAnnexBCodec(packet.Payload)) {
+			sawAnnexB = true
+		}
+	}
+	if !sawAnnexB || total == 0 {
+		return nil, "", fmt.Errorf("gamestream bytestream not detected")
+	}
+
+	out := make([]byte, 0, total)
+	for _, packet := range builder.Packets {
+		if len(packet.Payload) == 0 {
+			continue
+		}
+		out = append(out, packet.Payload...)
+	}
+
+	switch detectedCodec {
+	case "H264":
+		return out, ".h264", nil
+	case "H265", "HEVC":
+		return out, ".h265", nil
+	default:
+		return nil, "", fmt.Errorf("unsupported gamestream bytestream codec: %s", detectedCodec)
+	}
 }
 
 func extractTransportPorts(raw string) []int {

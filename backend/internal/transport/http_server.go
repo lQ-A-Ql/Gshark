@@ -83,6 +83,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/tools/tshark", s.handleTsharkConfig)
+	mux.HandleFunc("/api/tools/ffmpeg", s.handleFFmpegStatus)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/capture/start", s.handleCaptureStart)
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
@@ -109,6 +110,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
 	mux.HandleFunc("/api/analysis/usb", s.handleUSBAnalysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
+	mux.HandleFunc("/api/analysis/media/play", s.handleMediaArtifactPlayback)
 	mux.HandleFunc("/api/tls", s.handleTLS)
 	mux.HandleFunc("/api/audit/logs", s.handleAuditLogs)
 	mux.HandleFunc("/api/plugins", s.handlePlugins)
@@ -157,6 +159,10 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.svc.FFmpegStatus())
 }
 
 func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
@@ -434,8 +440,19 @@ func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, analysis)
 }
 
-func (s *Server) handleMediaAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.svc.MediaAnalysis()
+func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
+	refreshParam := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("refresh")))
+	forceRefresh := refreshParam == "1" || refreshParam == "true" || refreshParam == "yes"
+
+	var (
+		analysis model.MediaAnalysis
+		err      error
+	)
+	if forceRefresh {
+		analysis, err = s.svc.RefreshMediaAnalysis()
+	} else {
+		analysis, err = s.svc.MediaAnalysis()
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -491,6 +508,37 @@ func (s *Server) handleMediaArtifactDownload(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
+	http.ServeContent(w, r, name, info.ModTime(), file)
+}
+
+func (s *Server) handleMediaArtifactPlayback(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "missing media artifact token")
+		return
+	}
+
+	path, name, err := s.svc.MediaPlayback(token)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", name))
 	http.ServeContent(w, r, name, info.ModTime(), file)
 }
 

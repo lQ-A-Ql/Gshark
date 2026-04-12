@@ -59,39 +59,49 @@ GShark-Sentinel 是一款面向安全分析师、CTF 选手、应急响应人员
 
 ## 快速启动
 
-### 方式一：前后端分开启动
-
-启动后端：
-
-```powershell
-cd backend
-go run ./cmd/sentinel serve :17891
-```
-
-启动前端：
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-### 方式二：一键开发启动
+### 方式一：一键桌面开发启动
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
 ```
 
-### 方式三：Wails 桌面模式
+### 方式二：直接启动 Wails 开发模式
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 ```
 
+说明：
+
+- 项目已切换为桌面端优先工作流，不再保留独立网页端启动模式
+- `scripts/start-dev.ps1` 现在会直接委托给 `scripts/start-wails-dev.ps1`
+- 已移除独立 `backend + frontend` 开发入口，仅保留 Wails 桌面工作流
+
 构建桌面应用：
 
 ```powershell
 wails build
+```
+
+一键准备发布包与 `version.json`：
+
+```powershell
+python .\scripts\build_release_package.py v0.0.5
+```
+
+说明：
+
+- 默认会先执行 `wails build`
+- 默认把发布包整理到 `release/out/<version>/`
+- 默认生成 `release/out/<version>/version.json`
+- 默认同步更新仓库内的 `release/version.json`
+- 默认会优先读取 `release/notes/<version>.md` 作为 release notes
+- 如需跳过构建并复用现有 exe，可加 `--skip-build`
+
+例如：
+
+```powershell
+python .\scripts\build_release_package.py v0.0.5 --skip-build
 ```
 
 ## 测试与构建
@@ -118,15 +128,15 @@ go test ./...
 
 ```powershell
 cd frontend
-npm install
-npm run test
+pnpm install
+pnpm run test
 ```
 
-前端构建：
+桌面资源前端构建：
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build:wails
 ```
 
 ## 重点模块说明

@@ -34,12 +34,12 @@ Invoke-Step "Backend tests" {
 
 Invoke-Step "Frontend tests" {
   Set-Location (Join-Path $root "frontend")
-  npm run test
+  pnpm run test
 }
 
 Invoke-Step "Frontend build" {
   Set-Location (Join-Path $root "frontend")
-  npm run build
+  pnpm run build
 }
 
 Write-Host ""

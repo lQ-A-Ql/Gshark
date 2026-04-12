@@ -35,7 +35,7 @@ const NAV_ITEMS = [
   { path: "/traffic-graph", icon: BarChart3, label: "流量图" },
   { path: "/industrial-analysis", icon: Factory, label: "工控分析" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析" },
-  { path: "/media-analysis", icon: Clapperboard, label: "视频流还原" },
+  { path: "/media-analysis", icon: Clapperboard, label: "媒体流还原" },
   { path: "/usb-analysis", icon: Usb, label: "USB 分析" },
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心" },
   { path: "/objects", icon: FileDown, label: "附件提取" },
@@ -200,7 +200,7 @@ export function MainLayout() {
                 </MenuItem>
                 <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
                 <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                <MenuItem onClick={() => navigate("/media-analysis")}>视频流还原</MenuItem>
+                <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
                 <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
                 <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
                 <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
@@ -211,7 +211,7 @@ export function MainLayout() {
                 <MenuItem onClick={() => navigate("/traffic-graph")}>流量图</MenuItem>
                 <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
                 <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                <MenuItem onClick={() => navigate("/media-analysis")}>视频流还原</MenuItem>
+                <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
                 <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
                 <MenuItem onClick={exportEndpointStats}>端点统计导出</MenuItem>
                 <MenuItem onClick={exportProtocolStats}>协议统计导出</MenuItem>

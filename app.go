@@ -23,6 +23,7 @@ type DesktopApp struct {
 	ctx              context.Context
 	backendCmd       *exec.Cmd
 	backendAuthToken string
+	backendStatus    string
 	mu               sync.Mutex
 	updateMu         sync.Mutex
 	updateInProgress bool
@@ -35,33 +36,41 @@ type openCaptureDialogResult struct {
 }
 
 func NewDesktopApp() *DesktopApp {
-	return &DesktopApp{}
+	return &DesktopApp{
+		backendStatus: "not-started",
+	}
 }
 
 func (a *DesktopApp) Startup(ctx context.Context) {
 	a.ctx = ctx
+	a.setBackendStatus("starting")
 	if err := a.startBackendIfPossible(); err != nil {
+		a.setBackendStatus("failed: " + err.Error())
 		fmt.Fprintf(os.Stderr, "desktop startup: backend bootstrap failed: %v\n", err)
 	}
 }
 
 func (a *DesktopApp) Shutdown(_ context.Context) {
+	a.setBackendStatus("stopped")
 	a.stopBackend()
 }
 
 func (a *DesktopApp) BackendStatus() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.backendCmd != nil && a.backendCmd.Process != nil {
-		return "running"
-	}
-	return "not-started"
+	return a.backendStatus
 }
 
 func (a *DesktopApp) GetBackendAuthToken() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.backendAuthToken
+}
+
+func (a *DesktopApp) setBackendStatus(status string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.backendStatus = strings.TrimSpace(status)
 }
 
 func (a *DesktopApp) OpenCaptureDialog() (openCaptureDialogResult, error) {
@@ -163,12 +172,17 @@ func (a *DesktopApp) startBackendIfPossible() error {
 		a.backendAuthToken = strings.TrimSpace(os.Getenv("GSHARK_BACKEND_TOKEN"))
 	}
 	if a.backendCmd != nil {
+		a.backendStatus = "running"
 		fmt.Fprintln(os.Stdout, "desktop startup: backend process already started in this app instance")
 		return nil
 	}
 	if isBackendAlive("127.0.0.1:17891") {
-		fmt.Fprintln(os.Stdout, "desktop startup: detected existing backend on 127.0.0.1:17891")
-		return nil
+		if allowReuseExistingBackend() {
+			a.backendStatus = "running (reused-existing)"
+			fmt.Fprintln(os.Stdout, "desktop startup: reusing existing backend on 127.0.0.1:17891 due to GSHARK_ALLOW_EXISTING_BACKEND=1")
+			return nil
+		}
+		return fmt.Errorf("backend port 127.0.0.1:17891 is already in use; close the existing process or set GSHARK_ALLOW_EXISTING_BACKEND=1 to reuse it")
 	}
 
 	cmd, err := buildBackendCommand()
@@ -192,6 +206,7 @@ func (a *DesktopApp) startBackendIfPossible() error {
 	}
 	fmt.Fprintf(os.Stdout, "desktop startup: backend process started with pid=%d\n", cmd.Process.Pid)
 	a.backendCmd = cmd
+	a.backendStatus = "running"
 	return nil
 }
 
@@ -361,4 +376,14 @@ func generateBackendAuthToken() (string, error) {
 		return "", fmt.Errorf("generate backend auth token: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+func allowReuseExistingBackend() bool {
+	raw := strings.TrimSpace(os.Getenv("GSHARK_ALLOW_EXISTING_BACKEND"))
+	switch strings.ToLower(raw) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

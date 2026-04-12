@@ -64,3 +64,45 @@ func TestExtractReleaseVersionFallsBackToAssetName(t *testing.T) {
 		t.Fatalf("extractReleaseVersion() = %q, want %q", got, "v0.0.2")
 	}
 }
+
+func TestResolveUpdateManifestURLPrefersExplicitValue(t *testing.T) {
+	original := appManifestURL
+	appManifestURL = "https://updates.example.com/gshark/version.json"
+	t.Cleanup(func() {
+		appManifestURL = original
+	})
+
+	if got := resolveUpdateManifestURL("lQ-A-Ql/Gshark"); got != "https://updates.example.com/gshark/version.json" {
+		t.Fatalf("resolveUpdateManifestURL() = %q, want explicit manifest URL", got)
+	}
+}
+
+func TestResolveUpdateManifestURLBuildsRawGitHubURL(t *testing.T) {
+	original := appManifestURL
+	appManifestURL = ""
+	t.Cleanup(func() {
+		appManifestURL = original
+	})
+	t.Setenv("GSHARK_UPDATE_MANIFEST_URL", "")
+	t.Setenv("GSHARK_UPDATE_MANIFEST_REF", "release/version.json")
+
+	got := resolveUpdateManifestURL("lQ-A-Ql/Gshark")
+	want := "https://raw.githubusercontent.com/lQ-A-Ql/Gshark/release/version.json"
+	if got != want {
+		t.Fatalf("resolveUpdateManifestURL() = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeSHA256(t *testing.T) {
+	t.Parallel()
+
+	input := "sha256:ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789"
+	got := normalizeSHA256(input)
+	want := "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+	if got != want {
+		t.Fatalf("normalizeSHA256() = %q, want %q", got, want)
+	}
+	if got := normalizeSHA256("invalid"); got != "" {
+		t.Fatalf("normalizeSHA256() = %q, want empty", got)
+	}
+}

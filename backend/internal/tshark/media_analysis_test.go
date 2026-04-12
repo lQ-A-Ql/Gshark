@@ -1,10 +1,13 @@
 package tshark
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 func TestParseSDPCodecHints(t *testing.T) {
@@ -62,6 +65,95 @@ func TestReconstructH264Stream(t *testing.T) {
 	}
 	if !reflect.DeepEqual(payload, expected) {
 		t.Fatalf("unexpected payload:\nwant=%#v\ngot =%#v", expected, payload)
+	}
+}
+
+func TestParseGameStreamUDPPayload(t *testing.T) {
+	raw, err := hexDecodeString("9000000000000000000000000000000000000000010000000500100020030001010000024d0100000000000167640c2aac2b403c")
+	if err != nil {
+		t.Fatalf("hexDecodeString() error = %v", err)
+	}
+
+	payload, seq, timestamp, ssrc, marker, ok := parseGameStreamUDPPayload(raw)
+	if !ok {
+		t.Fatalf("expected GameStream UDP payload to be recognized")
+	}
+	if seq != 0 {
+		t.Fatalf("expected sequence 0, got %d", seq)
+	}
+	if timestamp != 0 {
+		t.Fatalf("expected timestamp 0, got %d", timestamp)
+	}
+	if ssrc != "0x0" {
+		t.Fatalf("expected ssrc 0x0, got %q", ssrc)
+	}
+	if marker {
+		t.Fatalf("expected marker bit to be false")
+	}
+
+	builder := &mediaSessionBuilder{
+		Application: "Moonlight / GameStream",
+		Packets: []rtpPacketRecord{{
+			Timestamp: timestamp,
+			Payload:   payload,
+		}},
+	}
+	processed := preprocessGameStreamPackets(builder)
+	if len(processed.Packets) != 1 {
+		t.Fatalf("expected one processed packet, got %d", len(processed.Packets))
+	}
+	if !bytes.HasPrefix(processed.Packets[0].Payload, []byte{0x00, 0x00, 0x00, 0x01, 0x67}) {
+		previewLen := len(processed.Packets[0].Payload)
+		if previewLen > 8 {
+			previewLen = 8
+		}
+		t.Fatalf("expected stripped GameStream payload to start with Annex B SPS, got %#v", processed.Packets[0].Payload[:previewLen])
+	}
+}
+
+func TestParseGameStreamUDPPayloadRejectsControlPacket(t *testing.T) {
+	raw, err := hexDecodeString("800065fc86000004002601002200030000000846b3f435f84ee8a5daf4afaf3ede5c89e557209769e9fc5ede31db52ef8603000100280100240004000000e067e55e3609d67def3e71ec317d3e6f99208250071cfc9535cbd4b967679682")
+	if err != nil {
+		t.Fatalf("hexDecodeString() error = %v", err)
+	}
+	if _, _, _, _, _, ok := parseGameStreamUDPPayload(raw); ok {
+		t.Fatalf("expected non-video GameStream control packet to be rejected")
+	}
+}
+
+func TestDetectPacketCodecAnnexBH264(t *testing.T) {
+	payload := []byte{0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x00, 0x1f}
+	if codec := detectPacketCodec(nil, payload); codec != "H264" {
+		t.Fatalf("expected Annex-B payload to be detected as H264, got %q", codec)
+	}
+}
+
+func TestReconstructGameStreamBytestream(t *testing.T) {
+	builder := &mediaSessionBuilder{
+		Application: "Moonlight / GameStream",
+		Packets: []rtpPacketRecord{
+			{Payload: []byte{0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x00, 0x1f}},
+			{Payload: []byte{0xaa, 0xbb, 0xcc}},
+			{Payload: []byte{0x01}},
+			{Payload: []byte{0x02}},
+			{Payload: []byte{0x03}},
+			{Payload: []byte{0x04}},
+			{Payload: []byte{0x05}},
+			{Payload: []byte{0x06}},
+		},
+	}
+
+	payload, ext, err := reconstructGameStreamBytestream(builder, "H264")
+	if err != nil {
+		t.Fatalf("reconstructGameStreamBytestream() error = %v", err)
+	}
+	if ext != ".h264" {
+		t.Fatalf("expected .h264 extension, got %q", ext)
+	}
+
+	expected := []byte{0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x00, 0x1f, 0xaa, 0xbb, 0xcc, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+	if !bytes.Equal(payload, expected) {
+		t.Fatalf("unexpected bytestream payload:\nwant=%#v\ngot =%#v", expected, payload)
 	}
 }
 
@@ -130,5 +222,32 @@ func TestBuildMediaAnalysisFromGameStreamSample(t *testing.T) {
 	}
 	if artifactCount == 0 {
 		t.Fatalf("expected at least one extracted video artifact, got none")
+	}
+
+	var video47998 *model.MediaSession
+	var audio48000Count int
+	for i := range stats.Sessions {
+		session := &stats.Sessions[i]
+		if session.SourcePort == 47998 && session.DestinationPort == 33314 && session.PacketCount > 100 {
+			video47998 = session
+		}
+		if session.SourcePort == 48000 && session.MediaType == "audio" {
+			audio48000Count++
+			if session.Artifact != nil {
+				t.Fatalf("expected GameStream audio port 48000 to have no video artifact, got %+v", session.Artifact)
+			}
+		}
+	}
+	if video47998 == nil {
+		t.Fatalf("expected GameStream video session on 47998, got %+v", stats.Sessions)
+	}
+	if video47998.Codec != "H264" {
+		t.Fatalf("expected 47998 session codec H264, got %+v", video47998)
+	}
+	if video47998.Artifact == nil {
+		t.Fatalf("expected 47998 session to generate artifact, got %+v", video47998)
+	}
+	if audio48000Count == 0 {
+		t.Fatalf("expected at least one audio-classified GameStream session on port 48000, got %+v", stats.Sessions)
 	}
 }

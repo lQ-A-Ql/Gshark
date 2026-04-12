@@ -950,7 +950,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (cancelled) return;
       if (!available) {
         setBackendConnected(false);
-        setBackendStatus("后端未连接，请先启动 backend 服务");
+        const desktopStatus = await bridge.getDesktopBackendStatus().catch(() => "");
+        const detail = desktopStatus.trim();
+        if (detail && detail !== "not-started" && detail !== "starting") {
+          setBackendStatus(detail);
+        } else {
+          setBackendStatus("桌面后端未连接，请启动或重启桌面应用");
+        }
         scheduleBackendRetry();
         return;
       }
@@ -1106,7 +1112,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const startCapture = useCallback(async (filePath?: string, filterOverride?: string) => {
     if (!backendConnected) {
-      setBackendStatus("后端未连接，无法打开文件");
+      setBackendStatus("桌面后端未连接，无法打开文件");
       return;
     }
 
@@ -1249,7 +1255,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const togglePlugin = useCallback((id: number | string) => {
     if (!backendConnected) {
-      setBackendStatus("后端未连接，无法切换插件");
+      setBackendStatus("桌面后端未连接，无法切换插件");
       return;
     }
 
@@ -1267,7 +1273,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const addPlugin = useCallback(async (plugin: PluginItem) => {
     if (!backendConnected) {
-      setBackendStatus("后端未连接，无法新增插件");
+      setBackendStatus("桌面后端未连接，无法新增插件");
       return;
     }
     try {
@@ -1298,7 +1304,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const deletePlugin = useCallback(async (id: number | string) => {
     if (!backendConnected) {
-      setBackendStatus("后端未连接，无法删除插件");
+      setBackendStatus("桌面后端未连接，无法删除插件");
       return;
     }
     try {
@@ -1315,7 +1321,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const setPluginsEnabled = useCallback((ids: (number | string)[], enabled: boolean) => {
     if (!backendConnected) {
-      setBackendStatus("后端未连接，无法批量设置插件");
+      setBackendStatus("桌面后端未连接，无法批量设置插件");
       return;
     }
 

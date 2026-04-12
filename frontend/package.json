@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1",
+    "build": "vite build",
+    "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -88,6 +89,10 @@
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "esbuild"
+    ]
   }
 }

@@ -63,6 +63,12 @@ export interface TSharkStatus {
   usingCustomPath: boolean;
 }
 
+export interface FFmpegStatus {
+  available: boolean;
+  path: string;
+  message: string;
+}
+
 interface TrafficBucket {
   label: string;
   count: number;
@@ -126,9 +132,11 @@ function normalizePacketTime(value: unknown): string {
 
 export interface BackendBridge {
   isAvailable(): Promise<boolean>;
+  getDesktopBackendStatus(): Promise<string>;
   checkAppUpdate(): Promise<AppUpdateStatus>;
   installAppUpdate(): Promise<void>;
   checkTShark(): Promise<TSharkStatus>;
+  checkFFmpeg(): Promise<FFmpegStatus>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   openPcapFile(): Promise<OpenFileResult>;
   startStreamingPackets(filePath: string, filter: string): Promise<void>;
@@ -151,9 +159,10 @@ export interface BackendBridge {
   getGlobalTrafficStats(): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(): Promise<VehicleAnalysis>;
-  getMediaAnalysis(): Promise<MediaAnalysis>;
+  getMediaAnalysis(forceRefresh?: boolean): Promise<MediaAnalysis>;
   getUSBAnalysis(): Promise<USBAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
+  getMediaPlaybackBlob(token: string): Promise<Blob>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
   addVehicleDBC(path: string): Promise<DBCProfile[]>;
   removeVehicleDBC(path: string): Promise<DBCProfile[]>;
@@ -434,11 +443,34 @@ export async function getBackendAuthHeaders(path: string, headersInit?: HeadersI
 
 export const bridge: BackendBridge = {
   async isAvailable() {
+    const desktopApp = getDesktopAppBinding();
+    if (desktopApp?.BackendStatus) {
+      try {
+        const status = String(await desktopApp.BackendStatus()).trim().toLowerCase();
+        if (status && status !== "running" && status !== "running (reused-existing)" && status !== "starting") {
+          return false;
+        }
+      } catch {
+        // Ignore desktop status errors and fall through to HTTP health check.
+      }
+    }
     try {
       await request<{ status: string }>("/health");
       return true;
     } catch {
       return false;
+    }
+  },
+
+  async getDesktopBackendStatus() {
+    const desktopApp = getDesktopAppBinding();
+    if (!desktopApp?.BackendStatus) {
+      return "";
+    }
+    try {
+      return String(await desktopApp.BackendStatus()).trim();
+    } catch {
+      return "";
     }
   },
 
@@ -456,10 +488,14 @@ export const bridge: BackendBridge = {
       currentVersionDisplay: String(result.currentVersionDisplay ?? ""),
       currentVersionSource: String(result.currentVersionSource ?? ""),
       currentExecutable: String(result.currentExecutable ?? ""),
+      localHash: String(result.localHash ?? ""),
       repo: String(result.repo ?? ""),
+      authMode: String(result.authMode ?? ""),
       checkedAt: String(result.checkedAt ?? ""),
+      apiUrl: String(result.apiUrl ?? ""),
       hasUpdate: Boolean(result.hasUpdate),
       upToDate: Boolean(result.upToDate),
+      hashMismatch: Boolean(result.hashMismatch),
       latestTag: String(result.latestTag ?? ""),
       latestName: String(result.latestName ?? ""),
       latestPublishedAt: String(result.latestPublishedAt ?? ""),
@@ -494,6 +530,15 @@ export const bridge: BackendBridge = {
       message: String(payload.message ?? ""),
       customPath: String(payload.custom_path ?? ""),
       usingCustomPath: Boolean(payload.using_custom_path),
+    };
+  },
+
+  async checkFFmpeg() {
+    const payload = await request<any>("/api/tools/ffmpeg");
+    return {
+      available: Boolean(payload.available),
+      path: String(payload.path ?? ""),
+      message: String(payload.message ?? ""),
     };
   },
 
@@ -1009,8 +1054,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async getMediaAnalysis() {
-    const payload = await request<any>("/api/analysis/media");
+  async getMediaAnalysis(forceRefresh = false) {
+    const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media");
     return {
       totalMediaPackets: Number(payload.total_media_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
@@ -1135,6 +1180,10 @@ export const bridge: BackendBridge = {
   async downloadMediaArtifact(token: string, filename: string) {
     const blob = await requestBlob(`/api/analysis/media/export?token=${encodeURIComponent(token)}`);
     downloadBlob(filename, blob);
+  },
+
+  async getMediaPlaybackBlob(token: string) {
+    return await requestBlob(`/api/analysis/media/play?token=${encodeURIComponent(token)}`);
   },
 
   async listVehicleDBCProfiles() {

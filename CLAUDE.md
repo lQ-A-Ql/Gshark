@@ -14,12 +14,11 @@ GShark-Sentinel is a desktop offline traffic analysis tool (PCAP/PCAPNG) built w
 ### Running in Development
 
 ```powershell
-# Start backend + frontend separately (recommended)
-./scripts/start-backend.ps1   # go run ./cmd/sentinel serve :17891
-./scripts/start-frontend.ps1  # npm run dev (in frontend/)
+# Desktop-only development entry
+./scripts/start-dev.ps1
 
-# Or Wails desktop mode
-./scripts/start-wails-dev.ps1  # wails dev
+# Direct Wails development mode
+./scripts/start-wails-dev.ps1
 ```
 
 ### Testing
@@ -41,8 +40,8 @@ cd frontend && npm run test -- --run
 ### Building
 
 ```bash
-# Frontend build
-cd frontend && npm run build
+# Desktop asset build
+cd frontend && pnpm run build:wails
 
 # Desktop app
 wails build

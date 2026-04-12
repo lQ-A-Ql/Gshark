@@ -496,6 +496,7 @@ type MediaArtifact struct {
 
 type MediaSession struct {
 	ID              string         `json:"id"`
+	MediaType       string         `json:"media_type"`
 	Family          string         `json:"family"`
 	Application     string         `json:"application"`
 	Source          string         `json:"source"`

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -50,7 +50,6 @@ export default function UpdateCenter() {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState("");
   const [installProgress, setInstallProgress] = useState(0);
-  const autoInstallStartedRef = useRef(false);
 
   const tone = useMemo(() => statusTone(status), [status]);
 
@@ -101,19 +100,6 @@ export default function UpdateCenter() {
     return () => window.clearInterval(timer);
   }, [installing]);
 
-  useEffect(() => {
-    if (!status || loading || installing || error || autoInstallStartedRef.current) {
-      return undefined;
-    }
-    if (!status.hasUpdate || !status.canInstall) {
-      return undefined;
-    }
-
-    autoInstallStartedRef.current = true;
-    void installUpdate();
-    return undefined;
-  }, [error, installing, loading, status]);
-
   const actionDisabled = loading || installing || !status?.hasUpdate || !status?.canInstall;
   const notes = status?.releaseNotes?.trim() || "该版本没有附带 Release 说明。";
 
@@ -129,10 +115,10 @@ export default function UpdateCenter() {
                   更新中心
                 </div>
                 <CardTitle className="text-3xl font-semibold tracking-tight text-slate-900">
-                  GitHub Release 自动检测与替换更新
+                  version.json 自动检测与替换更新
                 </CardTitle>
                 <CardDescription className="max-w-2xl text-sm leading-6 text-slate-600">
-                  页面会直接检查仓库最新 Release。检测到新 tag 后，会自动开始下载更新包并替换当前程序，完成后自动重启。
+                  页面会读取公开的版本清单并匹配适用于当前系统的安装包。检测到新版本后，需要你手动点击安装，程序才会开始下载更新包、替换当前程序并自动重启。
                 </CardDescription>
               </div>
 
@@ -143,7 +129,7 @@ export default function UpdateCenter() {
           </CardHeader>
 
           <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <StatusTile
                 title="当前版本"
                 value={status?.currentVersionDisplay || "读取中"}
@@ -159,6 +145,11 @@ export default function UpdateCenter() {
                 value={status?.selectedAsset?.name || "暂无匹配资产"}
                 hint={status?.selectedAsset ? formatBytes(status.selectedAsset.sizeBytes) : "当前 Release 未匹配到安装包"}
               />
+              <StatusTile
+                title="本地 SHA-256"
+                value={status?.localHash ? `${status.localHash.slice(0, 16)}…` : "计算中"}
+                hint={status?.hashMismatch ? "⚠ 本地程序与 Release 资产大小不一致" : status?.localHash ? "已完成本地程序哈希计算" : "正在计算本地程序哈希"}
+              />
             </div>
 
             {(loading || installing) && (
@@ -171,7 +162,7 @@ export default function UpdateCenter() {
                 <p className="mt-3 text-xs leading-5 text-slate-500">
                   {installing
                     ? "更新包下载完成后，程序会自动退出、替换原文件并重新启动。"
-                    : "正在向 GitHub 查询最新非预发布 Release。"}
+                    : "正在读取公开 version.json 更新清单。"}
                 </p>
               </div>
             )}
@@ -189,8 +180,8 @@ export default function UpdateCenter() {
             {status && !error && (
               <div
                 className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${status.hasUpdate
-                    ? "border-amber-200 bg-amber-50 text-amber-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
                   }`}
               >
                 {status.hasUpdate ? (
@@ -294,14 +285,28 @@ export default function UpdateCenter() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="text-lg font-semibold text-slate-900">查询诊断</CardTitle>
+              <CardDescription>用于确认更新中心到底访问了哪个仓库和接口，也方便区分代码问题与网络环境问题。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-700">
+              <DiagnosticRow label="目标仓库" value={status?.repo || "读取中"} />
+              <DiagnosticRow label="检查方式" value={status?.authMode || "读取中"} />
+              <DiagnosticRow label="更新清单" value={status?.apiUrl || "读取中"} />
+              <DiagnosticRow label="最近检查" value={status?.checkedAt ? formatReleaseTime(status.checkedAt) : "尚未检查"} />
+              <DiagnosticRow label="诊断结论" value={error ? "程序已进入错误分支；若更新清单地址可在浏览器打开，优先排查代理、证书或桌面运行环境差异。" : "当前检查走公开 version.json 清单，不依赖 GitHub API Token 或限流额度。"} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-lg font-semibold text-slate-900">更新步骤</CardTitle>
               <CardDescription>当前流程只替换主程序本体，不会动你的本地抓包文件和分析记录。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <StepCard
                 index="01"
-                title="检查最新 Tag"
-                description="访问 GitHub Release 接口，读取最新正式版本的 tag、发布时间和安装资产。"
+                title="读取更新清单"
+                description="访问公开 version.json，读取最新版本号、发布时间、Release 页面和安装资产。"
               />
               <StepCard
                 index="02"
@@ -346,6 +351,15 @@ function StepCard({ index, title, description }: { index: string; title: string;
         <div className="text-sm font-semibold text-slate-900">{title}</div>
       </div>
       <div className="mt-3 text-sm leading-6 text-slate-600">{description}</div>
+    </div>
+  );
+}
+
+function DiagnosticRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
+      <div className="mt-2 break-all font-mono text-[13px] leading-6 text-slate-800">{value}</div>
     </div>
   );
 }
