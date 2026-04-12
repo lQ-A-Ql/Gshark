@@ -1,5 +1,6 @@
-import { ChevronLeft, ChevronRight, Keyboard, MousePointer2, Pause, Play, RefreshCw, Route, Usb, Workflow } from "lucide-react";
+import { ChevronLeft, ChevronRight, Keyboard, MousePointer2, Pause, Play, Route, Usb, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AnalysisHero } from "../components/AnalysisHero";
 import type { TrafficBucket, USBAnalysis as USBAnalysisData, USBKeyboardEvent, USBMouseEvent, USBPacketRecord } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
@@ -25,6 +26,7 @@ const EMPTY_ANALYSIS: USBAnalysisData = {
 };
 
 const usbAnalysisCache = new Map<string, USBAnalysisData>();
+const USB_PROTOCOL_TAGS = ["键盘", "鼠标", "其余 USB"];
 
 export default function UsbAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
@@ -189,20 +191,15 @@ export default function UsbAnalysis() {
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
-      <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        <Usb className="h-5 w-5 text-blue-600" />
-        USB HID 分析
-        <span className="rounded border border-border bg-accent px-2 py-0.5 text-xs font-medium text-muted-foreground">
-          键盘 / 鼠标 / 其余 USB
-        </span>
-        <button
-          className="ml-2 inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => refreshAnalysis(true)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          刷新
-        </button>
-      </div>
+      <AnalysisHero
+        icon={<Usb className="h-5 w-5" />}
+        title="USB HID 分析"
+        subtitle="USB INTERACTION INSIGHTS"
+        tags={USB_PROTOCOL_TAGS}
+        tagsLabel="交互域"
+        theme="cyan"
+        onRefresh={() => refreshAnalysis(true)}
+      />
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">

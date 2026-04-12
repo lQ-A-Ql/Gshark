@@ -1,6 +1,7 @@
-import { AlertTriangle, Factory, RefreshCw, Shield, Workflow } from "lucide-react";
+import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData, TrafficBucket } from "../core/types";
+import { AnalysisHero } from "../components/AnalysisHero";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
@@ -24,6 +25,17 @@ const EMPTY_ANALYSIS: IndustrialAnalysisData = {
 };
 
 const industrialAnalysisCache = new Map<string, IndustrialAnalysisData>();
+
+const INDUSTRIAL_PROTOCOL_TAGS = [
+  "Modbus",
+  "S7",
+  "DNP3",
+  "CIP",
+  "BACnet",
+  "IEC104",
+  "OPC UA",
+  "PROFINET",
+];
 
 export default function IndustrialAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
@@ -74,18 +86,15 @@ export default function IndustrialAnalysis() {
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
-      <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        <Factory className="h-5 w-5 text-blue-600" />
-        工控分析
-        <span className="rounded border border-border bg-accent px-2 py-0.5 text-xs font-medium text-muted-foreground">Modbus / S7 / DNP3 / CIP / BACnet / IEC104 / OPC UA / PROFINET</span>
-        <button
-          className="ml-2 inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => refreshAnalysis(true)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          刷新
-        </button>
-      </div>
+      <AnalysisHero
+        icon={<Factory className="h-5 w-5" />}
+        title="工控分析"
+        subtitle="INDUSTRIAL PROTOCOLS"
+        tags={INDUSTRIAL_PROTOCOL_TAGS}
+        tagsLabel="协议族"
+        theme="blue"
+        onRefresh={() => refreshAnalysis(true)}
+      />
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在调用 tshark 生成工控分析结果...</div>

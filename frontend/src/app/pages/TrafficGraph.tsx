@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Activity, BarChart3, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { AnalysisHero } from "../components/AnalysisHero";
 import { bridge, type GlobalTrafficStats } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet } from "../core/types";
@@ -108,13 +109,15 @@ export default function TrafficGraph() {
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
-      <div className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
-        <BarChart3 className="h-5 w-5 text-blue-600" /> 流量图分析
-        <span className="ml-2 rounded border border-border bg-accent px-2 py-0.5 text-xs font-medium text-muted-foreground">全局视图 (忽略过滤器)</span>
-        <button className="ml-2 rounded border border-border bg-card px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => refreshStats(true)}>
-          刷新
-        </button>
-      </div>
+      <AnalysisHero
+        icon={<BarChart3 className="h-5 w-5" />}
+        title="流量图分析"
+        subtitle="GLOBAL TRAFFIC OVERVIEW"
+        tags={["全局视图", "忽略过滤器", "协议分布", "会话热点"]}
+        tagsLabel="视图层"
+        theme="amber"
+        onRefresh={() => refreshStats(true)}
+      />
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在加载全局流量统计...</div>

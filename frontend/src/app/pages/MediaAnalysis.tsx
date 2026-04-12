@@ -1,5 +1,6 @@
-import { Clapperboard, Download, Headphones, Loader2, Play, RefreshCw, Video } from "lucide-react";
+import { Clapperboard, Download, Headphones, Loader2, Play, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AnalysisHero } from "../components/AnalysisHero";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ const EMPTY_ANALYSIS: MediaAnalysisData = {
 };
 
 const mediaAnalysisCache = new Map<string, MediaAnalysisData>();
+const MEDIA_PROTOCOL_TAGS = ["RTP", "RTSP", "Moonlight", "GameStream"];
 
 export default function MediaAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
@@ -150,18 +152,15 @@ export default function MediaAnalysis() {
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
-      <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        <Clapperboard className="h-5 w-5 text-blue-600" />
-        媒体流还原
-        <span className="rounded border border-border bg-accent px-2 py-0.5 text-xs font-medium text-muted-foreground">RTP / RTSP / Moonlight / GameStream</span>
-        <button
-          className="ml-2 inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => refreshAnalysis(true)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          刷新
-        </button>
-      </div>
+      <AnalysisHero
+        icon={<Clapperboard className="h-5 w-5" />}
+        title="媒体流还原"
+        subtitle="MEDIA STREAM RECONSTRUCTION"
+        tags={MEDIA_PROTOCOL_TAGS}
+        tagsLabel="协议族"
+        theme="rose"
+        onRefresh={() => refreshAnalysis(true)}
+      />
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在识别 RTP / RTSP / Moonlight / GameStream 并尝试还原媒体流...</div>

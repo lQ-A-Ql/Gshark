@@ -1,5 +1,6 @@
-import { Car, FolderOpen, RefreshCw, Route, ShieldAlert, Trash2 } from "lucide-react";
+import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AnalysisHero } from "../components/AnalysisHero";
 import type { DBCProfile, TrafficBucket, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
@@ -52,6 +53,7 @@ const EMPTY_ANALYSIS: VehicleAnalysisData = {
 
 const vehicleAnalysisCache = new Map<string, VehicleAnalysisData>();
 const MAX_CAN_DATA_LINES_PER_ID = 12;
+const VEHICLE_PROTOCOL_TAGS = ["CAN", "J1939", "DoIP", "UDS"];
 
 interface CanIdDataLine {
   packetId: number;
@@ -172,18 +174,15 @@ export default function VehicleAnalysis() {
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
-      <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        <Car className="h-5 w-5 text-blue-600" />
-        车机流量分析
-        <span className="rounded border border-border bg-accent px-2 py-0.5 text-xs font-medium text-muted-foreground">CAN / J1939 / DoIP / UDS</span>
-        <button
-          className="ml-2 inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => refreshAnalysis(true)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          刷新
-        </button>
-      </div>
+      <AnalysisHero
+        icon={<Car className="h-5 w-5" />}
+        title="车机流量分析"
+        subtitle="AUTOMOTIVE PROTOCOLS"
+        tags={VEHICLE_PROTOCOL_TAGS}
+        tagsLabel="协议族"
+        theme="emerald"
+        onRefresh={() => refreshAnalysis(true)}
+      />
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在调用 tshark 生成车机分析结果...</div>
