@@ -107,7 +107,7 @@ export interface StreamLoadMeta {
   tsharkMs?: number;
 }
 
-export type StreamDecoderKind = "base64" | "behinder" | "antsword" | "godzilla";
+export type StreamDecoderKind = "base64" | "behinder" | "antsword" | "godzilla" | "auto";
 
 export interface StreamDecodeResult {
   decoder: StreamDecoderKind;
@@ -303,11 +303,39 @@ export interface IndustrialProtocolDetail {
   records: IndustrialProtocolRecord[];
 }
 
+export interface ModbusSuspiciousWrite {
+  target: string;
+  unitId: number;
+  functionCode: number;
+  functionName: string;
+  writeCount: number;
+  sources: string[];
+  firstTime: string;
+  lastTime: string;
+  sampleValues: string[];
+  samplePacketId: number;
+}
+
+export interface IndustrialControlCommand {
+  packetId: number;
+  time: string;
+  protocol: string;
+  source: string;
+  destination: string;
+  operation: string;
+  target: string;
+  value: string;
+  result: string;
+  summary: string;
+}
+
 export interface IndustrialAnalysis {
   totalIndustrialPackets: number;
   protocols: TrafficBucket[];
   conversations: AnalysisConversation[];
   modbus: ModbusAnalysis;
+  suspiciousWrites?: ModbusSuspiciousWrite[];
+  controlCommands?: IndustrialControlCommand[];
   details: IndustrialProtocolDetail[];
   notes: string[];
 }

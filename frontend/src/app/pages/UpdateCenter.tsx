@@ -188,11 +188,10 @@ export default function UpdateCenter() {
 
             {status && !error && (
               <div
-                className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
-                  status.hasUpdate
+                className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${status.hasUpdate
                     ? "border-amber-200 bg-amber-50 text-amber-700"
                     : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                }`}
+                  }`}
               >
                 {status.hasUpdate ? (
                   <ArrowDownToLine className="mt-0.5 h-4 w-4 shrink-0" />
@@ -263,13 +262,14 @@ export default function UpdateCenter() {
                         {children}
                       </a>
                     ),
-                    code: ({ inline, children }) => (
-                      inline ? (
-                        <code className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-[13px] text-slate-800">{children}</code>
+                    code: ({ children, ...props }) => {
+                      const isInline = !String(children).includes("\n");
+                      return isInline ? (
+                        <code className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-[13px] text-slate-800" {...props}>{children}</code>
                       ) : (
-                        <code className="font-mono text-[13px] text-slate-100">{children}</code>
-                      )
-                    ),
+                        <code className="font-mono text-[13px] text-slate-100" {...props}>{children}</code>
+                      );
+                    },
                     pre: ({ children }) => (
                       <pre className="mt-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-[13px] leading-6 text-slate-100 shadow-inner">
                         {children}

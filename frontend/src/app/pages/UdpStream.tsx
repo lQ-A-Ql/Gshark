@@ -53,7 +53,7 @@ export default function UdpStream() {
   useEffect(() => {
     setStreamView({
       id: udpStream.id,
-      protocol: udpStream.protocol,
+      protocol: "UDP" as const,
       from: udpStream.from,
       to: udpStream.to,
       chunks: udpStream.chunks,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Binary, Bug, Cog, KeyRound, LoaderCircle, ShieldAlert, Wand2 } from "lucide-react";
+import { Binary, Bug, Cog, KeyRound, LoaderCircle, Search, ShieldAlert, Wand2 } from "lucide-react";
 import type { StreamDecodeResult, StreamDecoderKind } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 
@@ -7,15 +7,18 @@ type DecoderSettings = {
   behinder: {
     pass: string;
     key: string;
+    iv: string;
     extractParam: boolean;
     deriveKeyFromPass: boolean;
     urlDecodeRounds: number;
     inputEncoding: "auto" | "base64" | "hex";
+    cipherMode: "ecb" | "cbc";
   };
   antsword: {
     pass: string;
     extractParam: boolean;
     urlDecodeRounds: number;
+    encoder: "" | "rot13";
   };
   godzilla: {
     pass: string;
@@ -24,7 +27,7 @@ type DecoderSettings = {
     stripMarkers: boolean;
     urlDecodeRounds: number;
     inputEncoding: "auto" | "base64" | "hex";
-    cipher: "aes_ecb" | "xor";
+    cipher: "aes_ecb" | "aes_cbc" | "xor";
   };
 };
 
@@ -40,15 +43,18 @@ const DEFAULT_SETTINGS: DecoderSettings = {
   behinder: {
     pass: "rebeyond",
     key: "",
+    iv: "",
     extractParam: true,
     deriveKeyFromPass: true,
     urlDecodeRounds: 0,
     inputEncoding: "auto",
+    cipherMode: "ecb",
   },
   antsword: {
     pass: "pass",
     extractParam: true,
     urlDecodeRounds: 1,
+    encoder: "",
   },
   godzilla: {
     pass: "pass",
@@ -126,9 +132,9 @@ export function StreamDecoderWorkbench({
     }
     const options =
       decoder === "behinder" ? settings.behinder :
-      decoder === "antsword" ? settings.antsword :
-      decoder === "godzilla" ? settings.godzilla :
-      {};
+        decoder === "antsword" ? settings.antsword :
+          decoder === "godzilla" ? settings.godzilla :
+            {};
     return bridge.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options);
   }
 
@@ -190,6 +196,13 @@ export function StreamDecoderWorkbench({
           <div className="text-xs text-muted-foreground">{chunkLabel}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <DecoderButton
+            icon={Search}
+            label="自动检测"
+            active={runningDecoder === "auto"}
+            disabled={!hasPayload && !hasBatchMode}
+            onClick={() => void runDecoder("auto")}
+          />
           <DecoderButton
             icon={Binary}
             label="Base64"
@@ -307,6 +320,20 @@ export function StreamDecoderWorkbench({
                   checked={settings.behinder.deriveKeyFromPass}
                   onChange={(checked) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, deriveKeyFromPass: checked } }))}
                 />
+                <LabeledSelect
+                  label="加密模式"
+                  value={settings.behinder.cipherMode}
+                  options={[["ecb", "AES-ECB (冰蝎4.x默认)"], ["cbc", "AES-CBC (冰蝎2.x/3.x)"]]}
+                  onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, cipherMode: value as DecoderSettings["behinder"]["cipherMode"] } }))}
+                />
+                {settings.behinder.cipherMode === "cbc" && (
+                  <LabeledInput
+                    label="IV (留空则全零)"
+                    value={settings.behinder.iv}
+                    onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, iv: value } }))}
+                    placeholder="留空则使用全零 IV"
+                  />
+                )}
               </div>
             </DecoderSettingsSection>
           )}
@@ -336,6 +363,12 @@ export function StreamDecoderWorkbench({
                     }))
                   }
                 />
+                <LabeledSelect
+                  label="编码器"
+                  value={settings.antsword.encoder}
+                  options={[["", "默认 (Base64)"], ["rot13", "ROT13"]]}
+                  onChange={(value) => setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, encoder: value as DecoderSettings["antsword"]["encoder"] } }))}
+                />
               </div>
             </DecoderSettingsSection>
           )}
@@ -361,7 +394,7 @@ export function StreamDecoderWorkbench({
                 <LabeledSelect
                   label="加密算法"
                   value={settings.godzilla.cipher}
-                  options={[["aes_ecb", "AES-ECB"], ["xor", "XOR"]]}
+                  options={[["aes_ecb", "AES-ECB"], ["aes_cbc", "AES-CBC"], ["xor", "XOR (PHP)"]]}
                   onChange={(value) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, cipher: value as DecoderSettings["godzilla"]["cipher"] } }))}
                 />
                 <LabeledInput

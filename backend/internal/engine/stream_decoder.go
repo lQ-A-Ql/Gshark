@@ -44,6 +44,8 @@ func DecodeStreamPayload(req StreamDecodeRequest) (StreamDecodeResult, error) {
 		return decodeAntSwordPayload(req.Payload, req.Options)
 	case "godzilla":
 		return decodeGodzillaPayload(req.Payload, req.Options)
+	case "auto":
+		return autoDetectDecode(req.Payload, req.Options)
 	default:
 		return StreamDecodeResult{}, fmt.Errorf("unsupported decoder: %s", req.Decoder)
 	}
@@ -59,6 +61,12 @@ func decodeBase64Payload(raw string) (StreamDecodeResult, error) {
 }
 
 func decodeBehinderPayload(raw string, options map[string]any) (StreamDecodeResult, error) {
+	// Check if CBC mode is requested — delegate to CBC handler
+	cipherMode := strings.ToLower(strings.TrimSpace(optionsStringDefault(options, "cipherMode", "ecb")))
+	if cipherMode == "cbc" {
+		return decodeBehinderPayloadCBC(raw, options)
+	}
+
 	candidate := extractPayloadCandidate(raw, optionsString(options, "pass"), optionsBool(options, "extractParam"))
 	if candidate == "" {
 		return StreamDecodeResult{}, errors.New("未提取到冰蝎密文")
@@ -78,7 +86,9 @@ func decodeBehinderPayload(raw string, options map[string]any) (StreamDecodeResu
 	if err != nil {
 		return StreamDecodeResult{}, err
 	}
-	plain, err := decryptAESECB(cipherBytes, normalizeAESKey([]byte(key)))
+
+	// Use lenient unpadding for better CTF compatibility
+	plain, err := decryptAESECBLenient(cipherBytes, []byte(key))
 	if err != nil {
 		return StreamDecodeResult{}, err
 	}
@@ -103,6 +113,18 @@ func decodeAntSwordPayload(raw string, options map[string]any) (StreamDecodeResu
 			break
 		}
 		candidate = decoded
+	}
+
+	// Try chr() decoding first
+	if chrDecoded, ok := decodeAntSwordChr(candidate); ok {
+		return buildDecodeResult("antsword", "蚁剑 chr() 解码", []byte(chrDecoded), "chr"), nil
+	}
+
+	// Try rot13
+	encoder := strings.ToLower(strings.TrimSpace(optionsStringDefault(options, "encoder", "")))
+	if encoder == "rot13" {
+		rot13Result := decodeRot13(candidate)
+		return buildDecodeResult("antsword", "蚁剑 ROT13 解码", []byte(rot13Result), "rot13"), nil
 	}
 
 	best := extractBestBase64Candidate(candidate)
@@ -135,12 +157,24 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 	}
 
 	cipherMode := strings.ToLower(strings.TrimSpace(optionsStringDefault(options, "cipher", "aes_ecb")))
+	pass := optionsString(options, "pass")
 	var plain []byte
 	switch cipherMode {
 	case "xor":
-		plain = xorBytes(cipherBytes, []byte(key))
+		// Godzilla PHP XOR: key = md5(pass+key)[:16]
+		xorKey := deriveGodzillaXORKey(pass, key)
+		plain = xorBytes(cipherBytes, xorKey)
 	case "aes", "aes_ecb":
-		plain, err = decryptAESECB(cipherBytes, normalizeAESKey([]byte(key)))
+		plain, err = decryptAESECBLenient(cipherBytes, normalizeAESKey([]byte(key)))
+		if err != nil {
+			return StreamDecodeResult{}, err
+		}
+	case "aes_cbc":
+		var iv []byte
+		if ivStr := strings.TrimSpace(optionsString(options, "iv")); ivStr != "" {
+			iv = []byte(ivStr)
+		}
+		plain, err = decryptAESCBC(cipherBytes, []byte(key), iv)
 		if err != nil {
 			return StreamDecodeResult{}, err
 		}
@@ -148,7 +182,7 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 		return StreamDecodeResult{}, fmt.Errorf("unsupported godzilla cipher: %s", cipherMode)
 	}
 
-	return buildDecodeResult("godzilla", "哥斯拉流量解密", plain, encoding), nil
+	return buildDecodeResult("godzilla", fmt.Sprintf("哥斯拉流量解密 (%s)", cipherMode), plain, encoding), nil
 }
 
 func buildDecodeResult(decoder, summary string, data []byte, encoding string) StreamDecodeResult {

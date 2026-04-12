@@ -1,4 +1,4 @@
-import { Factory, RefreshCw, Workflow } from "lucide-react";
+import { AlertTriangle, Factory, RefreshCw, Shield, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData, TrafficBucket } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
@@ -155,6 +155,101 @@ export default function IndustrialAnalysis() {
           )}
         </div>
       </Panel>
+
+      {(analysis.suspiciousWrites?.length ?? 0) > 0 && (
+        <Panel title={`Modbus 可疑写操作 (${analysis.suspiciousWrites!.length})`} className="mt-4">
+          <div className="mb-2 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>以下为按写入次数排序的 Modbus 写操作聚合，高频写入可能对应灯控、阀门切换或寄存器篡改。</span>
+          </div>
+          <div className="max-h-[420px] overflow-auto">
+            <table className="w-full table-fixed border-collapse text-left text-xs">
+              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
+                <tr>
+                  <th className="w-36 px-3 py-2">目标地址</th>
+                  <th className="w-20 px-3 py-2">Unit ID</th>
+                  <th className="w-28 px-3 py-2">功能码</th>
+                  <th className="w-20 px-3 py-2">写入次数</th>
+                  <th className="w-36 px-3 py-2">来源 IP</th>
+                  <th className="w-28 px-3 py-2">首次时间</th>
+                  <th className="w-28 px-3 py-2">末次时间</th>
+                  <th className="px-3 py-2">样本值</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.suspiciousWrites!.map((sw, idx) => (
+                  <tr key={`sw-${idx}`} className="border-b border-border/70 align-top">
+                    <td className="px-3 py-2 font-mono">{sw.target}</td>
+                    <td className="px-3 py-2 font-mono">{sw.unitId || "--"}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-mono">{String(sw.functionCode).padStart(2, "0")}</div>
+                      <div className="text-muted-foreground">{sw.functionName}</div>
+                    </td>
+                    <td className="px-3 py-2 font-mono font-semibold text-amber-700">{sw.writeCount}</td>
+                    <td className="px-3 py-2 font-mono">{sw.sources.join(", ") || "--"}</td>
+                    <td className="px-3 py-2 font-mono">{sw.firstTime || "--"}</td>
+                    <td className="px-3 py-2 font-mono">{sw.lastTime || "--"}</td>
+                    <td className="px-3 py-2">
+                      {sw.sampleValues.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {sw.sampleValues.map((v, vi) => (
+                            <div key={vi} className="break-all font-mono text-[11px] text-muted-foreground">{v}</div>
+                          ))}
+                        </div>
+                      ) : "--"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+
+      {(analysis.controlCommands?.length ?? 0) > 0 && (
+        <Panel title={`控制指令 (${analysis.controlCommands!.length})`} className="mt-4">
+          <div className="mb-2 flex items-start gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>以下为从 IEC 104、DNP3、BACnet 等协议中提取的控制/操作类指令，可能涉及遥控、设点或设备重启。</span>
+          </div>
+          <div className="max-h-[520px] overflow-auto">
+            <table className="w-full table-fixed border-collapse text-left text-xs">
+              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
+                <tr>
+                  <th className="w-20 px-3 py-2">包号</th>
+                  <th className="w-28 px-3 py-2">时间</th>
+                  <th className="w-20 px-3 py-2">协议</th>
+                  <th className="w-32 px-3 py-2">源</th>
+                  <th className="w-32 px-3 py-2">目标</th>
+                  <th className="w-36 px-3 py-2">操作</th>
+                  <th className="w-28 px-3 py-2">对象</th>
+                  <th className="w-24 px-3 py-2">值</th>
+                  <th className="w-24 px-3 py-2">结果</th>
+                  <th className="px-3 py-2">摘要</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.controlCommands!.map((cmd, idx) => (
+                  <tr key={`cmd-${idx}`} className="border-b border-border/70 align-top">
+                    <td className="px-3 py-2 font-mono text-muted-foreground">{cmd.packetId}</td>
+                    <td className="px-3 py-2 font-mono">{cmd.time || "--"}</td>
+                    <td className="px-3 py-2">
+                      <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-blue-700">{cmd.protocol}</span>
+                    </td>
+                    <td className="px-3 py-2">{cmd.source || "--"}</td>
+                    <td className="px-3 py-2">{cmd.destination || "--"}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-rose-700">{cmd.operation || "--"}</td>
+                    <td className="px-3 py-2 font-mono">{cmd.target || "--"}</td>
+                    <td className="px-3 py-2 font-mono">{cmd.value || "--"}</td>
+                    <td className="px-3 py-2">{cmd.result || "--"}</td>
+                    <td className="px-3 py-2">{cmd.summary || "--"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
 
       <Panel title={`Modbus 事务明细 (${analysis.modbus.transactions.length})`} className="mt-4">
         <div className="max-h-[520px] overflow-auto">

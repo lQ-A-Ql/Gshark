@@ -45,7 +45,7 @@ export default function TcpStream() {
   useEffect(() => {
     setStreamView({
       id: tcpStream.id,
-      protocol: tcpStream.protocol,
+      protocol: "TCP" as const,
       from: tcpStream.from,
       to: tcpStream.to,
       chunks: tcpStream.chunks,

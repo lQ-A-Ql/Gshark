@@ -262,11 +262,41 @@ type IndustrialProtocolDetail struct {
 	Records     []IndustrialProtocolRecord `json:"records"`
 }
 
+// ModbusSuspiciousWrite aggregates write operations to a specific target address.
+type ModbusSuspiciousWrite struct {
+	Target         string   `json:"target"`
+	UnitID         int      `json:"unit_id"`
+	FunctionCode   int      `json:"function_code"`
+	FunctionName   string   `json:"function_name"`
+	WriteCount     int      `json:"write_count"`
+	Sources        []string `json:"sources"`
+	FirstTime      string   `json:"first_time"`
+	LastTime       string   `json:"last_time"`
+	SampleValues   []string `json:"sample_values"`
+	SamplePacketID int64    `json:"sample_packet_id"`
+}
+
+// IndustrialControlCommand represents a control/operate command from IEC104, DNP3, etc.
+type IndustrialControlCommand struct {
+	PacketID    int64  `json:"packet_id"`
+	Time        string `json:"time"`
+	Protocol    string `json:"protocol"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Operation   string `json:"operation"`
+	Target      string `json:"target"`
+	Value       string `json:"value"`
+	Result      string `json:"result"`
+	Summary     string `json:"summary"`
+}
+
 type IndustrialAnalysis struct {
 	TotalIndustrialPackets int                        `json:"total_industrial_packets"`
 	Protocols              []TrafficBucket            `json:"protocols"`
 	Conversations          []AnalysisConversation     `json:"conversations"`
 	Modbus                 ModbusAnalysis             `json:"modbus"`
+	SuspiciousWrites       []ModbusSuspiciousWrite    `json:"suspicious_writes,omitempty"`
+	ControlCommands        []IndustrialControlCommand `json:"control_commands,omitempty"`
 	Details                []IndustrialProtocolDetail `json:"details"`
 	Notes                  []string                   `json:"notes"`
 }
