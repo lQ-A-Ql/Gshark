@@ -37,7 +37,7 @@ var (
 
 const (
 	defaultReleaseRepo = "lQ-A-Ql/Gshark"
-	defaultManifestRef = "main/release/version.json"
+	defaultManifestRef = "master/release/version.json"
 	updaterUserAgent   = "GShark-Sentinel-Updater"
 )
 

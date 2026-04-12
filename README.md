@@ -97,6 +97,7 @@ python .\scripts\build_release_package.py v0.0.5
 - 默认同步更新仓库内的 `release/version.json`
 - 默认会优先读取 `release/notes/<version>.md` 作为 release notes
 - 如需跳过构建并复用现有 exe，可加 `--skip-build`
+- 客户端默认读取仓库公开分支上的 `release/version.json`；如你的发布分支不是 `master`，可通过 `GSHARK_UPDATE_MANIFEST_REF` 覆盖
 
 例如：
 
