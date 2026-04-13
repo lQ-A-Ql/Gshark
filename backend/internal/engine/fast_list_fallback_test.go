@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -121,5 +123,68 @@ func TestLoadPCAPFallsBackToCompatWhenEKStillFails(t *testing.T) {
 	packets := svc.Packets()
 	if len(packets) != 1 || packets[0].ID != 7 {
 		t.Fatalf("expected compat fallback packet to be persisted, got %+v", packets)
+	}
+}
+
+func TestLoadPCAPSkipsEstimateForLargeFastListCapture(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldFast := streamPacketsFastFn
+	oldStream := streamPacketsFn
+	oldCompat := streamPacketsCompatFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFastFn = oldFast
+		streamPacketsFn = oldStream
+		streamPacketsCompatFn = oldCompat
+	})
+
+	largeCapture := filepath.Join(t.TempDir(), "large.pcap")
+	file, err := os.Create(largeCapture)
+	if err != nil {
+		t.Fatalf("create temp capture: %v", err)
+	}
+	if err := file.Truncate(skipEstimateFileSizeThreshold); err != nil {
+		_ = file.Close()
+		t.Fatalf("truncate temp capture: %v", err)
+	}
+	_ = file.Close()
+
+	estimateCalled := false
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		estimateCalled = true
+		return 123, nil
+	}
+
+	streamPacketsFastFn = func(_ context.Context, _ model.ParseOptions, onPacket func(model.Packet) error, onProgress func(int)) error {
+		if onProgress != nil {
+			onProgress(1)
+		}
+		return onPacket(model.Packet{ID: 99, Protocol: "UDP", Info: "large fast_list packet"})
+	}
+	streamPacketsFn = func(_ context.Context, _ model.ParseOptions, _ func(model.Packet) error, _ func(int)) error {
+		t.Fatal("ek fallback should not be called in large fast_list estimate skip test")
+		return nil
+	}
+	streamPacketsCompatFn = func(_ context.Context, _ model.ParseOptions, _ func(model.Packet) error, _ func(int)) error {
+		t.Fatal("compat fallback should not be called in large fast_list estimate skip test")
+		return nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
+		FilePath: largeCapture,
+		FastList: true,
+	}); err != nil {
+		t.Fatalf("LoadPCAP() error = %v", err)
+	}
+
+	if estimateCalled {
+		t.Fatal("expected packet estimate to be skipped for large fast_list capture")
+	}
+	packets := svc.Packets()
+	if len(packets) != 1 || packets[0].ID != 99 {
+		t.Fatalf("expected streamed packet to be persisted, got %+v", packets)
 	}
 }

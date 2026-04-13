@@ -13,6 +13,7 @@ type Packet struct {
 	Info            string              `json:"info"`
 	Payload         string              `json:"payload"`
 	RawHex          string              `json:"raw_hex,omitempty"`
+	UDPPayloadHex   string              `json:"udp_payload_hex,omitempty"`
 	StreamID        int64               `json:"stream_id"`
 	IPHeaderLen     int                 `json:"ip_header_len,omitempty"`
 	L4HeaderLen     int                 `json:"l4_header_len,omitempty"`

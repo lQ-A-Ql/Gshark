@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -41,6 +42,73 @@ func TestPacketStorePageRespectsFilter(t *testing.T) {
 	}
 }
 
+func TestPacketStorePageSummariesStripPayload(t *testing.T) {
+	store, err := newPacketStore()
+	if err != nil {
+		t.Fatalf("newPacketStore() error = %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Append([]model.Packet{
+		{ID: 1, Protocol: "HTTP", Info: "POST /upload", Payload: "username=alice", RawHex: "de:ad:be:ef"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	page, next, total, err := store.PageSummaries(0, 10, nil)
+	if err != nil {
+		t.Fatalf("PageSummaries() error = %v", err)
+	}
+	if total != 1 || next != 1 || len(page) != 1 {
+		t.Fatalf("unexpected page metadata: total=%d next=%d len=%d", total, next, len(page))
+	}
+	if page[0].Payload != "" || page[0].RawHex != "" {
+		t.Fatalf("expected summary page to strip payload fields, got %+v", page[0])
+	}
+
+	packet, ok, err := store.PacketByID(1)
+	if err != nil {
+		t.Fatalf("PacketByID() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("expected packet #1 to exist")
+	}
+	if packet.Payload != "username=alice" || packet.RawHex != "de:ad:be:ef" {
+		t.Fatalf("expected full packet payload to remain available, got %+v", packet)
+	}
+}
+
+func TestPacketStoreTopUDPDestinationPorts(t *testing.T) {
+	store, err := newPacketStore()
+	if err != nil {
+		t.Fatalf("newPacketStore() error = %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Append([]model.Packet{
+		{ID: 1, Protocol: "UDP", DestPort: 50000},
+		{ID: 2, Protocol: "UDP", DestPort: 50000},
+		{ID: 3, Protocol: "UDP", DestPort: 50000},
+		{ID: 4, Protocol: "UDP", DestPort: 50002},
+		{ID: 5, Protocol: "UDP", DestPort: 50002},
+		{ID: 6, Protocol: "TCP", DestPort: 443},
+		{ID: 7, Protocol: "UDP", DestPort: 53},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	ports, err := store.TopUDPDestinationPorts(4, 2)
+	if err != nil {
+		t.Fatalf("TopUDPDestinationPorts() error = %v", err)
+	}
+	if len(ports) != 2 {
+		t.Fatalf("expected 2 ports, got %v", ports)
+	}
+	if ports[0] != 50000 || ports[1] != 50002 {
+		t.Fatalf("unexpected port ranking: %v", ports)
+	}
+}
+
 func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 	store, err := newPacketStore()
 	if err != nil {
@@ -67,6 +135,37 @@ func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 	}
 	if cursor != 2 {
 		t.Fatalf("expected cursor 2 for packet #4, got %d", cursor)
+	}
+}
+
+func TestClearCaptureResetsPacketStore(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 1, Protocol: "TCP", Info: "demo"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	svc.pcap = "demo.pcap"
+
+	pathBefore := svc.packetStore.Path()
+	if pathBefore == "" {
+		t.Fatal("expected packet store path to be initialized")
+	}
+
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+
+	if svc.packetStore.Count() != 0 {
+		t.Fatalf("expected cleared packet store, got %d packets", svc.packetStore.Count())
+	}
+	if svc.pcap != "" {
+		t.Fatalf("expected capture path to be cleared, got %q", svc.pcap)
+	}
+	if _, err := os.Stat(pathBefore); !os.IsNotExist(err) {
+		t.Fatalf("expected old packet db to be removed, stat err=%v", err)
 	}
 }
 

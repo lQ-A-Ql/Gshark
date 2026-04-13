@@ -146,7 +146,7 @@ func TestParsePacketFromEK_UsesFrameNumberWhenAvailable(t *testing.T) {
 }
 
 func TestParseFastListLine_PreservesDisplayProtocol(t *testing.T) {
-	parts := make([]string, 64)
+	parts := make([]string, 65)
 	parts[0] = "5"
 	parts[1] = "1700000000.123"
 	parts[2] = "192.168.1.10"

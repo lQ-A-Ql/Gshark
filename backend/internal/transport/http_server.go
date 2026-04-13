@@ -87,10 +87,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/capture/start", s.handleCaptureStart)
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
+	mux.HandleFunc("/api/capture/close", s.handleCaptureClose)
 	mux.HandleFunc("/api/capture/upload", s.handleCaptureUpload)
 	mux.HandleFunc("/api/packets", s.handlePackets)
 	mux.HandleFunc("/api/packets/page", s.handlePacketsPage)
 	mux.HandleFunc("/api/packets/locate", s.handlePacketLocate)
+	mux.HandleFunc("/api/packet", s.handlePacket)
 	mux.HandleFunc("/api/hunting", s.handleHunting)
 	mux.HandleFunc("/api/hunting/config", s.handleHuntingConfig)
 	mux.HandleFunc("/api/objects", s.handleObjects)
@@ -220,6 +222,18 @@ func (s *Server) handleCaptureStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 
+func (s *Server) handleCaptureClose(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := s.svc.ClearCapture(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "closed"})
+}
+
 func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -330,6 +344,21 @@ func (s *Server) handlePacketLocate(w http.ResponseWriter, r *http.Request) {
 		"total":     total,
 		"found":     found,
 	})
+}
+
+func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
+	packetID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("id")), 10, 64)
+	if err != nil || packetID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid packet id")
+		return
+	}
+
+	packet, err := s.svc.Packet(packetID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, packet)
 }
 
 func (s *Server) handleHunting(w http.ResponseWriter, r *http.Request) {
@@ -537,7 +566,14 @@ func (s *Server) handleMediaArtifactPlayback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "video/mp4")
+	contentType := "video/mp4"
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".m4a":
+		contentType = "audio/mp4"
+	case ".mp3":
+		contentType = "audio/mpeg"
+	}
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", name))
 	http.ServeContent(w, r, name, info.ModTime(), file)
 }

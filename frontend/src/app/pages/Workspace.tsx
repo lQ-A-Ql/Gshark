@@ -213,6 +213,7 @@ export default function Workspace() {
     if (preloadTotal <= 0) return 0;
     return Math.max(0, Math.min(100, Math.floor((preloadProcessed / preloadTotal) * 100)));
   }, [preloadProcessed, preloadTotal]);
+  const hasDeterministicPreloadProgress = preloadTotal > 0;
   const hasOpenedCapture = Boolean(fileMeta.path);
   const showFilterLoadingBlankState = useMemo(
     () => isFilterLoading && !isPreloadingCapture && filteredPackets.length === 0,
@@ -328,9 +329,9 @@ export default function Workspace() {
           onClick={() => void stopCapture()}
           disabled={!backendConnected}
           className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground shadow-sm transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-          title={backendConnected ? "停止当前解析任务" : "后端未连接"}
+          title={backendConnected ? "关闭当前抓包并清理临时数据库" : "后端未连接"}
         >
-          <Square className="h-3.5 w-3.5 text-rose-600" /> 停止
+          <Square className="h-3.5 w-3.5 text-rose-600" /> 关闭抓包
         </button>
         <button
           onClick={() => void loadPrevPackets()}
@@ -494,10 +495,18 @@ export default function Workspace() {
         <div className="border-b border-border bg-accent/30 px-3 py-2">
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>正在预加载全部流量</span>
-            <span>{preloadProcessed.toLocaleString()} / {Math.max(preloadTotal, totalPackets).toLocaleString()} ({preloadPercent}%)</span>
+            <span>
+              {hasDeterministicPreloadProgress
+                ? `${preloadProcessed.toLocaleString()} / ${Math.max(preloadTotal, totalPackets).toLocaleString()} (${preloadPercent}%)`
+                : `已入库 ${Math.max(preloadProcessed, totalPackets).toLocaleString()} 包，正在继续解析...`}
+            </span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded bg-muted">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${preloadPercent}%` }} />
+            {hasDeterministicPreloadProgress ? (
+              <div className="h-full bg-blue-600 transition-all" style={{ width: `${preloadPercent}%` }} />
+            ) : (
+              <div className="h-full w-1/3 animate-pulse rounded bg-blue-600/80" />
+            )}
           </div>
         </div>
       )}

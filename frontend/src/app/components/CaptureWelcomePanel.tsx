@@ -26,13 +26,13 @@ export function CaptureWelcomePanel() {
   } = useSentinel();
   const [capturePath, setCapturePath] = useState("");
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
-  const recentItems = useMemo(() => recentCaptures.slice(0, 6), [recentCaptures]);
+  const recentItems = useMemo(() => recentCaptures, [recentCaptures]);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_36%),linear-gradient(180deg,_#f8fbff_0%,_#f6f8fb_100%)] p-6 text-foreground">
-      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
-          <div className="border-b border-slate-200/80 p-8 lg:border-b-0 lg:border-r">
+    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_36%),linear-gradient(180deg,_#f8fbff_0%,_#f6f8fb_100%)] p-6 text-foreground">
+      <section className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
+        <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
+          <div className="border-b border-slate-200/80 p-8 lg:min-h-0 lg:border-b-0 lg:border-r lg:overflow-auto">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
               GSHARK QUICK START
@@ -93,7 +93,7 @@ export function CaptureWelcomePanel() {
             </div>
           </div>
 
-          <div className="p-8">
+          <div className="flex min-h-0 flex-col p-8">
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ENGINE STATUS</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
@@ -109,7 +109,7 @@ export function CaptureWelcomePanel() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RECENT FILES</div>
@@ -123,7 +123,8 @@ export function CaptureWelcomePanel() {
                   这里会保留最近打开过的抓包路径，方便你反复对照样本与回归测试。
                 </div>
               ) : (
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 min-h-0 max-h-[420px] flex-1 overflow-y-auto pr-2">
+                  <div className="space-y-3">
                   {recentItems.map((item) => (
                     <button
                       key={item.path}
@@ -139,6 +140,7 @@ export function CaptureWelcomePanel() {
                       </div>
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </div>

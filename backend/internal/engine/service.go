@@ -63,6 +63,7 @@ type Service struct {
 
 const defaultStreamCacheLimit = 256
 const displayFilterCacheLimit = 16
+const skipEstimateFileSizeThreshold int64 = 256 << 20
 
 type filteredPacketIndex struct {
 	mu        sync.Mutex
@@ -213,13 +214,20 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	)
 
 	s.emitter.EmitStatus("开始解析 PCAP")
-	total, countErr := estimatePacketsFn(runCtx, opts)
-	if countErr == nil && total > 0 {
-		s.emitter.EmitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
-		s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
-		log.Printf("engine: tshark estimated %d packets for %q", total, opts.FilePath)
-	} else if countErr != nil {
-		log.Printf("engine: tshark packet estimate failed for %q: %v", opts.FilePath, countErr)
+	total := 0
+	if shouldSkipPacketEstimate(opts) {
+		s.emitter.EmitStatus("大流量包已跳过总包数预估，直接开始入库解析。")
+		log.Printf("engine: skipping packet estimate for %q due to large file fast_list path", opts.FilePath)
+	} else {
+		estimatedTotal, countErr := estimatePacketsFn(runCtx, opts)
+		if countErr == nil && estimatedTotal > 0 {
+			total = estimatedTotal
+			s.emitter.EmitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
+			s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
+			log.Printf("engine: tshark estimated %d packets for %q", total, opts.FilePath)
+		} else if countErr != nil {
+			log.Printf("engine: tshark packet estimate failed for %q: %v", opts.FilePath, countErr)
+		}
 	}
 
 	processed := 0
@@ -395,6 +403,21 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	return err
 }
 
+func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
+	if !opts.FastList {
+		return false
+	}
+	filePath := strings.TrimSpace(opts.FilePath)
+	if filePath == "" {
+		return false
+	}
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Size() >= skipEstimateFileSizeThreshold
+}
+
 func (s *Service) StopStreaming() {
 	s.mu.Lock()
 	cancel := s.cancel
@@ -403,6 +426,56 @@ func (s *Service) StopStreaming() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+func (s *Service) ClearCapture() error {
+	s.StopStreaming()
+
+	if s.packetStore != nil {
+		if err := s.packetStore.Reset(); err != nil {
+			return err
+		}
+	}
+
+	s.objMu.Lock()
+	if s.exportDir != "" {
+		_ = os.RemoveAll(s.exportDir)
+		s.exportDir = ""
+	}
+	s.objectsLoaded = false
+	s.objects = nil
+	s.objMu.Unlock()
+
+	s.mu.Lock()
+	if s.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaExportDir)
+		s.mediaExportDir = ""
+	}
+	if s.pcap != "" {
+		tshark.ClearFieldScanCache(s.pcap)
+	}
+	s.cancelDisplayFilterCacheLocked()
+	s.pcap = ""
+	s.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.globalTrafficStats = nil
+	s.industrialAnalysis = nil
+	s.vehicleAnalysis = nil
+	s.mediaAnalysis = nil
+	s.usbAnalysis = nil
+	s.mediaArtifacts = map[string]string{}
+	s.mediaPlayback = map[string]string{}
+	s.streamCache = map[string]model.ReassembledStream{}
+	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.rawStreamIndex = map[string]model.ReassembledStream{}
+	s.streamOverrides = map[string]map[int]string{}
+	s.mu.Unlock()
+
+	s.yaraMu.Lock()
+	s.yaraLoaded = false
+	s.yaraHits = nil
+	s.yaraMu.Unlock()
+	return nil
 }
 
 func (s *Service) Packets() []model.Packet {
@@ -426,7 +499,7 @@ func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]mode
 		if err != nil {
 			return []model.Packet{}, 0, 0, err
 		}
-		out, err := s.packetStore.PacketsByIDs(ids)
+		out, err := s.packetStore.PacketsByIDsSummary(ids)
 		if err != nil {
 			s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
 			return []model.Packet{}, 0, 0, err
@@ -441,7 +514,7 @@ func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]mode
 	}
 
 	predicate := compilePacketFilter(filter)
-	out, next, total, err := s.packetStore.Page(cursor, limit, predicate)
+	out, next, total, err := s.packetStore.PageSummaries(cursor, limit, predicate)
 	if err != nil {
 		s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
 		return []model.Packet{}, 0, 0, err
@@ -492,6 +565,20 @@ func (s *Service) PacketPageCursorWithError(packetID int64, limit int, filter st
 func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (int, int, bool) {
 	cursor, total, found, _ := s.PacketPageCursorWithError(packetID, limit, filter)
 	return cursor, total, found
+}
+
+func (s *Service) Packet(packetID int64) (model.Packet, error) {
+	if packetID <= 0 || s.packetStore == nil {
+		return model.Packet{}, errors.New("invalid packet id")
+	}
+	packet, ok, err := s.packetStore.PacketByID(packetID)
+	if err != nil {
+		return model.Packet{}, err
+	}
+	if !ok {
+		return model.Packet{}, errors.New("packet not found")
+	}
+	return packet, nil
 }
 
 func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
@@ -1307,18 +1394,45 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	if strings.TrimSpace(pcap) == "" {
 		return model.MediaAnalysis{}, errors.New("no capture loaded")
 	}
-	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
-		log.Printf("engine: specialized field cache warm failed for media analysis: %v", err)
-	}
+	s.emitter.EmitStatus("__progress__:media:0:3:准备媒体流分析")
+	cfg := s.buildMediaScanConfig(pcap)
 
 	tempDir, err := os.MkdirTemp("", "gshark-media-")
 	if err != nil {
+		s.emitter.EmitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err
 	}
 
-	analysis, artifacts, err := tshark.BuildMediaAnalysisFromFile(pcap, tempDir)
+	progressFn := func(current, total int, label string) {
+		s.emitter.EmitStatus(fmt.Sprintf("__progress__:media:%d:%d:%s", current, total, label))
+	}
+
+	var (
+		analysis  model.MediaAnalysis
+		artifacts map[string]string
+	)
+
+	if s.packetStore != nil && s.packetStore.Count() > 0 {
+		packetCount := s.packetStore.Count()
+		analysis, artifacts, err = tshark.BuildMediaAnalysisFromPacketStream(tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
+			return s.packetStore.Iterate(nil, onPacket)
+		})
+		if err != nil {
+			log.Printf("engine: media analysis packet-store fast path failed, falling back to tshark file scan: %v", err)
+		} else if analysis.TotalMediaPackets > 0 || len(analysis.Sessions) > 0 {
+			log.Printf("engine: media analysis completed via packet-store fast path packets=%d sessions=%d", analysis.TotalMediaPackets, len(analysis.Sessions))
+		} else {
+			log.Printf("engine: media analysis packet-store fast path found no sessions, falling back to tshark file scan")
+			err = nil
+		}
+	}
+
+	if err == nil && analysis.TotalMediaPackets == 0 && len(analysis.Sessions) == 0 {
+		analysis, artifacts, err = tshark.BuildMediaAnalysisFromFileWithConfig(pcap, tempDir, cfg, progressFn)
+	}
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
+		s.emitter.EmitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err
 	}
 
@@ -1344,7 +1458,83 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	}
 	out := *s.mediaAnalysis
 	s.mu.Unlock()
+	s.emitter.EmitStatus("媒体流分析完成")
 	return out, nil
+}
+
+func (s *Service) buildMediaScanConfig(pcap string) tshark.MediaScanConfig {
+	cfg := tshark.MediaScanConfig{}
+	if s.packetStore == nil || strings.TrimSpace(pcap) == "" {
+		return cfg
+	}
+
+	candidatePorts, err := s.packetStore.TopUDPDestinationPorts(10, 32)
+	if err != nil {
+		log.Printf("engine: media preflight failed to query udp ports: %v", err)
+		return cfg
+	}
+	if len(candidatePorts) == 0 {
+		return cfg
+	}
+
+	decodeAsPorts, err := tshark.DetectLikelyRTPPorts(pcap, candidatePorts, 24)
+	if err != nil {
+		log.Printf("engine: media preflight failed to detect rtp-like ports: %v", err)
+		return cfg
+	}
+	if len(decodeAsPorts) == 0 {
+		return cfg
+	}
+
+	cfg.RTPDecodeAsPorts = decodeAsPorts
+	cfg.PreflightNotes = append(cfg.PreflightNotes, fmt.Sprintf("预探测发现 RTP-like UDP 端口：%s。", formatPortList(decodeAsPorts)))
+	if onlyNonStandardRTPPorts(decodeAsPorts) {
+		cfg.SkipControlHints = true
+		cfg.PreflightNotes = append(cfg.PreflightNotes, "检测到媒体流位于非标准 RTP 端口，已跳过全量 RTSP/SDP 控制信令扫描以避免大包阻塞。")
+	}
+	log.Printf("engine: media preflight config skip_control=%t decode_as_ports=%v", cfg.SkipControlHints, cfg.RTPDecodeAsPorts)
+	return cfg
+}
+
+func onlyNonStandardRTPPorts(ports []int) bool {
+	if len(ports) == 0 {
+		return false
+	}
+
+	known := map[int]struct{}{
+		554:   {},
+		8554:  {},
+		5004:  {},
+		5005:  {},
+		6970:  {},
+		7070:  {},
+		47984: {},
+		47989: {},
+		47990: {},
+		47998: {},
+		47999: {},
+		48000: {},
+		48002: {},
+		48010: {},
+	}
+
+	for _, port := range ports {
+		if _, ok := known[port]; ok {
+			return false
+		}
+	}
+	return true
+}
+
+func formatPortList(ports []int) string {
+	if len(ports) == 0 {
+		return ""
+	}
+	items := make([]string, 0, len(ports))
+	for _, port := range ports {
+		items = append(items, strconv.Itoa(port))
+	}
+	return strings.Join(items, ", ")
 }
 
 func (s *Service) USBAnalysis() (model.USBAnalysis, error) {

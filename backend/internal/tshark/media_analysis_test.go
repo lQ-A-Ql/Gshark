@@ -128,6 +128,35 @@ func TestDetectPacketCodecAnnexBH264(t *testing.T) {
 	}
 }
 
+func TestIsLikelyRTPPayload(t *testing.T) {
+	valid := []byte{
+		0x80, 0x80, 0x76, 0x38,
+		0x99, 0x59, 0x48, 0x23,
+		0x88, 0x48, 0x19, 0xee,
+		0x00, 0x01, 0x02, 0x03,
+	}
+	if !isLikelyRTPPayload(valid) {
+		t.Fatalf("expected valid RTP-like payload to be recognized")
+	}
+
+	invalid := []byte{0x10, 0x20, 0x30, 0x40, 0x50}
+	if isLikelyRTPPayload(invalid) {
+		t.Fatalf("expected invalid payload to be rejected")
+	}
+}
+
+func TestInferStaticRTPProfile(t *testing.T) {
+	mediaType, codec, clockRate := inferStaticRTPProfile("0")
+	if mediaType != "audio" || codec != "PCMU" || clockRate != 8000 {
+		t.Fatalf("expected PT 0 to map to audio/PCMU/8000, got %q %q %d", mediaType, codec, clockRate)
+	}
+
+	mediaType, codec, clockRate = inferStaticRTPProfile("26")
+	if mediaType != "video" || codec != "JPEG" || clockRate != 90000 {
+		t.Fatalf("expected PT 26 to map to video/JPEG/90000, got %q %q %d", mediaType, codec, clockRate)
+	}
+}
+
 func TestReconstructGameStreamBytestream(t *testing.T) {
 	builder := &mediaSessionBuilder{
 		Application: "Moonlight / GameStream",
@@ -154,6 +183,87 @@ func TestReconstructGameStreamBytestream(t *testing.T) {
 	expected := []byte{0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x00, 0x1f, 0xaa, 0xbb, 0xcc, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
 	if !bytes.Equal(payload, expected) {
 		t.Fatalf("unexpected bytestream payload:\nwant=%#v\ngot =%#v", expected, payload)
+	}
+}
+
+func TestBuildMediaAnalysisFromPacketStream(t *testing.T) {
+	exportDir := t.TempDir()
+	packet := model.Packet{
+		ID:              1,
+		Timestamp:       "2026-04-13 12:00:00",
+		SourceIP:        "192.168.1.10",
+		SourcePort:      50000,
+		DestIP:          "192.168.1.20",
+		DestPort:        50001,
+		Protocol:        "UDP",
+		DisplayProtocol: "UDP",
+		Length:          58,
+		RawHex:          "00112233445566778899aabb08004500002c0001000040110000c0a8010ac0a80114c350c351001800008060000100000010123456787c851122",
+		IPHeaderLen:     20,
+		L4HeaderLen:     8,
+	}
+
+	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
+		return onPacket(packet)
+	})
+	if err != nil {
+		t.Fatalf("BuildMediaAnalysisFromPacketStream() error = %v", err)
+	}
+	if stats.TotalMediaPackets != 1 {
+		t.Fatalf("expected 1 media packet, got %+v", stats)
+	}
+	if len(stats.Sessions) != 1 {
+		t.Fatalf("expected 1 media session, got %+v", stats.Sessions)
+	}
+	session := stats.Sessions[0]
+	if session.Codec != "H264" {
+		t.Fatalf("expected H264 session, got %+v", session)
+	}
+	if session.Artifact == nil {
+		t.Fatalf("expected generated artifact, got %+v", session)
+	}
+	if artifacts[session.Artifact.Token] == "" {
+		t.Fatalf("expected artifact path for token %q", session.Artifact.Token)
+	}
+}
+
+func TestBuildMediaAnalysisFromPacketStreamStaticAudioPayloadType(t *testing.T) {
+	exportDir := t.TempDir()
+	packet := model.Packet{
+		ID:              1,
+		Timestamp:       "2026-04-13 12:00:00",
+		SourceIP:        "10.0.0.1",
+		SourcePort:      40000,
+		DestIP:          "10.0.0.2",
+		DestPort:        50000,
+		Protocol:        "UDP",
+		DisplayProtocol: "UDP",
+		Length:          58,
+		UDPPayloadHex:   "800000010000001012345678aabbccdd",
+		IPHeaderLen:     20,
+		L4HeaderLen:     8,
+	}
+
+	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
+		return onPacket(packet)
+	})
+	if err != nil {
+		t.Fatalf("BuildMediaAnalysisFromPacketStream() error = %v", err)
+	}
+	if len(stats.Sessions) != 1 {
+		t.Fatalf("expected 1 session, got %+v", stats.Sessions)
+	}
+	if stats.Sessions[0].MediaType != "audio" {
+		t.Fatalf("expected PT 0 RTP stream to classify as audio, got %+v", stats.Sessions[0])
+	}
+	if stats.Sessions[0].Artifact == nil {
+		t.Fatalf("expected audio RTP stream to generate raw artifact, got %+v", stats.Sessions[0])
+	}
+	if stats.Sessions[0].Artifact.Format != "ulaw" {
+		t.Fatalf("expected PCMU artifact format ulaw, got %+v", stats.Sessions[0].Artifact)
+	}
+	if artifacts[stats.Sessions[0].Artifact.Token] == "" {
+		t.Fatalf("expected audio artifact path for token %q", stats.Sessions[0].Artifact.Token)
 	}
 }
 
@@ -233,8 +343,8 @@ func TestBuildMediaAnalysisFromGameStreamSample(t *testing.T) {
 		}
 		if session.SourcePort == 48000 && session.MediaType == "audio" {
 			audio48000Count++
-			if session.Artifact != nil {
-				t.Fatalf("expected GameStream audio port 48000 to have no video artifact, got %+v", session.Artifact)
+			if session.Artifact != nil && session.Artifact.SizeBytes <= 0 {
+				t.Fatalf("expected GameStream audio artifact metadata to report size, got %+v", session.Artifact)
 			}
 		}
 	}

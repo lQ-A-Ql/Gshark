@@ -37,6 +37,17 @@ interface PreparedPacketStream {
   streamId: number | null;
 }
 
+interface MediaAnalysisProgress {
+  active: boolean;
+  current: number;
+  total: number;
+  label: string;
+  phase: "prepare" | "scan" | "organize" | "rebuild" | "complete" | "unknown";
+  phaseLabel: string;
+  percent: number;
+  recent: string[];
+}
+
 interface SentinelContextValue {
   packets: Packet[];
   totalPackets: number;
@@ -83,12 +94,14 @@ interface SentinelContextValue {
   decryptionConfig: DecryptionConfig;
   updateDecryptionConfig: (patch: Partial<DecryptionConfig>) => void;
   fileMeta: { name: string; sizeBytes: number; path: string };
+  captureRevision: number;
   recentCaptures: RecentCapture[];
   openCapture: (filePath?: string) => Promise<void>;
   stopCapture: () => Promise<void>;
   preparePacketStream: (packetId: number, preferredProtocol?: "HTTP" | "TCP" | "UDP", filterOverride?: string) => Promise<PreparedPacketStream>;
   backendConnected: boolean;
   backendStatus: string;
+  mediaAnalysisProgress: MediaAnalysisProgress;
   tsharkStatus: TSharkStatus;
   isTSharkChecking: boolean;
   setTSharkPath: (path: string) => Promise<void>;
@@ -148,6 +161,64 @@ const EMPTY_SWITCH_METRICS: StreamSwitchMetrics = {
     UDP: { ...EMPTY_SWITCH_STAT },
   },
 };
+
+const EMPTY_MEDIA_ANALYSIS_PROGRESS: MediaAnalysisProgress = {
+  active: false,
+  current: 0,
+  total: 0,
+  label: "",
+  phase: "unknown",
+  phaseLabel: "",
+  percent: 0,
+  recent: [],
+};
+
+function classifyMediaProgressPhase(label: string): MediaAnalysisProgress["phase"] {
+  const normalized = label.trim();
+  if (!normalized) return "unknown";
+  if (normalized.includes("准备")) return "prepare";
+  if (normalized.includes("扫描")) return "scan";
+  if (normalized.includes("整理")) return "organize";
+  if (normalized.includes("重建")) return "rebuild";
+  if (normalized.includes("完成")) return "complete";
+  return "unknown";
+}
+
+function phaseLabelForMediaProgress(phase: MediaAnalysisProgress["phase"]): string {
+  switch (phase) {
+    case "prepare":
+      return "准备";
+    case "scan":
+      return "扫描";
+    case "organize":
+      return "整理";
+    case "rebuild":
+      return "重建";
+    case "complete":
+      return "完成";
+    default:
+      return "处理中";
+  }
+}
+
+function computeMediaProgressPercent(phase: MediaAnalysisProgress["phase"], current: number, total: number): number {
+  const safeTotal = total > 0 ? total : 0;
+  const local = safeTotal > 0 ? Math.max(0, Math.min(1, current / Math.max(safeTotal, 1))) : 0;
+  switch (phase) {
+    case "prepare":
+      return Math.max(1, local * 5);
+    case "scan":
+      return 5 + local * 67;
+    case "organize":
+      return 72 + local * 10;
+    case "rebuild":
+      return 82 + local * 18;
+    case "complete":
+      return 100;
+    default:
+      return safeTotal > 0 ? local * 100 : 0;
+  }
+}
 
 const SWITCH_SAMPLE_LIMIT = 300;
 
@@ -296,12 +367,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [displayFilter, setDisplayFilter] = useState("");
   const [selectedPacketId, setSelectedPacketId] = useState<number | null>(null);
+  const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
   const [selectedPacketRawHex, setSelectedPacketRawHex] = useState("");
   const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
   const [plugins, setPlugins] = useState<PluginItem[]>([]);
   const [pluginLogs, setPluginLogs] = useState<string[]>(DEFAULT_PLUGIN_LOGS);
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendStatus, setBackendStatus] = useState("等待后端连接");
+  const [mediaAnalysisProgress, setMediaAnalysisProgress] = useState<MediaAnalysisProgress>(EMPTY_MEDIA_ANALYSIS_PROGRESS);
   const [tsharkStatus, setTsharkStatus] = useState<TSharkStatus>(EMPTY_TSHARK_STATUS);
   const [isTSharkChecking, setIsTSharkChecking] = useState(false);
   const [threatHits, setThreatHits] = useState<ThreatHit[]>([]);
@@ -319,6 +392,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     sizeBytes: 0,
     path: "",
   });
+  const [captureRevision, setCaptureRevision] = useState(0);
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>(() => readRecentCaptures());
   const [decryptionConfig, setDecryptionConfig] = useState<DecryptionConfig>({
     sslKeyLogPath: "",
@@ -399,6 +473,26 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsPageLoading(false);
   }, []);
 
+  const commitPacketPage = useCallback((safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
+    pageStartRef.current = safeCursor;
+    setPageStart(safeCursor);
+    setTotalPackets(page.total);
+    setPackets(page.items);
+    setSelectedPacketId((prev) => {
+      if (prev == null) return null;
+      return page.items.some((p) => p.id === prev) ? prev : null;
+    });
+    setSelectedPacketDetail((prev) => {
+      if (!prev) return null;
+      return page.items.some((p) => p.id === prev.id) ? prev : null;
+    });
+    setSelectedPacketRawHex("");
+    setSelectedPacketLayers(null);
+    setHasPrevPackets(safeCursor > 0);
+    hasMorePacketsRef.current = page.hasMore;
+    setHasMorePackets(page.hasMore);
+  }, []);
+
   const resetPacketViewport = useCallback(() => {
     cancelPacketPageLoad();
     pageStartRef.current = 0;
@@ -409,6 +503,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     hasMorePacketsRef.current = false;
     setHasMorePackets(false);
     setSelectedPacketId(null);
+    setSelectedPacketDetail(null);
     setSelectedPacketRawHex("");
     setSelectedPacketLayers(null);
   }, [cancelPacketPageLoad]);
@@ -430,19 +525,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (abortController.signal.aborted || requestSeq !== packetPageSeqRef.current) {
         return null;
       }
-      pageStartRef.current = safeCursor;
-      setPageStart(safeCursor);
-      setTotalPackets(page.total);
-      setPackets(page.items);
-      setSelectedPacketId((prev) => {
-        if (prev == null) return null;
-        return page.items.some((p) => p.id === prev) ? prev : null;
-      });
-      setSelectedPacketRawHex("");
-      setSelectedPacketLayers(null);
-      setHasPrevPackets(safeCursor > 0);
-      hasMorePacketsRef.current = page.hasMore;
-      setHasMorePackets(page.hasMore);
+      commitPacketPage(safeCursor, page);
       return page;
     } catch (error) {
       if (abortController.signal.aborted) {
@@ -467,7 +550,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         }
       }
     }
-  }, [backendConnected, displayFilter]);
+  }, [backendConnected, commitPacketPage, displayFilter]);
 
   const loadMorePackets = useCallback(async () => {
     const next = pageStartRef.current + PAGE_SIZE;
@@ -522,8 +605,32 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const updateProgressFromStatus = useCallback((message: string): boolean => {
     if (!message.startsWith("__progress__:")) return false;
     const parts = message.split(":");
-    if (parts.length < 4) return true;
+    if (parts.length < 3) return true;
     const phase = parts[1];
+    if (phase === "media") {
+      const current = Number(parts[2]) || 0;
+      const total = Number(parts[3]) || 0;
+      const label = parts.slice(4).join(":").trim();
+      const progressPhase = classifyMediaProgressPhase(label);
+      const percent = computeMediaProgressPercent(progressPhase, current, total);
+      setMediaAnalysisProgress((prev) => {
+        const nextRecent = label && label !== prev.label
+          ? [label, ...prev.recent.filter((item) => item !== label)].slice(0, 4)
+          : prev.recent;
+        return {
+          active: progressPhase !== "complete" && (total <= 0 || current < total),
+          current,
+          total,
+          label,
+          phase: progressPhase,
+          phaseLabel: phaseLabelForMediaProgress(progressPhase),
+          percent,
+          recent: nextRecent,
+        };
+      });
+      return true;
+    }
+    if (parts.length < 4) return true;
     const processed = Number(parts[2]) || 0;
     const total = Number(parts[3]) || 0;
     if (total > 0) {
@@ -623,14 +730,25 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     }
     setBackendStatus(status.message || "tshark is unavailable");
     throw new Error(status.message || "tshark is unavailable");
-  }, [backendConnected]);
+  }, [backendConnected, cancelPacketPageLoad]);
 
   const filteredPackets = useMemo(() => packets, [packets]);
 
   const selectedPacket = useMemo(() => {
-    if (selectedPacketId == null) return filteredPackets[0] ?? null;
-    return filteredPackets.find((p) => p.id === selectedPacketId) ?? null;
-  }, [filteredPackets, selectedPacketId]);
+    const fallback = selectedPacketId == null
+      ? filteredPackets[0] ?? null
+      : filteredPackets.find((p) => p.id === selectedPacketId) ?? null;
+    if (!fallback) {
+      return selectedPacketDetail;
+    }
+    if (selectedPacketDetail && selectedPacketDetail.id === fallback.id) {
+      return {
+        ...fallback,
+        ...selectedPacketDetail,
+      };
+    }
+    return fallback;
+  }, [filteredPackets, selectedPacketDetail, selectedPacketId]);
 
   const refreshAnalysisResult = useCallback(async () => {
     if (!backendConnected) return;
@@ -1032,6 +1150,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
               parseErrorRef.current = msg;
             }
           }
+          if (msg.includes("媒体流分析完成") || msg.includes("媒体流分析失败")) {
+            setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+          }
           wakeCaptureWaiters();
           setBackendStatus(msg);
         },
@@ -1040,6 +1161,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           if (preloadingRef.current) {
             parseFinishedRef.current = true;
             parseErrorRef.current = next;
+          }
+          if (next.includes("媒体流")) {
+            setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
           }
           wakeCaptureWaiters();
           setBackendStatus(next);
@@ -1061,6 +1185,34 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedPacketId == null) {
+      setSelectedPacketDetail(null);
+      return;
+    }
+
+    if (selectedPacketDetail?.id === selectedPacketId) {
+      return;
+    }
+
+    let cancelled = false;
+    void bridge.getPacket(selectedPacketId)
+      .then((packet) => {
+        if (!cancelled) {
+          setSelectedPacketDetail(packet);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedPacketDetail(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPacketDetail?.id, selectedPacketId]);
 
   useEffect(() => {
     if (selectedPacketId == null || !selectedPacket) {
@@ -1142,6 +1294,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       preloadingRef.current = true;
       setHasMorePackets(true);
       setSelectedPacketId(null);
+      setSelectedPacketDetail(null);
       setSelectedPacketRawHex("");
       setSelectedPacketLayers(null);
       httpStreamCacheRef.current.clear();
@@ -1168,11 +1321,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
       setThreatHits([]);
       setExtractedObjects([]);
+      setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
       setFileMeta({
         name: opened.fileName,
         sizeBytes: Number(opened.fileSize ?? 0),
         path: opened.filePath,
       });
+      setCaptureRevision((prev) => prev + 1);
       activeCapturePathRef.current = opened.filePath;
       rememberRecentCapture({
         path: opened.filePath,
@@ -1187,12 +1342,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       const waitDeadline = Date.now() + 120000;
       let firstPageLoaded = false;
       while (Date.now() < waitDeadline) {
-        if (!firstPageLoaded) {
-          const firstPage = await bridge.listPacketsPage(0, 1, effectiveFilter);
-          if (firstPage.total > 0) {
-            await loadPacketPage(0, effectiveFilter);
-            firstPageLoaded = true;
+        const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
+        const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter);
+        if (probePage.total > 0) {
+          setTotalPackets(probePage.total);
+          if (preloadTotalRef.current <= 0) {
+            setPreloadProcessed(probePage.total);
+            preloadProcessedRef.current = probePage.total;
           }
+        }
+        if (!firstPageLoaded && probePage.total > 0) {
+          commitPacketPage(0, {
+            items: probePage.items,
+            total: probePage.total,
+            hasMore: probePage.hasMore,
+          });
+          firstPageLoaded = true;
         }
 
         if (parseFinishedRef.current) {
@@ -1222,7 +1387,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setIsPreloadingCapture(false);
       wakeCaptureWaiters();
     }
-  }, [backendConnected, cancelPacketPageLoad, displayFilter, loadPacketPage, refreshAnalysisResult, refreshStreamIndex, rememberRecentCapture, waitForCaptureSignal, wakeCaptureWaiters]);
+  }, [backendConnected, cancelPacketPageLoad, commitPacketPage, displayFilter, refreshAnalysisResult, refreshStreamIndex, rememberRecentCapture, waitForCaptureSignal, wakeCaptureWaiters]);
 
   const applyFilter = useCallback((value?: string) => {
     const nextFilter = value ?? displayFilter;
@@ -1251,6 +1416,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const selectPacket = useCallback((id: number) => {
     setSelectedPacketId(id);
+    setSelectedPacketDetail((prev) => (prev?.id === id ? prev : null));
   }, []);
 
   const togglePlugin = useCallback((id: number | string) => {
@@ -1372,8 +1538,41 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const stopCapture = useCallback(async () => {
     if (!backendConnected) return;
     setIsFilterLoading(false);
-    await bridge.stopStreamingPackets();
-    setBackendStatus("解析已停止");
+    cancelPacketPageLoad();
+    await bridge.closeCapture();
+    setPackets([]);
+    setTotalPackets(0);
+    setPageStart(0);
+    pageStartRef.current = 0;
+    setPreloadProcessed(0);
+    setPreloadTotal(0);
+    preloadProcessedRef.current = 0;
+    preloadTotalRef.current = 0;
+    setHasPrevPackets(false);
+    hasMorePacketsRef.current = false;
+    setHasMorePackets(false);
+    setSelectedPacketId(null);
+    setSelectedPacketDetail(null);
+    setSelectedPacketRawHex("");
+    setSelectedPacketLayers(null);
+    setThreatHits([]);
+    setExtractedObjects([]);
+    setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+    setHttpStream(EMPTY_HTTP_STREAM);
+    setTcpStream(EMPTY_BINARY_STREAM);
+    setUdpStream({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
+    setStreamIds({ http: [], tcp: [], udp: [] });
+    httpStreamCacheRef.current.clear();
+    tcpStreamCacheRef.current.clear();
+    udpStreamCacheRef.current.clear();
+    setFileMeta({
+      name: "未打开文件",
+      sizeBytes: 0,
+      path: "",
+    });
+    setCaptureRevision((prev) => prev + 1);
+    activeCapturePathRef.current = "";
+    setBackendStatus("当前抓包已关闭，临时数据库已清理");
   }, [backendConnected]);
 
   const protocolTree = useMemo(
@@ -1431,12 +1630,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       decryptionConfig,
       updateDecryptionConfig,
       fileMeta,
+      captureRevision,
       recentCaptures,
       openCapture,
       stopCapture,
       preparePacketStream,
       backendConnected,
       backendStatus,
+      mediaAnalysisProgress,
       tsharkStatus,
       isTSharkChecking,
       setTSharkPath,
@@ -1486,12 +1687,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       decryptionConfig,
       updateDecryptionConfig,
       fileMeta,
+      captureRevision,
       recentCaptures,
       openCapture,
       stopCapture,
       preparePacketStream,
       backendConnected,
       backendStatus,
+      mediaAnalysisProgress,
       tsharkStatus,
       isTSharkChecking,
       setTSharkPath,

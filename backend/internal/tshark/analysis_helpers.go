@@ -131,6 +131,55 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 	return nil
 }
 
+func runDirectFieldScan(args []string, width int, onRow func([]string)) error {
+	if width <= 0 {
+		return nil
+	}
+
+	cmd, err := Command(args...)
+	if err != nil {
+		return fmt.Errorf("resolve tshark: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("create stdout pipe: %w", err)
+	}
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start tshark: %w", err)
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		row := normalizeFieldScanRow(strings.Split(line, "\t"), width)
+		if onRow != nil {
+			onRow(append([]string(nil), row...))
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		_ = cmd.Wait()
+		return fmt.Errorf("scan tshark output: %w", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail != "" {
+			return fmt.Errorf("wait tshark: %w: %s", err, detail)
+		}
+		return fmt.Errorf("wait tshark: %w", err)
+	}
+	return nil
+}
+
 func WarmFieldScanCache(filePath string, fields []string, opts fieldScanOptions) error {
 	return scanFieldRowsWithOptions(filePath, fields, opts, nil)
 }

@@ -57,6 +57,7 @@ func BuildFastListArgs(opts model.ParseOptions) []string {
 		"-e", "_ws.col.Info",
 		"-e", "tcp.stream",
 		"-e", "udp.stream",
+		"-e", "udp.payload",
 		"-e", "ip.hdr_len",
 		"-e", "tcp.hdr_len",
 		"-e", "tcp.analysis.flags",
@@ -272,6 +273,10 @@ func ParsePacketFromEK(line string, id int64) (model.Packet, error) {
 		findStringByPath(node, "layers.frame.frame_raw"),
 		findBySuffix(layers, "frameraw"),
 	)
+	udpPayloadHex := pickFirstString(
+		findStringByPath(node, "layers.udp.udp_payload"),
+		findBySuffix(layers, "udppayload"),
+	)
 
 	if sourceIP == "" && destIP == "" && packetLen == 0 && payload == "" && info == "" {
 		return model.Packet{}, errors.New("not a packet line")
@@ -290,6 +295,7 @@ func ParsePacketFromEK(line string, id int64) (model.Packet, error) {
 		Info:            info,
 		Payload:         payload,
 		RawHex:          rawHex,
+		UDPPayloadHex:   udpPayloadHex,
 		StreamID:        int64(streamID),
 		IPHeaderLen:     ipHeaderLen,
 		L4HeaderLen:     l4HeaderLen,
@@ -633,7 +639,7 @@ func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket 
 
 func parseFastListLine(line string) (model.Packet, error) {
 	parts := strings.Split(line, "\x1f")
-	if len(parts) < 64 {
+	if len(parts) < 65 {
 		return model.Packet{}, errors.New("invalid fast list line")
 	}
 
@@ -647,49 +653,50 @@ func parseFastListLine(line string) (model.Packet, error) {
 	length := parseInt(parts[13])
 	info := strings.TrimSpace(parts[14])
 	streamID := parseInt64(firstNonEmpty(parts[15], parts[16]))
-	ipHeaderLen := parseInt(parts[17])
-	l4HeaderLen := parseInt(parts[18])
+	udpPayloadHex := strings.TrimSpace(parts[17])
+	ipHeaderLen := parseInt(parts[18])
+	l4HeaderLen := parseInt(parts[19])
 	if l4HeaderLen == 0 && strings.EqualFold(normalizeProto(proto), "UDP") {
 		l4HeaderLen = 8
 	}
 
 	color := model.PacketColorFeatures{
-		TCPAnalysisFlags:  hasNonEmpty(parts[19]),
-		TCPWindowUpdate:   parseTruthy(parts[20]),
-		TCPKeepAlive:      parseTruthy(parts[21]),
-		TCPKeepAliveAck:   parseTruthy(parts[22]),
-		TCPRST:            parseTruthy(parts[23]),
-		TCPSYN:            parseTruthy(parts[24]),
-		TCPFIN:            parseTruthy(parts[25]),
-		HSRPState:         parseInt(parts[26]),
-		OSPFMsg:           parseInt(parts[27]),
-		STPTopologyChange: strings.EqualFold(strings.TrimSpace(parts[28]), "0x80"),
-		ICMPType:          parseInt(parts[29]),
-		ICMPv6Type:        parseInt(parts[30]),
-		IPv4TTL:           parseInt(parts[31]),
-		IPv6HopLimit:      parseInt(parts[32]),
-		Broadcast:         strings.EqualFold(strings.TrimSpace(parts[33]), "ff:ff:ff:ff:ff:ff"),
-		ChecksumBad:       isBadStatus(parts[34]) || isBadStatus(parts[35]) || isBadStatus(parts[36]) || isBadStatus(parts[37]) || isBadStatus(parts[38]) || isBadStatus(parts[39]) || isBadStatus(parts[40]) || isBadStatus(parts[41]) || isBadStatus(parts[42]) || isBadStatus(parts[43]),
-		HasSystemdJnl:     hasNonEmpty(parts[44]),
-		HasSysdig:         hasNonEmpty(parts[45]),
-		HasSMB:            hasNonEmpty(parts[46]),
-		HasNBSS:           hasNonEmpty(parts[47]),
-		HasNBNS:           hasNonEmpty(parts[48]),
-		HasNetBIOS:        hasNonEmpty(parts[49]),
-		HasDCERPC:         hasNonEmpty(parts[50]),
-		HasHSRP:           hasNonEmpty(parts[51]),
-		HasEIGRP:          hasNonEmpty(parts[52]),
-		HasOSPF:           hasNonEmpty(parts[53]),
-		HasBGP:            hasNonEmpty(parts[54]),
-		HasCDP:            hasNonEmpty(parts[55]),
-		HasVRRP:           hasNonEmpty(parts[56]),
-		HasCARP:           hasNonEmpty(parts[57]),
-		HasGVRP:           hasNonEmpty(parts[58]),
-		HasIGMP:           hasNonEmpty(parts[59]),
-		HasISMP:           hasNonEmpty(parts[60]),
-		HasRIP:            hasNonEmpty(parts[61]),
-		HasGLBP:           hasNonEmpty(parts[62]),
-		HasPIM:            hasNonEmpty(parts[63]),
+		TCPAnalysisFlags:  hasNonEmpty(parts[20]),
+		TCPWindowUpdate:   parseTruthy(parts[21]),
+		TCPKeepAlive:      parseTruthy(parts[22]),
+		TCPKeepAliveAck:   parseTruthy(parts[23]),
+		TCPRST:            parseTruthy(parts[24]),
+		TCPSYN:            parseTruthy(parts[25]),
+		TCPFIN:            parseTruthy(parts[26]),
+		HSRPState:         parseInt(parts[27]),
+		OSPFMsg:           parseInt(parts[28]),
+		STPTopologyChange: strings.EqualFold(strings.TrimSpace(parts[29]), "0x80"),
+		ICMPType:          parseInt(parts[30]),
+		ICMPv6Type:        parseInt(parts[31]),
+		IPv4TTL:           parseInt(parts[32]),
+		IPv6HopLimit:      parseInt(parts[33]),
+		Broadcast:         strings.EqualFold(strings.TrimSpace(parts[34]), "ff:ff:ff:ff:ff:ff"),
+		ChecksumBad:       isBadStatus(parts[35]) || isBadStatus(parts[36]) || isBadStatus(parts[37]) || isBadStatus(parts[38]) || isBadStatus(parts[39]) || isBadStatus(parts[40]) || isBadStatus(parts[41]) || isBadStatus(parts[42]) || isBadStatus(parts[43]) || isBadStatus(parts[44]),
+		HasSystemdJnl:     hasNonEmpty(parts[45]),
+		HasSysdig:         hasNonEmpty(parts[46]),
+		HasSMB:            hasNonEmpty(parts[47]),
+		HasNBSS:           hasNonEmpty(parts[48]),
+		HasNBNS:           hasNonEmpty(parts[49]),
+		HasNetBIOS:        hasNonEmpty(parts[50]),
+		HasDCERPC:         hasNonEmpty(parts[51]),
+		HasHSRP:           hasNonEmpty(parts[52]),
+		HasEIGRP:          hasNonEmpty(parts[53]),
+		HasOSPF:           hasNonEmpty(parts[54]),
+		HasBGP:            hasNonEmpty(parts[55]),
+		HasCDP:            hasNonEmpty(parts[56]),
+		HasVRRP:           hasNonEmpty(parts[57]),
+		HasCARP:           hasNonEmpty(parts[58]),
+		HasGVRP:           hasNonEmpty(parts[59]),
+		HasIGMP:           hasNonEmpty(parts[60]),
+		HasISMP:           hasNonEmpty(parts[61]),
+		HasRIP:            hasNonEmpty(parts[62]),
+		HasGLBP:           hasNonEmpty(parts[63]),
+		HasPIM:            hasNonEmpty(parts[64]),
 	}
 
 	return model.Packet{
@@ -704,6 +711,7 @@ func parseFastListLine(line string) (model.Packet, error) {
 		Length:          length,
 		Info:            info,
 		Payload:         "",
+		UDPPayloadHex:   udpPayloadHex,
 		StreamID:        streamID,
 		IPHeaderLen:     ipHeaderLen,
 		L4HeaderLen:     l4HeaderLen,

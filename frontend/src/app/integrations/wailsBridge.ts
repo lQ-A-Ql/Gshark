@@ -141,9 +141,11 @@ export interface BackendBridge {
   openPcapFile(): Promise<OpenFileResult>;
   startStreamingPackets(filePath: string, filter: string): Promise<void>;
   stopStreamingPackets(): Promise<void>;
+  closeCapture(): Promise<void>;
   listPackets(): Promise<Packet[]>;
   listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
   locatePacketPage(packetId: number, limit: number, filter?: string): Promise<PacketLocateResult>;
+  getPacket(packetId: number): Promise<Packet>;
   listThreatHits(prefixes?: string[]): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
@@ -597,6 +599,10 @@ export const bridge: BackendBridge = {
     await request("/api/capture/stop", { method: "POST" });
   },
 
+  async closeCapture() {
+    await request("/api/capture/close", { method: "POST" });
+  },
+
   async listPackets() {
     const rows = await request<any[]>("/api/packets");
     return rows.map(asPacket);
@@ -651,6 +657,11 @@ export const bridge: BackendBridge = {
       total: Number(payload.total ?? 0),
       found: Boolean(payload.found),
     };
+  },
+
+  async getPacket(packetId: number) {
+    const payload = await request<any>(`/api/packet?id=${encodeURIComponent(String(packetId))}`);
+    return asPacket(payload);
   },
 
   async listThreatHits(prefixes = ["flag{", "ctf{"]) {
@@ -1063,6 +1074,7 @@ export const bridge: BackendBridge = {
       sessions: Array.isArray(payload.sessions)
         ? payload.sessions.map((item: any) => ({
             id: String(item.id ?? ""),
+            mediaType: String(item.media_type ?? ""),
             family: String(item.family ?? ""),
             application: String(item.application ?? ""),
             source: String(item.source ?? ""),
