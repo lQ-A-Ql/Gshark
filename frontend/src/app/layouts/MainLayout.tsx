@@ -16,14 +16,24 @@ import {
   RefreshCw,
   Save,
   ScrollText,
+  Settings2,
   ShieldAlert,
   Upload,
   Usb,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarProvider,
+  SidebarRail,
+  useSidebar,
+} from "../components/ui/sidebar";
+import { RuntimeSettingsSidebar } from "../components/RuntimeSettingsSidebar";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -48,6 +58,7 @@ const NAV_ITEMS = [
 export function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const {
     fileMeta,
     filteredPackets,
@@ -155,134 +166,181 @@ export function MainLayout() {
     return () => window.removeEventListener("keydown", handler);
   }, [navigate, openCapture]);
 
+  const HeaderSettingsButton = () => {
+    const { toggleSidebar } = useSidebar();
+    return (
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+        title="打开设置侧栏"
+      >
+        <Settings2 className="h-4 w-4" />
+      </button>
+    );
+  };
+
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
-      <header className="relative z-50 flex shrink-0 flex-col border-b border-border bg-card shadow-sm">
-        <div className="flex h-12 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 font-semibold tracking-wide text-blue-600">
-              <Hexagon className="h-6 w-6" />
-              <span className="text-lg">GShark-Sentinel</span>
+    <SidebarProvider
+      open={settingsOpen}
+      onOpenChange={setSettingsOpen}
+      style={
+        {
+          "--sidebar-width": "31rem",
+        } as CSSProperties
+      }
+    >
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-background font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
+        <header className="relative z-50 flex shrink-0 flex-col border-b border-border bg-card shadow-sm">
+          <div className="flex h-12 items-center justify-between px-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 font-semibold tracking-wide text-blue-600">
+                <Hexagon className="h-6 w-6" />
+                <span className="text-lg">GShark-Sentinel</span>
+              </div>
+
+              <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                <MenuGroup label="文件">
+                  <MenuItem onClick={() => void openCapture()} icon={<FolderOpen className="h-4 w-4" />}>打开</MenuItem>
+                  <MenuItem onClick={exportPacketsJson} icon={<Save className="h-4 w-4" />}>导出当前列表</MenuItem>
+                  <MenuItem onClick={() => void openCapture()} icon={<Upload className="h-4 w-4" />}>导入...</MenuItem>
+                  <MenuItem onClick={() => navigate("/updates")} icon={<RefreshCw className="h-4 w-4" />}>检查更新</MenuItem>
+                  <MenuDivider />
+                  <MenuItem danger onClick={() => window.close()}>退出</MenuItem>
+                </MenuGroup>
+
+                <MenuGroup label="编辑">
+                  <MenuItem onClick={() => void copySelectedPacket()}>复制所选数据包</MenuItem>
+                  <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>查找数据包...</MenuItem>
+                  <MenuItem onClick={() => setSettingsOpen(true)}>首选项</MenuItem>
+                </MenuGroup>
+
+                <MenuGroup label="视图">
+                  <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
+                  <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
+                  <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
+                  <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
+                </MenuGroup>
+
+                <MenuGroup label="分析">
+                  <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setDisplayFilter("http");
+                      applyFilter("http");
+                    }}
+                  >
+                    应用过滤器 http
+                  </MenuItem>
+                  <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
+                  <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
+                  <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
+                  <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
+                </MenuGroup>
+
+                <MenuGroup label="统计">
+                  <MenuItem onClick={() => navigate("/traffic-graph")}>流量图</MenuItem>
+                  <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
+                  <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
+                  <MenuItem onClick={exportEndpointStats}>端点统计导出</MenuItem>
+                  <MenuItem onClick={exportProtocolStats}>协议统计导出</MenuItem>
+                </MenuGroup>
+              </nav>
             </div>
 
-            <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
-              <MenuGroup label="文件">
-                <MenuItem onClick={() => void openCapture()} icon={<FolderOpen className="h-4 w-4" />}>打开</MenuItem>
-                <MenuItem onClick={exportPacketsJson} icon={<Save className="h-4 w-4" />}>导出当前列表</MenuItem>
-                <MenuItem onClick={() => void openCapture()} icon={<Upload className="h-4 w-4" />}>导入...</MenuItem>
-                <MenuItem onClick={() => navigate("/updates")} icon={<RefreshCw className="h-4 w-4" />}>检查更新</MenuItem>
-                <MenuDivider />
-                <MenuItem danger onClick={() => window.close()}>退出</MenuItem>
-              </MenuGroup>
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <HeaderSettingsButton />
+              <span className="flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600">
+                <ShieldAlert className="h-3.5 w-3.5" /> OWASP
+              </span>
+              <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600">
+                <Activity className="h-3.5 w-3.5" /> CTF
+              </span>
+              <span className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600">
+                <KeyRound className="h-3.5 w-3.5" /> 解密
+              </span>
+            </div>
+          </div>
+        </header>
 
-              <MenuGroup label="编辑">
-                <MenuItem onClick={() => void copySelectedPacket()}>复制所选数据包</MenuItem>
-                <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>查找数据包...</MenuItem>
-                <MenuItem onClick={() => navigate("/plugins")}>首选项</MenuItem>
-              </MenuGroup>
-
-              <MenuGroup label="视图">
-                <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
-                <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
-                <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
-                <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
-              </MenuGroup>
-
-              <MenuGroup label="分析">
-                <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    setDisplayFilter("http");
-                    applyFilter("http");
-                  }}
+        <div className="flex flex-1 overflow-hidden">
+          <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-border bg-card py-4 shadow-sm">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  title={item.label}
+                  className={cn(
+                    "group relative rounded-xl p-3 transition-all",
+                    isActive
+                      ? "bg-blue-50 text-blue-600 shadow-sm"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
                 >
-                  应用过滤器 http
-                </MenuItem>
-                <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
-                <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
-                <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
-                <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
-                <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
-                <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
-              </MenuGroup>
+                  <Icon className="h-5 w-5" />
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
+                  )}
 
-              <MenuGroup label="统计">
-                <MenuItem onClick={() => navigate("/traffic-graph")}>流量图</MenuItem>
-                <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
-                <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
-                <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
-                <MenuItem onClick={exportEndpointStats}>端点统计导出</MenuItem>
-                <MenuItem onClick={exportProtocolStats}>协议统计导出</MenuItem>
-              </MenuGroup>
-            </nav>
-          </div>
+                  <div className="invisible absolute left-full z-50 ml-3 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100">
+                    {item.label}
+                  </div>
+                </Link>
+              );
+            })}
+          </aside>
 
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600">
-              <ShieldAlert className="h-3.5 w-3.5" /> OWASP
-            </span>
-            <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600">
-              <Activity className="h-3.5 w-3.5" /> CTF
-            </span>
-            <span className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600">
-              <KeyRound className="h-3.5 w-3.5" /> 解密
-            </span>
-          </div>
+          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+            <Outlet />
+          </main>
         </div>
-      </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-border bg-card py-4 shadow-sm">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                title={item.label}
-                className={cn(
-                  "group relative rounded-xl p-3 transition-all",
-                  isActive
-                    ? "bg-blue-50 text-blue-600 shadow-sm"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
-                )}
+        {settingsOpen ? (
+          <button
+            type="button"
+            aria-label="关闭设置侧栏"
+            className="fixed inset-0 z-40 bg-slate-900/12 backdrop-blur-[1px]"
+            onClick={() => setSettingsOpen(false)}
+          />
+        ) : null}
 
-                <div className="invisible absolute left-full z-50 ml-3 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100">
-                  {item.label}
-                </div>
-              </Link>
-            );
-          })}
-        </aside>
+        <Sidebar
+          side="right"
+          variant="floating"
+          collapsible="offcanvas"
+          className="z-[60] pt-14 pb-10 pr-3"
+        >
+          <SidebarHeader className="p-0" />
+          <SidebarContent className="p-0">
+            <RuntimeSettingsSidebar />
+          </SidebarContent>
+          <SidebarRail />
+        </Sidebar>
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <Outlet />
-        </main>
+        <footer className="z-40 flex h-7 shrink-0 items-center justify-between border-t border-border bg-card px-4 text-[11px] font-medium tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})</span>
+            <span className="flex items-center gap-1 text-blue-600">
+              显示: {filteredPackets.length.toLocaleString()} / 缓存: {packets.length.toLocaleString()} / 后端总计: {totalPackets.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1 text-amber-600"><KeyRound className="h-3.5 w-3.5" /> TLS 解密: {decryptionConfig.sslKeyLogPath ? "SSLKEYLOGFILE 已加载" : "未配置"}</span>
+            <span className={cn("flex items-center gap-1", backendConnected ? "text-emerald-600" : "text-muted-foreground")}>
+              <Activity className="h-3.5 w-3.5" /> 引擎: {backendStatus}
+            </span>
+          </div>
+        </footer>
       </div>
-
-      <footer className="z-40 flex h-7 shrink-0 items-center justify-between border-t border-border bg-card px-4 text-[11px] font-medium tracking-wider text-muted-foreground">
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})</span>
-          <span className="flex items-center gap-1 text-blue-600">
-            显示: {filteredPackets.length.toLocaleString()} / 缓存: {packets.length.toLocaleString()} / 后端总计: {totalPackets.toLocaleString()}
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-amber-600"><KeyRound className="h-3.5 w-3.5" /> TLS 解密: {decryptionConfig.sslKeyLogPath ? "SSLKEYLOGFILE 已加载" : "未配置"}</span>
-          <span className={cn("flex items-center gap-1", backendConnected ? "text-emerald-600" : "text-muted-foreground")}>
-            <Activity className="h-3.5 w-3.5" /> 引擎: {backendStatus}
-          </span>
-        </div>
-      </footer>
-    </div>
+    </SidebarProvider>
   );
 }
 

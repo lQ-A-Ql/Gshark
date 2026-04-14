@@ -18,24 +18,31 @@ type playbackProfile struct {
 }
 
 type FFmpegStatus struct {
-	Available bool   `json:"available"`
-	Path      string `json:"path"`
-	Message   string `json:"message"`
+	Available       bool   `json:"available"`
+	Path            string `json:"path"`
+	Message         string `json:"message"`
+	CustomPath      string `json:"custom_path,omitempty"`
+	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
 }
 
 func (s *Service) FFmpegStatus() FFmpegStatus {
-	path, err := exec.LookPath("ffmpeg")
+	customPath := strings.TrimSpace(os.Getenv(ffmpegEnvVar))
+	path, err := resolveFFmpegBinary(customPath)
 	if err != nil {
 		return FFmpegStatus{
-			Available: false,
-			Path:      "",
-			Message:   "未在环境变量 PATH 中找到 ffmpeg，请先安装 ffmpeg 并将其加入 PATH。",
+			Available:       false,
+			Path:            "",
+			Message:         "未检测到 ffmpeg，请先安装 ffmpeg 或在设置中配置其路径。",
+			CustomPath:      customPath,
+			UsingCustomPath: customPath != "",
 		}
 	}
 	return FFmpegStatus{
-		Available: true,
-		Path:      path,
-		Message:   "ok",
+		Available:       true,
+		Path:            path,
+		Message:         "ok",
+		CustomPath:      customPath,
+		UsingCustomPath: customPath != "",
 	}
 }
 
@@ -210,4 +217,38 @@ func compressedAudioPlaybackProfile(inputFormat string) playbackProfile {
 			"-movflags", "+faststart",
 		},
 	}
+}
+
+func resolveFFmpegBinary(custom string) (string, error) {
+	custom = strings.TrimSpace(custom)
+	if custom == "" {
+		return exec.LookPath("ffmpeg")
+	}
+
+	candidates := []string{custom}
+	if info, err := os.Stat(custom); err == nil && info.IsDir() {
+		candidates = append(candidates,
+			filepath.Join(custom, "ffmpeg.exe"),
+			filepath.Join(custom, "ffmpeg"),
+		)
+	}
+
+	var lastErr error
+	for _, candidate := range candidates {
+		if resolved, err := exec.LookPath(candidate); err == nil {
+			return resolved, nil
+		} else {
+			lastErr = err
+		}
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
+		} else if err != nil {
+			lastErr = err
+		}
+	}
+
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", exec.ErrNotFound
 }

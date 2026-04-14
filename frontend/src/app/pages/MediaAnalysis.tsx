@@ -1,4 +1,4 @@
-import { Clapperboard, Download, Headphones, Loader2, Play, Video } from "lucide-react";
+import { Clapperboard, Copy, Download, FileText, Headphones, Loader2, Play, Square, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import {
@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import type { MediaAnalysis as MediaAnalysisData, MediaSession, TrafficBucket } from "../core/types";
+import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskItem, SpeechBatchTaskStatus, SpeechToTextStatus, TrafficBucket } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 
@@ -27,6 +27,18 @@ const EMPTY_ANALYSIS: MediaAnalysisData = {
 
 const mediaAnalysisCache = new Map<string, MediaAnalysisData>();
 const MEDIA_PROTOCOL_TAGS = ["RTP", "RTSP", "Moonlight", "GameStream"];
+const EMPTY_BATCH_STATUS: SpeechBatchTaskStatus = {
+  taskId: "",
+  total: 0,
+  queued: 0,
+  running: 0,
+  completed: 0,
+  failed: 0,
+  skipped: 0,
+  done: false,
+  cancelled: false,
+  items: [],
+};
 
 function canPlayArtifact(session: MediaSession): boolean {
   if (!session.artifact) return false;
@@ -39,6 +51,110 @@ function canPlayArtifact(session: MediaSession): boolean {
     return format === "ulaw" || format === "alaw" || format === "g722" || format === "l16" || format === "aac" || format === "opus" || format === "mpa" || format === "mp3";
   }
   return false;
+}
+
+function transcriptionStatusOf(session: MediaSession, batchStatus: SpeechBatchTaskStatus, transcriptions: Record<string, MediaTranscription>) {
+  const token = session.artifact?.token;
+  if (!token) return { status: "missing", label: "未生成", className: "bg-muted text-muted-foreground" };
+  const batchItem = batchStatus.items.find((item) => item.token === token);
+  if (batchItem) {
+    switch (batchItem.status) {
+      case "queued":
+        return { status: "queued", label: "排队中", className: "bg-slate-100 text-slate-700" };
+      case "running":
+        return { status: "running", label: "转写中", className: "bg-blue-100 text-blue-700" };
+      case "completed":
+        return { status: "completed", label: "已完成", className: "bg-emerald-100 text-emerald-700" };
+      case "failed":
+        return { status: "failed", label: "失败", className: "bg-rose-100 text-rose-700" };
+      case "skipped":
+        return { status: "skipped", label: "已跳过（缓存）", className: "bg-amber-100 text-amber-700" };
+    }
+  }
+  if (transcriptions[token]) {
+    return { status: "completed", label: "已完成", className: "bg-emerald-100 text-emerald-700" };
+  }
+  return { status: "idle", label: "未转写", className: "bg-muted text-muted-foreground" };
+}
+
+function transcriptionRecordOf(session: MediaSession, batchStatus: SpeechBatchTaskStatus, transcriptions: Record<string, MediaTranscription>) {
+  const token = session.artifact?.token;
+  if (!token) return null;
+  const cached = transcriptions[token];
+  if (cached) {
+    return {
+      text: cached.text || "",
+      error: cached.error || "",
+      status: cached.status || "completed",
+      cached: cached.cached,
+    };
+  }
+  const batchItem = batchStatus.items.find((item) => item.token === token);
+  if (!batchItem) return null;
+  return {
+    text: batchItem.text || "",
+    error: batchItem.error || "",
+    status: batchItem.status || "idle",
+    cached: batchItem.cached,
+  };
+}
+
+function estimateTranscriptionProgress(elapsedMs: number) {
+  if (elapsedMs < 800) {
+    return { percent: 14, label: "正在准备音频", tone: "rose" as const };
+  }
+  if (elapsedMs < 2600) {
+    return { percent: 38, label: "正在转码为识别输入", tone: "amber" as const };
+  }
+  if (elapsedMs < 9000) {
+    return { percent: 76, label: "正在进行离线转写", tone: "blue" as const };
+  }
+  return { percent: 92, label: "正在整理转写结果", tone: "emerald" as const };
+}
+
+function progressToneClass(tone: "rose" | "amber" | "blue" | "emerald") {
+  switch (tone) {
+    case "rose":
+      return "bg-rose-500";
+    case "amber":
+      return "bg-amber-500";
+    case "blue":
+      return "bg-blue-500";
+    case "emerald":
+      return "bg-emerald-500";
+  }
+}
+
+function collectBatchSummaryItems(batchStatus: SpeechBatchTaskStatus, transcriptions: Record<string, MediaTranscription>) {
+  const byToken = new Map<string, {
+    token: string;
+    title: string;
+    text: string;
+    status: string;
+    cached: boolean;
+  }>();
+  for (const item of batchStatus.items) {
+    const text = (item.text || transcriptions[item.token]?.text || "").trim();
+    if (!text) continue;
+    byToken.set(item.token, {
+      token: item.token,
+      title: item.title || transcriptions[item.token]?.title || item.mediaLabel,
+      text,
+      status: item.status,
+      cached: item.cached,
+    });
+  }
+  for (const [token, item] of Object.entries(transcriptions)) {
+    if (!item.text.trim() || byToken.has(token)) continue;
+    byToken.set(token, {
+      token,
+      title: item.title,
+      text: item.text,
+      status: item.status,
+      cached: item.cached,
+    });
+  }
+  return Array.from(byToken.values());
 }
 
 export default function MediaAnalysis() {
@@ -55,6 +171,15 @@ export default function MediaAnalysis() {
   const [playbackUrl, setPlaybackUrl] = useState("");
   const [playbackLoadingToken, setPlaybackLoadingToken] = useState("");
   const [ffmpegDialogMessage, setFfmpegDialogMessage] = useState("");
+  const [speechDialogMessage, setSpeechDialogMessage] = useState("");
+  const [speechStatus, setSpeechStatus] = useState<SpeechToTextStatus | null>(null);
+  const [transcriptions, setTranscriptions] = useState<Record<string, MediaTranscription>>({});
+  const [transcriptionLoadingToken, setTranscriptionLoadingToken] = useState("");
+  const [transcriptionStartedAt, setTranscriptionStartedAt] = useState<number | null>(null);
+  const [batchStatus, setBatchStatus] = useState<SpeechBatchTaskStatus>(EMPTY_BATCH_STATUS);
+  const [batchStarting, setBatchStarting] = useState(false);
+  const [batchTokenStartedAt, setBatchTokenStartedAt] = useState<number | null>(null);
+  const [progressClock, setProgressClock] = useState(() => Date.now());
 
   const filteredSessions = useMemo(() => {
     if (activeTab === "all") return analysis.sessions;
@@ -63,6 +188,14 @@ export default function MediaAnalysis() {
 
   const videoCount = useMemo(() => analysis.sessions.filter((s) => (s.mediaType || "video") === "video").length, [analysis.sessions]);
   const audioCount = useMemo(() => analysis.sessions.filter((s) => s.mediaType === "audio").length, [analysis.sessions]);
+  const audioArtifactSessions = useMemo(
+    () => analysis.sessions.filter((s) => s.mediaType === "audio" && s.artifact),
+    [analysis.sessions],
+  );
+  const batchSummaryItems = useMemo(
+    () => collectBatchSummaryItems(batchStatus, transcriptions),
+    [batchStatus, transcriptions],
+  );
 
   const refreshAnalysis = useCallback((force = false) => {
     if (!backendConnected) {
@@ -98,6 +231,125 @@ export default function MediaAnalysis() {
         setLoading(false);
       });
   }, [backendConnected, cacheKey]);
+
+  const ensureSpeechReady = useCallback(async () => {
+    const nextStatus = await bridge.checkSpeechToText();
+    setSpeechStatus(nextStatus);
+    if (!nextStatus.available) {
+      setSpeechDialogMessage(nextStatus.message || "语音转写依赖未就绪。");
+      throw new Error(nextStatus.message || "语音转写依赖未就绪。");
+    }
+    return nextStatus;
+  }, []);
+
+  const loadBatchStatus = useCallback(async () => {
+    if (!backendConnected) {
+      setBatchStatus(EMPTY_BATCH_STATUS);
+      return;
+    }
+    try {
+      const status = await bridge.getMediaBatchTranscriptionStatus();
+      setBatchStatus(status);
+      if (status.items.length > 0) {
+        setTranscriptions((prev) => {
+          const next = { ...prev };
+          for (const item of status.items) {
+            if (!item.text?.trim()) continue;
+            next[item.token] = {
+              token: item.token,
+              sessionId: item.sessionId,
+              title: item.title,
+              text: item.text,
+              language: speechStatus?.language || "zh-CN",
+              engine: speechStatus?.engine || "vosk",
+              status: item.status,
+              cached: item.cached,
+              durationSeconds: prev[item.token]?.durationSeconds ?? 0,
+              segments: prev[item.token]?.segments ?? [],
+            };
+          }
+          return next;
+        });
+      }
+    } catch {
+      setBatchStatus(EMPTY_BATCH_STATUS);
+    }
+  }, [backendConnected, speechStatus?.engine, speechStatus?.language]);
+
+  const runTranscription = useCallback(async (session: MediaSession, force = false) => {
+    if (!session.artifact) return;
+    setTranscriptionLoadingToken(session.artifact.token);
+    setTranscriptionStartedAt(Date.now());
+    setError("");
+    try {
+      await ensureSpeechReady();
+      const result = await bridge.transcribeMediaArtifact(session.artifact.token, force);
+      setTranscriptions((prev) => ({ ...prev, [result.token]: result }));
+      await loadBatchStatus();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "音频转写失败";
+      if (message.toLowerCase().includes("vosk") || message.toLowerCase().includes("python") || message.toLowerCase().includes("ffmpeg") || message.includes("模型")) {
+        setSpeechDialogMessage(message);
+      } else {
+        setError(message);
+      }
+    } finally {
+      setTranscriptionLoadingToken("");
+      setTranscriptionStartedAt(null);
+    }
+  }, [ensureSpeechReady, loadBatchStatus]);
+
+  const startBatchTranscription = useCallback(async (force = false) => {
+    setBatchStarting(true);
+    setError("");
+    try {
+      await ensureSpeechReady();
+      const status = await bridge.startMediaBatchTranscription(force);
+      setBatchStatus(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "批量转写启动失败";
+      if (message.toLowerCase().includes("vosk") || message.toLowerCase().includes("python") || message.toLowerCase().includes("ffmpeg") || message.includes("模型")) {
+        setSpeechDialogMessage(message);
+      } else {
+        setError(message);
+      }
+    } finally {
+      setBatchStarting(false);
+    }
+  }, [ensureSpeechReady]);
+
+  const cancelBatchTranscription = useCallback(async () => {
+    try {
+      const status = await bridge.cancelMediaBatchTranscription();
+      setBatchStatus(status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "取消批量转写失败");
+    }
+  }, []);
+
+  const copyText = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setError("");
+    } catch {
+      setError("复制文本失败");
+    }
+  }, []);
+
+  const copyAllText = useCallback(async () => {
+    const text = batchSummaryItems.map((item) => `${item.title}\n${item.text}`).join("\n\n");
+    if (!text.trim()) return;
+    await copyText(text);
+  }, [batchSummaryItems, copyText]);
+
+  const exportBatchTranscription = useCallback(async (format: "txt" | "json") => {
+    try {
+      await bridge.exportMediaBatchTranscription(format);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "批量转写导出失败");
+    }
+  }, []);
 
   const downloadArtifact = useCallback(async (session: MediaSession) => {
     if (!session.artifact) return;
@@ -155,6 +407,46 @@ export default function MediaAnalysis() {
     refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis]);
 
+  useEffect(() => {
+    setTranscriptions({});
+    setBatchStatus(EMPTY_BATCH_STATUS);
+    setSpeechStatus(null);
+    if (!isPreloadingCapture) {
+      void loadBatchStatus();
+    }
+  }, [captureRevision, isPreloadingCapture, loadBatchStatus]);
+
+  useEffect(() => {
+    if (isPreloadingCapture) return;
+    void loadBatchStatus();
+  }, [isPreloadingCapture, loadBatchStatus]);
+
+  useEffect(() => {
+    if (!batchStatus.taskId || batchStatus.done) return;
+    const timer = window.setInterval(() => {
+      void loadBatchStatus();
+    }, 900);
+    return () => window.clearInterval(timer);
+  }, [batchStatus.done, batchStatus.taskId, loadBatchStatus]);
+
+  useEffect(() => {
+    if (!batchStatus.currentToken) {
+      setBatchTokenStartedAt(null);
+      return;
+    }
+    setBatchTokenStartedAt(Date.now());
+  }, [batchStatus.currentToken]);
+
+  useEffect(() => {
+    if (!transcriptionLoadingToken && !batchStatus.currentToken) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setProgressClock(Date.now());
+    }, 280);
+    return () => window.clearInterval(timer);
+  }, [batchStatus.currentToken, transcriptionLoadingToken]);
+
   useEffect(() => (
     () => {
       if (playbackUrl) {
@@ -174,6 +466,35 @@ export default function MediaAnalysis() {
         theme="rose"
         onRefresh={() => refreshAnalysis(true)}
       />
+
+      {audioArtifactSessions.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => void startBatchTranscription(false)}
+            disabled={batchStarting || (!!batchStatus.taskId && !batchStatus.done)}
+          >
+            {batchStarting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            批量转写音频
+          </button>
+          <button
+            className="inline-flex items-center gap-1 rounded border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => void startBatchTranscription(true)}
+            disabled={batchStarting || (!!batchStatus.taskId && !batchStatus.done)}
+          >
+            强制重新转写
+          </button>
+          {batchStatus.taskId && !batchStatus.done && (
+            <button
+              className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-100"
+              onClick={() => void cancelBatchTranscription()}
+            >
+              <Square className="h-3.5 w-3.5" />
+              取消
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && (
         <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在识别 RTP / RTSP / Moonlight / GameStream 并尝试还原媒体流...</div>
@@ -247,6 +568,37 @@ export default function MediaAnalysis() {
         <div className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">{error}</div>
       )}
 
+      {batchStatus.taskId && (
+        <div className="mb-3 rounded border border-border bg-card px-3 py-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-foreground">批量音频转写</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {batchStatus.done
+                  ? (batchStatus.cancelled ? "任务已取消" : "任务已完成")
+                  : (batchStatus.currentLabel ? `当前处理：${batchStatus.currentLabel}` : "正在准备队列...")}
+              </div>
+            </div>
+            <div className="text-right text-xs text-muted-foreground">
+              <div>{batchStatus.completed + batchStatus.skipped} / {batchStatus.total}</div>
+              <div>失败 {batchStatus.failed} · 排队 {batchStatus.queued}</div>
+            </div>
+          </div>
+          <div className="mb-2 h-2 w-full overflow-hidden rounded bg-muted">
+            <div
+              className="h-full bg-rose-600 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, batchStatus.total > 0 ? ((batchStatus.completed + batchStatus.failed + batchStatus.skipped) / batchStatus.total) * 100 : 0))}%` }}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            <span className="rounded bg-muted px-2 py-1">完成 {batchStatus.completed}</span>
+            <span className="rounded bg-muted px-2 py-1">跳过 {batchStatus.skipped}</span>
+            <span className="rounded bg-muted px-2 py-1">运行中 {batchStatus.running}</span>
+            <span className="rounded bg-muted px-2 py-1">失败 {batchStatus.failed}</span>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <StatCard title="相关流量包" value={analysis.totalMediaPackets.toLocaleString()} />
         <StatCard title="协议标签" value={String(analysis.protocols.length)} />
@@ -312,13 +664,14 @@ export default function MediaAnalysis() {
                 <th className="px-3 py-2">时间</th>
                 <th className="px-3 py-2">统计</th>
                 <th className="px-3 py-2">控制面</th>
+                <th className="px-3 py-2">转写</th>
                 <th className="px-3 py-2">导出</th>
               </tr>
             </thead>
             <tbody>
               {filteredSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">暂无可还原的媒体会话</td>
+                  <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">暂无可还原的媒体会话</td>
                 </tr>
               ) : (
                 filteredSessions.map((session) => (
@@ -366,10 +719,86 @@ export default function MediaAnalysis() {
                       )}
                     </td>
                     <td className="px-3 py-2">
+                      {(() => {
+                        const mediaType = (session.mediaType || "").toLowerCase();
+                        if (mediaType !== "audio") {
+                          return <span className="text-muted-foreground">仅音频支持</span>;
+                        }
+                        if (!session.artifact) {
+                          return <span className="text-muted-foreground">音频流未导出</span>;
+                        }
+                        const transcriptionStatus = transcriptionStatusOf(session, batchStatus, transcriptions);
+                        const record = transcriptionRecordOf(session, batchStatus, transcriptions);
+                        const text = (record?.text || "").trim();
+                        const errorText = (record?.error || "").trim();
+                        const singleRunning = transcriptionLoadingToken === session.artifact.token;
+                        const batchRunning = !!batchStatus.currentToken && batchStatus.currentToken === session.artifact.token && !batchStatus.done;
+                        const running = singleRunning || batchRunning;
+                        const startedAt = singleRunning ? transcriptionStartedAt : batchRunning ? batchTokenStartedAt : null;
+                        const progress = running && startedAt
+                          ? estimateTranscriptionProgress(Math.max(0, progressClock - startedAt))
+                          : null;
+                        return (
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium ${transcriptionStatus.className}`}>
+                                {transcriptionStatus.label}
+                              </span>
+                              {record?.cached && transcriptionStatus.status === "completed" && (
+                                <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+                                  缓存
+                                </span>
+                              )}
+                              {text && (
+                                <button
+                                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-accent"
+                                  onClick={() => void copyText(text)}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  复制
+                                </button>
+                              )}
+                            </div>
+                            {text ? (
+                              <div className="max-w-[28rem] rounded border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] leading-5 text-emerald-950">
+                                <div className="line-clamp-4 whitespace-pre-wrap break-words">{text}</div>
+                              </div>
+                            ) : progress ? (
+                              <div className="max-w-[22rem] rounded border border-slate-200 bg-slate-50 px-2.5 py-2">
+                                <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] text-slate-600">
+                                  <span>{progress.label}</span>
+                                  <span>{progress.percent}%</span>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                  <div
+                                    className={`h-full transition-all ${progressToneClass(progress.tone)}`}
+                                    style={{ width: `${progress.percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : errorText ? (
+                              <div className="max-w-[22rem] rounded border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] leading-5 text-rose-700">
+                                {errorText}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-muted-foreground">
+                                {transcriptionStatus.status === "idle"
+                                  ? "点右侧“转写”后，结果会直接显示在这里。"
+                                  : transcriptionStatus.status === "completed"
+                                    ? "转写已完成，但这段音频暂时没有识别出可显示的文字。"
+                                    : "正在等待转写任务进入这一条音频。"}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-3 py-2">
                       {session.artifact ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
+                        <div className="w-full max-w-[13rem] rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] p-2 shadow-sm">
+                          <div className="flex flex-col gap-2">
+                            <button
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                             onClick={() => void downloadArtifact(session)}
                           >
                             <Download className="h-3.5 w-3.5" />
@@ -378,7 +807,7 @@ export default function MediaAnalysis() {
                           </button>
                           {canPlayArtifact(session) && (
                             <button
-                              className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                               onClick={() => void openPlayback(session)}
                               disabled={playbackLoadingToken === session.artifact.token}
                             >
@@ -390,7 +819,27 @@ export default function MediaAnalysis() {
                               播放
                             </button>
                           )}
-                          <div className="text-[11px] text-muted-foreground">{session.artifact.name}</div>
+                          {(session.mediaType || "").toLowerCase() === "audio" && (
+                            <button
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => void runTranscription(session, false)}
+                              disabled={transcriptionLoadingToken === session.artifact.token || (!!batchStatus.taskId && !batchStatus.done && batchStatus.currentToken === session.artifact.token)}
+                            >
+                              {transcriptionLoadingToken === session.artifact.token || (!!batchStatus.taskId && !batchStatus.done && batchStatus.currentToken === session.artifact.token) ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                              转写
+                            </button>
+                          )}
+                            <div className="rounded-xl bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">
+                              <div className="truncate font-medium text-slate-700">{session.artifact.name}</div>
+                              <div className="mt-1">
+                                {(session.mediaType || "").toLowerCase() === "audio" ? "音频文件已准备好，可下载、播放或直接转写。" : "视频裸流已导出，可继续下载或转为可播放格式。"}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">未生成</span>
@@ -403,6 +852,70 @@ export default function MediaAnalysis() {
           </table>
         </div>
       </Panel>
+
+      {(batchSummaryItems.length > 0 || (batchStatus.taskId && batchStatus.total > 0)) && (
+        <Panel title={`转写汇总 (${batchSummaryItems.length})`} className="mt-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+              onClick={() => void copyAllText()}
+              disabled={batchSummaryItems.length === 0}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              复制全部
+            </button>
+            <button
+              className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+              onClick={() => void exportBatchTranscription("txt")}
+              disabled={batchSummaryItems.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" />
+              导出 TXT
+            </button>
+            <button
+              className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+              onClick={() => void exportBatchTranscription("json")}
+              disabled={batchSummaryItems.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" />
+              导出 JSON
+            </button>
+          </div>
+          {batchSummaryItems.length === 0 ? (
+            <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+              批量转写结果会在这里汇总展示。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {batchSummaryItems.map((item) => (
+                <details key={item.token} className="rounded border border-border bg-background" open>
+                  <summary className="cursor-pointer list-none px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-medium">{item.title}</div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="rounded bg-muted px-2 py-0.5">{item.cached ? "缓存" : "新转写"}</span>
+                        <span>{item.status}</span>
+                      </div>
+                    </div>
+                  </summary>
+                  <div className="border-t border-border px-3 py-3">
+                    <div className="whitespace-pre-wrap text-sm text-foreground">{item.text}</div>
+                    <div className="mt-3">
+                      <button
+                        className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-xs hover:bg-accent"
+                        onClick={() => void copyText(item.text)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        复制
+                      </button>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+        </Panel>
+      )}
 
       <Dialog open={Boolean(playbackSession)} onOpenChange={(open) => { if (!open) closePlayback(); }}>
         <DialogContent className="max-w-4xl">
@@ -455,6 +968,20 @@ export default function MediaAnalysis() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setFfmpegDialogMessage("")}>我知道了</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(speechDialogMessage)} onOpenChange={(open) => { if (!open) setSpeechDialogMessage(""); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>语音转写不可用</AlertDialogTitle>
+            <AlertDialogDescription>
+              {speechDialogMessage || "本地语音转写依赖未就绪，请检查 Python、vosk 模块、模型目录与 ffmpeg。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setSpeechDialogMessage("")}>我知道了</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

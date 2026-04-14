@@ -49,6 +49,9 @@ type Service struct {
 	objects        []model.ObjectFile
 	mediaArtifacts map[string]string
 	mediaPlayback  map[string]string
+	mediaSpeech    map[string]model.MediaTranscription
+	speechBatch    *model.SpeechBatchTaskStatus
+	speechCancel   context.CancelFunc
 	objMu          sync.Mutex
 	yaraLoaded     bool
 	yaraHits       []model.ThreatHit
@@ -128,6 +131,7 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 		streamOverrides:    map[string]map[int]string{},
 		mediaArtifacts:     map[string]string{},
 		mediaPlayback:      map[string]string{},
+		mediaSpeech:        map[string]model.MediaTranscription{},
 		huntingPrefixes: []string{
 			"flag{",
 			"ctf{",
@@ -195,6 +199,9 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.usbAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
+	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.cancelSpeechBatchLocked()
+	s.speechBatch = nil
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = map[string]model.ReassembledStream{}
@@ -418,6 +425,13 @@ func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
 	return info.Size() >= skipEstimateFileSizeThreshold
 }
 
+func (s *Service) cancelSpeechBatchLocked() {
+	if s.speechCancel != nil {
+		s.speechCancel()
+		s.speechCancel = nil
+	}
+}
+
 func (s *Service) StopStreaming() {
 	s.mu.Lock()
 	cancel := s.cancel
@@ -465,6 +479,9 @@ func (s *Service) ClearCapture() error {
 	s.usbAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
+	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.cancelSpeechBatchLocked()
+	s.speechBatch = nil
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = map[string]model.ReassembledStream{}
@@ -1445,6 +1462,9 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 		s.mediaExportDir = tempDir
 		s.mediaArtifacts = artifacts
 		s.mediaPlayback = map[string]string{}
+		s.mediaSpeech = map[string]model.MediaTranscription{}
+		s.cancelSpeechBatchLocked()
+		s.speechBatch = nil
 	} else if s.mediaAnalysis == nil {
 		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
 			_ = os.RemoveAll(s.mediaExportDir)
@@ -1453,6 +1473,9 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 		s.mediaExportDir = tempDir
 		s.mediaArtifacts = artifacts
 		s.mediaPlayback = map[string]string{}
+		s.mediaSpeech = map[string]model.MediaTranscription{}
+		s.cancelSpeechBatchLocked()
+		s.speechBatch = nil
 	} else {
 		_ = os.RemoveAll(tempDir)
 	}

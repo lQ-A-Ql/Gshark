@@ -569,6 +569,109 @@ export interface MediaAnalysis {
   notes: string[];
 }
 
+export interface SpeechToTextStatus {
+  available: boolean;
+  engine: string;
+  language: string;
+  pythonAvailable: boolean;
+  pythonCommand?: string;
+  ffmpegAvailable: boolean;
+  voskAvailable: boolean;
+  modelAvailable: boolean;
+  modelPath?: string;
+  message: string;
+}
+
+export interface ToolRuntimeConfig {
+  tsharkPath: string;
+  ffmpegPath: string;
+  pythonPath: string;
+  voskModelPath: string;
+  yaraEnabled: boolean;
+  yaraBin: string;
+  yaraRules: string;
+  yaraTimeoutMs: number;
+}
+
+export interface YaraToolStatus {
+  available: boolean;
+  enabled: boolean;
+  path?: string;
+  rulePath?: string;
+  message: string;
+  customBin?: string;
+  customRules?: string;
+  usingCustomBin: boolean;
+  usingCustomRules: boolean;
+  timeoutMs: number;
+}
+
+export interface ToolRuntimeSnapshot {
+  config: ToolRuntimeConfig;
+  tshark: {
+    available: boolean;
+    path: string;
+    message: string;
+    customPath?: string;
+    usingCustomPath: boolean;
+  };
+  ffmpeg: {
+    available: boolean;
+    path: string;
+    message: string;
+    customPath?: string;
+    usingCustomPath: boolean;
+  };
+  speech: SpeechToTextStatus;
+  yara: YaraToolStatus;
+}
+
+export interface MediaTranscriptionSegment {
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+}
+
+export interface MediaTranscription {
+  token: string;
+  sessionId: string;
+  title: string;
+  text: string;
+  language: string;
+  engine: string;
+  status: string;
+  error?: string;
+  cached: boolean;
+  durationSeconds: number;
+  segments: MediaTranscriptionSegment[];
+}
+
+export interface SpeechBatchTaskItem {
+  token: string;
+  sessionId: string;
+  mediaLabel: string;
+  title: string;
+  status: "queued" | "running" | "completed" | "failed" | "skipped";
+  error?: string;
+  cached: boolean;
+  text?: string;
+}
+
+export interface SpeechBatchTaskStatus {
+  taskId: string;
+  total: number;
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+  currentToken?: string;
+  currentLabel?: string;
+  done: boolean;
+  cancelled: boolean;
+  items: SpeechBatchTaskItem[];
+}
+
 export interface USBPacketRecord {
   packetId: number;
   time: string;

@@ -94,6 +94,38 @@ type YaraConfig struct {
 	TimeoutMS int
 }
 
+type ToolRuntimeConfig struct {
+	TSharkPath    string `json:"tshark_path"`
+	FFmpegPath    string `json:"ffmpeg_path"`
+	PythonPath    string `json:"python_path"`
+	VoskModelPath string `json:"vosk_model_path"`
+	YaraEnabled   bool   `json:"yara_enabled"`
+	YaraBin       string `json:"yara_bin"`
+	YaraRules     string `json:"yara_rules"`
+	YaraTimeoutMS int    `json:"yara_timeout_ms"`
+}
+
+type YaraToolStatus struct {
+	Available        bool   `json:"available"`
+	Enabled          bool   `json:"enabled"`
+	Path             string `json:"path,omitempty"`
+	RulePath         string `json:"rule_path,omitempty"`
+	Message          string `json:"message"`
+	CustomBin        string `json:"custom_bin,omitempty"`
+	CustomRules      string `json:"custom_rules,omitempty"`
+	UsingCustomBin   bool   `json:"using_custom_bin"`
+	UsingCustomRules bool   `json:"using_custom_rules"`
+	TimeoutMS        int    `json:"timeout_ms"`
+}
+
+type ToolRuntimeSnapshot struct {
+	Config ToolRuntimeConfig  `json:"config"`
+	TShark any                `json:"tshark"`
+	FFmpeg any                `json:"ffmpeg"`
+	Speech SpeechToTextStatus `json:"speech"`
+	Yara   YaraToolStatus     `json:"yara"`
+}
+
 type ObjectFile struct {
 	ID        int64  `json:"id"`
 	PacketID  int64  `json:"packet_id"`
@@ -525,6 +557,81 @@ type MediaAnalysis struct {
 	Applications      []TrafficBucket `json:"applications"`
 	Sessions          []MediaSession  `json:"sessions"`
 	Notes             []string        `json:"notes"`
+}
+
+type SpeechToTextStatus struct {
+	Available       bool   `json:"available"`
+	Engine          string `json:"engine"`
+	Language        string `json:"language"`
+	PythonAvailable bool   `json:"python_available"`
+	PythonCommand   string `json:"python_command,omitempty"`
+	FFmpegAvailable bool   `json:"ffmpeg_available"`
+	VoskAvailable   bool   `json:"vosk_available"`
+	ModelAvailable  bool   `json:"model_available"`
+	ModelPath       string `json:"model_path,omitempty"`
+	Message         string `json:"message"`
+}
+
+type MediaTranscriptionSegment struct {
+	StartSeconds float64 `json:"start_seconds"`
+	EndSeconds   float64 `json:"end_seconds"`
+	Text         string  `json:"text"`
+}
+
+type MediaTranscription struct {
+	Token           string                      `json:"token"`
+	SessionID       string                      `json:"session_id"`
+	Title           string                      `json:"title"`
+	Text            string                      `json:"text"`
+	Language        string                      `json:"language"`
+	Engine          string                      `json:"engine"`
+	Status          string                      `json:"status"`
+	Error           string                      `json:"error,omitempty"`
+	Cached          bool                        `json:"cached"`
+	DurationSeconds float64                     `json:"duration_seconds"`
+	Segments        []MediaTranscriptionSegment `json:"segments,omitempty"`
+}
+
+type SpeechBatchTaskItem struct {
+	Token      string `json:"token"`
+	SessionID  string `json:"session_id"`
+	MediaLabel string `json:"media_label"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
+	Cached     bool   `json:"cached"`
+	Text       string `json:"text,omitempty"`
+}
+
+type SpeechBatchTaskStatus struct {
+	TaskID       string                `json:"task_id"`
+	Total        int                   `json:"total"`
+	Queued       int                   `json:"queued"`
+	Running      int                   `json:"running"`
+	Completed    int                   `json:"completed"`
+	Failed       int                   `json:"failed"`
+	Skipped      int                   `json:"skipped"`
+	CurrentToken string                `json:"current_token,omitempty"`
+	CurrentLabel string                `json:"current_label,omitempty"`
+	Done         bool                  `json:"done"`
+	Cancelled    bool                  `json:"cancelled"`
+	Items        []SpeechBatchTaskItem `json:"items"`
+}
+
+type MediaTranscriptionBatchItem struct {
+	Token     string `json:"token"`
+	SessionID string `json:"session_id"`
+	Title     string `json:"title"`
+	Text      string `json:"text"`
+	Status    string `json:"status"`
+	Cached    bool   `json:"cached"`
+}
+
+type MediaTranscriptionBatchExport struct {
+	TaskID   string                        `json:"task_id"`
+	Engine   string                        `json:"engine"`
+	Language string                        `json:"language"`
+	Items    []MediaTranscriptionBatchItem `json:"items"`
 }
 
 type USBPacketRecord struct {

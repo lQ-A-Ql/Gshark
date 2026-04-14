@@ -83,7 +83,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/tools/tshark", s.handleTsharkConfig)
+	mux.HandleFunc("/api/tools/runtime-config", s.handleToolRuntimeConfig)
 	mux.HandleFunc("/api/tools/ffmpeg", s.handleFFmpegStatus)
+	mux.HandleFunc("/api/tools/speech-to-text", s.handleSpeechToTextStatus)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/capture/start", s.handleCaptureStart)
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
@@ -113,6 +115,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/usb", s.handleUSBAnalysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/analysis/media/play", s.handleMediaArtifactPlayback)
+	mux.HandleFunc("/api/analysis/media/transcribe", s.handleMediaArtifactTranscription)
+	mux.HandleFunc("/api/analysis/media/transcribe/batch", s.handleMediaBatchTranscription)
+	mux.HandleFunc("/api/analysis/media/transcribe/batch/cancel", s.handleMediaBatchTranscriptionCancel)
+	mux.HandleFunc("/api/analysis/media/transcribe/batch/export", s.handleMediaBatchTranscriptionExport)
 	mux.HandleFunc("/api/tls", s.handleTLS)
 	mux.HandleFunc("/api/audit/logs", s.handleAuditLogs)
 	mux.HandleFunc("/api/plugins", s.handlePlugins)
@@ -163,8 +169,29 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.svc.ToolRuntimeSnapshot())
+	case http.MethodPost:
+		var cfg model.ToolRuntimeConfig
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid payload")
+			return
+		}
+		s.svc.SetToolRuntimeConfig(cfg)
+		writeJSON(w, http.StatusOK, s.svc.ToolRuntimeSnapshot())
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
 func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.svc.FFmpegStatus())
+}
+
+func (s *Server) handleSpeechToTextStatus(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.svc.SpeechToTextStatus())
 }
 
 func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
@@ -576,6 +603,94 @@ func (s *Server) handleMediaArtifactPlayback(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", name))
 	http.ServeContent(w, r, name, info.ModTime(), file)
+}
+
+func (s *Server) handleMediaArtifactTranscription(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var payload struct {
+		Token string `json:"token"`
+		Force bool   `json:"force"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	result, err := s.svc.TranscribeMediaArtifact(payload.Token, payload.Force)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleMediaBatchTranscription(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.svc.MediaBatchTranscriptionStatus())
+	case http.MethodPost:
+		var payload struct {
+			Force bool `json:"force"`
+		}
+		if r.Body != nil {
+			_ = json.NewDecoder(r.Body).Decode(&payload)
+		}
+		status, err := s.svc.StartMediaBatchTranscription(payload.Force)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, status)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleMediaBatchTranscriptionCancel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.svc.CancelMediaBatchTranscription())
+}
+
+func (s *Server) handleMediaBatchTranscriptionExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	export := s.svc.ExportMediaBatchTranscription()
+	if len(export.Items) == 0 {
+		writeError(w, http.StatusBadRequest, "no batch transcription results available")
+		return
+	}
+
+	switch format {
+	case "txt":
+		var b strings.Builder
+		for idx, item := range export.Items {
+			if idx > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString(item.Title)
+			b.WriteString("\n")
+			b.WriteString(item.Text)
+		}
+		filename := "media-transcription.txt"
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+		_, _ = w.Write([]byte(b.String()))
+	case "json":
+		filename := "media-transcription.json"
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+		_ = json.NewEncoder(w).Encode(export)
+	default:
+		writeError(w, http.StatusBadRequest, "unsupported export format")
+	}
 }
 
 func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
@@ -1175,6 +1290,11 @@ func classifyAuditAction(path, method string) string {
 			return "tools.tshark.configure"
 		}
 		return "tools.tshark.inspect"
+	case "/api/tools/runtime-config":
+		if method == http.MethodPost {
+			return "tools.runtime.configure"
+		}
+		return "tools.runtime.inspect"
 	case "/api/hunting/config":
 		if method == http.MethodPost {
 			return "hunting.configure"
@@ -1223,7 +1343,7 @@ func classifyAuditRisk(path, method string) string {
 	switch path {
 	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls":
 		return "high"
-	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/hunting/config":
+	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/hunting/config":
 		if method == http.MethodGet {
 			return "low"
 		}

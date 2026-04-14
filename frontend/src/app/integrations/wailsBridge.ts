@@ -8,8 +8,13 @@ import type {
   HttpStream,
   IndustrialAnalysis,
   MediaAnalysis,
+  MediaTranscription,
   Packet,
   PluginItem,
+  SpeechBatchTaskStatus,
+  SpeechToTextStatus,
+  ToolRuntimeConfig,
+  ToolRuntimeSnapshot,
   StreamDecodeResult,
   ThreatHit,
   USBAnalysis,
@@ -137,6 +142,9 @@ export interface BackendBridge {
   installAppUpdate(): Promise<void>;
   checkTShark(): Promise<TSharkStatus>;
   checkFFmpeg(): Promise<FFmpegStatus>;
+  checkSpeechToText(): Promise<SpeechToTextStatus>;
+  getToolRuntimeSnapshot(): Promise<ToolRuntimeSnapshot>;
+  updateToolRuntimeConfig(config: ToolRuntimeConfig): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   openPcapFile(): Promise<OpenFileResult>;
   startStreamingPackets(filePath: string, filter: string): Promise<void>;
@@ -162,6 +170,11 @@ export interface BackendBridge {
   getIndustrialAnalysis(): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(): Promise<VehicleAnalysis>;
   getMediaAnalysis(forceRefresh?: boolean): Promise<MediaAnalysis>;
+  transcribeMediaArtifact(token: string, force?: boolean): Promise<MediaTranscription>;
+  startMediaBatchTranscription(force?: boolean): Promise<SpeechBatchTaskStatus>;
+  getMediaBatchTranscriptionStatus(): Promise<SpeechBatchTaskStatus>;
+  cancelMediaBatchTranscription(): Promise<SpeechBatchTaskStatus>;
+  exportMediaBatchTranscription(format: "txt" | "json"): Promise<void>;
   getUSBAnalysis(): Promise<USBAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   getMediaPlaybackBlob(token: string): Promise<Blob>;
@@ -542,6 +555,44 @@ export const bridge: BackendBridge = {
       path: String(payload.path ?? ""),
       message: String(payload.message ?? ""),
     };
+  },
+
+  async checkSpeechToText() {
+    const payload = await request<any>("/api/tools/speech-to-text");
+    return {
+      available: Boolean(payload.available),
+      engine: String(payload.engine ?? ""),
+      language: String(payload.language ?? ""),
+      pythonAvailable: Boolean(payload.python_available),
+      pythonCommand: String(payload.python_command ?? "") || undefined,
+      ffmpegAvailable: Boolean(payload.ffmpeg_available),
+      voskAvailable: Boolean(payload.vosk_available),
+      modelAvailable: Boolean(payload.model_available),
+      modelPath: String(payload.model_path ?? "") || undefined,
+      message: String(payload.message ?? ""),
+    };
+  },
+
+  async getToolRuntimeSnapshot() {
+    const payload = await request<any>("/api/tools/runtime-config");
+    return asToolRuntimeSnapshot(payload);
+  },
+
+  async updateToolRuntimeConfig(config: ToolRuntimeConfig) {
+    const payload = await request<any>("/api/tools/runtime-config", {
+      method: "POST",
+      body: JSON.stringify({
+        tshark_path: config.tsharkPath,
+        ffmpeg_path: config.ffmpegPath,
+        python_path: config.pythonPath,
+        vosk_model_path: config.voskModelPath,
+        yara_enabled: config.yaraEnabled,
+        yara_bin: config.yaraBin,
+        yara_rules: config.yaraRules,
+        yara_timeout_ms: config.yaraTimeoutMs,
+      }),
+    });
+    return asToolRuntimeSnapshot(payload);
   },
 
   async setTSharkPath(path: string) {
@@ -1108,6 +1159,58 @@ export const bridge: BackendBridge = {
     };
   },
 
+  async transcribeMediaArtifact(token: string, force = false) {
+    const payload = await request<any>("/api/analysis/media/transcribe", {
+      method: "POST",
+      body: JSON.stringify({ token, force }),
+    });
+    return {
+      token: String(payload.token ?? ""),
+      sessionId: String(payload.session_id ?? ""),
+      title: String(payload.title ?? ""),
+      text: String(payload.text ?? ""),
+      language: String(payload.language ?? ""),
+      engine: String(payload.engine ?? ""),
+      status: String(payload.status ?? ""),
+      error: String(payload.error ?? "") || undefined,
+      cached: Boolean(payload.cached),
+      durationSeconds: Number(payload.duration_seconds ?? 0),
+      segments: Array.isArray(payload.segments)
+        ? payload.segments.map((item: any) => ({
+            startSeconds: Number(item.start_seconds ?? 0),
+            endSeconds: Number(item.end_seconds ?? 0),
+            text: String(item.text ?? ""),
+          }))
+        : [],
+    };
+  },
+
+  async startMediaBatchTranscription(force = false) {
+    const payload = await request<any>("/api/analysis/media/transcribe/batch", {
+      method: "POST",
+      body: JSON.stringify({ force }),
+    });
+    return asSpeechBatchTaskStatus(payload);
+  },
+
+  async getMediaBatchTranscriptionStatus() {
+    const payload = await request<any>("/api/analysis/media/transcribe/batch");
+    return asSpeechBatchTaskStatus(payload);
+  },
+
+  async cancelMediaBatchTranscription() {
+    const payload = await request<any>("/api/analysis/media/transcribe/batch/cancel", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return asSpeechBatchTaskStatus(payload);
+  },
+
+  async exportMediaBatchTranscription(format: "txt" | "json") {
+    const blob = await requestBlob(`/api/analysis/media/transcribe/batch/export?format=${encodeURIComponent(format)}`);
+    downloadBlob(`media-transcription.${format}`, blob);
+  },
+
   async getUSBAnalysis() {
     const payload = await request<any>("/api/analysis/usb");
     return {
@@ -1460,6 +1563,87 @@ function asBucket(input: any) {
   return {
     label: String(input.label ?? ""),
     count: Number(input.count ?? 0),
+  };
+}
+
+function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {
+  return {
+    taskId: String(input.task_id ?? ""),
+    total: Number(input.total ?? 0),
+    queued: Number(input.queued ?? 0),
+    running: Number(input.running ?? 0),
+    completed: Number(input.completed ?? 0),
+    failed: Number(input.failed ?? 0),
+    skipped: Number(input.skipped ?? 0),
+    currentToken: String(input.current_token ?? "") || undefined,
+    currentLabel: String(input.current_label ?? "") || undefined,
+    done: Boolean(input.done),
+    cancelled: Boolean(input.cancelled),
+    items: Array.isArray(input.items)
+      ? input.items.map((item: any) => ({
+          token: String(item.token ?? ""),
+          sessionId: String(item.session_id ?? ""),
+          mediaLabel: String(item.media_label ?? ""),
+          title: String(item.title ?? ""),
+          status: String(item.status ?? "queued") as SpeechBatchTaskStatus["items"][number]["status"],
+          error: String(item.error ?? "") || undefined,
+          cached: Boolean(item.cached),
+          text: String(item.text ?? "") || undefined,
+        }))
+      : [],
+  };
+}
+
+function asToolRuntimeSnapshot(input: any): ToolRuntimeSnapshot {
+  return {
+    config: {
+      tsharkPath: String(input?.config?.tshark_path ?? ""),
+      ffmpegPath: String(input?.config?.ffmpeg_path ?? ""),
+      pythonPath: String(input?.config?.python_path ?? ""),
+      voskModelPath: String(input?.config?.vosk_model_path ?? ""),
+      yaraEnabled: Boolean(input?.config?.yara_enabled),
+      yaraBin: String(input?.config?.yara_bin ?? ""),
+      yaraRules: String(input?.config?.yara_rules ?? ""),
+      yaraTimeoutMs: Number(input?.config?.yara_timeout_ms ?? 0) || 25000,
+    },
+    tshark: {
+      available: Boolean(input?.tshark?.available),
+      path: String(input?.tshark?.path ?? ""),
+      message: String(input?.tshark?.message ?? ""),
+      customPath: String(input?.tshark?.custom_path ?? "") || undefined,
+      usingCustomPath: Boolean(input?.tshark?.using_custom_path),
+    },
+    ffmpeg: {
+      available: Boolean(input?.ffmpeg?.available),
+      path: String(input?.ffmpeg?.path ?? ""),
+      message: String(input?.ffmpeg?.message ?? ""),
+      customPath: String(input?.ffmpeg?.custom_path ?? "") || undefined,
+      usingCustomPath: Boolean(input?.ffmpeg?.using_custom_path),
+    },
+    speech: {
+      available: Boolean(input?.speech?.available),
+      engine: String(input?.speech?.engine ?? ""),
+      language: String(input?.speech?.language ?? ""),
+      pythonAvailable: Boolean(input?.speech?.python_available),
+      pythonCommand: String(input?.speech?.python_command ?? "") || undefined,
+      ffmpegAvailable: Boolean(input?.speech?.ffmpeg_available),
+      voskAvailable: Boolean(input?.speech?.vosk_available),
+      modelAvailable: Boolean(input?.speech?.model_available),
+      modelPath: String(input?.speech?.model_path ?? "") || undefined,
+      message: String(input?.speech?.message ?? ""),
+    },
+    yara: {
+      available: Boolean(input?.yara?.available),
+      enabled: Boolean(input?.yara?.enabled),
+      path: String(input?.yara?.path ?? "") || undefined,
+      rulePath: String(input?.yara?.rule_path ?? "") || undefined,
+      message: String(input?.yara?.message ?? ""),
+      customBin: String(input?.yara?.custom_bin ?? "") || undefined,
+      customRules: String(input?.yara?.custom_rules ?? "") || undefined,
+      usingCustomBin: Boolean(input?.yara?.using_custom_bin),
+      usingCustomRules: Boolean(input?.yara?.using_custom_rules),
+      timeoutMs: Number(input?.yara?.timeout_ms ?? 0) || 25000,
+    },
   };
 }
 
