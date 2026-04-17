@@ -55,6 +55,7 @@ type Service struct {
 	objMu          sync.Mutex
 	yaraLoaded     bool
 	yaraHits       []model.ThreatHit
+	yaraLastError  string
 	yaraMu         sync.Mutex
 
 	huntMu          sync.RWMutex
@@ -143,6 +144,13 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 	}
 }
 
+func (s *Service) emitStatus(status string) {
+	if s == nil || s.emitter == nil {
+		return
+	}
+	s.emitter.EmitStatus(status)
+}
+
 func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	if opts.FilePath == "" {
 		return errors.New("empty file path")
@@ -175,6 +183,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
 	s.yaraHits = nil
+	s.yaraLastError = ""
 	s.yaraMu.Unlock()
 
 	if s.packetStore != nil {
@@ -220,17 +229,17 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		tsharkStatus.UsingCustomPath,
 	)
 
-	s.emitter.EmitStatus("开始解析 PCAP")
+	s.emitStatus("开始解析 PCAP")
 	total := 0
 	if shouldSkipPacketEstimate(opts) {
-		s.emitter.EmitStatus("大流量包已跳过总包数预估，直接开始入库解析。")
+		s.emitStatus("大流量包已跳过总包数预估，直接开始入库解析。")
 		log.Printf("engine: skipping packet estimate for %q due to large file fast_list path", opts.FilePath)
 	} else {
 		estimatedTotal, countErr := estimatePacketsFn(runCtx, opts)
 		if countErr == nil && estimatedTotal > 0 {
 			total = estimatedTotal
-			s.emitter.EmitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
-			s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
+			s.emitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
+			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
 			log.Printf("engine: tshark estimated %d packets for %q", total, opts.FilePath)
 		} else if countErr != nil {
 			log.Printf("engine: tshark packet estimate failed for %q: %v", opts.FilePath, countErr)
@@ -252,7 +261,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		}
 		if s.packetStore != nil {
 			if err := s.packetStore.Append(pending); err != nil {
-				s.emitter.EmitStatus("写入数据包存储失败: " + err.Error())
+				s.emitStatus("写入数据包存储失败: " + err.Error())
 			}
 		}
 		pending = pending[:0]
@@ -275,7 +284,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	}, func(frameProcessed int) {
 		processed = frameProcessed
 		if total > 0 {
-			s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 		}
 	})
 	flushPending()
@@ -291,7 +300,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			needsFallback = true
 		}
 		if needsFallback {
-			s.emitter.EmitStatus("fast_list compatibility fallback: retrying parse with EK mode")
+			s.emitStatus("fast_list compatibility fallback: retrying parse with EK mode")
 			if s.packetStore != nil {
 				if resetErr := s.packetStore.Reset(); resetErr != nil {
 					return resetErr
@@ -319,7 +328,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			}, func(frameProcessed int) {
 				processed = frameProcessed
 				if total > 0 {
-					s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 				}
 			})
 			flushPending()
@@ -332,7 +341,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			needsCompatFallback = true
 		}
 		if needsCompatFallback {
-			s.emitter.EmitStatus("compatibility fallback: retrying parse with minimal field mode")
+			s.emitStatus("compatibility fallback: retrying parse with minimal field mode")
 			log.Printf("engine: switching parser to compat_fields fallback for %q", opts.FilePath)
 			if s.packetStore != nil {
 				if resetErr := s.packetStore.Reset(); resetErr != nil {
@@ -360,7 +369,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			}, func(frameProcessed int) {
 				processed = frameProcessed
 				if total > 0 {
-					s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 				}
 			})
 			flushPending()
@@ -368,7 +377,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		}
 	}
 	if total > 0 {
-		s.emitter.EmitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", processed, total))
+		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", processed, total))
 	}
 
 	dropped := processed - accepted
@@ -376,10 +385,10 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		dropped = 0
 	}
 	if processed > 0 {
-		s.emitter.EmitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
+		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
 	}
 	if opts.FastList && dropped > 0 {
-		s.emitter.EmitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
+		s.emitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
 	}
 
 	if err == nil {
@@ -401,11 +410,11 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 			s.rawStreamIndex[key] = cloneReassembledStream(*stream)
 		}
 		s.mu.Unlock()
-		s.emitter.EmitStatus("解析完成")
+		s.emitStatus("解析完成")
 	case context.Canceled:
-		s.emitter.EmitStatus("解析被取消")
+		s.emitStatus("解析被取消")
 	default:
-		s.emitter.EmitStatus("解析失败: " + err.Error())
+		s.emitStatus("解析失败: " + err.Error())
 	}
 	return err
 }
@@ -491,6 +500,7 @@ func (s *Service) ClearCapture() error {
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
 	s.yaraHits = nil
+	s.yaraLastError = ""
 	s.yaraMu.Unlock()
 	return nil
 }
@@ -518,7 +528,7 @@ func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]mode
 		}
 		out, err := s.packetStore.PacketsByIDsSummary(ids)
 		if err != nil {
-			s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
+			s.emitStatus("数据包分页查询失败: " + err.Error())
 			return []model.Packet{}, 0, 0, err
 		}
 		return out, next, total, nil
@@ -533,7 +543,7 @@ func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]mode
 	predicate := compilePacketFilter(filter)
 	out, next, total, err := s.packetStore.PageSummaries(cursor, limit, predicate)
 	if err != nil {
-		s.emitter.EmitStatus("数据包分页查询失败: " + err.Error())
+		s.emitStatus("数据包分页查询失败: " + err.Error())
 		return []model.Packet{}, 0, 0, err
 	}
 	return out, next, total, nil
@@ -602,6 +612,7 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 	if len(prefixes) == 0 {
 		prefixes = s.getHuntingPrefixes()
 	}
+	s.emitStatus("__progress__:threat:0:5:准备威胁分析")
 	hunter := newThreatHunter(prefixes, 1)
 	var pluginRunner *plugin.PacketPluginRunner
 	if s.pluginManger != nil {
@@ -632,16 +643,20 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 		})
 		flushPluginBatch()
 	}
+	s.emitStatus("__progress__:threat:1:5:扫描数据包基础特征")
 
 	hits := hunter.Results()
 	if pluginRunner != nil {
 		hits = append(hits, pluginRunner.Close(int64(len(hits)+1))...)
 		for _, warning := range pluginRunner.Warnings() {
-			s.emitter.EmitStatus("plugin warning: " + warning)
+			s.emitStatus("plugin warning: " + warning)
 		}
 	}
+	s.emitStatus("__progress__:threat:2:5:导出可疑对象")
 	objects := s.Objects()
+	s.emitStatus("__progress__:threat:3:5:整理重组流与扫描目标")
 	hits = append(hits, s.cachedYaraHits(objects)...)
+	s.emitStatus("__progress__:threat:4:5:执行 YARA 扫描")
 	hits = append(hits, StegoPrecheck(objects)...)
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].ID == hits[j].ID {
@@ -649,6 +664,8 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 		}
 		return hits[i].ID < hits[j].ID
 	})
+	s.emitStatus("__progress__:threat:5:5:威胁分析完成")
+	s.emitStatus("威胁分析完成")
 	return hits
 }
 
@@ -719,6 +736,7 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
 	s.yaraHits = nil
+	s.yaraLastError = ""
 	s.yaraMu.Unlock()
 
 	return s.GetHuntingRuntimeConfig()
@@ -738,7 +756,32 @@ func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
 	yc := s.yaraConf
 	s.huntMu.RUnlock()
 
-	hits := BatchScanObjectsWithYaraConfig(objects, s.packetObjectNameIndex(), yc)
+	targets, cleanup, err := s.buildYaraScanTargets(objects)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
+		log.Printf("engine: build yara scan targets failed: %v", err)
+		s.emitStatus("YARA 扫描目标构建失败: " + err.Error())
+		hits := []model.ThreatHit{newYaraWarningHit("YARA 扫描目标构建失败: " + err.Error())}
+		s.yaraHits = make([]model.ThreatHit, len(hits))
+		copy(s.yaraHits, hits)
+		s.yaraLastError = err.Error()
+		s.yaraLoaded = true
+		out := make([]model.ThreatHit, len(s.yaraHits))
+		copy(out, s.yaraHits)
+		return out
+	}
+
+	hits, scanErr := BatchScanTargetsWithYaraConfig(targets, yc)
+	if scanErr != nil {
+		log.Printf("engine: yara scan failed: %v", scanErr)
+		s.emitStatus("YARA 扫描异常: " + scanErr.Error())
+		hits = append(hits, newYaraWarningHit(scanErr.Error()))
+		s.yaraLastError = scanErr.Error()
+	} else {
+		s.yaraLastError = ""
+	}
 	s.yaraHits = make([]model.ThreatHit, len(hits))
 	copy(s.yaraHits, hits)
 	s.yaraLoaded = true
@@ -1411,17 +1454,17 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	if strings.TrimSpace(pcap) == "" {
 		return model.MediaAnalysis{}, errors.New("no capture loaded")
 	}
-	s.emitter.EmitStatus("__progress__:media:0:3:准备媒体流分析")
+	s.emitStatus("__progress__:media:0:3:准备媒体流分析")
 	cfg := s.buildMediaScanConfig(pcap)
 
 	tempDir, err := os.MkdirTemp("", "gshark-media-")
 	if err != nil {
-		s.emitter.EmitStatus("媒体流分析失败: " + err.Error())
+		s.emitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err
 	}
 
 	progressFn := func(current, total int, label string) {
-		s.emitter.EmitStatus(fmt.Sprintf("__progress__:media:%d:%d:%s", current, total, label))
+		s.emitStatus(fmt.Sprintf("__progress__:media:%d:%d:%s", current, total, label))
 	}
 
 	var (
@@ -1449,7 +1492,7 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	}
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
-		s.emitter.EmitStatus("媒体流分析失败: " + err.Error())
+		s.emitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err
 	}
 
@@ -1481,7 +1524,7 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	}
 	out := *s.mediaAnalysis
 	s.mu.Unlock()
-	s.emitter.EmitStatus("媒体流分析完成")
+	s.emitStatus("媒体流分析完成")
 	return out, nil
 }
 

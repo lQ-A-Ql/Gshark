@@ -1,0 +1,20 @@
+{
+  "version": "v0.0.6",
+  "name": "Gshark v0.0.6",
+  "published_at": "2026-04-17T12:23:04.797988Z",
+  "release_url": "https://github.com/lQ-A-Ql/Gshark/releases/tag/v0.0.6",
+  "notes": "",
+  "channel": "stable",
+  "generated_at": "2026-04-17T12:23:04.797988Z",
+  "assets": [
+    {
+      "name": "gshark.v0.0.6.exe",
+      "download_url": "https://github.com/lQ-A-Ql/Gshark/releases/download/v0.0.6/gshark.v0.0.6.exe",
+      "size": 42379776,
+      "content_type": "application/vnd.microsoft.portable-executable",
+      "sha256": "7b961ac85a00b54b600027d08e7ed2b66196966d1ec706d7af8334d975fba376",
+      "os": "windows",
+      "arch": "amd64"
+    }
+  ]
+}

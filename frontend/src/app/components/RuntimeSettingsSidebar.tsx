@@ -295,7 +295,7 @@ export function RuntimeSettingsSidebar() {
             <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div>
                 <div className="text-xs font-semibold text-slate-800">启用 YARA 狩猎</div>
-                <div className="mt-0.5 text-[11px] text-slate-500">关闭后会保留路径配置，只是不再参与对象扫描。</div>
+                <div className="mt-0.5 text-[11px] text-slate-500">关闭后会保留路径配置，只是不再参与对象与重组流内容的狩猎扫描。</div>
               </div>
               <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
                 <input
@@ -317,7 +317,7 @@ export function RuntimeSettingsSidebar() {
                 label="YARA 规则文件"
                 value={form.yaraRules}
                 onChange={(value) => setForm((prev) => ({ ...prev, yaraRules: value }))}
-                placeholder="C:\\rules\\default.yar"
+                placeholder="C:\\rules\\default.yar 或 C:\\rules\\traffic-pack\\"
               />
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-slate-700">YARA 超时（毫秒）</span>
@@ -342,6 +342,12 @@ export function RuntimeSettingsSidebar() {
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
                 当前使用的规则文件：
                 <span className="break-all text-slate-700"> {toolRuntimeSnapshot.yara.rulePath}</span>
+              </div>
+            ) : null}
+            {toolRuntimeSnapshot?.yara.lastScanMessage ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-700">
+                最近一次扫描告警：
+                <span className="break-all"> {toolRuntimeSnapshot.yara.lastScanMessage}</span>
               </div>
             ) : null}
           </section>

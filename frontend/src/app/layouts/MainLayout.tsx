@@ -190,13 +190,15 @@ export function MainLayout() {
         } as CSSProperties
       }
     >
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-background font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
-        <header className="relative z-50 flex shrink-0 flex-col border-b border-border bg-card shadow-sm">
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.10),transparent_26%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f4f7fb_100%)] font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
+        <header className="relative z-50 flex shrink-0 flex-col border-b border-slate-200 bg-white/92 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] backdrop-blur">
           <div className="flex h-12 items-center justify-between px-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 font-semibold tracking-wide text-blue-600">
-                <Hexagon className="h-6 w-6" />
-                <span className="text-lg">GShark-Sentinel</span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 shadow-sm">
+                  <Hexagon className="h-5 w-5" />
+                </div>
+                <span className="text-lg text-slate-900">GShark-Sentinel</span>
               </div>
 
               <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
@@ -255,13 +257,13 @@ export function MainLayout() {
 
             <div className="flex items-center gap-2 text-xs font-medium">
               <HeaderSettingsButton />
-              <span className="flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600">
+              <span className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600 shadow-sm">
                 <ShieldAlert className="h-3.5 w-3.5" /> OWASP
               </span>
-              <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600">
+              <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600 shadow-sm">
                 <Activity className="h-3.5 w-3.5" /> CTF
               </span>
-              <span className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600">
+              <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600 shadow-sm">
                 <KeyRound className="h-3.5 w-3.5" /> 解密
               </span>
             </div>
@@ -269,7 +271,7 @@ export function MainLayout() {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-border bg-card py-4 shadow-sm">
+          <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-slate-200 bg-white/88 py-4 shadow-[8px_0_24px_-24px_rgba(15,23,42,0.28)] backdrop-blur">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -279,10 +281,10 @@ export function MainLayout() {
                   to={item.path}
                   title={item.label}
                   className={cn(
-                    "group relative rounded-xl p-3 transition-all",
+                    "group relative rounded-2xl p-3 transition-all",
                     isActive
-                      ? "bg-blue-50 text-blue-600 shadow-sm"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      ? "bg-blue-50 text-blue-600 shadow-[0_12px_30px_-20px_rgba(37,99,235,0.55)]"
+                      : "text-muted-foreground hover:bg-slate-100 hover:text-slate-900",
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -298,7 +300,7 @@ export function MainLayout() {
             })}
           </aside>
 
-          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
             <Outlet />
           </main>
         </div>
@@ -325,7 +327,7 @@ export function MainLayout() {
           <SidebarRail />
         </Sidebar>
 
-        <footer className="z-40 flex h-7 shrink-0 items-center justify-between border-t border-border bg-card px-4 text-[11px] font-medium tracking-wider text-muted-foreground">
+        <footer className="z-40 flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-white/90 px-4 text-[11px] font-medium tracking-wider text-slate-500 backdrop-blur">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})</span>
             <span className="flex items-center gap-1 text-blue-600">

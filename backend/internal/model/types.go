@@ -111,6 +111,7 @@ type YaraToolStatus struct {
 	Path             string `json:"path,omitempty"`
 	RulePath         string `json:"rule_path,omitempty"`
 	Message          string `json:"message"`
+	LastScanMessage  string `json:"last_scan_message,omitempty"`
 	CustomBin        string `json:"custom_bin,omitempty"`
 	CustomRules      string `json:"custom_rules,omitempty"`
 	UsingCustomBin   bool   `json:"using_custom_bin"`

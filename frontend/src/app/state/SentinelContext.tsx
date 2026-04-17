@@ -50,6 +50,17 @@ interface MediaAnalysisProgress {
   recent: string[];
 }
 
+interface ThreatAnalysisProgress {
+  active: boolean;
+  current: number;
+  total: number;
+  label: string;
+  phase: "prepare" | "packets" | "objects" | "streams" | "scan" | "complete" | "unknown";
+  phaseLabel: string;
+  percent: number;
+  recent: string[];
+}
+
 interface SentinelContextValue {
   packets: Packet[];
   totalPackets: number;
@@ -78,6 +89,8 @@ interface SentinelContextValue {
   protocolTree: ReturnType<typeof buildProtocolTree>;
   hexDump: string;
   threatHits: ThreatHit[];
+  isThreatAnalysisLoading: boolean;
+  threatAnalysisProgress: ThreatAnalysisProgress;
   extractedObjects: ExtractedObject[];
   httpStream: HttpStream;
   tcpStream: BinaryStream;
@@ -170,6 +183,17 @@ const EMPTY_SWITCH_METRICS: StreamSwitchMetrics = {
 };
 
 const EMPTY_MEDIA_ANALYSIS_PROGRESS: MediaAnalysisProgress = {
+  active: false,
+  current: 0,
+  total: 0,
+  label: "",
+  phase: "unknown",
+  phaseLabel: "",
+  percent: 0,
+  recent: [],
+};
+
+const EMPTY_THREAT_ANALYSIS_PROGRESS: ThreatAnalysisProgress = {
   active: false,
   current: 0,
   total: 0,
@@ -273,6 +297,59 @@ function computeMediaProgressPercent(phase: MediaAnalysisProgress["phase"], curr
       return 100;
     default:
       return safeTotal > 0 ? local * 100 : 0;
+  }
+}
+
+function classifyThreatProgressPhase(label: string): ThreatAnalysisProgress["phase"] {
+  const normalized = label.trim();
+  if (!normalized) return "unknown";
+  if (normalized.includes("准备")) return "prepare";
+  if (normalized.includes("基础特征") || normalized.includes("数据包")) return "packets";
+  if (normalized.includes("对象")) return "objects";
+  if (normalized.includes("重组流") || normalized.includes("扫描目标")) return "streams";
+  if (normalized.includes("YARA") || normalized.includes("扫描")) return "scan";
+  if (normalized.includes("完成")) return "complete";
+  return "unknown";
+}
+
+function phaseLabelForThreatProgress(phase: ThreatAnalysisProgress["phase"]): string {
+  switch (phase) {
+    case "prepare":
+      return "准备";
+    case "packets":
+      return "包级特征";
+    case "objects":
+      return "对象导出";
+    case "streams":
+      return "重组流";
+    case "scan":
+      return "YARA 扫描";
+    case "complete":
+      return "完成";
+    default:
+      return "处理中";
+  }
+}
+
+function computeThreatProgressPercent(phase: ThreatAnalysisProgress["phase"], current: number, total: number): number {
+  if (total > 0) {
+    return Math.max(0, Math.min(100, Math.round((current / total) * 100)));
+  }
+  switch (phase) {
+    case "prepare":
+      return 8;
+    case "packets":
+      return 24;
+    case "objects":
+      return 42;
+    case "streams":
+      return 64;
+    case "scan":
+      return 84;
+    case "complete":
+      return 100;
+    default:
+      return 12;
   }
 }
 
@@ -436,6 +513,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [toolRuntimeSnapshot, setToolRuntimeSnapshot] = useState<ToolRuntimeSnapshot | null>(null);
   const [isToolRuntimeLoading, setIsToolRuntimeLoading] = useState(false);
   const [threatHits, setThreatHits] = useState<ThreatHit[]>([]);
+  const [isThreatAnalysisLoading, setIsThreatAnalysisLoading] = useState(false);
+  const [threatAnalysisProgress, setThreatAnalysisProgress] = useState<ThreatAnalysisProgress>(EMPTY_THREAT_ANALYSIS_PROGRESS);
   const [extractedObjects, setExtractedObjects] = useState<ExtractedObject[]>([]);
   const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
   const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
@@ -472,6 +551,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
+  const threatAnalysisSeqRef = useRef(0);
   const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
   const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
   const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
@@ -682,6 +762,29 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           label,
           phase: progressPhase,
           phaseLabel: phaseLabelForMediaProgress(progressPhase),
+          percent,
+          recent: nextRecent,
+        };
+      });
+      return true;
+    }
+    if (phase === "threat") {
+      const current = Number(parts[2]) || 0;
+      const total = Number(parts[3]) || 0;
+      const label = parts.slice(4).join(":").trim();
+      const progressPhase = classifyThreatProgressPhase(label);
+      const percent = computeThreatProgressPercent(progressPhase, current, total);
+      setThreatAnalysisProgress((prev) => {
+        const nextRecent = label && label !== prev.label
+          ? [label, ...prev.recent.filter((item) => item !== label)].slice(0, 5)
+          : prev.recent;
+        return {
+          active: progressPhase !== "complete" && (total <= 0 || current < total),
+          current,
+          total,
+          label,
+          phase: progressPhase,
+          phaseLabel: phaseLabelForThreatProgress(progressPhase),
           percent,
           recent: nextRecent,
         };
@@ -916,17 +1019,53 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     return fallback;
   }, [filteredPackets, selectedPacketDetail, selectedPacketId]);
 
-  const refreshAnalysisResult = useCallback(async () => {
+  const refreshAnalysisResult = useCallback(async (
+    options?: {
+      capturePath?: string;
+      quietSuccess?: boolean;
+    },
+  ) => {
     if (!backendConnected) return;
+    const capturePath = options?.capturePath ?? activeCapturePathRef.current;
+    const seq = threatAnalysisSeqRef.current + 1;
+    threatAnalysisSeqRef.current = seq;
+    setIsThreatAnalysisLoading(true);
+    setThreatAnalysisProgress((prev) => ({
+      ...EMPTY_THREAT_ANALYSIS_PROGRESS,
+      active: true,
+      current: 0,
+      total: 5,
+      label: "准备威胁分析",
+      phase: "prepare",
+      phaseLabel: phaseLabelForThreatProgress("prepare"),
+      percent: prev.active && prev.percent > 0 ? prev.percent : 8,
+      recent: ["准备威胁分析"],
+    }));
     try {
-      const [hits, objects] = await Promise.all([
-        bridge.listThreatHits(["flag{", "ctf{"]),
-        bridge.listObjects(),
-      ]);
-      setThreatHits(hits);
+      const objects = await bridge.listObjects();
+      if (threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
+        return;
+      }
       setExtractedObjects(objects);
+
+      const hits = await bridge.listThreatHits(["flag{", "ctf{"]);
+      if (threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
+        return;
+      }
+      setThreatHits(hits);
+      if (!options?.quietSuccess) {
+        setBackendStatus(`威胁分析已更新: ${hits.length} 条命中`);
+      }
     } catch {
-      setBackendStatus("分析结果刷新失败");
+      if (threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
+        setBackendStatus("威胁分析刷新失败");
+        setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
+      }
+    } finally {
+      if (threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
+        setIsThreatAnalysisLoading(false);
+        setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
+      }
     }
   }, [backendConnected]);
 
@@ -1330,6 +1469,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           if (msg.includes("媒体流分析完成") || msg.includes("媒体流分析失败")) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
           }
+          if (msg.includes("威胁分析完成") || msg.includes("威胁分析失败")) {
+            setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
+          }
           wakeCaptureWaiters();
           setBackendStatus(msg);
         },
@@ -1341,6 +1483,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           }
           if (next.includes("媒体流")) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+          }
+          if (next.includes("威胁分析")) {
+            setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
+            setIsThreatAnalysisLoading(false);
           }
           wakeCaptureWaiters();
           setBackendStatus(next);
@@ -1497,6 +1643,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       };
       setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
       setThreatHits([]);
+      setIsThreatAnalysisLoading(false);
+      setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
       setExtractedObjects([]);
       setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
       setFileMeta({
@@ -1555,8 +1703,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         await loadPacketPage(0, effectiveFilter);
       }
       await refreshStreamIndex();
-      await refreshAnalysisResult();
       setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
+      void refreshAnalysisResult({
+        capturePath: opened.filePath,
+        quietSuccess: true,
+      });
     } catch (error) {
       setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
     } finally {
@@ -1733,6 +1884,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketRawHex("");
     setSelectedPacketLayers(null);
     setThreatHits([]);
+    setIsThreatAnalysisLoading(false);
+    setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
     setExtractedObjects([]);
     setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
     setHttpStream(EMPTY_HTTP_STREAM);
@@ -1749,6 +1902,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
     setCaptureRevision((prev) => prev + 1);
     activeCapturePathRef.current = "";
+    threatAnalysisSeqRef.current += 1;
     setBackendStatus("当前抓包已关闭，临时数据库已清理");
   }, [backendConnected]);
 
@@ -1789,6 +1943,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       protocolTree,
       hexDump,
       threatHits,
+      isThreatAnalysisLoading,
+      threatAnalysisProgress,
       extractedObjects,
       httpStream,
       tcpStream,
@@ -1850,6 +2006,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       protocolTree,
       hexDump,
       threatHits,
+      isThreatAnalysisLoading,
+      threatAnalysisProgress,
       extractedObjects,
       httpStream,
       tcpStream,

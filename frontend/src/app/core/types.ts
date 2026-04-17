@@ -76,7 +76,7 @@ export type ThreatLevel = "critical" | "high" | "medium" | "low";
 export interface ThreatHit {
   id: number;
   packetId: number;
-  category: "CTF" | "OWASP" | "Anomaly" | "Sensitive";
+  category: string;
   rule: string;
   level: ThreatLevel;
   preview: string;
@@ -599,6 +599,7 @@ export interface YaraToolStatus {
   path?: string;
   rulePath?: string;
   message: string;
+  lastScanMessage?: string;
   customBin?: string;
   customRules?: string;
   usingCustomBin: boolean;

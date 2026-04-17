@@ -1638,6 +1638,7 @@ function asToolRuntimeSnapshot(input: any): ToolRuntimeSnapshot {
       path: String(input?.yara?.path ?? "") || undefined,
       rulePath: String(input?.yara?.rule_path ?? "") || undefined,
       message: String(input?.yara?.message ?? ""),
+      lastScanMessage: String(input?.yara?.last_scan_message ?? "") || undefined,
       customBin: String(input?.yara?.custom_bin ?? "") || undefined,
       customRules: String(input?.yara?.custom_rules ?? "") || undefined,
       usingCustomBin: Boolean(input?.yara?.using_custom_bin),
