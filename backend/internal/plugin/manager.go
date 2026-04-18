@@ -434,12 +434,6 @@ func (m *Manager) sourceLocked(id string) (model.PluginSource, error) {
 	}, nil
 }
 
-func (m *Manager) LogicPath(id string) string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return strings.TrimSpace(m.logicFiles[id])
-}
-
 func (m *Manager) List() []model.Plugin {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -701,10 +695,6 @@ func isLogicFile(name string) bool {
 	default:
 		return false
 	}
-}
-
-func defaultLogicTemplate(pluginID string) string {
-	return defaultLogicTemplateForEntry(pluginID, pluginID+".js")
 }
 
 func defaultLogicTemplateForEntry(pluginID, entry string) string {

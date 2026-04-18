@@ -549,19 +549,7 @@ function resolveLayerByteRange(
   return undefined;
 }
 
-function resolveChildByteRange(name: string, inheritedRange?: [number, number]): [number, number] | undefined {
-  if (!inheritedRange) return undefined;
-  const normalized = name.toLowerCase();
-  if (
-    normalized.includes("payload") ||
-    normalized.includes("segment_data") ||
-    normalized.includes("app_data") ||
-    normalized.includes("reassembled") ||
-    normalized.includes("file_data") ||
-    normalized.includes("rawdata")
-  ) {
-    return inheritedRange;
-  }
+function resolveChildByteRange(_name: string, inheritedRange?: [number, number]): [number, number] | undefined {
   return inheritedRange;
 }
 

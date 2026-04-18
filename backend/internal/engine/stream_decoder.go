@@ -2,10 +2,8 @@ package engine
 
 import (
 	"bytes"
-	"crypto/aes"
 	"crypto/md5"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -426,13 +424,9 @@ func decodeBase64Loose(raw string) ([]byte, error) {
 }
 
 func decodeCipherHex(raw string) ([]byte, error) {
-	cleaned := strings.NewReplacer(":", "", " ", "", "\t", "", "\r", "", "\n", "").Replace(strings.TrimSpace(raw))
-	if cleaned == "" || len(cleaned)%2 != 0 {
+	decoded := decodeLooseHex(raw)
+	if len(decoded) == 0 {
 		return nil, errors.New("hex 解码失败")
-	}
-	decoded, err := hex.DecodeString(cleaned)
-	if err != nil {
-		return nil, err
 	}
 	return decoded, nil
 }
@@ -450,21 +444,6 @@ func normalizeAESKey(raw []byte) []byte {
 		copy(out, raw)
 		return out
 	}
-}
-
-func decryptAESECB(ciphertext, key []byte) ([]byte, error) {
-	if len(ciphertext) == 0 || len(ciphertext)%aes.BlockSize != 0 {
-		return nil, errors.New("AES-ECB 密文长度非法")
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]byte, len(ciphertext))
-	for offset := 0; offset < len(ciphertext); offset += aes.BlockSize {
-		block.Decrypt(out[offset:offset+aes.BlockSize], ciphertext[offset:offset+aes.BlockSize])
-	}
-	return pkcs7Unpad(out, aes.BlockSize)
 }
 
 func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {

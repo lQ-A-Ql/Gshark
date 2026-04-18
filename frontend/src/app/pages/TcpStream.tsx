@@ -1,16 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, Download, ChevronLeft, ChevronRight, ArrowLeft, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
+import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
 import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
+import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";
 
 type RawViewMode = "ascii" | "hex" | "raw";
 type RawChunk = { packetId: number; direction: string; body: string };
@@ -427,42 +423,6 @@ const RawStreamChunkCard = memo(function RawStreamChunkCard({
   );
 });
 
-function parseChunkBytes(body: string, limit = Number.POSITIVE_INFINITY): number[] {
-  const raw = (body ?? "").trim();
-  if (!raw) return [];
-  const isHex = /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw);
-  if (!isHex) {
-    return Array.from(new TextEncoder().encode(raw.slice(0, Number.isFinite(limit) ? limit : undefined)));
-  }
-  const parts = raw.split(":");
-  const size = Math.min(parts.length, Number.isFinite(limit) ? limit : parts.length);
-  const bytes: number[] = [];
-  for (let i = 0; i < size; i += 1) {
-    const value = Number.parseInt(parts[i], 16);
-    if (Number.isFinite(value)) {
-      bytes.push(value);
-    }
-  }
-  return bytes;
-}
-
-function bytesToAscii(bytes: number[]): string {
-  if (bytes.length === 0) return "(empty payload)";
-  return bytes.map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : ".")).join("");
-}
-
-function bytesToHexDump(bytes: number[]): string {
-  if (bytes.length === 0) return "(empty payload)";
-  const lines: string[] = [];
-  for (let i = 0; i < bytes.length; i += 16) {
-    const chunk = bytes.slice(i, i + 16);
-    const hex = chunk.map((b) => b.toString(16).padStart(2, "0")).join(" ");
-    const ascii = chunk.map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : ".")).join("");
-    lines.push(`${i.toString(16).padStart(4, "0")}  ${hex.padEnd(47, " ")}  ${ascii}`);
-  }
-  return lines.join("\n");
-}
-
 function isHexPayload(body: string): boolean {
   return /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test((body ?? "").trim());
 }
@@ -503,11 +463,3 @@ function renderStreamChunk(body: string, mode: RawViewMode, expanded = false): s
     : `${rendered}\n\n... 已截断，点击查看完整 payload`;
 }
 
-function estimatePayloadBytes(body: string): number {
-  const raw = (body ?? "").trim();
-  if (!raw) return 0;
-  if (isHexPayload(raw)) {
-    return raw.split(":").length;
-  }
-  return new TextEncoder().encode(raw).length;
-}

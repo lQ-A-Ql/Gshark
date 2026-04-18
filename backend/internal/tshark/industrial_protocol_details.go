@@ -243,8 +243,8 @@ func (b *industrialDetailBuilder) Build() (model.IndustrialProtocolDetail, map[s
 func scanS7CommDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("S7comm")
 	err := scanFieldRows(filePath, s7CommDetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "S7comm" {
 			return
 		}
@@ -260,7 +260,7 @@ func scanS7CommDetail(filePath string) (model.IndustrialProtocolDetail, map[stri
 			normalizeTimestamp(safeTrim(parts, 1)),
 			src,
 			dst,
-			firstNonEmpty(operation, safeTrim(parts, 10)),
+			FirstNonEmpty(operation, safeTrim(parts, 10)),
 			target,
 			result,
 			"",
@@ -277,13 +277,13 @@ func scanS7CommDetail(filePath string) (model.IndustrialProtocolDetail, map[stri
 func scanDNP3Detail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("DNP3")
 	err := scanFieldRows(filePath, dnp3DetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "DNP3" {
 			return
 		}
 
-		operation := firstNonEmpty(
+		operation := FirstNonEmpty(
 			dnp3AppFunctionName(safeTrim(parts, 15)),
 			dnp3LinkFunctionName(safeTrim(parts, 13)),
 			dnp3LinkFunctionName(safeTrim(parts, 14)),
@@ -293,7 +293,7 @@ func scanDNP3Detail(filePath string) (model.IndustrialProtocolDetail, map[string
 			formatDNPAddress(safeTrim(parts, 11), safeTrim(parts, 12)),
 			formatDNPObjectTarget(safeTrim(parts, 16), safeTrim(parts, 17), safeTrim(parts, 18)),
 		)
-		value := firstNonEmpty(safeTrim(parts, 20), safeTrim(parts, 19), safeTrim(parts, 21), safeTrim(parts, 22), safeTrim(parts, 23))
+		value := FirstNonEmpty(safeTrim(parts, 20), safeTrim(parts, 19), safeTrim(parts, 21), safeTrim(parts, 22), safeTrim(parts, 23))
 		result := safeTrim(parts, 24)
 
 		builder.Add(
@@ -318,13 +318,13 @@ func scanDNP3Detail(filePath string) (model.IndustrialProtocolDetail, map[string
 func scanCIPDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("EtherNet/IP / CIP")
 	err := scanFieldRows(filePath, cipDetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "EtherNet/IP / CIP" {
 			return
 		}
 
-		operation := firstNonEmpty(
+		operation := FirstNonEmpty(
 			cipServiceName(safeTrim(parts, 12)),
 			enipCommandName(safeTrim(parts, 11)),
 			safeTrim(parts, 10),
@@ -355,25 +355,25 @@ func scanCIPDetail(filePath string) (model.IndustrialProtocolDetail, map[string]
 func scanBACnetDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("BACnet")
 	err := scanFieldRows(filePath, bacnetDetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "BACnet" {
 			return
 		}
 
-		operation := firstNonEmpty(
+		operation := FirstNonEmpty(
 			bacnetServiceName(safeTrim(parts, 12), true),
 			bacnetServiceName(safeTrim(parts, 13), false),
 			bacnetMessageTypeName(safeTrim(parts, 11)),
 			safeTrim(parts, 10),
 		)
 		target := compactJoin(" / ",
-			firstNonEmpty(safeTrim(parts, 14), safeTrim(parts, 15)),
+			FirstNonEmpty(safeTrim(parts, 14), safeTrim(parts, 15)),
 			nonEmptyPrefixed("Property", safeTrim(parts, 16)),
 			nonEmptyPrefixed("Invoke", safeTrim(parts, 21)),
 		)
 		result := safeTrim(parts, 17)
-		value := firstNonEmpty(safeTrim(parts, 18), safeTrim(parts, 19), safeTrim(parts, 20))
+		value := FirstNonEmpty(safeTrim(parts, 18), safeTrim(parts, 19), safeTrim(parts, 20))
 
 		builder.Add(
 			parseInt64(safeTrim(parts, 0)),
@@ -397,21 +397,21 @@ func scanBACnetDetail(filePath string) (model.IndustrialProtocolDetail, map[stri
 func scanIEC104Detail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("IEC 104")
 	err := scanFieldRows(filePath, iec104DetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "IEC 104" {
 			return
 		}
 
 		typeID := safeTrim(parts, 12)
 		cause := safeTrim(parts, 13)
-		operation := firstNonEmpty(iec104TypeName(typeID), safeTrim(parts, 10))
+		operation := FirstNonEmpty(iec104TypeName(typeID), safeTrim(parts, 10))
 		target := compactJoin(" / ",
 			nonEmptyPrefixed("ASDU", safeTrim(parts, 11)),
 			nonEmptyPrefixed("IOA", safeTrim(parts, 14)),
 		)
 		result := iec104CauseName(cause)
-		value := firstNonEmpty(safeTrim(parts, 15), safeTrim(parts, 16), safeTrim(parts, 17), previewHexBytes(safeTrim(parts, 18), 8))
+		value := FirstNonEmpty(safeTrim(parts, 15), safeTrim(parts, 16), safeTrim(parts, 17), previewHexBytes(safeTrim(parts, 18), 8))
 
 		builder.Add(
 			parseInt64(safeTrim(parts, 0)),
@@ -435,20 +435,20 @@ func scanIEC104Detail(filePath string) (model.IndustrialProtocolDetail, map[stri
 func scanOPCUADetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("OPC UA")
 	err := scanFieldRows(filePath, opcuaDetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "OPC UA" {
 			return
 		}
 
 		serviceNode := safeTrim(parts, 11)
-		operation := firstNonEmpty(opcuaServiceName(serviceNode), safeTrim(parts, 10))
+		operation := FirstNonEmpty(opcuaServiceName(serviceNode), safeTrim(parts, 10))
 		target := compactJoin(" / ",
-			firstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 14), safeTrim(parts, 13), safeTrim(parts, 12), safeTrim(parts, 15)),
+			FirstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 14), safeTrim(parts, 13), safeTrim(parts, 12), safeTrim(parts, 15)),
 			nonEmptyPrefixed("Node", serviceNode),
 		)
-		result := firstNonEmpty(safeTrim(parts, 17), safeTrim(parts, 18))
-		value := firstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 14), safeTrim(parts, 13))
+		result := FirstNonEmpty(safeTrim(parts, 17), safeTrim(parts, 18))
+		value := FirstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 14), safeTrim(parts, 13))
 
 		builder.Add(
 			parseInt64(safeTrim(parts, 0)),
@@ -472,13 +472,13 @@ func scanOPCUADetail(filePath string) (model.IndustrialProtocolDetail, map[strin
 func scanPROFINETDetail(filePath string) (model.IndustrialProtocolDetail, map[string]conversationCount, error) {
 	builder := newIndustrialDetailBuilder("PROFINET")
 	err := scanFieldRows(filePath, profinetDetailFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 3), safeTrim(parts, 4), safeTrim(parts, 2))
-		dst := firstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7), safeTrim(parts, 5))
+		src := FirstNonEmpty(safeTrim(parts, 3), safeTrim(parts, 4), safeTrim(parts, 2))
+		dst := FirstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7), safeTrim(parts, 5))
 		if detectIndustrialProtocol(safeTrim(parts, 8), safeTrim(parts, 9), "", "") != "PROFINET" {
 			return
 		}
 
-		operation := firstNonEmpty(
+		operation := FirstNonEmpty(
 			profinetDCPServiceName(safeTrim(parts, 14), safeTrim(parts, 15)),
 			pnioOperationLabel(safeTrim(parts, 20), safeTrim(parts, 21), safeTrim(parts, 25), safeTrim(parts, 26), safeTrim(parts, 27)),
 			safeTrim(parts, 13),
@@ -487,7 +487,7 @@ func scanPROFINETDetail(filePath string) (model.IndustrialProtocolDetail, map[st
 		target := compactJoin(" / ",
 			nonEmptyPrefixed("FrameID", formatHex(safeTrim(parts, 11))),
 			nonEmptyPrefixed("Cycle", safeTrim(parts, 12)),
-			firstNonEmpty(
+			FirstNonEmpty(
 				safeTrim(parts, 17),
 				safeTrim(parts, 16),
 				safeTrim(parts, 22),
@@ -502,7 +502,7 @@ func scanPROFINETDetail(filePath string) (model.IndustrialProtocolDetail, map[st
 		)
 		result := pnioResultLabel(safeTrim(parts, 28), safeTrim(parts, 29), safeTrim(parts, 30), safeTrim(parts, 31))
 		value := compactJoin(" / ",
-			nonEmptyPrefixed("Station", firstNonEmpty(safeTrim(parts, 17), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 24))),
+			nonEmptyPrefixed("Station", FirstNonEmpty(safeTrim(parts, 17), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 24))),
 			nonEmptyPrefixed("IOCRs", safeTrim(parts, 27)),
 			nonEmptyPrefixed("ARType", safeTrim(parts, 21)),
 		)
@@ -667,7 +667,7 @@ func formatDNPAddress(src, dst string) string {
 	if src == "" && dst == "" {
 		return ""
 	}
-	return firstNonEmpty(src, "unknown") + " -> " + firstNonEmpty(dst, "unknown")
+	return FirstNonEmpty(src, "unknown") + " -> " + FirstNonEmpty(dst, "unknown")
 }
 
 func formatDNPObjectTarget(obj, pointIndex, count string) string {
@@ -942,7 +942,7 @@ func profinetDCPServiceName(serviceID, serviceType string) string {
 func pnioOperationLabel(opnum, arType, iocrType, iocrReference, iocrCount string) string {
 	return compactJoin(" / ",
 		nonEmptyPrefixed("Op", opnum),
-		firstNonEmpty(strings.TrimSpace(arType), ""),
+		FirstNonEmpty(strings.TrimSpace(arType), ""),
 		nonEmptyPrefixed("IOCRType", formatHex(iocrType)),
 		nonEmptyPrefixed("IOCRRef", formatHex(iocrReference)),
 		nonEmptyPrefixed("IOCRCount", iocrCount),

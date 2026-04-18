@@ -13,12 +13,6 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
-// ReassembleHTTPStreamFromFile rebuilds HTTP request/response bodies from the raw
-// TCP payload of a stream, independent from current display filter.
-func ReassembleHTTPStreamFromFile(filePath string, streamID int64) (model.ReassembledStream, error) {
-	return ReassembleHTTPStreamFromFileContext(context.Background(), filePath, streamID)
-}
-
 func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, streamID int64) (model.ReassembledStream, error) {
 	stream := model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
 	log.Printf("tshark: follow http stream start file=%q stream=%d", filePath, streamID)
@@ -88,7 +82,7 @@ func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, s
 		}
 
 		if clientIP == "" {
-			clientIP, stream.To = selectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
+			clientIP, stream.To = SelectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
 			if clientIP == srcIP {
 				clientPort = srcPort
 				stream.From = srcIP
@@ -102,14 +96,14 @@ func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, s
 			packetID = int64(len(stream.Chunks) + 1)
 		}
 		if srcIP == clientIP && (clientPort == 0 || srcPort == clientPort) {
-			appendStreamChunk(&stream, packetID, "client", payloadText)
+			AppendStreamChunk(&stream, packetID, "client", payloadText)
 			stream.Request += payloadText
 			if loggedChunks < 8 {
 				log.Printf("tshark: follow http stream=%d packet=%d dir=client bytes=%d", streamID, packetID, len(payloadText))
 				loggedChunks++
 			}
 		} else {
-			appendStreamChunk(&stream, packetID, "server", payloadText)
+			AppendStreamChunk(&stream, packetID, "server", payloadText)
 			stream.Response += payloadText
 			if loggedChunks < 8 {
 				log.Printf("tshark: follow http stream=%d packet=%d dir=server bytes=%d", streamID, packetID, len(payloadText))
@@ -135,7 +129,7 @@ func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, s
 	return stream, nil
 }
 
-func appendStreamChunk(stream *model.ReassembledStream, packetID int64, direction, body string) {
+func AppendStreamChunk(stream *model.ReassembledStream, packetID int64, direction, body string) {
 	if body == "" {
 		return
 	}
@@ -164,10 +158,6 @@ func decodeHexPayloadToText(payloadHex string) string {
 	}
 
 	return out.String()
-}
-
-func ReassembleRawStreamFromFile(filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
-	return ReassembleRawStreamFromFileContext(context.Background(), filePath, protocol, streamID)
 }
 
 func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol string, streamID int64) (model.ReassembledStream, error) {
@@ -254,7 +244,7 @@ func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol 
 		}
 
 		if clientIP == "" {
-			clientIP, stream.To = selectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
+			clientIP, stream.To = SelectClientServerHosts(srcIP, srcPort, dstIP, dstPort)
 			if clientIP == srcIP {
 				clientPort = srcPort
 				stream.From = srcIP
@@ -339,17 +329,17 @@ func normalizePayloadHex(payloadHex string) string {
 	return strings.Join(bytesOut, ":")
 }
 
-func selectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {
-	if isLikelyClientPort(srcPort, dstPort) {
+func SelectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {
+	if IsLikelyClientPort(srcPort, dstPort) {
 		return srcIP, dstIP
 	}
-	if isLikelyClientPort(dstPort, srcPort) {
+	if IsLikelyClientPort(dstPort, srcPort) {
 		return dstIP, srcIP
 	}
 	return srcIP, dstIP
 }
 
-func isLikelyClientPort(candidate int, peer int) bool {
+func IsLikelyClientPort(candidate int, peer int) bool {
 	if candidate <= 0 {
 		return false
 	}

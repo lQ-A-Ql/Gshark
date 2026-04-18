@@ -5,6 +5,7 @@ import type {
   DBCProfile,
   DecryptionConfig,
   ExtractedObject,
+  GlobalTrafficStats,
   HttpStream,
   IndustrialAnalysis,
   MediaAnalysis,
@@ -72,26 +73,6 @@ export interface FFmpegStatus {
   available: boolean;
   path: string;
   message: string;
-}
-
-interface TrafficBucket {
-  label: string;
-  count: number;
-}
-
-export interface GlobalTrafficStats {
-  totalPackets: number;
-  protocolKinds: number;
-  timeline: TrafficBucket[];
-  protocolDist: TrafficBucket[];
-  topTalkers: TrafficBucket[];
-  topHostnames: TrafficBucket[];
-  topDomains: TrafficBucket[];
-  topSrcIPs: TrafficBucket[];
-  topDstIPs: TrafficBucket[];
-  topComputerNames: TrafficBucket[];
-  topDestPorts: TrafficBucket[];
-  topSrcPorts: TrafficBucket[];
 }
 
 export interface PluginSource {

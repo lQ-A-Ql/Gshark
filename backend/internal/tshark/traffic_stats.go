@@ -98,8 +98,8 @@ func BuildGlobalTrafficStatsFromFile(filePath string) (model.GlobalTrafficStats,
 		}
 		protocolMap[protocol]++
 
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		if src == "" && dst == "" {
 			talkerMap["unknown"]++
 		} else {
@@ -118,7 +118,7 @@ func BuildGlobalTrafficStatsFromFile(filePath string) (model.GlobalTrafficStats,
 		}
 
 		// 收集域名 (HTTP Host, TLS SNI, DNS Query)
-		domain := normalizeDomain(firstNonEmpty(
+		domain := normalizeDomain(FirstNonEmpty(
 			safeTrim(parts, 8),  // http.host
 			safeTrim(parts, 9),  // tls.handshake.extensions_server_name
 			safeTrim(parts, 10), // dns.qry.name
@@ -127,7 +127,7 @@ func BuildGlobalTrafficStatsFromFile(filePath string) (model.GlobalTrafficStats,
 			domainMap[domain]++
 		}
 
-		computerName := normalizeComputerName(firstNonEmpty(
+		computerName := normalizeComputerName(FirstNonEmpty(
 			safeTrim(parts, 11), // nbns.name
 			safeTrim(parts, 12), // nbns.netbios_name
 			safeTrim(parts, 13), // dhcp.option.hostname

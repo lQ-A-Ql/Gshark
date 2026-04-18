@@ -6,7 +6,17 @@
       "Bash(grep:*)",
       "Bash(find /mnt/c/Users/QAQ/Desktop/gshark/backend/internal/tshark -name \"*_test.go\" -exec wc -l {} +)",
       "Bash(go build:*)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(ls:*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(sed 's/[\"'\\\\''].*//')",
+      "Bash(sed \"s/[\\\\\"'].*//\")",
+      "Bash(npx tsc:*)",
+      "Bash(rm:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx vite:*)",
+      "Bash",
+      "Edit"
     ]
   }
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 const (
@@ -329,22 +330,13 @@ func buildMediaSessionLabel(session model.MediaSession) string {
 	}
 	return fmt.Sprintf(
 		"%s / %s / %s:%d -> %s:%d",
-		firstNonEmptyString(session.Application, "RTP"),
+		tshark.FirstNonEmpty(session.Application, "RTP"),
 		codec,
-		firstNonEmptyString(session.Source, "src"),
+		tshark.FirstNonEmpty(session.Source, "src"),
 		session.SourcePort,
-		firstNonEmptyString(session.Destination, "dst"),
+		tshark.FirstNonEmpty(session.Destination, "dst"),
 		session.DestinationPort,
 	)
-}
-
-func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
 }
 
 func recomputeSpeechBatchCounts(task *model.SpeechBatchTaskStatus) {

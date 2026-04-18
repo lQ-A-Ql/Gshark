@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 var colonHexPayloadPattern = regexp.MustCompile(`^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$`)
@@ -31,7 +32,7 @@ func appendPacketToRawStreamIndex(index map[string]*model.ReassembledStream, pac
 	key := streamCacheKey(protocol, packet.StreamID)
 	stream := index[key]
 	if stream == nil {
-		from, to := selectClientServerHosts(packet.SourceIP, packet.SourcePort, packet.DestIP, packet.DestPort)
+		from, to := tshark.SelectClientServerHosts(packet.SourceIP, packet.SourcePort, packet.DestIP, packet.DestPort)
 		stream = &model.ReassembledStream{
 			StreamID: packet.StreamID,
 			Protocol: protocol,
@@ -200,10 +201,6 @@ func normalizePacketPayloadHex(payload string) string {
 	if raw == "" {
 		return ""
 	}
-	if strings.Contains(raw, ":") {
-		bytes := decodeLooseHex(raw)
-		return bytesToColonHex(bytes)
-	}
 	if decoded := decodeLooseHex(raw); len(decoded) > 0 {
 		return bytesToColonHex(decoded)
 	}
@@ -276,28 +273,3 @@ func isColonHexPayload(raw string) bool {
 	return colonHexPayloadPattern.MatchString(strings.TrimSpace(raw))
 }
 
-func selectClientServerHosts(srcIP string, srcPort int, dstIP string, dstPort int) (string, string) {
-	if isLikelyClientPort(srcPort, dstPort) {
-		return srcIP, dstIP
-	}
-	if isLikelyClientPort(dstPort, srcPort) {
-		return dstIP, srcIP
-	}
-	return srcIP, dstIP
-}
-
-func isLikelyClientPort(candidate int, peer int) bool {
-	if candidate <= 0 {
-		return false
-	}
-	if peer <= 0 {
-		return candidate >= 49152
-	}
-	if candidate >= 49152 && peer < 49152 {
-		return true
-	}
-	if candidate > 1024 && peer <= 1024 {
-		return true
-	}
-	return false
-}

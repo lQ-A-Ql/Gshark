@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileDown, FileText, Image as ImageIcon, Archive, FileQuestion, Download, Filter, Search } from "lucide-react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
+import { cn } from "../components/ui/utils";
 import { bridge, getBackendAuthHeaders } from "../integrations/wailsBridge";
 import type { ExtractedObject } from "../core/types";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 function iconForMime(mime: string) {
   if (mime.startsWith("image/")) return { icon: ImageIcon, color: "text-blue-500", kind: "image" };

@@ -12,6 +12,8 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+const maxStreamContentBytes = 1 << 20 // 1 MB
+
 func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTarget, func(), error) {
 	targets := make([]yaraScanTarget, 0, len(objects)+64)
 	for _, object := range objects {
@@ -43,6 +45,9 @@ func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTa
 			content, packetID := s.yaraStreamContent(ctx, protocol, streamID)
 			if strings.TrimSpace(content) == "" {
 				continue
+			}
+			if len(content) > maxStreamContentBytes {
+				content = content[:maxStreamContentBytes]
 			}
 			name := fmt.Sprintf("%s-stream-%d.txt", strings.ToLower(protocol), streamID)
 			path := filepath.Join(tempDir, name)

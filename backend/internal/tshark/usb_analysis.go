@@ -109,7 +109,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		busID := safeTrim(parts, 3)
 		deviceAddress := safeTrim(parts, 4)
 		endpointRaw := safeTrim(parts, 5)
-		endpointDirection := firstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7))
+		endpointDirection := FirstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7))
 		transferType := normalizeUSBTransferType(safeTrim(parts, 8))
 		urbType := normalizeUSBUrbType(safeTrim(parts, 9))
 		status := normalizeUSBStatus(safeTrim(parts, 10))
@@ -118,7 +118,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		setupValue := safeTrim(parts, 13)
 		setupIndex := safeTrim(parts, 14)
 		setupLength := safeTrim(parts, 15)
-		payloadRaw := firstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 17), safeTrim(parts, 18))
+		payloadRaw := FirstNonEmpty(safeTrim(parts, 16), safeTrim(parts, 17), safeTrim(parts, 18))
 		info := safeTrim(parts, 45)
 
 		if !looksLikeUSBRecord(protocol, busID, deviceAddress, endpointRaw, transferType, urbType) {
@@ -168,7 +168,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 			DataLength:     dataLength,
 			SetupRequest:   buildUSBSetupSummary(setupRequest, setupValue, setupIndex, setupLength),
 			PayloadPreview: previewUSBPayload(payloadRaw),
-			Summary:        firstNonEmpty(info, transferType, protocol, "USB packet"),
+			Summary:        FirstNonEmpty(info, transferType, protocol, "USB packet"),
 		}
 
 		if len(analysis.Records) < usbRecordLimit {

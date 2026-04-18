@@ -19,6 +19,7 @@ type yaraRuleMeta struct {
 	category string
 	ruleName string
 	level    string
+	cveID    string
 }
 
 type yaraRuleBundle struct {
@@ -43,22 +44,6 @@ var defaultYaraRuleMeta = map[string]yaraRuleMeta{
 
 var runYaraCommand = func(ctx context.Context, yaraExe, rulePath, scanPath string) ([]byte, error) {
 	return exec.CommandContext(ctx, yaraExe, "-r", rulePath, scanPath).CombinedOutput()
-}
-
-func BatchScanObjectsWithYara(objects []model.ObjectFile, packets []model.Packet) []model.ThreatHit {
-	hits, err := BatchScanObjectsWithYaraConfig(objects, model.YaraConfig{Enabled: true, TimeoutMS: 25000})
-	if err != nil {
-		return append(hits, newYaraWarningHit(err.Error()))
-	}
-	return hits
-}
-
-func BatchScanObjectsWithYaraIndex(objects []model.ObjectFile, _ map[string]int64) []model.ThreatHit {
-	hits, err := BatchScanObjectsWithYaraConfig(objects, model.YaraConfig{Enabled: true, TimeoutMS: 25000})
-	if err != nil {
-		return append(hits, newYaraWarningHit(err.Error()))
-	}
-	return hits
 }
 
 func BatchScanObjectsWithYaraConfig(objects []model.ObjectFile, yc model.YaraConfig) ([]model.ThreatHit, error) {
@@ -153,13 +138,17 @@ func BatchScanTargetsWithYaraConfig(targets []yaraScanTarget, yc model.YaraConfi
 				meta = fallbackYaraRuleMeta(ruleID)
 			}
 
+			preview := fmt.Sprintf("YARA 命中 %s: %s", readableYaraTargetSource(target.source), target.name)
+			if meta.cveID != "" {
+				preview += " | " + meta.cveID
+			}
 			hits = append(hits, model.ThreatHit{
 				ID:       seq,
 				PacketID: target.packetID,
 				Category: meta.category,
 				Rule:     meta.ruleName,
 				Level:    meta.level,
-				Preview:  previewText(fmt.Sprintf("YARA 命中 %s: %s", readableYaraTargetSource(target.source), target.name)),
+				Preview:  previewText(preview),
 				Match:    ruleID,
 			})
 			seq++
@@ -330,12 +319,13 @@ func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {
 		return yaraRuleBundle{}, err
 	}
 	rulePath := filepath.Join(tempDir, "gshark-default.yar")
-	if err := os.WriteFile(rulePath, []byte(yararules.DefaultRuleSource), 0o644); err != nil {
+	allSources := yararules.AllRuleSources()
+	if err := os.WriteFile(rulePath, []byte(allSources), 0o644); err != nil {
 		return yaraRuleBundle{}, err
 	}
 	return yaraRuleBundle{
 		path: rulePath,
-		meta: parseYaraRuleMetaFromSource(yararules.DefaultRuleSource),
+		meta: parseYaraRuleMetaFromSource(allSources),
 	}, nil
 }
 
@@ -493,6 +483,7 @@ func ruleMetaFromFields(ruleID string, fields map[string]string) (yaraRuleMeta, 
 		category: strings.TrimSpace(fields["family"]),
 		ruleName: strings.TrimSpace(fields["description"]),
 		level:    normalizeYaraLevel(fields["severity"]),
+		cveID:    strings.TrimSpace(fields["cve"]),
 	}
 	if meta.category == "" {
 		meta.category = strings.TrimSpace(fields["project"])

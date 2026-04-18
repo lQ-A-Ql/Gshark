@@ -130,13 +130,13 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 
 	err := scanFieldRows(filePath, modbusAnalysisFields, func(parts []string) {
 		packetID := parseInt64(safeTrim(parts, 0))
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		protoPath := safeTrim(parts, 8)
 		displayProto := safeTrim(parts, 9)
 		info := safeTrim(parts, 10)
-		srcPort := firstNonEmpty(safeTrim(parts, 11), safeTrim(parts, 12))
-		dstPort := firstNonEmpty(safeTrim(parts, 13), safeTrim(parts, 14))
+		srcPort := FirstNonEmpty(safeTrim(parts, 11), safeTrim(parts, 12))
+		dstPort := FirstNonEmpty(safeTrim(parts, 13), safeTrim(parts, 14))
 
 		if detectIndustrialProtocol(protoPath, displayProto, srcPort, dstPort) != "Modbus/TCP" {
 			return
@@ -153,9 +153,9 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 		responseTime := safeTrim(parts, 19)
 		exceptionFlag := parseTruthy(safeTrim(parts, 20))
 		exceptionCode := parseInt(safeTrim(parts, 21))
-		rawReference := firstNonEmpty(safeTrim(parts, 24), safeTrim(parts, 25), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 31), safeTrim(parts, 32))
+		rawReference := FirstNonEmpty(safeTrim(parts, 24), safeTrim(parts, 25), safeTrim(parts, 22), safeTrim(parts, 23), safeTrim(parts, 31), safeTrim(parts, 32))
 		reference := formatModbusReference(rawReference)
-		rawQuantity := firstNonEmpty(safeTrim(parts, 27), safeTrim(parts, 28), safeTrim(parts, 26), safeTrim(parts, 29), safeTrim(parts, 30))
+		rawQuantity := FirstNonEmpty(safeTrim(parts, 27), safeTrim(parts, 28), safeTrim(parts, 26), safeTrim(parts, 29), safeTrim(parts, 30))
 		quantity := rawQuantity
 		registerValues := compactJoin(", ",
 			safeTrim(parts, 33),
@@ -459,7 +459,7 @@ func buildModbusBitRangeFromFieldValues(defaultBitType, rawBitNumbers, rawBitVal
 		return nil
 	}
 
-	bitType := firstNonEmpty(fallbackCtx.BitType, defaultBitType)
+	bitType := FirstNonEmpty(fallbackCtx.BitType, defaultBitType)
 	if bitType == "" {
 		return nil
 	}

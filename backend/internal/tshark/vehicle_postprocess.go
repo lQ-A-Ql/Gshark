@@ -71,8 +71,8 @@ func buildUDSTransaction(request, response udsEvent, normalizedService, status s
 	serviceID := normalizedService
 	serviceName := udsServiceName(serviceID)
 	if strings.TrimSpace(serviceID) == "" {
-		serviceID = firstNonEmpty(request.ServiceID, response.ServiceID)
-		serviceName = firstNonEmpty(request.ServiceName, response.ServiceName)
+		serviceID = FirstNonEmpty(request.ServiceID, response.ServiceID)
+		serviceName = FirstNonEmpty(request.ServiceName, response.ServiceName)
 	}
 	transaction := model.UDSTransaction{
 		RequestPacketID: request.PacketID,
@@ -81,9 +81,9 @@ func buildUDSTransaction(request, response udsEvent, normalizedService, status s
 		TargetAddress:   request.TargetAddress,
 		ServiceID:       serviceID,
 		ServiceName:     serviceName,
-		SubFunction:     firstNonEmpty(request.SubFunction, response.SubFunction),
-		DataIdentifier:  firstNonEmpty(request.DataIdentifier, response.DataIdentifier),
-		DTC:             firstNonEmpty(request.DTC, response.DTC),
+		SubFunction:     FirstNonEmpty(request.SubFunction, response.SubFunction),
+		DataIdentifier:  FirstNonEmpty(request.DataIdentifier, response.DataIdentifier),
+		DTC:             FirstNonEmpty(request.DTC, response.DTC),
 		Status:          status,
 		RequestSummary:  request.Summary,
 	}

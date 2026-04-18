@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ShieldAlert, Crosshair, CheckCircle2, Flag, Shield, BarChart2, FolderCog, SearchCode, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
+import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Progress } from "../components/ui/progress";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 function levelColor(level: string) {
   if (level === "critical") return "text-rose-700 bg-rose-50 border-rose-200";

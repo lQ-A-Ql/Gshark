@@ -248,8 +248,8 @@ func specializedFieldWarmPlans() []fieldScanWarmPlan {
 func normalizeFieldScanOptions(opts fieldScanOptions) fieldScanOptions {
 	return fieldScanOptions{
 		DisplayFilter: strings.TrimSpace(opts.DisplayFilter),
-		Occurrence:    firstNonEmpty(strings.TrimSpace(opts.Occurrence), "f"),
-		Aggregator:    firstNonEmpty(strings.TrimSpace(opts.Aggregator), ","),
+		Occurrence:    FirstNonEmpty(strings.TrimSpace(opts.Occurrence), "f"),
+		Aggregator:    FirstNonEmpty(strings.TrimSpace(opts.Aggregator), ","),
 	}
 }
 

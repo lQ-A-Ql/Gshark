@@ -193,7 +193,7 @@ func BuildMediaAnalysisFromFileWithConfig(
 		}
 		applyStaticRTPProfile(builder)
 		if isGameStreamSession(builder) {
-			builder.MediaType = firstNonEmpty(builder.MediaType, inferGameStreamMediaType(builder.SourcePort, builder.DestinationPort))
+			builder.MediaType = FirstNonEmpty(builder.MediaType, inferGameStreamMediaType(builder.SourcePort, builder.DestinationPort))
 			if !strings.EqualFold(builder.MediaType, "audio") {
 				builder.Codec = inferSessionCodec(builder)
 			}
@@ -239,13 +239,13 @@ func BuildMediaAnalysisFromFileWithConfig(
 		session := model.MediaSession{
 			ID:              builder.ID,
 			MediaType:       mediaType,
-			Family:          firstNonEmpty(builder.Family, "RTP"),
-			Application:     firstNonEmpty(builder.Application, "RTP"),
+			Family:          FirstNonEmpty(builder.Family, "RTP"),
+			Application:     FirstNonEmpty(builder.Application, "RTP"),
 			Source:          builder.Source,
 			SourcePort:      builder.SourcePort,
 			Destination:     builder.Destination,
 			DestinationPort: builder.DestinationPort,
-			Transport:       firstNonEmpty(builder.Transport, "UDP"),
+			Transport:       FirstNonEmpty(builder.Transport, "UDP"),
 			SSRC:            builder.SSRC,
 			PayloadType:     builder.PayloadType,
 			Codec:           builder.Codec,
@@ -316,7 +316,7 @@ func BuildMediaAnalysisFromPacketStream(
 		}
 		applyStaticRTPProfile(builder)
 		if isGameStreamSession(builder) {
-			builder.MediaType = firstNonEmpty(builder.MediaType, inferGameStreamMediaType(builder.SourcePort, builder.DestinationPort))
+			builder.MediaType = FirstNonEmpty(builder.MediaType, inferGameStreamMediaType(builder.SourcePort, builder.DestinationPort))
 			if !strings.EqualFold(builder.MediaType, "audio") {
 				builder.Codec = inferSessionCodec(builder)
 			}
@@ -363,13 +363,13 @@ func BuildMediaAnalysisFromPacketStream(
 		session := model.MediaSession{
 			ID:              builder.ID,
 			MediaType:       mediaType,
-			Family:          firstNonEmpty(builder.Family, "RTP"),
-			Application:     firstNonEmpty(builder.Application, "RTP"),
+			Family:          FirstNonEmpty(builder.Family, "RTP"),
+			Application:     FirstNonEmpty(builder.Application, "RTP"),
 			Source:          builder.Source,
 			SourcePort:      builder.SourcePort,
 			Destination:     builder.Destination,
 			DestinationPort: builder.DestinationPort,
-			Transport:       firstNonEmpty(builder.Transport, "UDP"),
+			Transport:       FirstNonEmpty(builder.Transport, "UDP"),
 			SSRC:            builder.SSRC,
 			PayloadType:     builder.PayloadType,
 			Codec:           builder.Codec,
@@ -467,8 +467,8 @@ func scanMediaControlHints(filePath string, controlHints map[int][]mediaTrackHin
 		count++
 		protocolMap["RTSP/SDP"]++
 
-		srcPort := parseFlexibleInt(firstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7)))
-		dstPort := parseFlexibleInt(firstNonEmpty(safeTrim(parts, 8), safeTrim(parts, 9)))
+		srcPort := parseFlexibleInt(FirstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7)))
+		dstPort := parseFlexibleInt(FirstNonEmpty(safeTrim(parts, 8), safeTrim(parts, 9)))
 		text := strings.ToLower(strings.Join([]string{
 			safeTrim(parts, 10),
 			safeTrim(parts, 11),
@@ -705,8 +705,8 @@ func consumeRTPMediaRow(parts []string, controlHints map[int][]mediaTrackHint, s
 	}
 	protocolMap["RTP"]++
 
-	src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3))
-	dst := firstNonEmpty(safeTrim(parts, 4), safeTrim(parts, 5))
+	src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3))
+	dst := FirstNonEmpty(safeTrim(parts, 4), safeTrim(parts, 5))
 	srcPort := parseFlexibleInt(safeTrim(parts, 6))
 	dstPort := parseFlexibleInt(safeTrim(parts, 7))
 	ssrc := formatHex(safeTrim(parts, 11))
@@ -788,7 +788,7 @@ func consumeRTPMediaRow(parts []string, controlHints map[int][]mediaTrackHint, s
 }
 
 func isMediaCandidatePacket(packet model.Packet) bool {
-	protocol := strings.ToUpper(strings.TrimSpace(firstNonEmpty(packet.Protocol, packet.DisplayProtocol)))
+	protocol := strings.ToUpper(strings.TrimSpace(FirstNonEmpty(packet.Protocol, packet.DisplayProtocol)))
 	if protocol == "UDP" || protocol == "RTP" {
 		return true
 	}
@@ -1090,8 +1090,8 @@ func scanGameStreamUDPSessions(filePath string, controlHints map[int][]mediaTrac
 		count++
 		protocolMap["GameStream UDP"]++
 
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3))
-		dst := firstNonEmpty(safeTrim(parts, 4), safeTrim(parts, 5))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3))
+		dst := FirstNonEmpty(safeTrim(parts, 4), safeTrim(parts, 5))
 		srcPort := parseFlexibleInt(safeTrim(parts, 6))
 		dstPort := parseFlexibleInt(safeTrim(parts, 7))
 		payloadType := fmt.Sprintf("%d", raw[1]&0x7F)
@@ -1638,7 +1638,7 @@ func parseSDPMediaEntry(raw, overridePort string) (string, int, []string) {
 		return "", parseFlexibleInt(overridePort), nil
 	}
 	mediaType := strings.TrimSpace(fields[0])
-	port := parseFlexibleInt(firstNonEmpty(overridePort, fields[1]))
+	port := parseFlexibleInt(FirstNonEmpty(overridePort, fields[1]))
 	payloadTypes := make([]string, 0, len(fields)-3)
 	for _, item := range fields[3:] {
 		item = strings.TrimSpace(item)
@@ -1976,16 +1976,16 @@ func buildMediaArtifactName(builder *mediaSessionBuilder, ext string) string {
 	if ssrc == "" {
 		ssrc = "0"
 	}
-	payloadType := safeMediaName(firstNonEmpty(builder.PayloadType, "pt"))
+	payloadType := safeMediaName(FirstNonEmpty(builder.PayloadType, "pt"))
 	name := fmt.Sprintf(
 		"%s_%s_pt%s_ssrc%s_%s_%d_%s_%d%s",
-		safeMediaName(firstNonEmpty(builder.Application, "rtp")),
-		safeMediaName(firstNonEmpty(builder.Codec, "video")),
+		safeMediaName(FirstNonEmpty(builder.Application, "rtp")),
+		safeMediaName(FirstNonEmpty(builder.Codec, "video")),
 		payloadType,
 		safeMediaName(ssrc),
-		safeMediaName(firstNonEmpty(builder.Source, "src")),
+		safeMediaName(FirstNonEmpty(builder.Source, "src")),
 		builder.SourcePort,
-		safeMediaName(firstNonEmpty(builder.Destination, "dst")),
+		safeMediaName(FirstNonEmpty(builder.Destination, "dst")),
 		builder.DestinationPort,
 		ext,
 	)

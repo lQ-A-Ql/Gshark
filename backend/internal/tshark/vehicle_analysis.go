@@ -93,8 +93,8 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 	udsEvents := make([]udsEvent, 0, 128)
 
 	err := scanFieldRows(filePath, vehicleAnalysisFields, func(parts []string) {
-		src := firstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := firstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
 		protoPath := safeTrim(parts, 8)
 		displayProto := safeTrim(parts, 9)
 		info := safeTrim(parts, 10)
@@ -112,8 +112,8 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 			safeTrim(parts, 24),
 			safeTrim(parts, 29),
 			safeTrim(parts, 42),
-			firstNonEmpty(tcpSrcPort, udpSrcPort),
-			firstNonEmpty(tcpDstPort, udpDstPort),
+			FirstNonEmpty(tcpSrcPort, udpSrcPort),
+			FirstNonEmpty(tcpDstPort, udpDstPort),
 			obdPadding,
 		)
 		if len(protocols) == 0 {
@@ -200,12 +200,12 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 			stats.DoIP.TotalMessages++
 			messageType := formatHex(safeTrim(parts, 29))
 			vin := strings.TrimSpace(safeTrim(parts, 30))
-			logicalAddress := firstNonEmpty(strings.TrimSpace(safeTrim(parts, 32)), formatHex(safeTrim(parts, 31)))
-			sourceAddress := firstNonEmpty(strings.TrimSpace(safeTrim(parts, 34)), formatHex(safeTrim(parts, 33)))
-			targetAddress := firstNonEmpty(strings.TrimSpace(safeTrim(parts, 36)), formatHex(safeTrim(parts, 35)))
-			testerAddress := firstNonEmpty(strings.TrimSpace(safeTrim(parts, 38)), formatHex(safeTrim(parts, 37)))
+			logicalAddress := FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 32)), formatHex(safeTrim(parts, 31)))
+			sourceAddress := FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 34)), formatHex(safeTrim(parts, 33)))
+			targetAddress := FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 36)), formatHex(safeTrim(parts, 35)))
+			testerAddress := FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 38)), formatHex(safeTrim(parts, 37)))
 			responseCode := formatHex(safeTrim(parts, 39))
-			diagState := firstNonEmpty(formatHex(safeTrim(parts, 40)), formatHex(safeTrim(parts, 41)))
+			diagState := FirstNonEmpty(formatHex(safeTrim(parts, 40)), formatHex(safeTrim(parts, 41)))
 
 			if messageType != "" {
 				doipTypeMap[messageType]++
@@ -222,8 +222,8 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 			stats.DoIP.Messages = append(stats.DoIP.Messages, model.DoIPMessageSummary{
 				PacketID:        packetID,
 				Time:            packetTime,
-				Source:          firstNonEmpty(src, sourceAddress),
-				Destination:     firstNonEmpty(dst, targetAddress),
+				Source:          FirstNonEmpty(src, sourceAddress),
+				Destination:     FirstNonEmpty(dst, targetAddress),
 				Type:            messageType,
 				VIN:             vin,
 				LogicalAddress:  logicalAddress,
@@ -238,7 +238,7 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 
 		if containsString(protocols, "UDS") {
 			stats.UDS.TotalMessages++
-			serviceID := firstNonEmpty(formatHex(safeTrim(parts, 42)), formatHex(safeTrim(parts, 51)))
+			serviceID := FirstNonEmpty(formatHex(safeTrim(parts, 42)), formatHex(safeTrim(parts, 51)))
 			serviceName := udsServiceName(serviceID)
 			negativeCode := formatHex(safeTrim(parts, 52))
 			vin := strings.TrimSpace(safeTrim(parts, 53))
@@ -265,12 +265,12 @@ func BuildVehicleAnalysisFromFile(filePath string, databases ...*DBCDatabase) (m
 				ServiceName:    serviceName,
 				IsReply:        parseTruthy(safeTrim(parts, 43)),
 				SubFunction:    formatHex(safeTrim(parts, 44)),
-				SourceAddress:  firstNonEmpty(strings.TrimSpace(safeTrim(parts, 48)), formatHex(safeTrim(parts, 47)), strings.TrimSpace(safeTrim(parts, 46)), formatHex(safeTrim(parts, 45))),
-				TargetAddress:  firstNonEmpty(strings.TrimSpace(safeTrim(parts, 50)), formatHex(safeTrim(parts, 49))),
+				SourceAddress:  FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 48)), formatHex(safeTrim(parts, 47)), strings.TrimSpace(safeTrim(parts, 46)), formatHex(safeTrim(parts, 45))),
+				TargetAddress:  FirstNonEmpty(strings.TrimSpace(safeTrim(parts, 50)), formatHex(safeTrim(parts, 49))),
 				DataIdentifier: dataIdentifier,
 				DiagnosticVIN:  vin,
 				DTC:            dtc,
-				NegativeCode:   firstNonEmpty(negativeCode, udsNegativeResponseName(negativeCode)),
+				NegativeCode:   FirstNonEmpty(negativeCode, udsNegativeResponseName(negativeCode)),
 				Summary:        info,
 			}
 			stats.UDS.Messages = append(stats.UDS.Messages, message)
@@ -375,12 +375,12 @@ func buildVehicleConversation(protocol, src, dst string, parts []string) string 
 		sourceAddr := formatHex(safeTrim(parts, 26))
 		targetAddr := formatHex(safeTrim(parts, 27))
 		if sourceAddr != "" || targetAddr != "" {
-			return firstNonEmpty(sourceAddr, "unknown") + " -> " + firstNonEmpty(targetAddr, "broadcast")
+			return FirstNonEmpty(sourceAddr, "unknown") + " -> " + FirstNonEmpty(targetAddr, "broadcast")
 		}
 		return "J1939 network"
 	case "DoIP", "UDS":
-		left := firstNonEmpty(src, strings.TrimSpace(safeTrim(parts, 34)), strings.TrimSpace(safeTrim(parts, 48)), formatHex(safeTrim(parts, 33)), formatHex(safeTrim(parts, 47)))
-		right := firstNonEmpty(dst, strings.TrimSpace(safeTrim(parts, 36)), strings.TrimSpace(safeTrim(parts, 50)), formatHex(safeTrim(parts, 35)), formatHex(safeTrim(parts, 49)))
+		left := FirstNonEmpty(src, strings.TrimSpace(safeTrim(parts, 34)), strings.TrimSpace(safeTrim(parts, 48)), formatHex(safeTrim(parts, 33)), formatHex(safeTrim(parts, 47)))
+		right := FirstNonEmpty(dst, strings.TrimSpace(safeTrim(parts, 36)), strings.TrimSpace(safeTrim(parts, 50)), formatHex(safeTrim(parts, 35)), formatHex(safeTrim(parts, 49)))
 		return buildConversationLabel(left, right)
 	default:
 		return buildConversationLabel(src, dst)

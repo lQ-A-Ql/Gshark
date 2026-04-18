@@ -8,16 +8,11 @@ import {
   Search,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { ungzip } from "pako";
+import { cn } from "../components/ui/utils";
 import { useSentinel } from "../state/SentinelContext";
 import type { StreamLoadMeta } from "../core/types";
 import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 type HTTPChunk = {
   key: string;

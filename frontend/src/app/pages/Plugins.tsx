@@ -16,14 +16,9 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { useSentinel } from "../state/SentinelContext";
+import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 type StatusFilter = "all" | "enabled" | "disabled";
 type RuntimeOption = "javascript" | "python";

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 var httpStatusLineRE = regexp.MustCompile(`^\d{3}\s`)
@@ -262,17 +263,6 @@ func guessMIME(name string) string {
 	}
 }
 
-func ReassembleHTTPStream(packets []model.Packet, streamID int64) model.ReassembledStream {
-	return ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
-		for _, packet := range packets {
-			if err := fn(packet); err != nil {
-				return err
-			}
-		}
-		return nil
-	}, streamID)
-}
-
 func ReassembleHTTPStreamFromIterate(iterate func(func(model.Packet) error) error, streamID int64) model.ReassembledStream {
 	stream := model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
 	clientIP := ""
@@ -294,26 +284,15 @@ func ReassembleHTTPStreamFromIterate(iterate func(func(model.Packet) error) erro
 		}
 
 		if isHTTPRequestPacket(packet, clientIP, clientPort) {
-			appendHTTPChunk(&stream, packet.ID, "client", body)
+			tshark.AppendStreamChunk(&stream, packet.ID, "client", body)
 			stream.Request += body
 		} else {
-			appendHTTPChunk(&stream, packet.ID, "server", body)
+			tshark.AppendStreamChunk(&stream, packet.ID, "server", body)
 			stream.Response += body
 		}
 		return nil
 	})
 	return stream
-}
-
-func appendHTTPChunk(stream *model.ReassembledStream, packetID int64, direction, body string) {
-	if body == "" {
-		return
-	}
-	if n := len(stream.Chunks); n > 0 && stream.Chunks[n-1].Direction == direction {
-		stream.Chunks[n-1].Body += body
-		return
-	}
-	stream.Chunks = append(stream.Chunks, model.StreamChunk{PacketID: packetID, Direction: direction, Body: body})
 }
 
 func decodeHTTPPayloadText(payload string) string {

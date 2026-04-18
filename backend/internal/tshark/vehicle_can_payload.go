@@ -60,7 +60,7 @@ func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CAN
 		busID := formatHex(safeTrim(parts, 5))
 		identifier := formatHex(safeTrim(parts, 6))
 		length := parseInt(safeTrim(parts, 7))
-		rawData := firstNonEmpty(
+		rawData := FirstNonEmpty(
 			normalizeHexBytes(safeTrim(parts, 21)),
 			normalizeHexBytes(safeTrim(parts, 35)),
 			normalizeHexBytes(safeTrim(parts, 32)),
@@ -77,7 +77,7 @@ func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CAN
 
 		packetID := parseInt64(safeTrim(parts, 0))
 		packetTime := normalizeTimestamp(safeTrim(parts, 1))
-		sourceAddress := firstNonEmpty(formatHex(safeTrim(parts, 11)), formatHex(safeTrim(parts, 9)))
+		sourceAddress := FirstNonEmpty(formatHex(safeTrim(parts, 11)), formatHex(safeTrim(parts, 9)))
 		targetAddress := formatHex(safeTrim(parts, 10))
 
 		if hasISOTP {
@@ -89,13 +89,13 @@ func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CAN
 				PacketID:      packetID,
 				Time:          packetTime,
 				BusID:         busID,
-				Identifier:    firstNonEmpty(identifier, formatHex(safeTrim(parts, 29))),
+				Identifier:    FirstNonEmpty(identifier, formatHex(safeTrim(parts, 29))),
 				Protocol:      "CANopen",
 				FrameType:     canopenFunctionName(safeTrim(parts, 30)),
 				SourceAddress: "",
 				TargetAddress: nonEmptyPrefixed("Node", formatHex(safeTrim(parts, 31))),
 				Service:       canopenServiceLabel(parts),
-				Detail:        compactJoin(" / ", canopenObjectIndex(safeTrim(parts, 33), safeTrim(parts, 34)), firstNonEmpty(nonEmptyPrefixed("Abort", formatHex(safeTrim(parts, 37))), nonEmptyPrefixed("EMCY", formatHex(safeTrim(parts, 36))))),
+				Detail:        compactJoin(" / ", canopenObjectIndex(safeTrim(parts, 33), safeTrim(parts, 34)), FirstNonEmpty(nonEmptyPrefixed("Abort", formatHex(safeTrim(parts, 37))), nonEmptyPrefixed("EMCY", formatHex(safeTrim(parts, 36))))),
 				Length:        length,
 				RawData:       rawData,
 				Summary:       info,
@@ -132,7 +132,7 @@ func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CAN
 		}
 
 		if hasOBD {
-			service, detail := decodeOBDPayload(firstNonEmpty(safeTrim(parts, 21), safeTrim(parts, 8)))
+			service, detail := decodeOBDPayload(FirstNonEmpty(safeTrim(parts, 21), safeTrim(parts, 8)))
 			protocolMap["OBD-II"]++
 			records = append(records, model.CANPayloadRecord{
 				PacketID:      packetID,
@@ -162,7 +162,7 @@ func scanCANPayloadAnalysis(filePath string) ([]model.TrafficBucket, []model.CAN
 				FrameType:     isoTPFrameType(safeTrim(parts, 12), safeTrim(parts, 17), safeTrim(parts, 18)),
 				SourceAddress: sourceAddress,
 				TargetAddress: targetAddress,
-				Service:       compactJoin(" / ", nonEmptyPrefixed("Len", firstNonEmpty(safeTrim(parts, 13), safeTrim(parts, 14), safeTrim(parts, 15), safeTrim(parts, 16))), flowControlLabel(safeTrim(parts, 18), safeTrim(parts, 19), safeTrim(parts, 20))),
+				Service:       compactJoin(" / ", nonEmptyPrefixed("Len", FirstNonEmpty(safeTrim(parts, 13), safeTrim(parts, 14), safeTrim(parts, 15), safeTrim(parts, 16))), flowControlLabel(safeTrim(parts, 18), safeTrim(parts, 19), safeTrim(parts, 20))),
 				Detail:        compactJoin(" / ", nonEmptyPrefixed("Seq", formatHex(safeTrim(parts, 17))), nonEmptyPrefixed("Addr", formatHex(safeTrim(parts, 9)))),
 				Length:        resolveISOTPLength(parts),
 				RawData:       rawData,
@@ -198,7 +198,7 @@ func isoTPFrameType(messageType, sequenceNumber, flowStatus string) string {
 		}
 		return "Consecutive Frame"
 	case "0X30":
-		return firstNonEmpty(flowControlLabel(flowStatus, "", ""), "Flow Control")
+		return FirstNonEmpty(flowControlLabel(flowStatus, "", ""), "Flow Control")
 	default:
 		if strings.TrimSpace(messageType) == "" {
 			return ""
@@ -362,7 +362,7 @@ func canopenFunctionName(raw string) string {
 }
 
 func canopenServiceLabel(parts []string) string {
-	service := firstNonEmpty(canopenFunctionName(safeTrim(parts, 30)), "CANopen")
+	service := FirstNonEmpty(canopenFunctionName(safeTrim(parts, 30)), "CANopen")
 	if safeTrim(parts, 33) != "" || safeTrim(parts, 34) != "" {
 		return compactJoin(" / ", service, "SDO")
 	}
