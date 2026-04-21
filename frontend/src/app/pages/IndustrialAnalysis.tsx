@@ -2,6 +2,7 @@ import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData, TrafficBucket } from "../core/types";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
@@ -85,11 +86,12 @@ export default function IndustrialAnalysis() {
   }, [isPreloadingCapture, refreshAnalysis]);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
+    <PageShell>
       <AnalysisHero
         icon={<Factory className="h-5 w-5" />}
         title="工控分析"
         subtitle="INDUSTRIAL PROTOCOLS"
+        description="聚焦 Modbus 与其他工控协议的会话、功能码、异常响应和控制指令，用统一视图快速识别危险写操作。"
         tags={INDUSTRIAL_PROTOCOL_TAGS}
         tagsLabel="协议族"
         theme="blue"
@@ -355,7 +357,7 @@ export default function IndustrialAnalysis() {
           </div>
         </Panel>
       ))}
-    </div>
+    </PageShell>
   );
 }
 

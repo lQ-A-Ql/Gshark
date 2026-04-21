@@ -1,0 +1,14 @@
+{
+  "description": "这是一个最小可运行的 zip 模块示例。卡片样式由宿主统一提供，模块只需要描述字段。",
+  "submit_label": "运行 Echo",
+  "result_title": "Echo 结果",
+  "fields": [
+    {
+      "name": "message",
+      "label": "Message",
+      "type": "textarea",
+      "rows": 8,
+      "placeholder": "请输入任意文本"
+    }
+  ]
+}

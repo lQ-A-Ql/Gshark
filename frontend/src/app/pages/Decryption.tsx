@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { KeyRound, LockOpen, Upload, CheckCircle2, FileText, Lock } from "lucide-react";
+import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import { useSentinel } from "../state/SentinelContext";
 import { bridge } from "../integrations/wailsBridge";
 
@@ -32,8 +34,17 @@ export default function Decryption() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-background p-6 text-sm text-foreground">
-      <div className="mx-auto mt-10 flex h-auto w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+    <PageShell innerClassName="max-w-5xl px-6 py-6">
+      <AnalysisHero
+        icon={<LockOpen className="h-5 w-5" />}
+        title="TLS 解密"
+        subtitle="TLS DECRYPTION SETTINGS"
+        description="统一管理 SSLKEYLOGFILE 与 RSA 私钥配置，并在应用后触发当前抓包的 TLS 重新解析。"
+        tags={["TLS", "HTTPS", "SSLKEYLOGFILE", "RSA 私钥"]}
+        tagsLabel="解密域"
+        theme="amber"
+      />
+      <div className="mx-auto flex h-auto w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
         <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-6 py-5">
           <div className="flex items-center gap-3 text-lg font-semibold text-foreground">
             <LockOpen className="h-6 w-6 text-amber-600" /> TLS / HTTPS 流量解密配置
@@ -117,6 +128,6 @@ export default function Decryption() {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

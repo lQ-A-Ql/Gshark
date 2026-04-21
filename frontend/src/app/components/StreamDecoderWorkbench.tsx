@@ -37,6 +37,16 @@ type BatchItem = {
   label: string;
 };
 
+type BatchDecodeProgress = {
+  total: number;
+  done: number;
+  success: number;
+  failed: number;
+  currentLabel: string;
+};
+
+const MAX_BATCH_FAILURE_DETAILS = 20;
+
 const SETTINGS_STORAGE_KEY = "gshark.stream-decoders.v1";
 
 const DEFAULT_SETTINGS: DecoderSettings = {
@@ -90,6 +100,8 @@ export function StreamDecoderWorkbench({
   const [decodeError, setDecodeError] = useState("");
   const [runningDecoder, setRunningDecoder] = useState<StreamDecoderKind | null>(null);
   const [applyMessage, setApplyMessage] = useState("");
+  const [batchProgress, setBatchProgress] = useState<BatchDecodeProgress | null>(null);
+  const [batchFailureDetails, setBatchFailureDetails] = useState<string[]>([]);
   const selectedBatchOrdinal = useMemo(() => {
     if (!batchItems || batchItems.length === 0) return 1;
     const hit = batchItems.findIndex((item) => item.index === selectedBatchIndex);
@@ -107,6 +119,8 @@ export function StreamDecoderWorkbench({
     setDecodeError("");
     setRunningDecoder(null);
     setApplyMessage("");
+    setBatchProgress(null);
+    setBatchFailureDetails([]);
   }, [payload, chunkLabel]);
 
   useEffect(() => {
@@ -115,7 +129,6 @@ export function StreamDecoderWorkbench({
   }, [selectedBatchOrdinal, batchItems?.length]);
 
   const preparedPayload = useMemo(() => normalizeTransportPayload(payload), [payload]);
-  const extractedBase64Candidate = useMemo(() => extractBestBase64Candidate(preparedPayload), [preparedPayload]);
   const hasPayload = preparedPayload.trim().length > 0;
   const hasBatchMode = Boolean(batchItems && batchItems.length > 0 && onApplyDecodedBatch);
   const batchCount = batchItems?.length ?? 0;
@@ -156,14 +169,50 @@ export function StreamDecoderWorkbench({
         const selected = batchItems.slice(from - 1, to);
         const patches: Array<{ index: number; body: string }> = [];
         let lastResult: StreamDecodeResult | null = null;
+        let successCount = 0;
+        let failedCount = 0;
+        const failureMessages: string[] = [];
 
-        for (const item of selected) {
-          const next = await decodeOne(decoder, item.payload);
-          lastResult = next;
-          if (next.text.trim()) {
-            patches.push({ index: item.index, body: next.text });
+        setBatchProgress({
+          total: selected.length,
+          done: 0,
+          success: 0,
+          failed: 0,
+          currentLabel: selected[0]?.label ?? "",
+        });
+        setBatchFailureDetails([]);
+
+        for (let idx = 0; idx < selected.length; idx += 1) {
+          const item = selected[idx];
+          setBatchProgress((prev) => prev ? { ...prev, currentLabel: item.label } : prev);
+          try {
+            const next = await decodeOne(decoder, item.payload);
+            lastResult = next;
+            if (next.text.trim()) {
+              patches.push({ index: item.index, body: next.text });
+              successCount += 1;
+            } else {
+              failedCount += 1;
+              if (failureMessages.length < MAX_BATCH_FAILURE_DETAILS) {
+                failureMessages.push(`[${item.index}] ${item.label}: 解码结果为空`);
+              }
+            }
+          } catch (error) {
+            failedCount += 1;
+            const message = error instanceof Error ? error.message : "解码失败";
+            if (failureMessages.length < MAX_BATCH_FAILURE_DETAILS) {
+              failureMessages.push(`[${item.index}] ${item.label}: ${message}`);
+            }
           }
+          setBatchProgress((prev) => prev ? {
+            ...prev,
+            done: idx + 1,
+            success: successCount,
+            failed: failedCount,
+          } : prev);
         }
+
+        setBatchFailureDetails(failureMessages);
 
         if (patches.length === 0) {
           throw new Error("所选区间没有可覆盖的解码结果");
@@ -171,7 +220,7 @@ export function StreamDecoderWorkbench({
 
         await onApplyDecodedBatch?.(patches);
         setResult(lastResult);
-        setApplyMessage(`已批量解码并持久化 ${patches.length} 个片段，区间 ${from}-${to}`);
+        setApplyMessage(`已批量解码并持久化 ${patches.length}/${selected.length} 个片段（失败 ${failedCount} 条），区间 ${from}-${to}`);
         return;
       }
 
@@ -185,11 +234,14 @@ export function StreamDecoderWorkbench({
       setDecodeError(error instanceof Error ? error.message : "解码失败");
     } finally {
       setRunningDecoder(null);
+      if (!hasBatchMode) {
+        setBatchProgress(null);
+      }
     }
   }
 
   return (
-    <div className={`rounded-xl border ${toneClass} p-4`}>
+    <div className={`min-w-0 rounded-xl border ${toneClass} p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-foreground">Payload 解码工作台</div>
@@ -272,6 +324,39 @@ export function StreamDecoderWorkbench({
               )}
             </div>
           </div>
+
+          {batchProgress && (
+            <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>进度：{batchProgress.done}/{batchProgress.total}</span>
+                <span>成功：{batchProgress.success} · 失败：{batchProgress.failed}</span>
+              </div>
+              {batchProgress.total > 0 && (
+                <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
+                  <div
+                    className="h-full bg-blue-500 transition-all"
+                    style={{ width: `${Math.min(100, Math.round((batchProgress.done / batchProgress.total) * 100))}%` }}
+                  />
+                </div>
+              )}
+              {batchProgress.currentLabel && (
+                <div className="mt-2 truncate text-foreground" title={batchProgress.currentLabel}>
+                  当前：{batchProgress.currentLabel}
+                </div>
+              )}
+            </div>
+          )}
+
+          {batchFailureDetails.length > 0 && (
+            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+              <div className="font-semibold">批量失败明细（最多显示 {MAX_BATCH_FAILURE_DETAILS} 条）</div>
+              <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-auto pl-4">
+                {batchFailureDetails.map((item, idx) => (
+                  <li key={`${idx}-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -426,16 +511,14 @@ export function StreamDecoderWorkbench({
         </div>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PayloadPane
           title={preparedPayload === payload ? "原始 payload" : "原始 payload（已自动提取）"}
           content={preparedPayload || "(empty payload)"}
           footer={
             preparedPayload !== payload
-              ? "前端已自动剥离 HTTP 头或十六进制包裹层"
-              : extractedBase64Candidate !== preparedPayload
-                ? "检测到 Base64 候选串，点击 Base64 可直接尝试"
-                : undefined
+              ? "前端仅做轻量预处理；实际提取与解码以服务端规则为准"
+              : undefined
           }
         />
         <PayloadPane
@@ -613,7 +696,7 @@ function PayloadPane({
         <div className="text-xs font-semibold text-foreground">{title}</div>
         {loading && <span className="text-[11px] text-blue-600">解码中...</span>}
       </div>
-      <pre className={`max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs leading-5 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-border bg-card text-foreground"}`}>
+      <pre className={`max-h-72 min-w-0 overflow-auto whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs leading-5 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-border bg-card text-foreground"}`}>
         {content}
       </pre>
       {bytesHex && !error && (
@@ -627,23 +710,15 @@ function PayloadPane({
   );
 }
 
-const BASE64_CANDIDATE_PATTERN = /[A-Za-z0-9+/=_-]{8,}/g;
+const HTTP_METHOD_PREFIXES = ["GET ", "POST ", "PUT ", "DELETE ", "PATCH ", "HEAD ", "OPTIONS ", "CONNECT ", "TRACE "];
 
 function normalizeTransportPayload(raw: string): string {
-  let current = String(raw ?? "").trim();
-  for (let i = 0; i < 3; i += 1) {
-    let next = current;
-    if (looksLikeHttpMessage(next)) {
-      next = extractHttpBody(next).trim();
-    }
-    const unwrapped = unwrapHexEncodedText(next);
-    if (unwrapped) {
-      next = unwrapped.trim();
-    }
-    if (next === current) {
-      break;
-    }
-    current = next;
+  const current = String(raw ?? "").trim();
+  if (!current) {
+    return "";
+  }
+  if (looksLikeHttpMessage(current)) {
+    return extractHttpBody(current).trim();
   }
   return current;
 }
@@ -651,7 +726,15 @@ function normalizeTransportPayload(raw: string): string {
 function looksLikeHttpMessage(raw: string): boolean {
   const text = raw.trim();
   if (!text) return false;
-  return text.startsWith("HTTP/") || text.startsWith("GET ") || text.startsWith("POST ") || text.includes("\nHost:") || text.includes("\r\nHost:");
+  if (text.startsWith("HTTP/")) {
+    return true;
+  }
+  for (const method of HTTP_METHOD_PREFIXES) {
+    if (text.startsWith(method)) {
+      return true;
+    }
+  }
+  return text.includes("\nHost:") || text.includes("\r\nHost:");
 }
 
 function extractHttpBody(raw: string): string {
@@ -662,58 +745,8 @@ function extractHttpBody(raw: string): string {
   return raw;
 }
 
-function unwrapHexEncodedText(raw: string): string {
-  const decoded = decodeLooseHex(raw);
-  if (!decoded || decoded.length === 0) return "";
-  const trimmed = trimNullBytes(decoded);
-  if (trimmed.length === 0 || !looksMostlyPrintable(trimmed)) return "";
-  return new TextDecoder().decode(trimmed);
-}
-
-function decodeLooseHex(raw: string): Uint8Array | null {
-  const cleaned = raw.trim().replace(/[:\s]/g, "");
-  if (!cleaned || cleaned.length % 2 !== 0 || /[^0-9a-fA-F]/.test(cleaned)) {
-    return null;
-  }
-  const out = new Uint8Array(cleaned.length / 2);
-  for (let i = 0; i < cleaned.length; i += 2) {
-    out[i / 2] = Number.parseInt(cleaned.slice(i, i + 2), 16);
-  }
-  return out;
-}
-
-function trimNullBytes(data: Uint8Array): Uint8Array {
-  let start = 0;
-  let end = data.length;
-  while (start < end && data[start] === 0) start += 1;
-  while (end > start && data[end - 1] === 0) end -= 1;
-  return data.slice(start, end);
-}
-
-function looksMostlyPrintable(data: Uint8Array): boolean {
-  if (data.length === 0) return false;
-  let printable = 0;
-  for (const value of data) {
-    if (value === 9 || value === 10 || value === 13 || (value >= 32 && value <= 126)) {
-      printable += 1;
-    }
-  }
-  return printable / data.length >= 0.85;
-}
-
 function extractBestBase64Candidate(raw: string): string {
-  const trimmed = raw.trim();
-  const matches = trimmed.match(BASE64_CANDIDATE_PATTERN);
-  if (!matches || matches.length === 0) {
-    return trimmed;
-  }
-  let best = "";
-  for (const match of matches) {
-    if (match.length > best.length) {
-      best = match;
-    }
-  }
-  return best || trimmed;
+  return raw.trim();
 }
 
 function readDecoderSettings(): DecoderSettings {

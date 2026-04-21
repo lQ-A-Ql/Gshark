@@ -1,6 +1,9 @@
 # IDE / OS
 .vscode/
 .idea/
+.claude/
+.github/
+__pycache__/
 .DS_Store
 Thumbs.db
 

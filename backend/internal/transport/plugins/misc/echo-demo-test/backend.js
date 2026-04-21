@@ -1,0 +1,1 @@
+export function onRequest(input) { return { text: String(input.values.message || "") }; }

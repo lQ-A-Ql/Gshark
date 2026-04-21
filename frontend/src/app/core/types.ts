@@ -117,6 +117,127 @@ export interface StreamDecodeResult {
   encoding: string;
 }
 
+export interface WinRMDecryptRequest {
+  port: number;
+  authMode: "password" | "nt_hash";
+  password?: string;
+  ntHash?: string;
+  previewLines?: number;
+  includeErrorFrames?: boolean;
+  extractCommandOutput?: boolean;
+}
+
+export interface WinRMDecryptResult {
+  resultId: string;
+  captureName: string;
+  port: number;
+  authMode: string;
+  previewText: string;
+  previewTruncated: boolean;
+  lineCount: number;
+  frameCount: number;
+  errorFrameCount: number;
+  extractedFrameCount: number;
+  exportFilename: string;
+  message: string;
+}
+
+export interface SMB3RandomSessionKeyRequest {
+  username: string;
+  domain: string;
+  ntlmHash: string;
+  ntProofStr: string;
+  encryptedSessionKey: string;
+}
+
+export interface SMB3SessionCandidate {
+  sessionId: string;
+  username: string;
+  domain: string;
+  ntProofStr: string;
+  encryptedSessionKey: string;
+  src: string;
+  dst: string;
+  frameNumber: string;
+  timestamp: string;
+  complete: boolean;
+  displayLabel: string;
+}
+
+export interface MiscModuleFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface MiscModuleFormField {
+  name: string;
+  label: string;
+  type: string;
+  placeholder?: string;
+  defaultValue?: string;
+  helpText?: string;
+  required?: boolean;
+  secret?: boolean;
+  rows?: number;
+  options?: MiscModuleFieldOption[];
+}
+
+export interface MiscModuleFormSchema {
+  description?: string;
+  submitLabel?: string;
+  resultTitle?: string;
+  fields: MiscModuleFormField[];
+}
+
+export interface MiscModuleInterfaceSchema {
+  method?: string;
+  invokePath?: string;
+  runtime?: string;
+  entry?: string;
+  hostBridge?: boolean;
+}
+
+export interface MiscModuleTableColumn {
+  key: string;
+  label: string;
+}
+
+export interface MiscModuleTableResult {
+  columns: MiscModuleTableColumn[];
+  rows: Record<string, string>[];
+}
+
+export interface MiscModuleManifest {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  apiPrefix: string;
+  docsPath?: string;
+  requiresCapture: boolean;
+  formSchema?: MiscModuleFormSchema;
+  interfaceSchema?: MiscModuleInterfaceSchema;
+}
+
+export interface MiscModuleRunResult {
+  message: string;
+  text?: string;
+  output?: unknown;
+  table?: MiscModuleTableResult;
+}
+
+export interface MiscModuleImportResult {
+  module: MiscModuleManifest;
+  installedPath: string;
+  message: string;
+}
+
+export interface SMB3RandomSessionKeyResult {
+  randomSessionKey: string;
+  message: string;
+}
+
 export interface HttpStream {
   id: number;
   client: string;

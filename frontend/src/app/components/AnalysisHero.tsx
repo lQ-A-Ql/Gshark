@@ -1,6 +1,5 @@
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
-import { Badge } from "./ui/badge";
 import { cn } from "./ui/utils";
 
 type AnalysisHeroTheme = "blue" | "emerald" | "rose" | "cyan" | "amber";
@@ -10,6 +9,7 @@ interface AnalysisHeroProps {
   title: string;
   subtitle: string;
   tags: string[];
+  description?: string;
   tagsLabel?: string;
   onRefresh?: () => void;
   refreshLabel?: string;
@@ -19,72 +19,35 @@ interface AnalysisHeroProps {
 const themeClasses: Record<
   AnalysisHeroTheme,
   {
-    shell: string;
     iconWrap: string;
-    iconColor: string;
-    refreshButton: string;
-    badgePalette: string[];
+    iconText: string;
+    badgeStyle: string;
   }
 > = {
   blue: {
-    shell: "border-slate-200/80 bg-gradient-to-r from-white via-slate-50 to-blue-50/60",
-    iconWrap: "border-blue-200 bg-blue-100/80",
-    iconColor: "text-blue-700",
-    refreshButton: "border-slate-200 bg-white/90 text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-    badgePalette: [
-      "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100/80",
-      "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100/80",
-      "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100/80",
-      "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100/80",
-    ],
+    iconWrap: "bg-blue-50 border-blue-200/60",
+    iconText: "text-blue-600",
+    badgeStyle: "bg-blue-50/80 text-blue-700 border-blue-100/60",
   },
   emerald: {
-    shell: "border-emerald-200/80 bg-gradient-to-r from-white via-emerald-50/60 to-teal-50/80",
-    iconWrap: "border-emerald-200 bg-emerald-100/80",
-    iconColor: "text-emerald-700",
-    refreshButton: "border-emerald-200 bg-white/90 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900",
-    badgePalette: [
-      "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80",
-      "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100/80",
-      "border-lime-200 bg-lime-50 text-lime-700 hover:bg-lime-100/80",
-      "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100/80",
-    ],
+    iconWrap: "bg-emerald-50 border-emerald-200/60",
+    iconText: "text-emerald-600",
+    badgeStyle: "bg-emerald-50/80 text-emerald-700 border-emerald-100/60",
   },
   rose: {
-    shell: "border-rose-200/80 bg-gradient-to-r from-white via-rose-50/70 to-fuchsia-50/70",
-    iconWrap: "border-rose-200 bg-rose-100/80",
-    iconColor: "text-rose-700",
-    refreshButton: "border-rose-200 bg-white/90 text-rose-700 hover:bg-rose-50 hover:text-rose-900",
-    badgePalette: [
-      "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100/80",
-      "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100/80",
-      "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100/80",
-      "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100/80",
-    ],
+    iconWrap: "bg-rose-50 border-rose-200/60",
+    iconText: "text-rose-600",
+    badgeStyle: "bg-rose-50/80 text-rose-700 border-rose-100/60",
   },
   cyan: {
-    shell: "border-cyan-200/80 bg-gradient-to-r from-white via-cyan-50/60 to-sky-50/80",
-    iconWrap: "border-cyan-200 bg-cyan-100/80",
-    iconColor: "text-cyan-700",
-    refreshButton: "border-cyan-200 bg-white/90 text-cyan-700 hover:bg-cyan-50 hover:text-cyan-900",
-    badgePalette: [
-      "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100/80",
-      "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100/80",
-      "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100/80",
-      "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100/80",
-    ],
+    iconWrap: "bg-cyan-50 border-cyan-200/60",
+    iconText: "text-cyan-600",
+    badgeStyle: "bg-cyan-50/80 text-cyan-700 border-cyan-100/60",
   },
   amber: {
-    shell: "border-amber-200/80 bg-gradient-to-r from-white via-amber-50/60 to-orange-50/80",
-    iconWrap: "border-amber-200 bg-amber-100/80",
-    iconColor: "text-amber-700",
-    refreshButton: "border-amber-200 bg-white/90 text-amber-700 hover:bg-amber-50 hover:text-amber-900",
-    badgePalette: [
-      "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100/80",
-      "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100/80",
-      "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100/80",
-      "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100/80",
-    ],
+    iconWrap: "bg-amber-50 border-amber-200/60",
+    iconText: "text-amber-600",
+    badgeStyle: "bg-amber-50/80 text-amber-700 border-amber-100/60",
   },
 };
 
@@ -93,7 +56,8 @@ export function AnalysisHero({
   title,
   subtitle,
   tags,
-  tagsLabel = "协议族",
+  description,
+  tagsLabel = "标签",
   onRefresh,
   refreshLabel = "刷新",
   theme = "blue",
@@ -101,44 +65,99 @@ export function AnalysisHero({
   const themeConfig = themeClasses[theme];
 
   return (
-    <div className={cn("mb-4 flex flex-col gap-3 rounded-2xl border p-4 shadow-sm", themeConfig.shell)}>
-      <div className="flex flex-wrap items-center gap-2 text-lg font-semibold">
-        <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm", themeConfig.iconWrap)}>
-          <div className={themeConfig.iconColor}>{icon}</div>
+    <div className="flex min-h-[56px] w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur-sm sm:flex-nowrap sm:px-5">
+      <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        {/* Left: Icon container */}
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border shadow-sm",
+            themeConfig.iconWrap,
+            themeConfig.iconText
+          )}
+        >
+          {icon}
         </div>
-        <div className="flex flex-col">
-          <span className="text-slate-900">{title}</span>
-          <span className="text-xs font-medium tracking-[0.16em] text-slate-500">{subtitle}</span>
+
+        {/* Title Block */}
+        <div className="flex min-w-0 shrink-0 flex-col justify-center sm:flex-row sm:items-baseline sm:gap-2.5">
+          <h1 className="truncate text-[15px] font-bold text-slate-900 leading-tight">
+            {title}
+          </h1>
+          <span className="truncate text-[11px] font-extrabold tracking-widest text-slate-400 uppercase leading-tight mt-0.5 sm:mt-0">
+            {subtitle}
+          </span>
         </div>
-        {onRefresh && (
-          <button
-            className={cn(
-              "ml-auto inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors",
-              themeConfig.refreshButton,
-            )}
-            onClick={onRefresh}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            {refreshLabel}
-          </button>
-        )}
+
+        {/* Divider (visible on sm and larger) */}
+        <div className="hidden h-4 w-[1px] shrink-0 bg-slate-200 sm:block" />
+
+        {/* Metadata section (Tags & Description) */}
+        <div className="hidden min-w-0 flex-1 items-center gap-2.5 xl:flex">
+          {tags.length > 0 && (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {tagsLabel}
+              </span>
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={cn(
+                    "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm transition-colors",
+                    themeConfig.badgeStyle
+                  )}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {description && (
+            <>
+              {tags.length > 0 && (
+                <div className="h-1 w-1 shrink-0 rounded-full bg-slate-300 ml-1" />
+              )}
+              <span
+                className="truncate text-xs font-medium text-slate-500"
+                title={description}
+              >
+                {description}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{tagsLabel}</span>
-        {tags.map((tag, index) => (
-          <Badge
-            key={tag}
-            variant="outline"
-            className={cn(
-              "rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm transition-colors",
-              themeConfig.badgePalette[index % themeConfig.badgePalette.length],
-            )}
+      {/* Action Block */}
+      <div className="flex shrink-0 items-center justify-end w-full sm:w-auto mt-1 sm:mt-0">
+        {tags.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1.5 xl:hidden mr-auto">
+             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {tagsLabel}
+             </span>
+             {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={cn(
+                    "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm transition-colors",
+                    themeConfig.badgeStyle
+                  )}
+                >
+                  {tag}
+                </span>
+             ))}
+          </div>
+        )}
+        
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 active:scale-95"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-current/70" />
-            {tag}
-          </Badge>
-        ))}
+            <RefreshCw className="h-4 w-4" />
+            <span>{refreshLabel}</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
-import { RefreshCw, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import type { AuditEntry } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 
@@ -73,55 +75,47 @@ export default function AuditLogs() {
   }, [logs]);
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-card px-6 py-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-600">Security Audit</div>
-            <h1 className="mt-2 text-2xl font-semibold text-foreground">本地审计日志</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              展示高风险接口、插件管理、TLS 配置和抓包控制的最近访问记录。
-            </p>
-          </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
-            onClick={() => void loadLogs()}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            刷新
-          </button>
-        </div>
+    <PageShell>
+      <AnalysisHero
+        icon={<ShieldAlert className="h-5 w-5" />}
+        title="本地审计日志"
+        subtitle="SECURITY AUDIT"
+        description="统一回看高风险接口、TLS 配置、抓包控制和其他敏感操作的最近访问记录。"
+        tags={["安全审计", "高风险接口", "TLS 配置", "抓包控制"]}
+        tagsLabel="审计域"
+        theme="blue"
+        onRefresh={() => void loadLogs()}
+      />
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            高风险 {counts.high}
-          </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            中风险 {counts.medium}
-          </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            低风险 {counts.low}
-          </div>
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          高风险 {counts.high}
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-          {(["all", "high", "medium", "low"] as const).map((risk) => (
-            <button
-              key={risk}
-              className={`rounded-full border px-3 py-1.5 font-medium ${
-                riskFilter === risk
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
-                  : "border-border bg-background text-muted-foreground hover:bg-accent"
-              }`}
-              onClick={() => setRiskFilter(risk)}
-            >
-              {risk === "all" ? "全部" : risk}
-            </button>
-          ))}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          中风险 {counts.medium}
+        </div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          低风险 {counts.low}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-5">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {(["all", "high", "medium", "low"] as const).map((risk) => (
+          <button
+            key={risk}
+            className={`rounded-full border px-3 py-1.5 font-medium ${
+              riskFilter === risk
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-border bg-background text-muted-foreground hover:bg-accent"
+            }`}
+            onClick={() => setRiskFilter(risk)}
+          >
+            {risk === "all" ? "全部" : risk}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-auto">
         {error && (
           <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
@@ -167,6 +161,6 @@ export default function AuditLogs() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

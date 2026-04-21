@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Activity, BarChart3, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
-import { bridge, type GlobalTrafficStats } from "../integrations/wailsBridge";
+import { PageShell } from "../components/PageShell";
+import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
-import type { Packet } from "../core/types";
+import type { Packet, GlobalTrafficStats } from "../core/types";
 
 interface Bucket {
   label: string;
@@ -108,11 +109,12 @@ export default function TrafficGraph() {
   }, [applyFilter, navigate, setDisplayFilter]);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
+    <PageShell>
       <AnalysisHero
         icon={<BarChart3 className="h-5 w-5" />}
         title="流量图分析"
         subtitle="GLOBAL TRAFFIC OVERVIEW"
+        description="统一查看全局协议分布、时序趋势、热点 IP、端口与域名，适合作为进入其他专题分析前的总览视角。"
         tags={["全局视图", "忽略过滤器", "协议分布", "会话热点"]}
         tagsLabel="视图层"
         theme="amber"
@@ -171,7 +173,7 @@ export default function TrafficGraph() {
           <SimpleBarChart data={topSrcPorts} color="bg-orange-500" onSelect={(row) => jumpWithFilter(filterForPortBucket(row.label))} />
         </Panel>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

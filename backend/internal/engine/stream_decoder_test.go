@@ -7,6 +7,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -225,6 +226,76 @@ func TestDecodeStreamPayloadBehinderCBCWithIV(t *testing.T) {
 	}
 }
 
+func TestDecodeStreamPayloadBehinderCBCWithHexIV(t *testing.T) {
+	pass := "rebeyond"
+	keyHash := md5.Sum([]byte(pass))
+	key := keyHash[:16]
+	iv := []byte("0123456789abcdef")
+	plain := []byte("assert|behinder-cbc-iv-hex")
+	ciphertext := encryptAESCBCForTest(plain, key, iv)
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "behinder",
+		Payload: base64.StdEncoding.EncodeToString(ciphertext),
+		Options: map[string]any{
+			"pass":              pass,
+			"deriveKeyFromPass": true,
+			"inputEncoding":     "base64",
+			"cipherMode":        "cbc",
+			"iv":                "30313233343536373839616263646566",
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(behinder CBC+hex IV) error = %v", err)
+	}
+	if result.Text != string(plain) {
+		t.Fatalf("unexpected behinder CBC+hex IV text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadBehinderCBCWithBase64IV(t *testing.T) {
+	pass := "rebeyond"
+	keyHash := md5.Sum([]byte(pass))
+	key := keyHash[:16]
+	iv := []byte("0123456789abcdef")
+	plain := []byte("assert|behinder-cbc-iv-b64")
+	ciphertext := encryptAESCBCForTest(plain, key, iv)
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "behinder",
+		Payload: base64.StdEncoding.EncodeToString(ciphertext),
+		Options: map[string]any{
+			"pass":              pass,
+			"deriveKeyFromPass": true,
+			"inputEncoding":     "base64",
+			"cipherMode":        "cbc",
+			"iv":                "MDEyMzQ1Njc4OWFiY2RlZg==",
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(behinder CBC+base64 IV) error = %v", err)
+	}
+	if result.Text != string(plain) {
+		t.Fatalf("unexpected behinder CBC+base64 IV text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadBehinderCBCWithInvalidIVLength(t *testing.T) {
+	pass := "rebeyond"
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "behinder",
+		Payload: base64.StdEncoding.EncodeToString([]byte("abcd1234")),
+		Options: map[string]any{
+			"pass":              pass,
+			"deriveKeyFromPass": true,
+			"inputEncoding":     "base64",
+			"cipherMode":        "cbc",
+			"iv":                "short-iv",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected invalid IV length error")
+	}
+}
+
 func TestDecodeStreamPayloadAntSwordChr(t *testing.T) {
 	// chr(101).chr(99).chr(104).chr(111) => "echo"
 	payload := "pass=" + url.QueryEscape("chr(101).chr(99).chr(104).chr(111)")
@@ -324,6 +395,179 @@ func TestDecodeStreamPayloadAutoBase64(t *testing.T) {
 	}
 	if result.Text != "Hello Auto Detect" {
 		t.Fatalf("unexpected auto text: %q", result.Text)
+	}
+}
+
+func TestDecodeCipherAutoPrefersHexForPureHexToken(t *testing.T) {
+	result, encoding, err := decodeCipherInput("48656c6c6f20536861726b", "auto")
+	if err != nil {
+		t.Fatalf("decodeCipherInput(auto) error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("decodeCipherInput(auto) result is nil")
+	}
+	if encoding != "hex" {
+		t.Fatalf("unexpected decodeCipherInput(auto) encoding: %q", encoding)
+	}
+	if string(result) != "Hello Shark" {
+		t.Fatalf("unexpected decodeCipherInput(auto) text: %q", string(result))
+	}
+}
+
+func TestExtractBestBase64CandidateRejectsPlainToken(t *testing.T) {
+	raw := "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456"
+	candidate := extractBestBase64Candidate(raw)
+	if candidate != raw {
+		t.Fatalf("extractBestBase64Candidate should keep original text, got %q", candidate)
+	}
+}
+
+func TestScoreDecodeAttemptPenalizesPlainEncoding(t *testing.T) {
+	plainScore := scoreDecodeAttempt("AntSword", StreamDecodeResult{
+		Summary:  "蚁剑 URL 解码结果",
+		Text:     "echo('ok');",
+		BytesHex: "65:63:68:6f:28:27:6f:6b:27:29:3b",
+		Encoding: "plain",
+	})
+	base64Score := scoreDecodeAttempt("AntSword", StreamDecodeResult{
+		Summary:  "蚁剑 Base64 解码",
+		Text:     "echo('ok');",
+		BytesHex: "65:63:68:6f:28:27:6f:6b:27:29:3b",
+		Encoding: "base64",
+	})
+	if plainScore >= base64Score {
+		t.Fatalf("plain score should be lower than base64 score, plain=%d base64=%d", plainScore, base64Score)
+	}
+}
+
+func TestScoreDecodeAttemptRewardsSignatureDecoder(t *testing.T) {
+	behinderScore := scoreDecodeAttempt("Behinder (CBC)", StreamDecodeResult{
+		Summary:  "冰蝎 AES-CBC 解密",
+		Text:     "assert(base64_decode($_POST['x']));",
+		BytesHex: "61:73:73:65:72:74",
+		Encoding: "base64",
+	})
+	base64Score := scoreDecodeAttempt("Base64", StreamDecodeResult{
+		Summary:  "Base64 自动解码",
+		Text:     "assert(base64_decode($_POST['x']));",
+		BytesHex: "61:73:73:65:72:74",
+		Encoding: "base64",
+	})
+	if behinderScore <= base64Score {
+		t.Fatalf("behinder score should be greater than base64 score, behinder=%d base64=%d", behinderScore, base64Score)
+	}
+}
+
+func TestDecodeStreamPayloadAntSwordRot13TakesPriorityOverChr(t *testing.T) {
+	payload := "pass=" + url.QueryEscape("pu e(101)")
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "antsword",
+		Payload: payload,
+		Options: map[string]any{
+			"pass":            "pass",
+			"extractParam":    true,
+			"urlDecodeRounds": 1,
+			"encoder":         "rot13",
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(antsword rot13 priority) error = %v", err)
+	}
+	if result.Encoding != "rot13" {
+		t.Fatalf("unexpected encoding: %q", result.Encoding)
+	}
+}
+
+func TestDecodeCBCIVOptionInvalidLength(t *testing.T) {
+	_, err := decodeCBCIVOption(map[string]any{"iv": "short-iv"})
+	if err == nil {
+		t.Fatal("expected decodeCBCIVOption invalid length error")
+	}
+}
+
+func TestDecodeCBCIVOptionAcceptsHexAndBase64(t *testing.T) {
+	hexIV, err := decodeCBCIVOption(map[string]any{"iv": "30313233343536373839616263646566"})
+	if err != nil {
+		t.Fatalf("decodeCBCIVOption(hex) error = %v", err)
+	}
+	if string(hexIV) != "0123456789abcdef" {
+		t.Fatalf("unexpected hex IV decode: %q", string(hexIV))
+	}
+
+	base64IV, err := decodeCBCIVOption(map[string]any{"iv": "MDEyMzQ1Njc4OWFiY2RlZg=="})
+	if err != nil {
+		t.Fatalf("decodeCBCIVOption(base64) error = %v", err)
+	}
+	if string(base64IV) != "0123456789abcdef" {
+		t.Fatalf("unexpected base64 IV decode: %q", string(base64IV))
+	}
+}
+
+func TestDecodeCBCIVOptionErrorIncludesFormatHint(t *testing.T) {
+	_, err := decodeCBCIVOption(map[string]any{"iv": "MDEyMzQ1Njc4OQ=="})
+	if err == nil {
+		t.Fatal("expected decodeCBCIVOption error")
+	}
+	if !strings.Contains(err.Error(), "base64 解码后") {
+		t.Fatalf("expected base64 format hint in error, got: %v", err)
+	}
+}
+
+func TestNormalizeTransportPayloadSkipsQueryHexUnwrap(t *testing.T) {
+	raw := "pass=48656c6c6f20536861726b"
+	got := normalizeTransportPayload(raw)
+	if got != raw {
+		t.Fatalf("normalizeTransportPayload should keep query-like payload, got %q", got)
+	}
+}
+
+func TestNormalizeTransportPayloadUnwrapsPureHexText(t *testing.T) {
+	raw := "48656c6c6f20536861726b"
+	got := normalizeTransportPayload(raw)
+	if got != "Hello Shark" {
+		t.Fatalf("normalizeTransportPayload should unwrap pure hex text, got %q", got)
+	}
+}
+
+func TestDecodeStreamPayloadAutoLowConfidenceFails(t *testing.T) {
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "auto",
+		Payload: base64.StdEncoding.EncodeToString([]byte("test")),
+	})
+	if err == nil {
+		t.Fatal("expected auto failure")
+	}
+	if !strings.Contains(err.Error(), "置信度不足") && !strings.Contains(err.Error(), "未找到有效解码结果") {
+		t.Fatalf("expected low-confidence or no-valid-result error, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadAutoStillAcceptsHighConfidence(t *testing.T) {
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "auto",
+		Payload: base64.StdEncoding.EncodeToString([]byte("<?php echo 'ok';")),
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(auto high confidence) error = %v", err)
+	}
+	if !strings.Contains(result.Text, "<?php") {
+		t.Fatalf("unexpected auto high confidence result: %q", result.Text)
+	}
+}
+
+func TestLooksLikeHTTPMessageRecognizesPut(t *testing.T) {
+	raw := "PUT /shell.php HTTP/1.1\r\nHost: test\r\n\r\nbody"
+	if !looksLikeHTTPMessage(raw) {
+		t.Fatal("looksLikeHTTPMessage should recognize PUT request")
+	}
+}
+
+func TestIsPureHexToken(t *testing.T) {
+	if !isPureHexToken("48656c6c6f20536861726b") {
+		t.Fatal("isPureHexToken should return true for pure hex")
+	}
+	if isPureHexToken("HelloShark123456") {
+		t.Fatal("isPureHexToken should return false for non-hex token")
 	}
 }
 

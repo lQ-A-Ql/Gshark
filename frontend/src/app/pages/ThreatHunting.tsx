@@ -5,6 +5,7 @@ import { useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Progress } from "../components/ui/progress";
 
@@ -176,11 +177,12 @@ export default function ThreatHunting() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(251,113,133,0.10),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f5f7fb_100%)] p-4 text-sm text-foreground">
+    <PageShell innerClassName="max-w-7xl px-6 py-6">
       <AnalysisHero
         icon={<ShieldAlert className="h-5 w-5" />}
         title="威胁狩猎中心"
         subtitle="THREAT HUNTING WORKBENCH"
+        description="把 YARA、OWASP、CTF 命中与异常流量汇总到同一工作台，在统一布局中完成规则调参、定位数据包和关联流追踪。"
         tags={["YARA", "OWASP", "CTF", "异常流量"]}
         tagsLabel="狩猎域"
         theme="blue"
@@ -411,7 +413,7 @@ export default function ThreatHunting() {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

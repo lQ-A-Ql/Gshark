@@ -27,8 +27,9 @@ type StreamDecodeResult struct {
 }
 
 var (
-	base64CandidatePattern = regexp.MustCompile(`[A-Za-z0-9+/=_-]{12,}`)
+	base64CandidatePattern = regexp.MustCompile(`[A-Za-z0-9+/_-]{16,}={0,2}`)
 	multipartNamePattern   = regexp.MustCompile(`name="([^"]+)"`)
+	httpMethodPrefixes     = []string{"GET ", "POST ", "PUT ", "DELETE ", "PATCH ", "HEAD ", "OPTIONS ", "CONNECT ", "TRACE "}
 )
 
 func DecodeStreamPayload(req StreamDecodeRequest) (StreamDecodeResult, error) {
@@ -113,16 +114,14 @@ func decodeAntSwordPayload(raw string, options map[string]any) (StreamDecodeResu
 		candidate = decoded
 	}
 
-	// Try chr() decoding first
-	if chrDecoded, ok := decodeAntSwordChr(candidate); ok {
-		return buildDecodeResult("antsword", "蚁剑 chr() 解码", []byte(chrDecoded), "chr"), nil
-	}
-
-	// Try rot13
 	encoder := strings.ToLower(strings.TrimSpace(optionsStringDefault(options, "encoder", "")))
 	if encoder == "rot13" {
 		rot13Result := decodeRot13(candidate)
 		return buildDecodeResult("antsword", "蚁剑 ROT13 解码", []byte(rot13Result), "rot13"), nil
+	}
+
+	if chrDecoded, ok := decodeAntSwordChr(candidate); ok {
+		return buildDecodeResult("antsword", "蚁剑 chr() 解码", []byte(chrDecoded), "chr"), nil
 	}
 
 	best := extractBestBase64Candidate(candidate)
@@ -168,9 +167,9 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 			return StreamDecodeResult{}, err
 		}
 	case "aes_cbc":
-		var iv []byte
-		if ivStr := strings.TrimSpace(optionsString(options, "iv")); ivStr != "" {
-			iv = []byte(ivStr)
+		iv, ivErr := decodeCBCIVOption(options)
+		if ivErr != nil {
+			return StreamDecodeResult{}, ivErr
 		}
 		plain, err = decryptAESCBC(cipherBytes, []byte(key), iv)
 		if err != nil {
@@ -302,21 +301,16 @@ func extractBasePayload(raw string) string {
 
 func normalizeTransportPayload(raw string) string {
 	candidate := strings.TrimSpace(raw)
-	for i := 0; i < 3; i++ {
-		updated := candidate
-		if looksLikeHTTPMessage(updated) {
-			updated = strings.TrimSpace(extractHTTPMessageBody(updated))
-		}
-		if text, ok := unwrapHexEncodedText(updated); ok {
-			updated = text
-		}
-		updated = strings.TrimSpace(updated)
-		if updated == candidate {
-			break
-		}
-		candidate = updated
+	if candidate == "" {
+		return ""
 	}
-	return candidate
+	if looksLikeHTTPMessage(candidate) {
+		candidate = strings.TrimSpace(extractHTTPMessageBody(candidate))
+	}
+	if text, ok := unwrapHexEncodedText(candidate); ok {
+		candidate = text
+	}
+	return strings.TrimSpace(candidate)
 }
 
 func extractHTTPMessageBody(raw string) string {
@@ -334,26 +328,180 @@ func looksLikeHTTPMessage(raw string) bool {
 	if text == "" {
 		return false
 	}
-	return strings.Contains(text, "\r\nHost:") || strings.Contains(text, "\nHost:") || strings.HasPrefix(text, "HTTP/") || strings.HasPrefix(text, "GET ") || strings.HasPrefix(text, "POST ")
+	if strings.HasPrefix(text, "HTTP/") {
+		return true
+	}
+	for _, method := range httpMethodPrefixes {
+		if strings.HasPrefix(text, method) {
+			return true
+		}
+	}
+	return strings.Contains(text, "\r\nHost:") || strings.Contains(text, "\nHost:")
 }
 
 func extractBestBase64Candidate(raw string) string {
 	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return ""
+	}
+	if scoreBase64Candidate(candidate) >= 70 {
+		return candidate
+	}
 	matches := base64CandidatePattern.FindAllString(candidate, -1)
 	best := ""
+	bestScore := -1
 	for _, item := range matches {
-		if len(item) > len(best) {
+		if item != candidate && isAlphaNumericOnly(item) {
+			continue
+		}
+		score := scoreBase64Candidate(item)
+		if score > bestScore {
 			best = item
+			bestScore = score
 		}
 	}
-	if best == "" {
-		best = candidate
+	if bestScore >= 70 {
+		return best
 	}
-	return best
+	return candidate
+}
+
+func isAlphaNumericOnly(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	for _, c := range raw {
+		if !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+func scoreBase64Candidate(raw string) int {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return -1
+	}
+	if strings.ContainsAny(candidate, "{}[]()\\|;,'\"` ") {
+		return -1
+	}
+	if len(candidate) < 16 {
+		return -1
+	}
+	score := 0
+	if len(candidate)%4 == 0 {
+		score += 30
+	}
+	if strings.HasSuffix(candidate, "=") {
+		score += 10
+	}
+	if decoded, err := decodeBase64Loose(candidate); err == nil {
+		if len(decoded) == 0 {
+			return -1
+		}
+		score += 40
+		ratio := float64(len(decoded)) / float64(len(candidate))
+		if ratio >= 0.45 && ratio <= 0.8 {
+			score += 10
+		}
+	} else {
+		return -1
+	}
+	if strings.ContainsAny(candidate, "+/") {
+		score += 10
+	}
+	if strings.ContainsAny(candidate, "-_") {
+		score += 5
+	}
+	return score
+}
+
+func isLikelyHexCipher(raw string) bool {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return false
+	}
+	cleaned := strings.NewReplacer(":", "", " ", "", "\t", "", "\r", "", "\n", "").Replace(candidate)
+	if len(cleaned) < 16 || len(cleaned)%2 != 0 {
+		return false
+	}
+	if strings.ContainsAny(cleaned, "ghijklmnopqrstuvwxyzGHIJKLMNOPQRSTUVWXYZ") {
+		return false
+	}
+	if strings.ContainsAny(cleaned, "/+=_-") {
+		return false
+	}
+	decoded := decodeLooseHex(candidate)
+	if len(decoded) == 0 {
+		return false
+	}
+	return true
+}
+
+func isPureHexToken(raw string) bool {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return false
+	}
+	cleaned := strings.NewReplacer(":", "", " ", "", "\t", "", "\r", "", "\n", "").Replace(candidate)
+	if len(cleaned) < 16 || len(cleaned)%2 != 0 {
+		return false
+	}
+	for _, c := range cleaned {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func decodeCipherAuto(raw string) ([]byte, string, error) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return nil, "", errors.New("无法识别密文编码，支持 base64 / hex")
+	}
+
+	if isPureHexToken(candidate) {
+		if decoded, err := decodeCipherHex(candidate); err == nil {
+			return decoded, "hex", nil
+		}
+	}
+
+	bestBase64 := extractBestBase64Candidate(candidate)
+	base64Score := scoreBase64Candidate(bestBase64)
+	hexLikely := isLikelyHexCipher(candidate)
+
+	if base64Score >= 70 {
+		if decoded, err := decodeBase64Loose(bestBase64); err == nil {
+			return decoded, "base64", nil
+		}
+	}
+	if hexLikely {
+		if decoded, err := decodeCipherHex(candidate); err == nil {
+			return decoded, "hex", nil
+		}
+	}
+	if base64Score >= 40 {
+		if decoded, err := decodeBase64Loose(bestBase64); err == nil {
+			return decoded, "base64", nil
+		}
+	}
+	if decoded, err := decodeCipherHex(candidate); err == nil && len(decoded) > 0 {
+		return decoded, "hex", nil
+	}
+	if decoded, err := decodeBase64Loose(bestBase64); err == nil && len(decoded) > 0 {
+		return decoded, "base64", nil
+	}
+	return nil, "", errors.New("无法识别密文编码，支持 base64 / hex")
 }
 
 func unwrapHexEncodedText(raw string) (string, bool) {
-	decoded := decodeLooseHex(raw)
+	candidate := strings.TrimSpace(raw)
+	if !isLikelyWrappedHexText(candidate) {
+		return "", false
+	}
+	decoded := decodeLooseHex(candidate)
 	if len(decoded) == 0 {
 		return "", false
 	}
@@ -365,6 +513,27 @@ func unwrapHexEncodedText(raw string) (string, bool) {
 		return string(trimmed), true
 	}
 	return "", false
+}
+
+func isLikelyWrappedHexText(raw string) bool {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return false
+	}
+	if looksLikeHTTPMessage(candidate) {
+		return false
+	}
+	if strings.ContainsAny(candidate, "=&?") {
+		return false
+	}
+	cleaned := strings.NewReplacer(":", "", " ", "", "\t", "", "\r", "", "\n", "").Replace(candidate)
+	if len(cleaned) < 16 || len(cleaned)%2 != 0 {
+		return false
+	}
+	if !isPureHexToken(cleaned) {
+		return false
+	}
+	return true
 }
 
 func looksMostlyPrintable(data []byte) bool {
@@ -383,13 +552,7 @@ func looksMostlyPrintable(data []byte) bool {
 func decodeCipherInput(raw, mode string) ([]byte, string, error) {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "", "auto":
-		if decoded, err := decodeBase64Loose(extractBestBase64Candidate(raw)); err == nil {
-			return decoded, "base64", nil
-		}
-		if decoded, err := decodeCipherHex(raw); err == nil && len(decoded) > 0 {
-			return decoded, "hex", nil
-		}
-		return nil, "", errors.New("无法识别密文编码，支持 base64 / hex")
+		return decodeCipherAuto(raw)
 	case "base64":
 		decoded, err := decodeBase64Loose(extractBestBase64Candidate(raw))
 		return decoded, "base64", err

@@ -13,7 +13,6 @@ import {
   buildHexDump,
   buildProtocolTree,
   buildProtocolTreeFromLayers,
-  DEFAULT_PLUGIN_LOGS,
 } from "../core/engine";
 import type {
   BinaryStream,
@@ -21,7 +20,6 @@ import type {
   ExtractedObject,
   HttpStream,
   Packet,
-  PluginItem,
   RecentCapture,
   ToolRuntimeConfig,
   ToolRuntimeSnapshot,
@@ -99,13 +97,6 @@ interface SentinelContextValue {
   setActiveStream: (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => Promise<void>;
   persistStreamPayloads: (protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>) => Promise<void>;
   streamSwitchMetrics: StreamSwitchMetrics;
-  plugins: PluginItem[];
-  pluginLogs: string[];
-  addPlugin: (plugin: PluginItem) => Promise<void>;
-  deletePlugin: (id: number | string) => Promise<void>;
-  togglePlugin: (id: number | string) => void;
-  setPluginsEnabled: (ids: (number | string)[], enabled: boolean) => void;
-  refreshPlugins: () => void;
   decryptionConfig: DecryptionConfig;
   updateDecryptionConfig: (patch: Partial<DecryptionConfig>) => void;
   fileMeta: { name: string; sizeBytes: number; path: string };
@@ -503,8 +494,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
   const [selectedPacketRawHex, setSelectedPacketRawHex] = useState("");
   const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
-  const [plugins, setPlugins] = useState<PluginItem[]>([]);
-  const [pluginLogs, setPluginLogs] = useState<string[]>(DEFAULT_PLUGIN_LOGS);
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendStatus, setBackendStatus] = useState("等待后端连接");
   const [mediaAnalysisProgress, setMediaAnalysisProgress] = useState<MediaAnalysisProgress>(EMPTY_MEDIA_ANALYSIS_PROGRESS);
@@ -1420,12 +1409,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         }
 
       try {
-        const [backendPlugins, tls] = await Promise.all([
-          bridge.listPlugins(),
-          bridge.getTLSConfig(),
-        ]);
-
-        setPlugins(backendPlugins);
+        const tls = await bridge.getTLSConfig();
         if (tls) {
           setDecryptionConfig(tls);
         }
@@ -1453,12 +1437,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           if (updateProgressFromStatusRef.current(msg)) {
             wakeCaptureWaiters();
             return;
-          }
-          if (msg.toLowerCase().includes("plugin")) {
-            setPluginLogs((logs) => [
-              `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [DEBUG] ${msg}`,
-              ...logs,
-            ].slice(0, 120));
           }
           if (msg.includes("解析完成") || msg.includes("解析失败") || msg.includes("解析被取消")) {
             parseFinishedRef.current = true;
@@ -1747,107 +1725,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketDetail((prev) => (prev?.id === id ? prev : null));
   }, []);
 
-  const togglePlugin = useCallback((id: number | string) => {
-    if (!backendConnected) {
-      setBackendStatus("桌面后端未连接，无法切换插件");
-      return;
-    }
-
-    void bridge
-      .togglePlugin(String(id))
-      .then((updated) => {
-        setPlugins((prev) => prev.map((plugin) => (String(plugin.id) === String(updated.id) ? updated : plugin)));
-        setPluginLogs((logs) => [
-          `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] ${updated.name} ${updated.enabled ? "已启用" : "已禁用"}`,
-          ...logs,
-        ].slice(0, 120));
-      })
-      .catch(() => setBackendStatus("插件切换失败"));
-  }, [backendConnected]);
-
-  const addPlugin = useCallback(async (plugin: PluginItem) => {
-    if (!backendConnected) {
-      setBackendStatus("桌面后端未连接，无法新增插件");
-      return;
-    }
-    try {
-      const added = await bridge.addPlugin(plugin);
-      setPlugins((prev) => {
-        const existingIndex = prev.findIndex((p) => String(p.id) === String(added.id));
-        if (existingIndex >= 0) {
-          const next = [...prev];
-          next[existingIndex] = added;
-          return next;
-        }
-        return [added, ...prev];
-      });
-      setPluginLogs((logs) => [
-        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] 已新增插件 ${added.name} (${added.id})`,
-        ...logs,
-      ].slice(0, 120));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "新增插件失败";
-      setBackendStatus(message);
-      setPluginLogs((logs) => [
-        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [WARN] 新增插件失败: ${message}`,
-        ...logs,
-      ].slice(0, 120));
-      throw error instanceof Error ? error : new Error(message);
-    }
-  }, [backendConnected]);
-
-  const deletePlugin = useCallback(async (id: number | string) => {
-    if (!backendConnected) {
-      setBackendStatus("桌面后端未连接，无法删除插件");
-      return;
-    }
-    try {
-      await bridge.deletePlugin(String(id));
-      setPlugins((prev) => prev.filter((p) => String(p.id) !== String(id)));
-      setPluginLogs((logs) => [
-        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] 已删除插件 ${id}`,
-        ...logs,
-      ].slice(0, 120));
-    } catch {
-      setBackendStatus("删除插件失败");
-    }
-  }, [backendConnected]);
-
-  const setPluginsEnabled = useCallback((ids: (number | string)[], enabled: boolean) => {
-    if (!backendConnected) {
-      setBackendStatus("桌面后端未连接，无法批量设置插件");
-      return;
-    }
-
-    void bridge
-      .setPluginsEnabled(ids.map((id) => String(id)), enabled)
-      .then((updated) => {
-        if (ids.length === 0) {
-          setPlugins(updated);
-        } else {
-          const map = new Map(updated.map((p) => [String(p.id), p]));
-          setPlugins((prev) => prev.map((p) => map.get(String(p.id)) ?? p));
-        }
-
-        const scope = ids.length === 0 ? "全部插件" : `${ids.length} 个插件`;
-        setPluginLogs((logs) => [
-          `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] [INFO] ${scope}${enabled ? "已启用" : "已禁用"}`,
-          ...logs,
-        ].slice(0, 120));
-      })
-      .catch(() => setBackendStatus("批量插件设置失败"));
-  }, [backendConnected]);
-
-  const refreshPlugins = useCallback(() => {
-    if (!backendConnected) return;
-    void bridge
-      .listPlugins()
-      .then((items) => {
-        setPlugins(items);
-      })
-      .catch(() => setBackendStatus("插件列表刷新失败"));
-  }, [backendConnected]);
-
   const updateDecryptionConfig = useCallback((patch: Partial<DecryptionConfig>) => {
     setDecryptionConfig((prev) => {
       const next = { ...prev, ...patch };
@@ -1953,13 +1830,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setActiveStream,
       persistStreamPayloads,
       streamSwitchMetrics,
-      plugins,
-      pluginLogs,
-      addPlugin,
-      deletePlugin,
-      togglePlugin,
-      setPluginsEnabled,
-      refreshPlugins,
       decryptionConfig,
       updateDecryptionConfig,
       fileMeta,
@@ -2016,13 +1886,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setActiveStream,
       persistStreamPayloads,
       streamSwitchMetrics,
-      plugins,
-      pluginLogs,
-      addPlugin,
-      deletePlugin,
-      togglePlugin,
-      setPluginsEnabled,
-      refreshPlugins,
       decryptionConfig,
       updateDecryptionConfig,
       fileMeta,

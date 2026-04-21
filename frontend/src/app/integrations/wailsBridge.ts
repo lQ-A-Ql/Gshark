@@ -10,6 +10,9 @@ import type {
   IndustrialAnalysis,
   MediaAnalysis,
   MediaTranscription,
+  MiscModuleManifest,
+  MiscModuleImportResult,
+  MiscModuleRunResult,
   Packet,
   PluginItem,
   SpeechBatchTaskStatus,
@@ -20,6 +23,11 @@ import type {
   ThreatHit,
   USBAnalysis,
   VehicleAnalysis,
+  WinRMDecryptRequest,
+  WinRMDecryptResult,
+  SMB3SessionCandidate,
+  SMB3RandomSessionKeyRequest,
+  SMB3RandomSessionKeyResult,
 } from "../core/types";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
@@ -172,6 +180,15 @@ export interface BackendBridge {
   setPluginsEnabled(ids: string[], enabled: boolean): Promise<PluginItem[]>;
   getTLSConfig(): Promise<DecryptionConfig | null>;
   updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
+  runWinRMDecrypt(req: WinRMDecryptRequest): Promise<WinRMDecryptResult>;
+  getWinRMDecryptResultText(resultId: string): Promise<string>;
+  exportWinRMDecryptResult(resultId: string, filename: string): Promise<void>;
+  listMiscModules(): Promise<MiscModuleManifest[]>;
+  importMiscModulePackage(file: File): Promise<MiscModuleImportResult>;
+  deleteMiscModule(id: string): Promise<void>;
+  runMiscModule(id: string, values: Record<string, string>): Promise<MiscModuleRunResult>;
+  listSMB3SessionCandidates(): Promise<SMB3SessionCandidate[]>;
+  generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest): Promise<SMB3RandomSessionKeyResult>;
   listAuditLogs(): Promise<AuditEntry[]>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }
@@ -1452,6 +1469,220 @@ export const bridge: BackendBridge = {
         target_ip_port: cfg.privateKeyIpPort,
       }),
     });
+  },
+
+  async runWinRMDecrypt(req: WinRMDecryptRequest) {
+    const payload = await request<any>("/api/tools/winrm-decrypt", {
+      method: "POST",
+      body: JSON.stringify({
+        port: req.port,
+        auth_mode: req.authMode,
+        password: req.password ?? "",
+        nt_hash: req.ntHash ?? "",
+        preview_lines: req.previewLines ?? 0,
+        include_error_frames: Boolean(req.includeErrorFrames),
+        extract_command_output: Boolean(req.extractCommandOutput),
+      }),
+    });
+    return {
+      resultId: String(payload.result_id ?? ""),
+      captureName: String(payload.capture_name ?? ""),
+      port: Number(payload.port ?? req.port ?? 0),
+      authMode: String(payload.auth_mode ?? ""),
+      previewText: String(payload.preview_text ?? ""),
+      previewTruncated: Boolean(payload.preview_truncated),
+      lineCount: Number(payload.line_count ?? 0),
+      frameCount: Number(payload.frame_count ?? 0),
+      errorFrameCount: Number(payload.error_frame_count ?? 0),
+      extractedFrameCount: Number(payload.extracted_frame_count ?? 0),
+      exportFilename: String(payload.export_filename ?? "winrm-decrypt.txt"),
+      message: String(payload.message ?? ""),
+    };
+  },
+
+  async getWinRMDecryptResultText(resultId: string) {
+    const response = await fetch(`${API_BASE}/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`, {
+      headers: await buildAuthorizedHeaders(`/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`),
+    });
+    if (!response.ok) {
+      let message = "获取 WinRM 结果失败";
+      try {
+        const payload = await response.json();
+        message = String(payload.error ?? message);
+      } catch {
+        // ignore non-json error payload
+      }
+      throw new Error(message);
+    }
+    return await response.text();
+  },
+
+  async exportWinRMDecryptResult(resultId: string, filename: string) {
+    const response = await fetch(`${API_BASE}/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`, {
+      headers: await buildAuthorizedHeaders(`/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`),
+    });
+    if (!response.ok) {
+      let message = "导出 WinRM 结果失败";
+      try {
+        const payload = await response.json();
+        message = String(payload.error ?? message);
+      } catch {
+        // ignore non-json error payload
+      }
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async listMiscModules() {
+    const rows = await request<any[]>("/api/tools/misc/modules");
+    return rows.map((item) => ({
+      id: String(item.id ?? ""),
+      kind: String(item.kind ?? ""),
+      title: String(item.title ?? ""),
+      summary: String(item.summary ?? ""),
+      tags: Array.isArray(item.tags) ? item.tags.map((tag: any) => String(tag ?? "")) : [],
+      apiPrefix: String(item.api_prefix ?? ""),
+      docsPath: String(item.docs_path ?? "") || undefined,
+      requiresCapture: Boolean(item.requires_capture),
+      formSchema: item.form_schema && typeof item.form_schema === "object"
+        ? {
+            description: String(item.form_schema.description ?? "") || undefined,
+            submitLabel: String(item.form_schema.submit_label ?? "") || undefined,
+            resultTitle: String(item.form_schema.result_title ?? "") || undefined,
+            fields: Array.isArray(item.form_schema.fields)
+              ? item.form_schema.fields.map((field: any) => ({
+                  name: String(field.name ?? ""),
+                  label: String(field.label ?? ""),
+                  type: String(field.type ?? "text"),
+                  placeholder: String(field.placeholder ?? "") || undefined,
+                  defaultValue: String(field.default_value ?? "") || undefined,
+                  helpText: String(field.help_text ?? "") || undefined,
+                  required: Boolean(field.required),
+                  secret: Boolean(field.secret),
+                  rows: Number(field.rows ?? 0) || undefined,
+                  options: Array.isArray(field.options)
+                    ? field.options.map((option: any) => ({
+                        value: String(option.value ?? ""),
+                        label: String(option.label ?? ""),
+                      }))
+                    : undefined,
+                }))
+              : [],
+          }
+        : undefined,
+      interfaceSchema: item.interface_schema && typeof item.interface_schema === "object"
+        ? {
+            method: String(item.interface_schema.method ?? "") || undefined,
+            invokePath: String(item.interface_schema.invoke_path ?? "") || undefined,
+            runtime: String(item.interface_schema.runtime ?? "") || undefined,
+            entry: String(item.interface_schema.entry ?? "") || undefined,
+            hostBridge: Boolean(item.interface_schema.host_bridge),
+          }
+        : undefined,
+    }));
+  },
+
+  async importMiscModulePackage(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const payload = await request<any>("/api/tools/misc/import", {
+      method: "POST",
+      body: form,
+    });
+    return {
+      module: {
+        id: String(payload.module?.id ?? ""),
+        kind: String(payload.module?.kind ?? ""),
+        title: String(payload.module?.title ?? ""),
+        summary: String(payload.module?.summary ?? ""),
+        tags: Array.isArray(payload.module?.tags) ? payload.module.tags.map((tag: unknown) => String(tag ?? "")) : [],
+        apiPrefix: String(payload.module?.api_prefix ?? ""),
+        docsPath: String(payload.module?.docs_path ?? "") || undefined,
+        requiresCapture: Boolean(payload.module?.requires_capture),
+        formSchema: payload.module?.form_schema,
+        interfaceSchema: payload.module?.interface_schema,
+      },
+      installedPath: String(payload.installed_path ?? ""),
+      message: String(payload.message ?? ""),
+    };
+  },
+
+  async deleteMiscModule(id: string) {
+    await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  async runMiscModule(id: string, values: Record<string, string>) {
+    const payload = await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}/invoke`, {
+      method: "POST",
+      body: JSON.stringify({ values }),
+    });
+    return {
+      message: String(payload.message ?? ""),
+      text: String(payload.text ?? "") || undefined,
+      output: payload.output,
+      table: payload.table && typeof payload.table === "object"
+        ? {
+            columns: Array.isArray(payload.table.columns)
+              ? payload.table.columns.map((column: any) => ({
+                  key: String(column.key ?? ""),
+                  label: String(column.label ?? ""),
+                }))
+              : [],
+            rows: Array.isArray(payload.table.rows)
+              ? payload.table.rows.map((row: any) => {
+                  const next: Record<string, string> = {};
+                  for (const [key, value] of Object.entries(row ?? {})) {
+                    next[String(key)] = String(value ?? "");
+                  }
+                  return next;
+                })
+              : [],
+          }
+        : undefined,
+    };
+  },
+
+  async listSMB3SessionCandidates() {
+    const rows = await request<any[]>("/api/tools/smb3-session-candidates");
+    return rows.map((item) => ({
+      sessionId: String(item.session_id ?? ""),
+      username: String(item.username ?? ""),
+      domain: String(item.domain ?? ""),
+      ntProofStr: String(item.nt_proof_str ?? ""),
+      encryptedSessionKey: String(item.encrypted_session_key ?? ""),
+      src: String(item.src ?? ""),
+      dst: String(item.dst ?? ""),
+      frameNumber: String(item.frame_number ?? ""),
+      timestamp: String(item.timestamp ?? ""),
+      complete: Boolean(item.complete),
+      displayLabel: String(item.display_label ?? ""),
+    }));
+  },
+
+  async generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest) {
+    const payload = await request<any>("/api/tools/smb3-random-session-key", {
+      method: "POST",
+      body: JSON.stringify({
+        username: req.username,
+        domain: req.domain,
+        ntlm_hash: req.ntlmHash,
+        nt_proof_str: req.ntProofStr,
+        encrypted_session_key: req.encryptedSessionKey,
+      }),
+    });
+    return {
+      randomSessionKey: String(payload.random_session_key ?? ""),
+      message: String(payload.message ?? ""),
+    };
   },
 
   async listAuditLogs() {

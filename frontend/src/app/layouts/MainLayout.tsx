@@ -11,7 +11,7 @@ import {
   Hexagon,
   KeyRound,
   LayoutDashboard,
-  Puzzle,
+  Wrench,
   Radar,
   RefreshCw,
   Save,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import logoImg from "../../assets/logo.png";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 import {
@@ -50,7 +51,7 @@ const NAV_ITEMS = [
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心" },
   { path: "/objects", icon: FileDown, label: "附件提取" },
   { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
-  { path: "/plugins", icon: Puzzle, label: "插件管理" },
+  { path: "/misc", icon: Wrench, label: "MISC 工具箱" },
   { path: "/updates", icon: RefreshCw, label: "检查更新" },
   { path: "/audit-logs", icon: ScrollText, label: "审计日志" },
 ];
@@ -194,12 +195,8 @@ export function MainLayout() {
         <header className="relative z-50 flex shrink-0 flex-col border-b border-slate-200 bg-white/92 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] backdrop-blur">
           <div className="flex h-12 items-center justify-between px-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 font-semibold tracking-wide text-blue-600">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 shadow-sm">
-                  <Hexagon className="h-5 w-5" />
-                </div>
-                <span className="text-lg text-slate-900">GShark-Sentinel</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <img src={logoImg} alt="Logo" className="h-10 w-auto object-contain drop-shadow-sm transition-[transform_0.2s] hover:scale-105" /></div>
 
               <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
                 <MenuGroup label="文件">
@@ -221,6 +218,7 @@ export function MainLayout() {
                   <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
                   <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
                   <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
+                  <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
                   <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
                 </MenuGroup>
 
@@ -238,6 +236,7 @@ export function MainLayout() {
                   <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
                   <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
                   <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
                   <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
                   <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
                   <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
@@ -387,3 +386,5 @@ function MenuItem({
 function MenuDivider() {
   return <div className="my-1 h-px bg-border" />;
 }
+
+

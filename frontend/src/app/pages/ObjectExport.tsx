@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileDown, FileText, Image as ImageIcon, Archive, FileQuestion, Download, Filter, Search } from "lucide-react";
+import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
 import { bridge, getBackendAuthHeaders } from "../integrations/wailsBridge";
@@ -106,16 +108,19 @@ export default function ObjectExport() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-background p-6 text-sm text-foreground">
-      <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-        <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-5 py-3.5">
-          <div className="flex items-center gap-2 font-semibold text-foreground">
-            <FileDown className="h-5 w-5 text-amber-600" /> 提取的文件与对象
-          </div>
-        </div>
-
+    <PageShell innerClassName="max-w-6xl px-6 py-6">
+      <AnalysisHero
+        icon={<FileDown className="h-5 w-5" />}
+        title="附件提取"
+        subtitle="EXTRACTED OBJECTS"
+        description="按类型与后缀统一查看当前抓包里可导出的对象，快速筛选、分组并批量导出。"
+        tags={["HTTP", "FTP", "文件对象", "批量导出"]}
+        tagsLabel="导出域"
+        theme="amber"
+      />
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
         <div className="z-10 flex shrink-0 items-center justify-between border-b border-border bg-card px-5 py-2.5 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
               <Search className="h-4 w-4 text-muted-foreground" />
               <input
@@ -140,7 +145,7 @@ export default function ObjectExport() {
               </select>
             </div>
           </div>
-          <div className="text-xs text-muted-foreground">匹配 {objects.length} 个对象</div>
+          <div className="shrink-0 text-xs text-muted-foreground">匹配 {objects.length} 个对象</div>
         </div>
 
         <div className="flex-1 overflow-auto bg-accent/20 p-5">
@@ -206,7 +211,7 @@ export default function ObjectExport() {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

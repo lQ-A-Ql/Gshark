@@ -4,125 +4,171 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GShark-Sentinel is a desktop offline traffic analysis tool (PCAP/PCAPNG) built with:
-- **Desktop shell**: Go 1.22 + Wails v2 (root module: `github.com/gshark/sentinel/desktop`)
-- **Backend**: Go 1.25 HTTP/SSE server (module: `github.com/gshark/sentinel/backend`)
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS v4
-- Go workspace (`go.work`) links both modules; workspace requires Go 1.25
+GShark-Sentinel is a desktop-first offline traffic analysis tool for PCAP/PCAPNG.
 
-## Commands
+- Desktop shell: Go + Wails (`github.com/gshark/sentinel/desktop`)
+- Backend API/SSE service: Go (`github.com/gshark/sentinel/backend`)
+- Frontend: React 18 + TypeScript + Vite + Tailwind CSS
+- Parsing engine: tshark wrappers plus protocol-specific analyzers
+- Go workspace: `go.work` ties root desktop module and `./backend` (workspace Go 1.25)
 
-### Running in Development
+## Environment Notes
+
+- Recommended development environment is Windows.
+- Required tools: Go, Node.js 20+, `pnpm`, `tshark`, Wails CLI.
+- Root module targets Go 1.22; backend/workspace targets Go 1.25.
+- Development is desktop-only: start via Wails scripts, not separate frontend/backend web workflows.
+
+## Common Commands
+
+### Install frontend dependencies
+
+```bash
+cd frontend && pnpm install
+```
+
+### Development
 
 ```powershell
-# Desktop-only development entry
+# Desktop development entry (delegates to Wails dev)
 ./scripts/start-dev.ps1
 
-# Direct Wails development mode
+# Direct Wails dev mode
 ./scripts/start-wails-dev.ps1
 ```
 
-Both scripts kill processes on ports 34115/17891 before starting.
+Notes:
+- `start-wails-dev.ps1` force-releases ports `34115` and `17891` before starting.
+- Desktop app starts/reuses backend service on `127.0.0.1:17891`.
 
-### Testing
+### Backend standalone run (without Wails)
 
 ```bash
-# Backend tests
+# HTTP server mode
+cd backend && go run ./cmd/sentinel serve 127.0.0.1:17891
+
+# CLI parse mode
+cd backend && go run ./cmd/sentinel parse <capture.pcapng> [display-filter]
+```
+
+### Tests
+
+```bash
+# Root desktop-shell tests only
+go test ./...
+
+# Backend all tests
 cd backend && go test ./...
 
-# Single backend test
+# Backend single package
+cd backend && go test ./internal/engine/...
+
+# Backend single test
 cd backend && go test ./internal/engine/... -run TestName
 
-# Frontend tests (single run, no watch — uses Vitest)
+# Frontend tests (Vitest single run)
 cd frontend && pnpm run test
 
-# Frontend tests in watch mode
-cd frontend && npx vitest
+# Frontend single test file
+cd frontend && pnpm run test -- src/app/pages/VehicleAnalysis.test.ts
 
-# Full validation pipeline (go test, gofmt, vitest, frontend build)
-./scripts/check-all.ps1
+# Frontend test by name
+cd frontend && npx vitest run -t "test name"
 ```
 
-### Building
-
-```bash
-# Desktop asset build (vite build + copies backend binary)
-cd frontend && pnpm run build:wails
-
-# Desktop app
-wails build
-
-# Build tags: use -tags dev to disable self-update, -tags production to enable it
-wails build -tags dev
-```
-
-### Linting
+### Formatting / checks
 
 ```bash
 # Backend format check
 cd backend && gofmt -l .
 
-# Fix formatting
+# Backend format fix
 cd backend && gofmt -w .
+
+# Full project checks (desktop tests + backend fmt/tests + frontend tests/build)
+./scripts/check-all.ps1
 ```
 
-## Architecture
+### Build
 
-### Communication Flow
+```bash
+# Build frontend assets and copy backend binary into frontend/dist
+cd frontend && pnpm run build:wails
+
+# Build desktop app
+wails build
+
+# Disable self-update logic in build
+wails build -tags dev
+
+# Enable self-update logic in build
+wails build -tags production
+```
+
+### Release packaging
+
+```powershell
+# Build release bundle + version.json
+python .\scripts\build_release_package.py v0.0.5
+
+# Reuse existing build artifact
+python .\scripts\build_release_package.py v0.0.5 --skip-build
+```
+
+## High-Level Architecture
+
+### Runtime topology
 
 ```
 Wails Desktop Shell (app.go)
-  └─ spawns ──> Backend HTTP server (127.0.0.1:17891)
-                  └─ auth via GSHARK_BACKEND_TOKEN env var
-Frontend (React) ──HTTP/SSE──> Backend
+  └─ manages backend process + auth token
+     └─ Backend HTTP/SSE server (127.0.0.1:17891)
+Frontend (React) ── HTTP + SSE ──> Backend
 ```
 
-The desktop shell (`app.go`) manages the backend process lifecycle, generates an auth token, and exposes file dialog methods to the frontend via Wails bindings.
+Desktop responsibilities:
+- Starts backend process on app startup, stops it on shutdown.
+- Provides Wails file-dialog bindings to frontend.
+- Injects/reads backend auth token (`GSHARK_BACKEND_TOKEN`).
 
-### Backend (`/backend`)
+### Backend structure (`backend/`)
 
-Entry point: `cmd/sentinel/main.go` — two modes:
-- `serve [addr]` — HTTP server mode (default `127.0.0.1:17891`)
-- `parse <file.pcapng> [filter]` — CLI mode
+- `cmd/sentinel/main.go`: entry point with `serve` and `parse` modes.
+- `internal/transport`: HTTP router + SSE hub + auth/audit middleware; exposes API endpoints used by UI.
+- `internal/engine/service.go`: orchestration core (capture lifecycle, caches, stream state, threat hunting, tool runtime config).
+- `internal/tshark`: tshark invocations, packet streaming/parsing helpers, industrial/vehicle/media protocol extraction.
+- `internal/plugin`: plugin manager and JS/Python runtime handling.
+- `internal/model`: backend API/shared data contracts.
 
-Key packages:
-- `internal/engine` — core analysis: packet store, stream reassembly, display filters, threat hunting, YARA matching. `service.go` is the central Service struct (~1800 lines) managing stream cache (LRU 256), display filter cache (LRU 16), plugin manager, YARA config.
-- `internal/transport` — HTTP/SSE server and event hub (~1400 lines, 40+ REST endpoints). Bearer token auth + audit logging middleware.
-- `internal/tshark` — tshark CLI wrapper, industrial protocol parsers (Modbus, S7comm, DNP3, CIP, PROFINET, BACnet, IEC 104, OPC UA), automotive parsers (CAN, J1939, DoIP, UDS, OBD-II, CANopen, DBC)
-- `internal/plugin` — plugin discovery and JS (goja VM) / Python (subprocess IPC) runtime execution
-- `internal/model` — shared types (Packet, ParseOptions, etc.)
+Important backend behavior:
+- Packet ingestion uses staged tshark strategies (fast path with fallbacks).
+- Stream reassembly is cached and can fall back to file/index reconstruction.
+- Threat hunting combines prefix matching, plugins, and YARA.
+- Runtime tool config includes tshark/ffmpeg/python/speech/yara settings via API.
 
-Key engine behaviors:
-- **PCAP loading** uses a 3-tier tshark parsing fallback: `fast_list` → `ek` → `compat_fields`
-- **Stream reassembly** falls back through: memory → index → file
-- **Threat hunting** runs prefix matching + plugins + YARA + steganography detection
+### Frontend structure (`frontend/src/app`)
 
-### Frontend (`/frontend/src/app`)
+- `routes.tsx`: lazy-loaded feature routes.
+- `state/SentinelContext.tsx`: central app state (packet pagination, selected packet, stream state, threat/media progress, plugin state).
+- `integrations/wailsBridge.ts`: typed backend bridge for HTTP/SSE + desktop bindings.
+- `core/types.ts`: frontend contract types mirroring backend responses.
+- `pages/*`: feature views (workspace, stream views, threat hunting, protocol analyses, media/USB/tools pages).
 
-- `App.tsx` / `routes.tsx` — root and 16 lazy-loaded routes (react-router v7)
-- `core/types.ts` — TypeScript interfaces mirroring backend model types
-- `core/engine.ts` — protocol tree and hex dump builders
-- `integrations/wailsBridge.ts` — backend API client implementing `BackendBridge` interface; HTTP with Bearer auth; Wails desktop bindings; SSE subscriptions with exponential backoff reconnect
-- `state/SentinelContext.tsx` — `SentinelProvider` managing global state (packets, streams, plugins, threat analysis); `PAGE_SIZE = 2000`; use `useSentinel()` hook
-- `pages/` — one file per feature: Workspace, HttpStream, TcpStream, UdpStream, ThreatHunting, Objects, IndustrialAnalysis, VehicleAnalysis, MediaAnalysis, UsbAnalysis, etc.
-- `components/ui/` — shadcn/ui Radix-based components
+Frontend data flow:
+- SSE events (`packet/status/error`) update context state incrementally.
+- Paginated packet APIs (`/api/packets/page`, locate APIs) drive large-capture browsing.
+- Stream pages load chunked stream data and support payload patch persistence.
 
-Notable deps: `@monaco-editor/react`, `recharts`, `react-resizable-panels`, `react-dnd`
+### Plugins and rules
 
-### Plugin System
+- Plugin directory: `backend/plugins/rules/`.
+- Plugin manager loads JSON metadata + logic entry (`.js`/`.py`) and validates IDs/capabilities.
+- Threat hunting invokes enabled plugins during analysis runs.
+- YARA rules/assets live under `backend/rules/yara/` and are copied into build artifacts for runtime use.
 
-Plugins live in `backend/plugins/rules/`. Each plugin is a pair:
-- `<id>.json` — metadata (id, name, version, runtime, capabilities, enabled)
-- `<id>.js` or `<id>.py` — logic
+## Operational knobs that affect behavior
 
-JS plugins: `onPacket(packet, ctx)` + optional `onFinish(ctx)`; executed via goja VM
-Python plugins: stdin/stdout JSON line protocol
-Plugins run during threat hunting. See `docs/plugin-interface.md` for the plugin API spec.
-
-### Data Flow
-
-1. Load PCAP → tshark parses → packets streamed to frontend via SSE
-2. Display filters applied in `internal/engine/filter.go`
-3. Stream reassembly on demand (`stream_decoder.go`)
-4. Threat hunting runs plugins + YARA rules (`threat_hunt_stream.go`, `yara_batch.go`)
-5. Object extraction and export (`object_mapping.go`)
+- `GSHARK_BACKEND_TOKEN`: backend bearer token (generated if absent).
+- `GSHARK_ALLOW_EXISTING_BACKEND=1`: allows desktop app to reuse an already-running backend on `127.0.0.1:17891`.
+- `VITE_BACKEND_URL`: frontend API base override (defaults to `http://127.0.0.1:17891`).
+- `GSHARK_UPDATE_MANIFEST_REF`: override update manifest branch/ref used by updater flow.

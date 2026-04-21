@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const aesBlockSize = aes.BlockSize
+
 // decryptAESCBC decrypts AES-CBC ciphertext. If iv is nil or empty, uses zero IV.
 // Supports lenient PKCS7 unpadding — returns raw data on padding failure instead of error.
 func decryptAESCBC(ciphertext, key, iv []byte) ([]byte, error) {
@@ -22,13 +24,10 @@ func decryptAESCBC(ciphertext, key, iv []byte) ([]byte, error) {
 	}
 	if len(iv) == 0 {
 		iv = make([]byte, aes.BlockSize)
+	} else if len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("AES-CBC IV 长度非法: %d", len(iv))
 	}
-	if len(iv) < aes.BlockSize {
-		padded := make([]byte, aes.BlockSize)
-		copy(padded, iv)
-		iv = padded
-	}
-	mode := cipher.NewCBCDecrypter(block, iv[:aes.BlockSize])
+	mode := cipher.NewCBCDecrypter(block, iv)
 	out := make([]byte, len(ciphertext))
 	mode.CryptBlocks(out, ciphertext)
 	return pkcs7UnpadLenient(out, aes.BlockSize), nil
@@ -89,10 +88,9 @@ func decodeBehinderPayloadCBC(raw string, options map[string]any) (StreamDecodeR
 		return StreamDecodeResult{}, err
 	}
 
-	// For CBC mode, IV is either explicitly provided or defaults to zero IV
-	var iv []byte
-	if ivStr := strings.TrimSpace(optionsString(options, "iv")); ivStr != "" {
-		iv = []byte(ivStr)
+	iv, err := decodeCBCIVOption(options)
+	if err != nil {
+		return StreamDecodeResult{}, err
 	}
 
 	plain, err := decryptAESCBC(cipherBytes, []byte(key), iv)
@@ -212,11 +210,7 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 		if err != nil {
 			continue
 		}
-		text := strings.TrimSpace(result.Text)
-		if text == "" {
-			continue
-		}
-		score := scoreDecodedText(text)
+		score := scoreDecodeAttempt(a.name, result)
 		if score > bestScore {
 			bestScore = score
 			bestResult = result
@@ -227,7 +221,56 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 	if bestScore < 0 {
 		return StreamDecodeResult{}, errors.New("自动检测未找到有效解码结果，请手动选择解码器")
 	}
+	if bestScore < 35 {
+		return StreamDecodeResult{}, errors.New("自动检测置信度不足，请手动选择解码器")
+	}
 	return bestResult, nil
+}
+
+func scoreDecodeAttempt(attemptName string, result StreamDecodeResult) int {
+	text := strings.TrimSpace(result.Text)
+	if text == "" {
+		return -1
+	}
+	score := scoreDecodedText(text)
+	if score < 0 {
+		return -1
+	}
+
+	name := strings.ToLower(strings.TrimSpace(attemptName))
+	summary := strings.ToLower(strings.TrimSpace(result.Summary))
+	encoding := strings.ToLower(strings.TrimSpace(result.Encoding))
+
+	switch {
+	case strings.Contains(name, "behinder") || strings.Contains(summary, "冰蝎"):
+		score += 20
+	case strings.Contains(name, "godzilla") || strings.Contains(summary, "哥斯拉"):
+		score += 20
+	case strings.Contains(name, "antsword") || strings.Contains(summary, "蚁剑"):
+		score += 15
+	case strings.Contains(name, "base64"):
+		score += 5
+	}
+
+	switch encoding {
+	case "chr", "rot13":
+		score += 20
+	case "base64", "hex":
+		score += 8
+	case "plain":
+		score -= 20
+	}
+
+	if strings.HasPrefix(result.BytesHex, "00:") || strings.HasSuffix(result.BytesHex, ":00") {
+		score -= 8
+	}
+	if strings.Contains(result.Text, "\x00") {
+		score -= 20
+	}
+	if len([]rune(text)) < 12 {
+		score -= 40
+	}
+	return score
 }
 
 // scoreDecodedText scores decoded text by how "readable" it looks.
@@ -235,6 +278,14 @@ func scoreDecodedText(text string) int {
 	if text == "" {
 		return -1
 	}
+	total := len([]rune(text))
+	if total == 0 {
+		return -1
+	}
+	if total < 4 {
+		return -1
+	}
+
 	score := 0
 	printable := 0
 	for _, r := range text {
@@ -242,24 +293,61 @@ func scoreDecodedText(text string) int {
 			printable++
 		}
 	}
-	total := len([]rune(text))
-	if total == 0 {
-		return -1
-	}
 	ratio := printable * 100 / total
 	if ratio >= 90 {
-		score += 50
-	} else if ratio >= 70 {
+		score += 40
+	} else if ratio >= 75 {
 		score += 20
+	} else {
+		score -= 30
 	}
-	// Bonus for common code/shell patterns
 	for _, keyword := range []string{"<?php", "eval(", "system(", "exec(", "base64_decode", "function", "class ", "import ", "require", "echo ", "print"} {
 		if strings.Contains(strings.ToLower(text), keyword) {
 			score += 10
 		}
 	}
-	score += min(len(text)/10, 30)
+	if strings.Count(text, "\n") > 0 {
+		score += 5
+	}
+	if len(text) >= 16 {
+		score += min(len(text)/12, 20)
+	}
 	return score
+}
+
+func decodeCBCIVOption(options map[string]any) ([]byte, error) {
+	ivStr := strings.TrimSpace(optionsString(options, "iv"))
+	if ivStr == "" {
+		return nil, nil
+	}
+
+	ivRaw := []byte(ivStr)
+	if len(ivRaw) == aesBlockSize && !strings.ContainsAny(ivStr, "=+/_-") {
+		return ivRaw, nil
+	}
+
+	hexDecoded := decodeLooseHex(ivStr)
+	if len(hexDecoded) > 0 {
+		if len(hexDecoded) == aesBlockSize {
+			return hexDecoded, nil
+		}
+		return nil, fmt.Errorf("AES-CBC IV 长度非法: %d (hex 解码后)", len(hexDecoded))
+	}
+
+	if strings.ContainsAny(ivStr, "=+/_-") {
+		base64Decoded, base64Err := decodeBase64Loose(ivStr)
+		if base64Err == nil && len(base64Decoded) > 0 {
+			if len(base64Decoded) == aesBlockSize {
+				return base64Decoded, nil
+			}
+			return nil, fmt.Errorf("AES-CBC IV 长度非法: %d (base64 解码后)", len(base64Decoded))
+		}
+	}
+
+	if len(ivRaw) == aesBlockSize {
+		return ivRaw, nil
+	}
+	return nil, fmt.Errorf("AES-CBC IV 长度非法: %d (原始文本字节长度)", len(ivRaw))
 }
 
 func min(a, b int) int {

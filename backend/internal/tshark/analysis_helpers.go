@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +51,14 @@ var fieldScanCache = struct {
 
 func scanFieldRows(filePath string, fields []string, onRow func([]string)) error {
 	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{}, onRow)
+}
+
+func ScanFieldRowsWithDisplayFilter(filePath string, fields []string, displayFilter string, onRow func([]string)) error {
+	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{DisplayFilter: displayFilter}, onRow)
+}
+
+func ScanFieldRows(filePath string, fields []string, onRow func([]string)) error {
+	return scanFieldRows(filePath, fields, onRow)
 }
 
 func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOptions, onRow func([]string)) error {
@@ -413,63 +422,55 @@ func sortConversationBuckets(input map[string]conversationCount) []model.Analysi
 			Count:    item.Count,
 		})
 	}
-	for i := 0; i < len(items); i++ {
-		for j := i + 1; j < len(items); j++ {
-			if items[j].Count > items[i].Count || (items[j].Count == items[i].Count && items[j].Label < items[i].Label) {
-				items[i], items[j] = items[j], items[i]
-			}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count == items[j].Count {
+			return items[i].Label < items[j].Label
 		}
-	}
+		return items[i].Count > items[j].Count
+	})
 	return items
 }
 
-func formatHex(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+func previewHexBytes(raw string, limit int) string {
+	parts := splitHexBytes(raw)
+	if len(parts) == 0 {
 		return ""
 	}
-	if strings.HasPrefix(strings.ToLower(raw), "0x") {
-		return strings.ToUpper(raw)
+	if limit <= 0 || len(parts) <= limit {
+		return strings.Join(parts, ":")
 	}
-	value := parseInt(raw)
-	if value <= 0 {
-		return raw
-	}
-	return fmt.Sprintf("0x%X", value)
+	return strings.Join(parts[:limit], ":") + ":..."
 }
 
 func parseFlexibleInt(raw string) int {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
 		return 0
 	}
-	if value, err := strconv.Atoi(raw); err == nil {
-		return value
-	}
-	if strings.HasPrefix(strings.ToLower(raw), "0x") {
-		if value, err := strconv.ParseInt(raw, 0, 64); err == nil {
+	if strings.HasPrefix(trimmed, "0x") || strings.HasPrefix(trimmed, "0X") {
+		if value, err := strconv.ParseInt(trimmed[2:], 16, 64); err == nil {
 			return int(value)
 		}
+	}
+	if value, err := strconv.Atoi(trimmed); err == nil {
+		return value
 	}
 	return 0
 }
 
 func splitHexBytes(raw string) []string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
 		return nil
 	}
-	replacer := strings.NewReplacer(":", " ", "-", " ", ",", " ", "\t", " ")
-	raw = replacer.Replace(raw)
-	parts := strings.Fields(raw)
+	parts := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == ':' || r == ' ' || r == '\t' || r == '\r' || r == '\n'
+	})
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
-		part = strings.TrimSpace(strings.TrimPrefix(strings.ToUpper(part), "0X"))
+		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
-		}
-		if len(part) == 1 {
-			part = "0" + part
 		}
 		out = append(out, part)
 	}
@@ -478,19 +479,13 @@ func splitHexBytes(raw string) []string {
 
 func normalizeHexBytes(raw string) string {
 	parts := splitHexBytes(raw)
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, ":")
 }
 
-func previewHexBytes(raw string, limit int) string {
-	parts := splitHexBytes(raw)
-	if len(parts) == 0 {
-		return ""
+func formatHex(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "0x") {
+		return "0X" + trimmed[2:]
 	}
-	if limit > 0 && len(parts) > limit {
-		return strings.Join(parts[:limit], " ") + " ..."
-	}
-	return strings.Join(parts, " ")
+	return trimmed
 }

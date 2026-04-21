@@ -1,6 +1,7 @@
 import { Clapperboard, Copy, Download, FileText, Headphones, Loader2, Play, Square, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -378,7 +379,7 @@ export default function MediaAnalysis() {
     try {
       const ffmpeg = await bridge.checkFFmpeg();
       if (!ffmpeg.available) {
-        setFFmpegDialogMessage(ffmpeg.message || "未检测到 ffmpeg，请先将 ffmpeg 加入环境变量 PATH。");
+        setFfmpegDialogMessage(ffmpeg.message || "未检测到 ffmpeg，请先将 ffmpeg 加入环境变量 PATH。");
         return;
       }
       const blob = await bridge.getMediaPlaybackBlob(session.artifact.token);
@@ -393,7 +394,7 @@ export default function MediaAnalysis() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "媒体播放初始化失败";
       if (message.toLowerCase().includes("ffmpeg")) {
-        setFFmpegDialogMessage(message);
+        setFfmpegDialogMessage(message);
       } else {
         setError(message);
       }
@@ -456,11 +457,12 @@ export default function MediaAnalysis() {
   ), [playbackUrl]);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
+    <PageShell>
       <AnalysisHero
         icon={<Clapperboard className="h-5 w-5" />}
         title="媒体流还原"
         subtitle="MEDIA STREAM RECONSTRUCTION"
+        description="统一串起媒体流识别、播放、导出与语音转写，让 RTP、RTSP、Moonlight 和音频流分析保持同一套页面骨架。"
         tags={MEDIA_PROTOCOL_TAGS}
         tagsLabel="协议族"
         theme="rose"
@@ -985,7 +987,7 @@ export default function MediaAnalysis() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }
 

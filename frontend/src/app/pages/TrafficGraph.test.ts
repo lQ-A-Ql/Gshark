@@ -42,9 +42,9 @@ describe("buildStatsFromPackets", () => {
     expect(stats.topComputerNames[0]).toEqual({ label: "WS-01", count: 1 });
     expect(stats.topSrcIPs[0]).toEqual({ label: "10.0.0.2", count: 2 });
     expect(stats.topDstIPs[0]).toEqual({ label: "93.184.216.34", count: 2 });
-    expect(stats.topDestPorts.map((item) => item.label)).toContain("443");
-    expect(stats.topDestPorts.map((item) => item.label)).toContain("80");
-    expect(stats.topSrcPorts.map((item) => item.label)).toContain("52344");
-    expect(stats.topSrcPorts.map((item) => item.label)).toContain("52345");
+    expect(stats.topDestPorts.map((item: any) => item.label)).toContain("443");
+    expect(stats.topDestPorts.map((item: any) => item.label)).toContain("80");
+    expect(stats.topSrcPorts.map((item: any) => item.label)).toContain("52344");
+    expect(stats.topSrcPorts.map((item: any) => item.label)).toContain("52345");
   });
 });

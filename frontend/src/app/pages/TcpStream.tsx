@@ -213,7 +213,7 @@ export default function TcpStream() {
             )}
           </div>
         </div>
-        <div className="space-y-4 xl:sticky xl:top-0">
+        <div className="min-w-0 space-y-4 xl:sticky xl:top-0">
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -398,13 +398,13 @@ const RawStreamChunkCard = memo(function RawStreamChunkCard({
 
   return (
     <div
-      className={cn("flex min-h-[164px] cursor-pointer flex-col rounded-md border px-3 py-2 transition-shadow", tone, selected && "ring-2 ring-blue-300 shadow-sm")}
+      className={cn("flex min-h-[164px] min-w-0 cursor-pointer flex-col rounded-md border px-3 py-2 transition-shadow", tone, selected && "ring-2 ring-blue-300 shadow-sm")}
       onClick={onSelect}
     >
       <span className="mr-2 select-none text-xs font-semibold opacity-60">
         {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
       </span>
-      <pre className="mt-1 max-h-40 flex-1 overflow-hidden whitespace-pre-wrap break-all text-xs leading-5">{rendered}</pre>
+      <pre className="mt-1 max-h-40 min-w-0 flex-1 overflow-hidden whitespace-pre-wrap break-all text-xs leading-5">{rendered}</pre>
       <div className="mt-2 flex items-center justify-between text-[11px] opacity-80">
         <span>packet #{chunk.packetId}</span>
         {truncated && (

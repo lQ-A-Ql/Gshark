@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
+	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
@@ -36,15 +37,20 @@ type event struct {
 	Data any    `json:"data"`
 }
 
-const clientEventBufferSize = 1024
+const (
+	clientEventBufferSize   = 1024
+	maxStreamDecodeBodySize = 1 << 20 // 1MB
+)
 
 type Server struct {
 	svc *engine.Service
 	hub *Hub
 
-	mu        sync.Mutex
-	clients   map[chan event]struct{}
-	authToken string
+	mu          sync.Mutex
+	clients     map[chan event]struct{}
+	authToken   string
+	miscModules []MiscModule
+	miscPkgMgr  *miscpkg.Manager
 
 	auditMu   sync.Mutex
 	auditLogs []model.AuditEntry
@@ -55,10 +61,14 @@ type Server struct {
 }
 
 func NewServer(svc *engine.Service, hub *Hub) *Server {
+	pkgMgr := miscpkg.NewManager()
+	_ = pkgMgr.LoadFromDir(filepath.Join("plugins", "misc"))
 	s := &Server{
 		svc:           svc,
 		hub:           hub,
 		clients:       map[chan event]struct{}{},
+		miscModules:   defaultMiscModules(),
+		miscPkgMgr:    pkgMgr,
 		uploadedFiles: map[string]struct{}{},
 	}
 	hub.OnPacket(func(packet model.Packet) {
@@ -86,6 +96,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tools/runtime-config", s.handleToolRuntimeConfig)
 	mux.HandleFunc("/api/tools/ffmpeg", s.handleFFmpegStatus)
 	mux.HandleFunc("/api/tools/speech-to-text", s.handleSpeechToTextStatus)
+	s.registerMiscModuleRoutes(mux)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/capture/start", s.handleCaptureStart)
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
@@ -192,6 +203,81 @@ func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleSpeechToTextStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.svc.SpeechToTextStatus())
+}
+
+func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req model.WinRMDecryptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	result, err := s.svc.RunWinRMDecrypt(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleWinRMDecryptExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	resultID := strings.TrimSpace(r.URL.Query().Get("result_id"))
+	if resultID == "" {
+		writeError(w, http.StatusBadRequest, "missing result_id")
+		return
+	}
+	filePath, filename, err := s.svc.WinRMExportFile(resultID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read export file")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
+}
+
+func (s *Server) handleSMB3RandomSessionKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req model.SMB3RandomSessionKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	result, err := s.svc.GenerateSMB3RandomSessionKey(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleSMB3SessionCandidates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.svc.ListSMB3SessionCandidates()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
 }
 
 func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
@@ -932,8 +1018,11 @@ func (s *Server) handleStreamDecode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	body := http.MaxBytesReader(w, r.Body, maxStreamDecodeBodySize)
+	defer body.Close()
+
 	var payload engine.StreamDecodeRequest
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(body).Decode(&payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -1328,7 +1417,15 @@ func classifyAuditAction(path, method string) string {
 		return "plugin.toggle"
 	case "/api/plugins/bulk":
 		return "plugin.bulk"
+	case "/api/tools/misc/import":
+		return "misc.import"
 	default:
+		if strings.HasPrefix(path, "/api/tools/misc/packages/") {
+			if method == http.MethodDelete {
+				return "misc.delete"
+			}
+			return "misc.invoke"
+		}
 		if strings.HasPrefix(path, "/api/analysis/") {
 			return "analysis.read"
 		}
@@ -1341,7 +1438,7 @@ func classifyAuditAction(path, method string) string {
 
 func classifyAuditRisk(path, method string) string {
 	switch path {
-	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls":
+	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls", "/api/tools/misc/import":
 		return "high"
 	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/hunting/config":
 		if method == http.MethodGet {
@@ -1349,6 +1446,12 @@ func classifyAuditRisk(path, method string) string {
 		}
 		return "medium"
 	default:
+		if strings.HasPrefix(path, "/api/tools/misc/packages/") {
+			if method == http.MethodDelete {
+				return "high"
+			}
+			return "medium"
+		}
 		if method == http.MethodPost || method == http.MethodDelete {
 			return "medium"
 		}

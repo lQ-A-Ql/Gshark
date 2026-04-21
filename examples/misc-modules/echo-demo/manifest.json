@@ -1,0 +1,12 @@
+{
+  "id": "echo-demo",
+  "title": "Echo Demo",
+  "summary": "把输入文本原样回显，作为自定义 MISC zip 模块模板。",
+  "version": "0.1.0",
+  "author": "GShark",
+  "tags": ["Demo", "Echo"],
+  "requires_capture": false,
+  "backend": "backend.js",
+  "api": "api.json",
+  "form": "form.json"
+}

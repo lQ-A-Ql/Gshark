@@ -127,6 +127,144 @@ type ToolRuntimeSnapshot struct {
 	Yara   YaraToolStatus     `json:"yara"`
 }
 
+type WinRMDecryptRequest struct {
+	Port                 int    `json:"port"`
+	AuthMode             string `json:"auth_mode"`
+	Password             string `json:"password,omitempty"`
+	NTHash               string `json:"nt_hash,omitempty"`
+	PreviewLines         int    `json:"preview_lines,omitempty"`
+	IncludeErrorFrames   bool   `json:"include_error_frames,omitempty"`
+	ExtractCommandOutput bool   `json:"extract_command_output,omitempty"`
+}
+
+type WinRMDecryptResult struct {
+	ResultID            string `json:"result_id"`
+	CaptureName         string `json:"capture_name"`
+	Port                int    `json:"port"`
+	AuthMode            string `json:"auth_mode"`
+	PreviewText         string `json:"preview_text"`
+	PreviewTruncated    bool   `json:"preview_truncated"`
+	LineCount           int    `json:"line_count"`
+	FrameCount          int    `json:"frame_count"`
+	ErrorFrameCount     int    `json:"error_frame_count"`
+	ExtractedFrameCount int    `json:"extracted_frame_count"`
+	ExportFilename      string `json:"export_filename"`
+	Message             string `json:"message"`
+}
+
+type SMB3RandomSessionKeyRequest struct {
+	Username            string `json:"username"`
+	Domain              string `json:"domain"`
+	NTLMHash            string `json:"ntlm_hash"`
+	NTProofStr          string `json:"nt_proof_str"`
+	EncryptedSessionKey string `json:"encrypted_session_key"`
+}
+
+type SMB3SessionCandidate struct {
+	SessionID           string `json:"session_id"`
+	Username            string `json:"username"`
+	Domain              string `json:"domain"`
+	NTProofStr          string `json:"nt_proof_str"`
+	EncryptedSessionKey string `json:"encrypted_session_key"`
+	Src                 string `json:"src"`
+	Dst                 string `json:"dst"`
+	FrameNumber         string `json:"frame_number"`
+	Timestamp           string `json:"timestamp"`
+	Complete            bool   `json:"complete"`
+	DisplayLabel        string `json:"display_label"`
+}
+
+type MiscModuleFieldOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type MiscModuleFormField struct {
+	Name         string                  `json:"name"`
+	Label        string                  `json:"label"`
+	Type         string                  `json:"type"`
+	Placeholder  string                  `json:"placeholder,omitempty"`
+	DefaultValue string                  `json:"default_value,omitempty"`
+	HelpText     string                  `json:"help_text,omitempty"`
+	Required     bool                    `json:"required,omitempty"`
+	Secret       bool                    `json:"secret,omitempty"`
+	Rows         int                     `json:"rows,omitempty"`
+	Options      []MiscModuleFieldOption `json:"options,omitempty"`
+}
+
+type MiscModuleFormSchema struct {
+	Description string                `json:"description,omitempty"`
+	SubmitLabel string                `json:"submit_label,omitempty"`
+	ResultTitle string                `json:"result_title,omitempty"`
+	Fields      []MiscModuleFormField `json:"fields,omitempty"`
+}
+
+type MiscModuleInterfaceSchema struct {
+	Method     string `json:"method,omitempty"`
+	InvokePath string `json:"invoke_path,omitempty"`
+	Runtime    string `json:"runtime,omitempty"`
+	Entry      string `json:"entry,omitempty"`
+	HostBridge bool   `json:"host_bridge,omitempty"`
+}
+
+type MiscModuleTableColumn struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+type MiscModuleTableResult struct {
+	Columns []MiscModuleTableColumn `json:"columns,omitempty"`
+	Rows    []map[string]string     `json:"rows,omitempty"`
+}
+
+type MiscModuleManifest struct {
+	ID              string                     `json:"id"`
+	Kind            string                     `json:"kind"`
+	Title           string                     `json:"title"`
+	Summary         string                     `json:"summary"`
+	Tags            []string                   `json:"tags"`
+	APIPrefix       string                     `json:"api_prefix"`
+	DocsPath        string                     `json:"docs_path,omitempty"`
+	RequiresCapture bool                       `json:"requires_capture"`
+	FormSchema      *MiscModuleFormSchema      `json:"form_schema,omitempty"`
+	InterfaceSchema *MiscModuleInterfaceSchema `json:"interface_schema,omitempty"`
+}
+
+type MiscModuleRunRequest struct {
+	Values map[string]string `json:"values"`
+}
+
+type MiscModuleRunResult struct {
+	Message string                 `json:"message,omitempty"`
+	Text    string                 `json:"text,omitempty"`
+	Output  any                    `json:"output,omitempty"`
+	Table   *MiscModuleTableResult `json:"table,omitempty"`
+}
+
+type MiscModulePackageManifest struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Summary         string   `json:"summary"`
+	Version         string   `json:"version,omitempty"`
+	Author          string   `json:"author,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	RequiresCapture bool     `json:"requires_capture,omitempty"`
+	Backend         string   `json:"backend,omitempty"`
+	Form            string   `json:"form,omitempty"`
+	API             string   `json:"api,omitempty"`
+}
+
+type MiscModulePackageImportResult struct {
+	Module        MiscModuleManifest `json:"module"`
+	InstalledPath string             `json:"installed_path"`
+	Message       string             `json:"message"`
+}
+
+type SMB3RandomSessionKeyResult struct {
+	RandomSessionKey string `json:"random_session_key"`
+	Message          string `json:"message"`
+}
+
 type ObjectFile struct {
 	ID        int64  `json:"id"`
 	PacketID  int64  `json:"packet_id"`

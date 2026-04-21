@@ -13,6 +13,8 @@ import remarkGfm from "remark-gfm";
 import type { AppUpdateStatus } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes } from "../state/SentinelContext";
+import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
@@ -104,31 +106,21 @@ export default function UpdateCenter() {
   const notes = status?.releaseNotes?.trim() || "该版本没有附带 Release 说明。";
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-6">
-        <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white via-blue-50 to-cyan-50 shadow-sm">
-          <CardHeader className="gap-3">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
-                  <Sparkles className="h-4 w-4" />
-                  更新中心
-                </div>
-                <CardTitle className="text-3xl font-semibold tracking-tight text-slate-900">
-                  version.json 自动检测与替换更新
-                </CardTitle>
-                <CardDescription className="max-w-2xl text-sm leading-6 text-slate-600">
-                  页面会读取公开的版本清单并匹配适用于当前系统的安装包。检测到新版本后，需要你手动点击安装，程序才会开始下载更新包、替换当前程序并自动重启。
-                </CardDescription>
-              </div>
+    <PageShell>
+      <AnalysisHero
+        icon={<Sparkles className="h-5 w-5" />}
+        title="更新中心"
+        subtitle="UPDATE CENTER"
+        description="统一查看 version.json 自动检测结果、安装资产、Release 说明和替换流程，保证更新页与其他专题页保持同一标题区和布局节奏。"
+        tags={["version.json", "自动更新", "Release", "桌面程序"]}
+        tagsLabel="更新域"
+        theme="blue"
+        onRefresh={() => void refreshStatus()}
+        refreshLabel="重新检查"
+      />
 
-              <div className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${tone.className}`}>
-                {tone.badge}
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-5">
+      <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white via-blue-50 to-cyan-50 shadow-sm">
+        <CardContent className="space-y-5 pt-6">
             <div className="grid gap-4 md:grid-cols-4">
               <StatusTile
                 title="当前版本"
@@ -216,10 +208,10 @@ export default function UpdateCenter() {
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-slate-900">Release 说明</CardTitle>
@@ -325,9 +317,8 @@ export default function UpdateCenter() {
               />
             </CardContent>
           </Card>
-        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

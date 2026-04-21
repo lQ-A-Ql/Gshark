@@ -1,6 +1,7 @@
 import { Binary, BookOpenText, FolderOpen, History, Radar, ShieldAlert } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
+import logoImg from "../../assets/logo.png";
 
 function formatRecentTime(value: string) {
   const parsed = new Date(value);
@@ -32,7 +33,7 @@ export function CaptureWelcomePanel() {
     <div className="flex h-full min-h-0 flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_36%),linear-gradient(180deg,_#f8fbff_0%,_#f6f8fb_100%)] p-6 text-foreground">
       <section className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
         <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
-          <div className="border-b border-slate-200/80 p-8 lg:min-h-0 lg:border-b-0 lg:border-r lg:overflow-auto">
+          <div className="relative border-b border-slate-200/80 p-8 lg:min-h-0 lg:border-b-0 lg:border-r lg:overflow-hidden">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
               GSHARK QUICK START
@@ -89,6 +90,15 @@ export function CaptureWelcomePanel() {
                 icon={<Binary className="h-4 w-4 text-amber-600" />}
                 title="3. 快速解码 Payload"
                 text="选中数据包后就能直接尝试 Base64、Behinder、AntSword、Godzilla 等解码，不必先切流页面。"
+              />
+            </div>
+
+            {/* Empty space logo filler */}
+            <div className="pointer-events-none absolute -bottom-10 left-0 right-8 z-[0] flex justify-end opacity-10 mix-blend-multiply select-none">
+              <img 
+                src={logoImg} 
+                alt="GShark Background" 
+                className="w-full max-w-[440px] object-contain drop-shadow-sm transition-opacity duration-700 hover:opacity-[0.85]" 
               />
             </div>
           </div>

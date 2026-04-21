@@ -1,6 +1,7 @@
 import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { PageShell } from "../components/PageShell";
 import type { DBCProfile, TrafficBucket, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
@@ -173,11 +174,12 @@ export default function VehicleAnalysis() {
   }, [isPreloadingCapture, refreshAnalysis, refreshDBCProfiles]);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background p-4 text-foreground">
+    <PageShell>
       <AnalysisHero
         icon={<Car className="h-5 w-5" />}
         title="车机流量分析"
         subtitle="AUTOMOTIVE PROTOCOLS"
+        description="统一查看 CAN、J1939、DoIP、UDS 等车载协议，并在同一页处理 DBC 映射、诊断事务和安全提示。"
         tags={VEHICLE_PROTOCOL_TAGS}
         tagsLabel="协议族"
         theme="emerald"
@@ -488,7 +490,7 @@ export default function VehicleAnalysis() {
           ])}
         />
       </Panel>
-    </div>
+    </PageShell>
   );
 }
 
