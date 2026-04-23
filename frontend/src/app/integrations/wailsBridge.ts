@@ -1,6 +1,5 @@
 import type {
   AppUpdateStatus,
-  AuditEntry,
   BinaryStream,
   DBCProfile,
   DecryptionConfig,
@@ -189,7 +188,6 @@ export interface BackendBridge {
   runMiscModule(id: string, values: Record<string, string>): Promise<MiscModuleRunResult>;
   listSMB3SessionCandidates(): Promise<SMB3SessionCandidate[]>;
   generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest): Promise<SMB3RandomSessionKeyResult>;
-  listAuditLogs(): Promise<AuditEntry[]>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }
 
@@ -1211,81 +1209,114 @@ export const bridge: BackendBridge = {
 
   async getUSBAnalysis() {
     const payload = await request<any>("/api/analysis/usb");
+    const asUSBPacketRecord = (item: any) => ({
+      packetId: Number(item.packet_id ?? 0),
+      time: String(item.time ?? ""),
+      protocol: String(item.protocol ?? ""),
+      busId: String(item.bus_id ?? ""),
+      deviceAddress: String(item.device_address ?? ""),
+      endpoint: String(item.endpoint ?? ""),
+      direction: String(item.direction ?? ""),
+      transferType: String(item.transfer_type ?? ""),
+      urbType: String(item.urb_type ?? ""),
+      status: String(item.status ?? ""),
+      dataLength: Number(item.data_length ?? 0),
+      setupRequest: String(item.setup_request ?? "") || undefined,
+      payloadPreview: String(item.payload_preview ?? "") || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asUSBKeyboardEvent = (item: any) => ({
+      packetId: Number(item.packet_id ?? 0),
+      time: String(item.time ?? ""),
+      device: String(item.device ?? ""),
+      endpoint: String(item.endpoint ?? ""),
+      modifiers: Array.isArray(item.modifiers) ? item.modifiers.map((value: unknown) => String(value ?? "")) : [],
+      keys: Array.isArray(item.keys) ? item.keys.map((value: unknown) => String(value ?? "")) : [],
+      pressedModifiers: Array.isArray(item.pressed_modifiers) ? item.pressed_modifiers.map((value: unknown) => String(value ?? "")) : [],
+      releasedModifiers: Array.isArray(item.released_modifiers) ? item.released_modifiers.map((value: unknown) => String(value ?? "")) : [],
+      pressedKeys: Array.isArray(item.pressed_keys) ? item.pressed_keys.map((value: unknown) => String(value ?? "")) : [],
+      releasedKeys: Array.isArray(item.released_keys) ? item.released_keys.map((value: unknown) => String(value ?? "")) : [],
+      text: String(item.text ?? "") || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asUSBMouseEvent = (item: any) => ({
+      packetId: Number(item.packet_id ?? 0),
+      time: String(item.time ?? ""),
+      device: String(item.device ?? ""),
+      endpoint: String(item.endpoint ?? ""),
+      buttons: Array.isArray(item.buttons) ? item.buttons.map((value: unknown) => String(value ?? "")) : [],
+      pressedButtons: Array.isArray(item.pressed_buttons) ? item.pressed_buttons.map((value: unknown) => String(value ?? "")) : [],
+      releasedButtons: Array.isArray(item.released_buttons) ? item.released_buttons.map((value: unknown) => String(value ?? "")) : [],
+      xDelta: Number(item.x_delta ?? 0),
+      yDelta: Number(item.y_delta ?? 0),
+      wheelVertical: Number(item.wheel_vertical ?? 0),
+      wheelHorizontal: Number(item.wheel_horizontal ?? 0),
+      positionX: Number(item.position_x ?? 0),
+      positionY: Number(item.position_y ?? 0),
+      summary: String(item.summary ?? ""),
+    });
+    const asUSBMassStorageOperation = (item: any) => ({
+      packetId: Number(item.packet_id ?? 0),
+      time: String(item.time ?? ""),
+      device: String(item.device ?? ""),
+      endpoint: String(item.endpoint ?? ""),
+      lun: String(item.lun ?? ""),
+      command: String(item.command ?? ""),
+      operation: String(item.operation ?? "other"),
+      transferLength: Number(item.transfer_length ?? 0),
+      direction: String(item.direction ?? ""),
+      status: String(item.status ?? ""),
+      requestFrame: item.request_frame == null ? undefined : Number(item.request_frame),
+      responseFrame: item.response_frame == null ? undefined : Number(item.response_frame),
+      latencyMs: item.latency_ms == null ? undefined : Number(item.latency_ms),
+      dataResidue: item.data_residue == null ? undefined : Number(item.data_residue),
+      summary: String(item.summary ?? ""),
+    });
     return {
       totalUSBPackets: Number(payload.total_usb_packets ?? 0),
       keyboardPackets: Number(payload.keyboard_packets ?? 0),
       mousePackets: Number(payload.mouse_packets ?? 0),
       otherUSBPackets: Number(payload.other_usb_packets ?? 0),
+      hidPackets: Number(payload.hid_packets ?? 0),
+      massStoragePackets: Number(payload.mass_storage_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
       transferTypes: Array.isArray(payload.transfer_types) ? payload.transfer_types.map(asBucket) : [],
       directions: Array.isArray(payload.directions) ? payload.directions.map(asBucket) : [],
       devices: Array.isArray(payload.devices) ? payload.devices.map(asBucket) : [],
       endpoints: Array.isArray(payload.endpoints) ? payload.endpoints.map(asBucket) : [],
       setupRequests: Array.isArray(payload.setup_requests) ? payload.setup_requests.map(asBucket) : [],
-      records: Array.isArray(payload.records)
-        ? payload.records.map((item: any) => ({
-            packetId: Number(item.packet_id ?? 0),
-            time: String(item.time ?? ""),
-            protocol: String(item.protocol ?? ""),
-            busId: String(item.bus_id ?? ""),
-            deviceAddress: String(item.device_address ?? ""),
-            endpoint: String(item.endpoint ?? ""),
-            direction: String(item.direction ?? ""),
-            transferType: String(item.transfer_type ?? ""),
-            urbType: String(item.urb_type ?? ""),
-            status: String(item.status ?? ""),
-            dataLength: Number(item.data_length ?? 0),
-            setupRequest: String(item.setup_request ?? "") || undefined,
-            payloadPreview: String(item.payload_preview ?? "") || undefined,
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
-      keyboardEvents: Array.isArray(payload.keyboard_events)
-        ? payload.keyboard_events.map((item: any) => ({
-            packetId: Number(item.packet_id ?? 0),
-            time: String(item.time ?? ""),
-            device: String(item.device ?? ""),
-            endpoint: String(item.endpoint ?? ""),
-            modifiers: Array.isArray(item.modifiers) ? item.modifiers.map((value: unknown) => String(value ?? "")) : [],
-            keys: Array.isArray(item.keys) ? item.keys.map((value: unknown) => String(value ?? "")) : [],
-            text: String(item.text ?? "") || undefined,
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
-      mouseEvents: Array.isArray(payload.mouse_events)
-        ? payload.mouse_events.map((item: any) => ({
-            packetId: Number(item.packet_id ?? 0),
-            time: String(item.time ?? ""),
-            device: String(item.device ?? ""),
-            endpoint: String(item.endpoint ?? ""),
-            buttons: Array.isArray(item.buttons) ? item.buttons.map((value: unknown) => String(value ?? "")) : [],
-            xDelta: Number(item.x_delta ?? 0),
-            yDelta: Number(item.y_delta ?? 0),
-            wheelVertical: Number(item.wheel_vertical ?? 0),
-            wheelHorizontal: Number(item.wheel_horizontal ?? 0),
-            positionX: Number(item.position_x ?? 0),
-            positionY: Number(item.position_y ?? 0),
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
-      otherRecords: Array.isArray(payload.other_records)
-        ? payload.other_records.map((item: any) => ({
-            packetId: Number(item.packet_id ?? 0),
-            time: String(item.time ?? ""),
-            protocol: String(item.protocol ?? ""),
-            busId: String(item.bus_id ?? ""),
-            deviceAddress: String(item.device_address ?? ""),
-            endpoint: String(item.endpoint ?? ""),
-            direction: String(item.direction ?? ""),
-            transferType: String(item.transfer_type ?? ""),
-            urbType: String(item.urb_type ?? ""),
-            status: String(item.status ?? ""),
-            dataLength: Number(item.data_length ?? 0),
-            setupRequest: String(item.setup_request ?? "") || undefined,
-            payloadPreview: String(item.payload_preview ?? "") || undefined,
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
+      records: Array.isArray(payload.records) ? payload.records.map(asUSBPacketRecord) : [],
+      keyboardEvents: Array.isArray(payload.keyboard_events) ? payload.keyboard_events.map(asUSBKeyboardEvent) : [],
+      mouseEvents: Array.isArray(payload.mouse_events) ? payload.mouse_events.map(asUSBMouseEvent) : [],
+      otherRecords: Array.isArray(payload.other_records) ? payload.other_records.map(asUSBPacketRecord) : [],
+      hid: {
+        keyboardEvents: Array.isArray(payload.hid?.keyboard_events) ? payload.hid.keyboard_events.map(asUSBKeyboardEvent) : [],
+        mouseEvents: Array.isArray(payload.hid?.mouse_events) ? payload.hid.mouse_events.map(asUSBMouseEvent) : [],
+        devices: Array.isArray(payload.hid?.devices) ? payload.hid.devices.map(asBucket) : [],
+        notes: Array.isArray(payload.hid?.notes) ? payload.hid.notes.map((item: unknown) => String(item ?? "")) : [],
+      },
+      massStorage: {
+        totalPackets: Number(payload.mass_storage?.total_packets ?? 0),
+        readPackets: Number(payload.mass_storage?.read_packets ?? 0),
+        writePackets: Number(payload.mass_storage?.write_packets ?? 0),
+        controlPackets: Number(payload.mass_storage?.control_packets ?? 0),
+        devices: Array.isArray(payload.mass_storage?.devices) ? payload.mass_storage.devices.map(asBucket) : [],
+        luns: Array.isArray(payload.mass_storage?.luns) ? payload.mass_storage.luns.map(asBucket) : [],
+        commands: Array.isArray(payload.mass_storage?.commands) ? payload.mass_storage.commands.map(asBucket) : [],
+        readOperations: Array.isArray(payload.mass_storage?.read_operations) ? payload.mass_storage.read_operations.map(asUSBMassStorageOperation) : [],
+        writeOperations: Array.isArray(payload.mass_storage?.write_operations) ? payload.mass_storage.write_operations.map(asUSBMassStorageOperation) : [],
+        notes: Array.isArray(payload.mass_storage?.notes) ? payload.mass_storage.notes.map((item: unknown) => String(item ?? "")) : [],
+      },
+      other: {
+        totalPackets: Number(payload.other?.total_packets ?? 0),
+        controlPackets: Number(payload.other?.control_packets ?? 0),
+        devices: Array.isArray(payload.other?.devices) ? payload.other.devices.map(asBucket) : [],
+        endpoints: Array.isArray(payload.other?.endpoints) ? payload.other.endpoints.map(asBucket) : [],
+        setupRequests: Array.isArray(payload.other?.setup_requests) ? payload.other.setup_requests.map(asBucket) : [],
+        controlRecords: Array.isArray(payload.other?.control_records) ? payload.other.control_records.map(asUSBPacketRecord) : [],
+        records: Array.isArray(payload.other?.records) ? payload.other.records.map(asUSBPacketRecord) : [],
+        notes: Array.isArray(payload.other?.notes) ? payload.other.notes.map((item: unknown) => String(item ?? "")) : [],
+      },
       notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
     };
   },
@@ -1683,21 +1714,6 @@ export const bridge: BackendBridge = {
       randomSessionKey: String(payload.random_session_key ?? ""),
       message: String(payload.message ?? ""),
     };
-  },
-
-  async listAuditLogs() {
-    const rows = await request<any[]>("/api/audit/logs");
-    return rows.map((item) => ({
-      time: String(item.time ?? ""),
-      method: String(item.method ?? ""),
-      path: String(item.path ?? ""),
-      action: String(item.action ?? ""),
-      risk: String(item.risk ?? "low"),
-      origin: String(item.origin ?? "") || undefined,
-      remoteAddr: String(item.remote_addr ?? "") || undefined,
-      status: Number(item.status ?? 0),
-      authenticated: Boolean(item.authenticated),
-    }));
   },
 
   subscribeEvents(handlers: EventHandlers) {

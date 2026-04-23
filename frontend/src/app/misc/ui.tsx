@@ -3,8 +3,11 @@ import { ShieldAlert } from "lucide-react";
 
 export function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <label className={`flex min-w-0 flex-col gap-1.5 text-[13px] ${className ?? ""}`}>
-      <span className="font-semibold text-slate-700">{label}</span>
+    <label className={`group/field flex min-w-0 flex-col gap-2 text-[13px] ${className ?? ""}`}>
+      <span className="flex items-center gap-2 font-semibold text-slate-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_0_3px_rgba(34,211,238,0.14)] transition-colors group-focus-within/field:bg-sky-500" />
+        {label}
+      </span>
       {children}
     </label>
   );

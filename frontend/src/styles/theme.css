@@ -143,3 +143,114 @@
     line-height: 1.5;
   }
 }
+
+@layer utilities {
+  .gshark-page-bg {
+    background-color: rgb(var(--gshark-bg-base, 239 246 255));
+    background-image:
+      radial-gradient(circle at 12% 10%, rgb(var(--gshark-bg-accent, 59 130 246) / 0.18), transparent 30rem),
+      radial-gradient(circle at 88% 16%, rgb(var(--gshark-bg-accent-2, 14 165 233) / 0.14), transparent 26rem),
+      linear-gradient(145deg, rgb(var(--gshark-bg-accent, 59 130 246) / 0.08), transparent 38%),
+      linear-gradient(180deg, rgb(var(--gshark-bg-top, 248 250 252)) 0%, rgb(var(--gshark-bg-base, 239 246 255)) 54%, rgb(var(--gshark-bg-bottom, 248 250 252)) 100%);
+    background-position:
+      center,
+      center,
+      center,
+      center;
+    background-size:
+      auto,
+      auto,
+      auto,
+      auto;
+  }
+}
+
+@keyframes misc-select-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.92);
+    filter: blur(4px);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(1px) scaleY(1.015);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes misc-select-stream {
+  0% {
+    opacity: 0;
+    transform: translateY(-3rem);
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  72% {
+    opacity: 0.75;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(17rem);
+  }
+}
+
+@keyframes misc-select-panel-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-7px) scaleY(0.94);
+    filter: blur(3px);
+  }
+}
+
+@keyframes misc-select-stream-out {
+  0% {
+    opacity: 0.5;
+    transform: translateY(7rem);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-2rem);
+  }
+}
+
+@keyframes misc-select-option-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes misc-select-option-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}

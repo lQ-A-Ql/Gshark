@@ -147,7 +147,7 @@ export default function TcpStream() {
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
+    <div className="gshark-page-bg relative flex h-full flex-col overflow-hidden text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="rounded p-1 text-foreground transition-colors hover:bg-accent" title="返回上一页">
@@ -171,7 +171,7 @@ export default function TcpStream() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 bg-card p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 bg-transparent p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
         <div
           ref={viewportRef}
           className="min-h-0 overflow-auto rounded-xl border border-border bg-background p-4 font-mono text-sm leading-relaxed shadow-sm"
@@ -462,4 +462,3 @@ function renderStreamChunk(body: string, mode: RawViewMode, expanded = false): s
     ? rendered
     : `${rendered}\n\n... 已截断，点击查看完整 payload`;
 }
-

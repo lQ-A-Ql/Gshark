@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   updateTLSConfig: vi.fn(),
-  openCapture: vi.fn(),
-  setDisplayFilter: vi.fn(),
-  applyFilter: vi.fn(),
-  updateDecryptionConfig: vi.fn(),
+  onOpenChange: vi.fn(),
   sentinelState: {
     decryptionConfig: {
       sslKeyLogPath: "C:/keys/sslkeylog.log",
@@ -36,11 +33,12 @@ vi.mock("../integrations/wailsBridge", () => ({
   },
 }));
 
-import Decryption from "./Decryption";
+import { TLSDecryptionDialog } from "./TLSDecryptionDialog";
 
-describe("Decryption", () => {
+describe("TLSDecryptionDialog", () => {
   beforeEach(() => {
     mocks.updateTLSConfig.mockReset();
+    mocks.onOpenChange.mockReset();
     mocks.sentinelState.openCapture.mockReset();
     mocks.sentinelState.setDisplayFilter.mockReset();
     mocks.sentinelState.applyFilter.mockReset();
@@ -52,7 +50,7 @@ describe("Decryption", () => {
   });
 
   it("reloads the current capture after applying TLS config", async () => {
-    render(<Decryption />);
+    render(<TLSDecryptionDialog open onOpenChange={mocks.onOpenChange} />);
 
     fireEvent.click(screen.getByTestId("tls-apply-button"));
 
@@ -67,7 +65,7 @@ describe("Decryption", () => {
   it("saves config without reopening when no capture is active", async () => {
     mocks.sentinelState.fileMeta.path = "";
 
-    render(<Decryption />);
+    render(<TLSDecryptionDialog open onOpenChange={mocks.onOpenChange} />);
 
     fireEvent.click(screen.getByTestId("tls-apply-button"));
 

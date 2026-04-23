@@ -160,7 +160,7 @@ export default function HttpStream() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
+    <div className="gshark-page-bg relative flex h-full flex-col overflow-hidden text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
         <div className="flex items-center gap-3">
           <button

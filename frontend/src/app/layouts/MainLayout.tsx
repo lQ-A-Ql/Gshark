@@ -15,7 +15,6 @@ import {
   Radar,
   RefreshCw,
   Save,
-  ScrollText,
   Settings2,
   ShieldAlert,
   Upload,
@@ -35,31 +34,96 @@ import {
   useSidebar,
 } from "../components/ui/sidebar";
 import { RuntimeSettingsSidebar } from "../components/RuntimeSettingsSidebar";
+import { TLSDecryptionDialog } from "../components/TLSDecryptionDialog";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
 const NAV_ITEMS = [
-  { path: "/", icon: LayoutDashboard, label: "主工作区" },
-  { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱" },
-  { path: "/traffic-graph", icon: BarChart3, label: "流量图" },
-  { path: "/industrial-analysis", icon: Factory, label: "工控分析" },
-  { path: "/vehicle-analysis", icon: Car, label: "车机分析" },
-  { path: "/media-analysis", icon: Clapperboard, label: "媒体流还原" },
-  { path: "/usb-analysis", icon: Usb, label: "USB 分析" },
-  { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心" },
-  { path: "/objects", icon: FileDown, label: "附件提取" },
-  { path: "/decryption", icon: KeyRound, label: "TLS 解密" },
-  { path: "/misc", icon: Wrench, label: "MISC 工具箱" },
-  { path: "/updates", icon: RefreshCw, label: "检查更新" },
-  { path: "/audit-logs", icon: ScrollText, label: "审计日志" },
+  { path: "/", icon: LayoutDashboard, label: "主工作区", theme: "blue" },
+  { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱", theme: "indigo" },
+  { path: "/traffic-graph", icon: BarChart3, label: "流量图", theme: "amber" },
+  { path: "/industrial-analysis", icon: Factory, label: "工控分析", theme: "blue" },
+  { path: "/vehicle-analysis", icon: Car, label: "车机分析", theme: "emerald" },
+  { path: "/media-analysis", icon: Clapperboard, label: "媒体流还原", theme: "rose" },
+  { path: "/usb-analysis", icon: Usb, label: "USB 分析", theme: "cyan" },
+  { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心", theme: "rose" },
+  { path: "/objects", icon: FileDown, label: "附件提取", theme: "amber" },
+  { path: "/misc", icon: Wrench, label: "MISC 工具箱", theme: "cyan" },
+  { path: "/updates", icon: RefreshCw, label: "检查更新", theme: "blue" },
 ];
+
+const PAGE_THEMES = {
+  blue: {
+    base: "239 246 255",
+    top: "248 250 252",
+    bottom: "241 245 249",
+    accent: "59 130 246",
+    accent2: "14 165 233",
+    active: "bg-blue-50 text-blue-600 shadow-[0_12px_30px_-20px_rgba(37,99,235,0.55)]",
+    bar: "bg-blue-600",
+  },
+  indigo: {
+    base: "238 242 255",
+    top: "248 250 252",
+    bottom: "245 243 255",
+    accent: "99 102 241",
+    accent2: "59 130 246",
+    active: "bg-indigo-50 text-indigo-600 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.55)]",
+    bar: "bg-indigo-600",
+  },
+  amber: {
+    base: "255 251 235",
+    top: "255 253 244",
+    bottom: "248 250 252",
+    accent: "245 158 11",
+    accent2: "251 191 36",
+    active: "bg-amber-50 text-amber-600 shadow-[0_12px_30px_-20px_rgba(217,119,6,0.55)]",
+    bar: "bg-amber-500",
+  },
+  emerald: {
+    base: "236 253 245",
+    top: "248 250 252",
+    bottom: "240 253 244",
+    accent: "16 185 129",
+    accent2: "20 184 166",
+    active: "bg-emerald-50 text-emerald-600 shadow-[0_12px_30px_-20px_rgba(5,150,105,0.55)]",
+    bar: "bg-emerald-500",
+  },
+  rose: {
+    base: "255 241 242",
+    top: "255 251 252",
+    bottom: "248 250 252",
+    accent: "244 63 94",
+    accent2: "251 113 133",
+    active: "bg-rose-50 text-rose-600 shadow-[0_12px_30px_-20px_rgba(225,29,72,0.55)]",
+    bar: "bg-rose-500",
+  },
+  cyan: {
+    base: "236 254 255",
+    top: "248 250 252",
+    bottom: "240 249 255",
+    accent: "6 182 212",
+    accent2: "14 165 233",
+    active: "bg-cyan-50 text-cyan-600 shadow-[0_12px_30px_-20px_rgba(8,145,178,0.55)]",
+    bar: "bg-cyan-500",
+  },
+} as const;
+
+type PageThemeName = keyof typeof PAGE_THEMES;
+
+function themeForPath(pathname: string): (typeof PAGE_THEMES)[PageThemeName] {
+  const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme
+    ?? (pathname === "/" ? "blue" : pathname.includes("udp") ? "cyan" : pathname.includes("http") ? "cyan" : "blue");
+  return PAGE_THEMES[navTheme as PageThemeName] ?? PAGE_THEMES.blue;
+}
 
 export function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tlsDialogOpen, setTlsDialogOpen] = useState(false);
   const {
     fileMeta,
     filteredPackets,
@@ -181,6 +245,15 @@ export function MainLayout() {
     );
   };
 
+  const activeTheme = themeForPath(location.pathname);
+  const pageThemeStyle = {
+    "--gshark-bg-base": activeTheme.base,
+    "--gshark-bg-top": activeTheme.top,
+    "--gshark-bg-bottom": activeTheme.bottom,
+    "--gshark-bg-accent": activeTheme.accent,
+    "--gshark-bg-accent-2": activeTheme.accent2,
+  } as CSSProperties;
+
   return (
     <SidebarProvider
       open={settingsOpen}
@@ -191,7 +264,10 @@ export function MainLayout() {
         } as CSSProperties
       }
     >
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.10),transparent_26%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f4f7fb_100%)] font-sans text-foreground selection:bg-blue-200 selection:text-blue-900">
+      <div
+        className="gshark-page-bg flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
+        style={pageThemeStyle}
+      >
         <header className="relative z-50 flex shrink-0 flex-col border-b border-slate-200 bg-white/92 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] backdrop-blur">
           <div className="flex h-12 items-center justify-between px-4">
             <div className="flex items-center gap-4">
@@ -217,9 +293,12 @@ export function MainLayout() {
                 <MenuGroup label="视图">
                   <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
                   <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
-                  <MenuItem onClick={() => navigate("/decryption")}>TLS 解密</MenuItem>
                   <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
                   <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
+                </MenuGroup>
+
+                <MenuGroup label="解密">
+                  <MenuItem onClick={() => setTlsDialogOpen(true)} icon={<KeyRound className="h-4 w-4" />}>TLS 解密配置</MenuItem>
                 </MenuGroup>
 
                 <MenuGroup label="分析">
@@ -237,7 +316,6 @@ export function MainLayout() {
                   <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
                   <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
                   <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
-                  <MenuItem onClick={() => navigate("/audit-logs")}>审计日志</MenuItem>
                   <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
                   <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
                 </MenuGroup>
@@ -262,9 +340,14 @@ export function MainLayout() {
               <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600 shadow-sm">
                 <Activity className="h-3.5 w-3.5" /> CTF
               </span>
-              <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setTlsDialogOpen(true)}
+                className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600 shadow-sm transition hover:bg-amber-100 hover:text-amber-700"
+                title="打开 TLS 解密配置"
+              >
                 <KeyRound className="h-3.5 w-3.5" /> 解密
-              </span>
+              </button>
             </div>
           </div>
         </header>
@@ -282,13 +365,13 @@ export function MainLayout() {
                   className={cn(
                     "group relative rounded-2xl p-3 transition-all",
                     isActive
-                      ? "bg-blue-50 text-blue-600 shadow-[0_12px_30px_-20px_rgba(37,99,235,0.55)]"
+                      ? activeTheme.active
                       : "text-muted-foreground hover:bg-slate-100 hover:text-slate-900",
                   )}
                 >
                   <Icon className="h-5 w-5" />
                   {isActive && (
-                    <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
+                    <div className={cn("absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full", activeTheme.bar)} />
                   )}
 
                   <div className="invisible absolute left-full z-50 ml-3 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100">
@@ -299,7 +382,7 @@ export function MainLayout() {
             })}
           </aside>
 
-          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
+          <main className="gshark-page-bg relative flex min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>
         </div>
@@ -340,6 +423,7 @@ export function MainLayout() {
             </span>
           </div>
         </footer>
+        <TLSDecryptionDialog open={tlsDialogOpen} onOpenChange={setTlsDialogOpen} />
       </div>
     </SidebarProvider>
   );

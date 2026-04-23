@@ -791,14 +791,18 @@ type USBPacketRecord struct {
 }
 
 type USBKeyboardEvent struct {
-	PacketID  int64    `json:"packet_id"`
-	Time      string   `json:"time"`
-	Device    string   `json:"device"`
-	Endpoint  string   `json:"endpoint"`
-	Modifiers []string `json:"modifiers,omitempty"`
-	Keys      []string `json:"keys,omitempty"`
-	Text      string   `json:"text,omitempty"`
-	Summary   string   `json:"summary"`
+	PacketID          int64    `json:"packet_id"`
+	Time              string   `json:"time"`
+	Device            string   `json:"device"`
+	Endpoint          string   `json:"endpoint"`
+	Modifiers         []string `json:"modifiers,omitempty"`
+	Keys              []string `json:"keys,omitempty"`
+	PressedModifiers  []string `json:"pressed_modifiers,omitempty"`
+	ReleasedModifiers []string `json:"released_modifiers,omitempty"`
+	PressedKeys       []string `json:"pressed_keys,omitempty"`
+	ReleasedKeys      []string `json:"released_keys,omitempty"`
+	Text              string   `json:"text,omitempty"`
+	Summary           string   `json:"summary"`
 }
 
 type USBMouseEvent struct {
@@ -807,6 +811,8 @@ type USBMouseEvent struct {
 	Device          string   `json:"device"`
 	Endpoint        string   `json:"endpoint"`
 	Buttons         []string `json:"buttons,omitempty"`
+	PressedButtons  []string `json:"pressed_buttons,omitempty"`
+	ReleasedButtons []string `json:"released_buttons,omitempty"`
 	XDelta          int      `json:"x_delta"`
 	YDelta          int      `json:"y_delta"`
 	WheelVertical   int      `json:"wheel_vertical"`
@@ -816,20 +822,74 @@ type USBMouseEvent struct {
 	Summary         string   `json:"summary"`
 }
 
+type USBMassStorageOperation struct {
+	PacketID       int64   `json:"packet_id"`
+	Time           string  `json:"time"`
+	Device         string  `json:"device"`
+	Endpoint       string  `json:"endpoint"`
+	LUN            string  `json:"lun"`
+	Command        string  `json:"command"`
+	Operation      string  `json:"operation"`
+	TransferLength int     `json:"transfer_length"`
+	Direction      string  `json:"direction"`
+	Status         string  `json:"status"`
+	RequestFrame   int64   `json:"request_frame,omitempty"`
+	ResponseFrame  int64   `json:"response_frame,omitempty"`
+	LatencyMs      float64 `json:"latency_ms,omitempty"`
+	DataResidue    int     `json:"data_residue,omitempty"`
+	Summary        string  `json:"summary"`
+}
+
+type USBHIDAnalysis struct {
+	KeyboardEvents []USBKeyboardEvent `json:"keyboard_events"`
+	MouseEvents    []USBMouseEvent    `json:"mouse_events"`
+	Devices        []TrafficBucket    `json:"devices"`
+	Notes          []string           `json:"notes"`
+}
+
+type USBMassStorageAnalysis struct {
+	TotalPackets    int                       `json:"total_packets"`
+	ReadPackets     int                       `json:"read_packets"`
+	WritePackets    int                       `json:"write_packets"`
+	ControlPackets  int                       `json:"control_packets"`
+	Devices         []TrafficBucket           `json:"devices"`
+	LUNs            []TrafficBucket           `json:"luns"`
+	Commands        []TrafficBucket           `json:"commands"`
+	ReadOperations  []USBMassStorageOperation `json:"read_operations"`
+	WriteOperations []USBMassStorageOperation `json:"write_operations"`
+	Notes           []string                  `json:"notes"`
+}
+
+type USBOtherAnalysis struct {
+	TotalPackets   int               `json:"total_packets"`
+	ControlPackets int               `json:"control_packets"`
+	Devices        []TrafficBucket   `json:"devices"`
+	Endpoints      []TrafficBucket   `json:"endpoints"`
+	SetupRequests  []TrafficBucket   `json:"setup_requests"`
+	ControlRecords []USBPacketRecord `json:"control_records"`
+	Records        []USBPacketRecord `json:"records"`
+	Notes          []string          `json:"notes"`
+}
+
 type USBAnalysis struct {
-	TotalUSBPackets int                `json:"total_usb_packets"`
-	KeyboardPackets int                `json:"keyboard_packets"`
-	MousePackets    int                `json:"mouse_packets"`
-	OtherUSBPackets int                `json:"other_usb_packets"`
-	Protocols       []TrafficBucket    `json:"protocols"`
-	TransferTypes   []TrafficBucket    `json:"transfer_types"`
-	Directions      []TrafficBucket    `json:"directions"`
-	Devices         []TrafficBucket    `json:"devices"`
-	Endpoints       []TrafficBucket    `json:"endpoints"`
-	SetupRequests   []TrafficBucket    `json:"setup_requests"`
-	Records         []USBPacketRecord  `json:"records"`
-	KeyboardEvents  []USBKeyboardEvent `json:"keyboard_events"`
-	MouseEvents     []USBMouseEvent    `json:"mouse_events"`
-	OtherRecords    []USBPacketRecord  `json:"other_records"`
-	Notes           []string           `json:"notes"`
+	TotalUSBPackets    int                    `json:"total_usb_packets"`
+	KeyboardPackets    int                    `json:"keyboard_packets"`
+	MousePackets       int                    `json:"mouse_packets"`
+	OtherUSBPackets    int                    `json:"other_usb_packets"`
+	HIDPackets         int                    `json:"hid_packets"`
+	MassStoragePackets int                    `json:"mass_storage_packets"`
+	Protocols          []TrafficBucket        `json:"protocols"`
+	TransferTypes      []TrafficBucket        `json:"transfer_types"`
+	Directions         []TrafficBucket        `json:"directions"`
+	Devices            []TrafficBucket        `json:"devices"`
+	Endpoints          []TrafficBucket        `json:"endpoints"`
+	SetupRequests      []TrafficBucket        `json:"setup_requests"`
+	Records            []USBPacketRecord      `json:"records"`
+	KeyboardEvents     []USBKeyboardEvent     `json:"keyboard_events"`
+	MouseEvents        []USBMouseEvent        `json:"mouse_events"`
+	OtherRecords       []USBPacketRecord      `json:"other_records"`
+	HID                USBHIDAnalysis         `json:"hid"`
+	MassStorage        USBMassStorageAnalysis `json:"mass_storage"`
+	Other              USBOtherAnalysis       `json:"other"`
+	Notes              []string               `json:"notes"`
 }

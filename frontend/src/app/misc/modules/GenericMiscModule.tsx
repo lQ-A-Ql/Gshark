@@ -1,5 +1,5 @@
-import { Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, ChevronDown, Loader2, Play, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -9,6 +9,178 @@ import { bridge } from "../../integrations/wailsBridge";
 import type { MiscModuleFormField } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
 import { ErrorBlock, Field } from "../ui";
+
+const fieldSurfaceClass =
+  "border-slate-200/80 bg-gradient-to-br from-white to-slate-50/80 text-slate-900 shadow-[0_1px_0_rgba(15,23,42,0.03),0_10px_24px_rgba(15,23,42,0.04)] transition-all placeholder:text-slate-400 hover:border-cyan-200 hover:bg-white focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100/70 disabled:cursor-not-allowed disabled:opacity-60";
+
+function SchemaSelectField({
+  field,
+  value,
+  onChange,
+  disabled,
+}: {
+  field: MiscModuleFormField;
+  value: string;
+  onChange: (next: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rendered, setRendered] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<number | undefined>(undefined);
+  const options = field.options ?? [];
+  const selected = options.find((option) => option.value === value);
+  const placeholder = field.placeholder ?? "请选择";
+  const displayText = selected?.label || placeholder;
+  const allOptions = [{ label: placeholder, value: "" }, ...options];
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current !== undefined) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = undefined;
+    }
+  };
+
+  const openDropdown = () => {
+    clearCloseTimer();
+    setRendered(true);
+    setOpen(true);
+  };
+
+  const closeDropdown = () => {
+    clearCloseTimer();
+    setOpen(false);
+    closeTimerRef.current = window.setTimeout(() => {
+      setRendered(false);
+      closeTimerRef.current = undefined;
+    }, 170);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        closeDropdown();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeDropdown();
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (disabled) {
+      closeDropdown();
+    }
+  }, [disabled]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={(event) => {
+          event.preventDefault();
+          if (!disabled) {
+            if (open) {
+              closeDropdown();
+            } else {
+              openDropdown();
+            }
+          }
+        }}
+        onKeyDown={(event) => {
+          if (disabled) {
+            return;
+          }
+          if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+            event.preventDefault();
+            openDropdown();
+          }
+        }}
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3.5 text-sm outline-none ${fieldSurfaceClass} ${
+          open ? "border-cyan-400 bg-white ring-4 ring-cyan-100/70" : ""
+        } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={`min-w-0 truncate ${selected ? "text-slate-900" : "text-slate-400"}`}>{displayText}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-cyan-500" : ""
+          }`}
+        />
+      </div>
+
+      {rendered ? (
+        <div
+          role="listbox"
+          className={`absolute left-0 right-0 top-full z-50 mt-2 origin-top overflow-hidden rounded-2xl border border-cyan-100 bg-white/95 p-1.5 shadow-[0_22px_55px_rgba(8,145,178,0.18)] ring-1 ring-cyan-50 backdrop-blur ${
+            open
+              ? "animate-[misc-select-panel-in_180ms_cubic-bezier(0.22,1,0.36,1)_both]"
+              : "pointer-events-none animate-[misc-select-panel-out_160ms_cubic-bezier(0.4,0,1,1)_both]"
+          }`}
+        >
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-transparent via-cyan-200/35 to-transparent ${
+              open
+                ? "animate-[misc-select-stream_820ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                : "animate-[misc-select-stream-out_160ms_cubic-bezier(0.4,0,1,1)_both]"
+            }`}
+          />
+          <div className="max-h-64 overflow-auto pr-1">
+            {allOptions.map((option, index) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={`${field.name}-${option.value || "__empty"}`}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onChange(option.value);
+                    closeDropdown();
+                  }}
+                  style={{ animationDelay: open ? `${Math.min(index * 24, 144)}ms` : "0ms" }}
+                  className={`group relative flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                    open
+                      ? "animate-[misc-select-option-in_220ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                      : "animate-[misc-select-option-out_120ms_cubic-bezier(0.4,0,1,1)_both]"
+                  } ${
+                    active
+                      ? "bg-gradient-to-r from-cyan-50 to-sky-50 font-semibold text-cyan-800"
+                      : "text-slate-700 hover:bg-slate-50 hover:text-cyan-700"
+                  }`}
+                >
+                  <span className="min-w-0 truncate">{option.label || option.value || placeholder}</span>
+                  {active ? <Check className="h-4 w-4 shrink-0 text-cyan-500" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function buildInitialValues(module: MiscModuleRendererProps["module"]): Record<string, string> {
   const entries = module.formSchema?.fields ?? [];
@@ -33,26 +205,12 @@ function renderField(
         rows={field.rows ?? 6}
         placeholder={field.placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className={`min-h-[120px] w-full rounded-md border px-3 py-2 text-sm shadow-sm outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 ${commonClass}`}
+        className={`min-h-[140px] w-full resize-y rounded-2xl border px-4 py-3 text-sm leading-relaxed outline-none ${fieldSurfaceClass}`}
       />
     );
   }
   if (field.type === "select") {
-    return (
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className={`h-10 w-full rounded-md border px-3 text-sm shadow-sm outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 ${commonClass}`}
-      >
-        <option value="">{field.placeholder ?? "请选择"}</option>
-        {(field.options ?? []).map((option) => (
-          <option key={`${field.name}-${option.value}`} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    );
+    return <SchemaSelectField field={field} value={value} onChange={onChange} disabled={disabled} />;
   }
   return (
     <Input
@@ -61,7 +219,7 @@ function renderField(
       type={field.secret ? "password" : field.type === "number" ? "number" : "text"}
       placeholder={field.placeholder}
       onChange={(event) => onChange(event.target.value)}
-      className={commonClass}
+      className={`h-11 rounded-xl px-3.5 text-sm ${commonClass} ${fieldSurfaceClass}`}
     />
   );
 }
@@ -126,29 +284,48 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
   }
 
   return (
-    <Card className="min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm">
-      <CardHeader className="gap-2 border-b border-slate-100 bg-slate-50/70 pb-5">
+    <Card className="group relative min-w-0 overflow-visible border-cyan-100/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)] ring-1 ring-cyan-50/80 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_26px_70px_rgba(8,145,178,0.14)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-cyan-400 via-sky-500 to-indigo-500" />
+      <CardHeader className="relative gap-3 rounded-t-xl border-b border-cyan-100/70 bg-[radial-gradient(circle_at_12%_20%,rgba(34,211,238,0.22),transparent_34%),linear-gradient(135deg,#0f172a_0%,#164e63_58%,#1e3a8a_100%)] pb-5 text-white">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-              {module.kind === "custom" ? "Custom" : "Builtin"}
-            </Badge>
-            <CardTitle className="text-base text-slate-800">{module.title}</CardTitle>
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-white/20 bg-white/12 text-white shadow-sm backdrop-blur">
+                {module.kind === "custom" ? "Custom" : "Builtin"}
+              </Badge>
+              {module.interfaceSchema?.runtime ? (
+                <Badge variant="outline" className="border-cyan-200/40 bg-cyan-300/15 text-cyan-50 shadow-sm backdrop-blur">
+                  {module.interfaceSchema.runtime}
+                </Badge>
+              ) : null}
+            </div>
+            <CardTitle className="break-words text-lg font-semibold tracking-tight text-white drop-shadow-sm">{module.title}</CardTitle>
           </div>
           {canDelete ? (
-            <Button type="button" variant="outline" size="sm" className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => void handleDelete()} disabled={deleting || running}>
-              <Trash2 className="h-4 w-4" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-white/20 bg-white/10 text-white shadow-sm backdrop-blur hover:border-rose-200/60 hover:bg-rose-500/20 hover:text-white"
+              onClick={() => void handleDelete()}
+              disabled={deleting || running}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               {deleting ? "删除中..." : "删除模块"}
             </Button>
           ) : null}
         </div>
-        <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
+        <CardDescription className="max-w-3xl text-[13px] leading-relaxed text-cyan-50/85">{module.summary}</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-4 pt-6">
+      <CardContent className="space-y-5 rounded-b-xl bg-gradient-to-b from-white via-white to-slate-50/80 pt-6">
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
-            <Badge key={`${module.id}-${tag}`} variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+            <Badge
+              key={`${module.id}-${tag}`}
+              variant="outline"
+              className="rounded-full border-cyan-100 bg-cyan-50/70 px-2.5 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm"
+            >
               {tag}
             </Badge>
           ))}
@@ -157,27 +334,36 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
         {hasSchemaForm ? (
           <>
             {module.formSchema?.description ? (
-              <div className="rounded-xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-[13px] leading-relaxed text-sky-800">
+              <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-sky-50 to-white px-4 py-3 text-[13px] leading-relaxed text-cyan-900 shadow-inner shadow-white/50">
                 {module.formSchema.description}
               </div>
             ) : null}
 
-            <div className="grid gap-4">
+            <div className="grid gap-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_30px_rgba(15,23,42,0.04)]">
               {module.formSchema?.fields.map((field) => (
                 <Field key={`${module.id}-${field.name}`} label={field.label}>
                   {renderField(field, values[field.name] ?? "", (next) => {
                     setValues((current) => ({ ...current, [field.name]: next }));
                   }, running)}
-                  {field.helpText ? <span className="text-xs leading-relaxed text-slate-500">{field.helpText}</span> : null}
+                  {field.helpText ? <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs leading-relaxed text-slate-500">{field.helpText}</span> : null}
                 </Field>
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="min-w-0 text-xs text-slate-500">
-                调用入口: <span className="font-mono text-slate-700">{module.interfaceSchema?.invokePath}</span>
+            <div className="flex flex-col gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-slate-50 via-cyan-50/50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1 text-xs text-slate-500">
+                <div className="font-semibold uppercase tracking-[0.2em] text-cyan-700/80">Invoke endpoint</div>
+                <div className="break-all rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-700 shadow-inner">
+                  {module.interfaceSchema?.invokePath}
+                </div>
               </div>
-              <Button type="button" onClick={() => void handleRun()} disabled={running}>
+              <Button
+                type="button"
+                onClick={() => void handleRun()}
+                disabled={running}
+                className="h-11 min-w-32 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 px-5 font-semibold text-white shadow-[0_12px_28px_rgba(14,165,233,0.32)] hover:from-cyan-400 hover:via-sky-500 hover:to-indigo-500"
+              >
+                {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 {running ? "运行中..." : module.formSchema?.submitLabel ?? "运行模块"}
               </Button>
             </div>
@@ -185,15 +371,20 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
             {error ? <ErrorBlock message={error} /> : null}
 
             {(resultText || resultJSON || resultTable) ? (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-semibold text-slate-800">{resultTitle}</div>
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-800">{resultTitle}</div>
+                  <Badge variant="outline" className="rounded-full border-emerald-100 bg-emerald-50 text-[11px] text-emerald-700">
+                    Result
+                  </Badge>
+                </div>
                 {resultTable && resultTable.columns.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full text-left text-xs text-slate-700">
-                      <thead className="bg-slate-100 text-slate-800">
+                      <thead className="bg-gradient-to-r from-slate-100 to-cyan-50 text-slate-800">
                         <tr>
                           {resultTable.columns.map((column) => (
-                            <th key={`${module.id}-${column.key}`} className="whitespace-nowrap border-b border-slate-200 px-3 py-2 font-semibold">
+                            <th key={`${module.id}-${column.key}`} className="whitespace-nowrap border-b border-slate-200 px-3 py-2.5 font-semibold">
                               {column.label}
                             </th>
                           ))}
@@ -201,9 +392,9 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
                       </thead>
                       <tbody>
                         {resultTable.rows.map((row, index) => (
-                          <tr key={`${module.id}-row-${index}`} className="border-b border-slate-100 last:border-b-0">
+                          <tr key={`${module.id}-row-${index}`} className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-cyan-50/40">
                             {resultTable.columns.map((column) => (
-                              <td key={`${module.id}-${index}-${column.key}`} className="whitespace-pre-wrap px-3 py-2 align-top">
+                              <td key={`${module.id}-${index}-${column.key}`} className="whitespace-pre-wrap px-3 py-2.5 align-top">
                                 {row[column.key] ?? ""}
                               </td>
                             ))}
@@ -214,12 +405,12 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
                   </div>
                 ) : null}
                 {resultText ? (
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-700 shadow-inner">
                     {resultText}
                   </pre>
                 ) : null}
                 {resultJSON ? (
-                  <pre className="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3 text-xs leading-relaxed text-slate-100">
+                  <pre className="max-h-72 overflow-auto rounded-xl border border-slate-800 bg-[linear-gradient(135deg,#020617_0%,#0f172a_58%,#111827_100%)] p-3.5 text-xs leading-relaxed text-cyan-50 shadow-inner">
                     {resultJSON}
                   </pre>
                 ) : null}
@@ -227,14 +418,14 @@ export function GenericMiscModule({ module, onModuleDeleted }: MiscModuleRendere
             ) : null}
           </>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-[13px] text-slate-600 shadow-inner">
             <div className="font-semibold text-slate-800">已注册模块</div>
             <div className="mt-2 break-all">
-              API 前缀: <span className="font-mono text-slate-700">{module.apiPrefix}</span>
+              API 前缀: <span className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-700 shadow-sm">{module.apiPrefix}</span>
             </div>
             {module.docsPath ? (
               <div className="mt-1 break-all">
-                文档: <span className="font-mono text-slate-700">{module.docsPath}</span>
+                文档: <span className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-700 shadow-sm">{module.docsPath}</span>
               </div>
             ) : null}
             <div className="mt-3 leading-relaxed">

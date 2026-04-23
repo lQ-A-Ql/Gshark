@@ -287,18 +287,6 @@ export interface PluginItem {
   capabilities?: string[];
 }
 
-export interface AuditEntry {
-  time: string;
-  method: string;
-  path: string;
-  action: string;
-  risk: string;
-  origin?: string;
-  remoteAddr?: string;
-  status: number;
-  authenticated: boolean;
-}
-
 export interface DecryptionConfig {
   sslKeyLogPath: string;
   privateKeyPath: string;
@@ -818,6 +806,10 @@ export interface USBKeyboardEvent {
   endpoint: string;
   modifiers: string[];
   keys: string[];
+  pressedModifiers: string[];
+  releasedModifiers: string[];
+  pressedKeys: string[];
+  releasedKeys: string[];
   text?: string;
   summary: string;
 }
@@ -828,6 +820,8 @@ export interface USBMouseEvent {
   device: string;
   endpoint: string;
   buttons: string[];
+  pressedButtons: string[];
+  releasedButtons: string[];
   xDelta: number;
   yDelta: number;
   wheelVertical: number;
@@ -837,11 +831,62 @@ export interface USBMouseEvent {
   summary: string;
 }
 
+export interface USBMassStorageOperation {
+  packetId: number;
+  time: string;
+  device: string;
+  endpoint: string;
+  lun: string;
+  command: string;
+  operation: "read" | "write" | "other" | string;
+  transferLength: number;
+  direction: string;
+  status: string;
+  requestFrame?: number;
+  responseFrame?: number;
+  latencyMs?: number;
+  dataResidue?: number;
+  summary: string;
+}
+
+export interface USBHIDAnalysis {
+  keyboardEvents: USBKeyboardEvent[];
+  mouseEvents: USBMouseEvent[];
+  devices: TrafficBucket[];
+  notes: string[];
+}
+
+export interface USBMassStorageAnalysis {
+  totalPackets: number;
+  readPackets: number;
+  writePackets: number;
+  controlPackets: number;
+  devices: TrafficBucket[];
+  luns: TrafficBucket[];
+  commands: TrafficBucket[];
+  readOperations: USBMassStorageOperation[];
+  writeOperations: USBMassStorageOperation[];
+  notes: string[];
+}
+
+export interface USBOtherAnalysis {
+  totalPackets: number;
+  controlPackets: number;
+  devices: TrafficBucket[];
+  endpoints: TrafficBucket[];
+  setupRequests: TrafficBucket[];
+  controlRecords: USBPacketRecord[];
+  records: USBPacketRecord[];
+  notes: string[];
+}
+
 export interface USBAnalysis {
   totalUSBPackets: number;
   keyboardPackets: number;
   mousePackets: number;
   otherUSBPackets: number;
+  hidPackets: number;
+  massStoragePackets: number;
   protocols: TrafficBucket[];
   transferTypes: TrafficBucket[];
   directions: TrafficBucket[];
@@ -852,5 +897,8 @@ export interface USBAnalysis {
   keyboardEvents: USBKeyboardEvent[];
   mouseEvents: USBMouseEvent[];
   otherRecords: USBPacketRecord[];
+  hid: USBHIDAnalysis;
+  massStorage: USBMassStorageAnalysis;
+  other: USBOtherAnalysis;
   notes: string[];
 }
