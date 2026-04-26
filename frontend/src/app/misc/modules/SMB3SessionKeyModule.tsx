@@ -9,7 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ErrorBlock, Field } from "../ui";
 
-export function SMB3SessionKeyModule({ module }: MiscModuleRendererProps) {
+export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const [smbUser, setSmbUser] = useState("");
   const [smbDomain, setSmbDomain] = useState("");
@@ -23,6 +23,7 @@ export function SMB3SessionKeyModule({ module }: MiscModuleRendererProps) {
   const [smbLoading, setSmbLoading] = useState(false);
   const [smbError, setSmbError] = useState("");
   const [smbResult, setSmbResult] = useState<SMB3RandomSessionKeyResult | null>(null);
+  const embedded = surfaceVariant === "embedded";
 
   const hasCapture = Boolean(fileMeta.path);
   const smbCandidateSummary = useMemo(() => {
@@ -144,8 +145,8 @@ export function SMB3SessionKeyModule({ module }: MiscModuleRendererProps) {
   }
 
   return (
-    <Card className="min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm">
-      <CardHeader className="gap-2 border-b border-slate-100 bg-slate-50/70 pb-5">
+    <Card className={embedded ? "min-w-0 h-fit border-0 bg-transparent shadow-none" : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"}>
+      <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
             <Key className="h-4 w-4" />
@@ -154,7 +155,7 @@ export function SMB3SessionKeyModule({ module }: MiscModuleRendererProps) {
         </div>
         <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6">
+      <CardContent className={embedded ? "space-y-6 px-0 pt-0" : "space-y-6 pt-6"}>
         <div className="grid gap-4">
           <Field label="Session 候选选择器">
             <div className="space-y-3">

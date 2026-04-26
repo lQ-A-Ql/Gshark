@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Database, Download, HardDrive, Keyboard, MousePointer2, Pause, Play, Route, Upload, Usb, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Database, Download, HardDrive, Keyboard, Pause, Play, Route, Upload, Usb, Workflow } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import type {
@@ -70,11 +70,10 @@ const usbAnalysisCache = new Map<string, USBAnalysisData>();
 const USB_PROTOCOL_TAGS = ["HID", "Mass Storage", "其他"];
 
 export default function UsbAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
+  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
   const cacheKey = useMemo(() => {
-    if (!fileMeta.path) return "";
-    return `${fileMeta.path}::${totalPackets}`;
-  }, [fileMeta.path, totalPackets]);
+    return buildUSBAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets);
+  }, [captureRevision, fileMeta.path, totalPackets]);
 
   const [analysis, setAnalysis] = useState<USBAnalysisData>(EMPTY_ANALYSIS);
   const [loading, setLoading] = useState(true);
@@ -89,6 +88,8 @@ export default function UsbAnalysis() {
   const [activeMouseDevice, setActiveMouseDevice] = useState("");
   const [activeMassStorageDevice, setActiveMassStorageDevice] = useState("all");
   const [activeMassStorageLUN, setActiveMassStorageLUN] = useState("all");
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const refreshAnalysis = useCallback((force = false) => {
     if (!backendConnected) {
@@ -106,26 +107,48 @@ export default function UsbAnalysis() {
 
     setLoading(true);
     setError("");
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
+    const requestSeq = ++requestSeqRef.current;
+    const isLatest = () => requestSeq === requestSeqRef.current;
     void bridge
-      .getUSBAnalysis()
+      .getUSBAnalysis(abortController.signal)
       .then((payload) => {
+        if (!isLatest()) return;
         if (cacheKey) {
           usbAnalysisCache.set(cacheKey, payload);
         }
         setAnalysis(payload);
       })
       .catch((err) => {
+        if (!isLatest() || abortController.signal.aborted) return;
         setError(err instanceof Error ? err.message : "USB 分析加载失败");
         setAnalysis(EMPTY_ANALYSIS);
       })
       .finally(() => {
-        setLoading(false);
+        if (requestAbortRef.current === abortController) {
+          requestAbortRef.current = null;
+        }
+        if (isLatest()) {
+          setLoading(false);
+        }
       });
+    return () => {
+      abortController.abort();
+      if (requestAbortRef.current === abortController) {
+        requestAbortRef.current = null;
+      }
+    };
   }, [backendConnected, cacheKey]);
+
+  useEffect(() => () => {
+    requestAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (isPreloadingCapture) return;
-    refreshAnalysis();
+    return refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis]);
 
   const hidKeyboardEvents = useMemo(
@@ -1223,4 +1246,10 @@ function BucketChart({ data, color }: { data: TrafficBucket[]; color: string }) 
       </div>
     </div>
   );
+}
+
+export function buildUSBAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
+  const normalizedPath = filePath.trim();
+  if (!normalizedPath) return "";
+  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
 }

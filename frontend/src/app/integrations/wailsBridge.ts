@@ -5,6 +5,7 @@ import type {
   DecryptionConfig,
   ExtractedObject,
   GlobalTrafficStats,
+  HTTPLoginAnalysis,
   HttpStream,
   IndustrialAnalysis,
   MediaAnalysis,
@@ -12,14 +13,19 @@ import type {
   MiscModuleManifest,
   MiscModuleImportResult,
   MiscModuleRunResult,
+  MySQLAnalysis,
   Packet,
   PluginItem,
+  ShiroRememberMeAnalysis,
+  SMTPAnalysis,
   SpeechBatchTaskStatus,
   SpeechToTextStatus,
   ToolRuntimeConfig,
   ToolRuntimeSnapshot,
   StreamDecodeResult,
+  StreamPayloadInspection,
   ThreatHit,
+  NTLMSessionMaterial,
   USBAnalysis,
   VehicleAnalysis,
   WinRMDecryptRequest,
@@ -59,6 +65,7 @@ interface PacketsPageResult {
   nextCursor: number;
   total: number;
   hasMore: boolean;
+  filtering?: boolean;
 }
 
 interface PacketLocateResult {
@@ -142,28 +149,29 @@ export interface BackendBridge {
   listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
   locatePacketPage(packetId: number, limit: number, filter?: string): Promise<PacketLocateResult>;
   getPacket(packetId: number): Promise<Packet>;
-  listThreatHits(prefixes?: string[]): Promise<ThreatHit[]>;
+  listThreatHits(prefixes?: string[], signal?: AbortSignal): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
-  listObjects(): Promise<ExtractedObject[]>;
+  listObjects(signal?: AbortSignal): Promise<ExtractedObject[]>;
   getHttpStream(streamId: number, signal?: AbortSignal): Promise<HttpStream>;
   getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
   getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
   decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>): Promise<StreamDecodeResult>;
+  inspectStreamPayload(payload: string): Promise<StreamPayloadInspection>;
   updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal): Promise<HttpStream | BinaryStream>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
   getPacketRawHex(packetId: number): Promise<string>;
   getPacketLayers(packetId: number): Promise<Record<string, unknown> | null>;
-  getGlobalTrafficStats(): Promise<GlobalTrafficStats>;
-  getIndustrialAnalysis(): Promise<IndustrialAnalysis>;
-  getVehicleAnalysis(): Promise<VehicleAnalysis>;
-  getMediaAnalysis(forceRefresh?: boolean): Promise<MediaAnalysis>;
+  getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
+  getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
+  getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
+  getMediaAnalysis(forceRefresh?: boolean, signal?: AbortSignal): Promise<MediaAnalysis>;
   transcribeMediaArtifact(token: string, force?: boolean): Promise<MediaTranscription>;
   startMediaBatchTranscription(force?: boolean): Promise<SpeechBatchTaskStatus>;
   getMediaBatchTranscriptionStatus(): Promise<SpeechBatchTaskStatus>;
   cancelMediaBatchTranscription(): Promise<SpeechBatchTaskStatus>;
   exportMediaBatchTranscription(format: "txt" | "json"): Promise<void>;
-  getUSBAnalysis(): Promise<USBAnalysis>;
+  getUSBAnalysis(signal?: AbortSignal): Promise<USBAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   getMediaPlaybackBlob(token: string): Promise<Blob>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
@@ -188,6 +196,11 @@ export interface BackendBridge {
   runMiscModule(id: string, values: Record<string, string>): Promise<MiscModuleRunResult>;
   listSMB3SessionCandidates(): Promise<SMB3SessionCandidate[]>;
   generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest): Promise<SMB3RandomSessionKeyResult>;
+  listNTLMSessionMaterials(): Promise<NTLMSessionMaterial[]>;
+  getHTTPLoginAnalysis(signal?: AbortSignal): Promise<HTTPLoginAnalysis>;
+  getSMTPAnalysis(signal?: AbortSignal): Promise<SMTPAnalysis>;
+  getMySQLAnalysis(signal?: AbortSignal): Promise<MySQLAnalysis>;
+  getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal): Promise<ShiroRememberMeAnalysis>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }
 
@@ -345,6 +358,7 @@ function asStreamLoadMeta(input: any): HttpStream["loadMeta"] {
     indexHit: Boolean(input.index_hit),
     fileFallback: Boolean(input.file_fallback),
     tsharkMs: Number(input.tshark_ms ?? 0) || 0,
+    overrideCount: Number(input.override_count ?? 0) || undefined,
   };
 }
 
@@ -670,6 +684,7 @@ export const bridge: BackendBridge = {
       nextCursor: Number(payload.next_cursor ?? rows.length),
       total: Number(payload.total ?? rows.length),
       hasMore: Boolean(payload.has_more),
+      filtering: Boolean(payload.filtering),
     };
   },
 
@@ -711,9 +726,9 @@ export const bridge: BackendBridge = {
     return asPacket(payload);
   },
 
-  async listThreatHits(prefixes = ["flag{", "ctf{"]) {
+  async listThreatHits(prefixes = ["flag{", "ctf{"], signal?: AbortSignal) {
     const query = prefixes.map((p) => `prefix=${encodeURIComponent(p)}`).join("&");
-    const rows = await request<any[]>(`/api/hunting?${query}`);
+    const rows = await request<any[]>(`/api/hunting?${query}`, { signal });
     return rows.map(asThreatHit);
   },
 
@@ -754,8 +769,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async listObjects() {
-    const rows = await request<any[]>("/api/objects");
+  async listObjects(signal?: AbortSignal) {
+    const rows = await request<any[]>("/api/objects", { signal });
     return rows.map(asObject);
   },
 
@@ -795,6 +810,34 @@ export const bridge: BackendBridge = {
     };
   },
 
+  async inspectStreamPayload(payload: string) {
+    const result = await request<any>("/api/streams/inspect", {
+      method: "POST",
+      body: JSON.stringify({ payload }),
+    });
+    return {
+      normalizedPayload: String(result.normalized_payload ?? ""),
+      candidates: Array.isArray(result.candidates)
+        ? result.candidates.map((item: any) => ({
+            id: String(item.id ?? ""),
+            label: String(item.label ?? ""),
+            kind: String(item.kind ?? ""),
+            paramName: String(item.param_name ?? "") || undefined,
+            value: String(item.value ?? ""),
+            preview: String(item.preview ?? "") || undefined,
+            confidence: Number(item.confidence ?? 0) || undefined,
+            decoderHints: Array.isArray(item.decoder_hints) ? item.decoder_hints.map((x: unknown) => String(x ?? "")) : [],
+            fingerprints: Array.isArray(item.fingerprints) ? item.fingerprints.map((x: unknown) => String(x ?? "")) : [],
+          }))
+        : [],
+      suggestedCandidateId: String(result.suggested_candidate_id ?? "") || undefined,
+      suggestedDecoder: String(result.suggested_decoder ?? "") || undefined,
+      suggestedFamily: String(result.suggested_family ?? "") || undefined,
+      confidence: Number(result.confidence ?? 0) || undefined,
+      reasons: Array.isArray(result.reasons) ? result.reasons.map((item: unknown) => String(item ?? "")) : [],
+    } as StreamPayloadInspection;
+  },
+
   async updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal) {
     const payload = await request<any>("/api/streams/payloads", {
       method: "POST",
@@ -831,8 +874,8 @@ export const bridge: BackendBridge = {
     return null;
   },
 
-  async getGlobalTrafficStats() {
-    const payload = await request<any>("/api/stats/traffic/global");
+  async getGlobalTrafficStats(signal?: AbortSignal) {
+    const payload = await request<any>("/api/stats/traffic/global", { signal });
     return {
       totalPackets: Number(payload.total_packets ?? 0),
       protocolKinds: Number(payload.protocol_kinds ?? 0),
@@ -869,8 +912,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async getIndustrialAnalysis() {
-    const payload = await request<any>("/api/analysis/industrial");
+  async getIndustrialAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/analysis/industrial", { signal });
     return {
       totalIndustrialPackets: Number(payload.total_industrial_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
@@ -900,10 +943,62 @@ export const bridge: BackendBridge = {
               exceptionCode: Number(item.exception_code ?? 0),
               responseTime: String(item.response_time ?? ""),
               registerValues: String(item.register_values ?? "") || undefined,
+              bitRange: item.bit_range && typeof item.bit_range === "object"
+                ? {
+                    type: String(item.bit_range.type ?? "") || undefined,
+                    start: Number(item.bit_range.start ?? 0) || undefined,
+                    count: Number(item.bit_range.count ?? 0) || undefined,
+                    values: Array.isArray(item.bit_range.values) ? item.bit_range.values.map((value: unknown) => Boolean(value)) : undefined,
+                    preview: String(item.bit_range.preview ?? "") || undefined,
+                  }
+                : undefined,
               summary: String(item.summary ?? ""),
             }))
           : [],
       },
+      suspiciousWrites: Array.isArray(payload.suspicious_writes)
+        ? payload.suspicious_writes.map((item: any) => ({
+            target: String(item.target ?? ""),
+            unitId: Number(item.unit_id ?? 0),
+            functionCode: Number(item.function_code ?? 0),
+            functionName: String(item.function_name ?? ""),
+            writeCount: Number(item.write_count ?? 0),
+            sources: Array.isArray(item.sources) ? item.sources.map((value: unknown) => String(value ?? "")) : [],
+            firstTime: String(item.first_time ?? ""),
+            lastTime: String(item.last_time ?? ""),
+            sampleValues: Array.isArray(item.sample_values) ? item.sample_values.map((value: unknown) => String(value ?? "")) : [],
+            samplePacketId: Number(item.sample_packet_id ?? 0),
+          }))
+        : [],
+      controlCommands: Array.isArray(payload.control_commands)
+        ? payload.control_commands.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            time: String(item.time ?? ""),
+            protocol: String(item.protocol ?? ""),
+            source: String(item.source ?? ""),
+            destination: String(item.destination ?? ""),
+            operation: String(item.operation ?? ""),
+            target: String(item.target ?? ""),
+            value: String(item.value ?? ""),
+            result: String(item.result ?? ""),
+            summary: String(item.summary ?? ""),
+          }))
+        : [],
+      ruleHits: Array.isArray(payload.rule_hits)
+        ? payload.rule_hits.map((item: any) => ({
+            rule: String(item.rule ?? ""),
+            level: threatLevel(String(item.level ?? "low")),
+            packetId: Number(item.packet_id ?? 0) || undefined,
+            time: String(item.time ?? "") || undefined,
+            source: String(item.source ?? "") || undefined,
+            destination: String(item.destination ?? "") || undefined,
+            functionCode: Number(item.function_code ?? 0) || undefined,
+            functionName: String(item.function_name ?? "") || undefined,
+            target: String(item.target ?? "") || undefined,
+            evidence: String(item.evidence ?? "") || undefined,
+            summary: String(item.summary ?? ""),
+          }))
+        : [],
       details: Array.isArray(payload.details)
         ? payload.details.map((detail: any) => ({
             name: String(detail.name ?? ""),
@@ -930,8 +1025,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async getVehicleAnalysis() {
-    const payload = await request<any>("/api/analysis/vehicle");
+  async getVehicleAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/analysis/vehicle", { signal });
     return {
       totalVehiclePackets: Number(payload.total_vehicle_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
@@ -1112,8 +1207,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async getMediaAnalysis(forceRefresh = false) {
-    const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media");
+  async getMediaAnalysis(forceRefresh = false, signal?: AbortSignal) {
+    const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media", { signal });
     return {
       totalMediaPackets: Number(payload.total_media_packets ?? 0),
       protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
@@ -1207,8 +1302,8 @@ export const bridge: BackendBridge = {
     downloadBlob(`media-transcription.${format}`, blob);
   },
 
-  async getUSBAnalysis() {
-    const payload = await request<any>("/api/analysis/usb");
+  async getUSBAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/analysis/usb", { signal });
     const asUSBPacketRecord = (item: any) => ({
       packetId: Number(item.packet_id ?? 0),
       time: String(item.time ?? ""),
@@ -1582,6 +1677,10 @@ export const bridge: BackendBridge = {
       apiPrefix: String(item.api_prefix ?? ""),
       docsPath: String(item.docs_path ?? "") || undefined,
       requiresCapture: Boolean(item.requires_capture),
+      protocolDomain: String(item.protocol_domain ?? "") || undefined,
+      supportsExport: Boolean(item.supports_export),
+      cancellable: Boolean(item.cancellable),
+      dependsOn: Array.isArray(item.depends_on) ? item.depends_on.map((value: any) => String(value ?? "")) : undefined,
       formSchema: item.form_schema && typeof item.form_schema === "object"
         ? {
             description: String(item.form_schema.description ?? "") || undefined,
@@ -1714,6 +1813,263 @@ export const bridge: BackendBridge = {
       randomSessionKey: String(payload.random_session_key ?? ""),
       message: String(payload.message ?? ""),
     };
+  },
+
+  async listNTLMSessionMaterials() {
+    const payload = await request<any[]>("/api/tools/ntlm-sessions");
+    return payload.map((item: any) => ({
+      protocol: String(item.protocol ?? ""),
+      transport: String(item.transport ?? "") || undefined,
+      frameNumber: String(item.frame_number ?? ""),
+      timestamp: String(item.timestamp ?? "") || undefined,
+      src: String(item.src ?? "") || undefined,
+      dst: String(item.dst ?? "") || undefined,
+      srcPort: String(item.src_port ?? "") || undefined,
+      dstPort: String(item.dst_port ?? "") || undefined,
+      direction: String(item.direction ?? "") || undefined,
+      username: String(item.username ?? "") || undefined,
+      domain: String(item.domain ?? "") || undefined,
+      userDisplay: String(item.user_display ?? "") || undefined,
+      challenge: String(item.challenge ?? "") || undefined,
+      ntProofStr: String(item.nt_proof_str ?? "") || undefined,
+      encryptedSessionKey: String(item.encrypted_session_key ?? "") || undefined,
+      sessionId: String(item.session_id ?? "") || undefined,
+      authHeader: String(item.auth_header ?? "") || undefined,
+      wwwAuthenticate: String(item.www_authenticate ?? "") || undefined,
+      info: String(item.info ?? "") || undefined,
+      complete: Boolean(item.complete),
+      displayLabel: String(item.display_label ?? ""),
+    })) as NTLMSessionMaterial[];
+  },
+
+  async getHTTPLoginAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/tools/http-login-analysis", { signal });
+    return {
+      totalAttempts: Number(payload.total_attempts ?? 0),
+      candidateEndpoints: Number(payload.candidate_endpoints ?? 0),
+      successCount: Number(payload.success_count ?? 0),
+      failureCount: Number(payload.failure_count ?? 0),
+      uncertainCount: Number(payload.uncertain_count ?? 0),
+      bruteforceCount: Number(payload.bruteforce_count ?? 0),
+      endpoints: Array.isArray(payload.endpoints)
+        ? payload.endpoints.map((item: any) => ({
+            key: String(item.key ?? ""),
+            method: String(item.method ?? "") || undefined,
+            host: String(item.host ?? "") || undefined,
+            path: String(item.path ?? "") || undefined,
+            attemptCount: Number(item.attempt_count ?? 0),
+            successCount: Number(item.success_count ?? 0),
+            failureCount: Number(item.failure_count ?? 0),
+            uncertainCount: Number(item.uncertain_count ?? 0),
+            possibleBruteforce: Boolean(item.possible_bruteforce),
+            usernameVariants: Number(item.username_variants ?? 0) || undefined,
+            passwordAttempts: Number(item.password_attempts ?? 0) || undefined,
+            captchaCount: Number(item.captcha_count ?? 0) || undefined,
+            setCookieCount: Number(item.set_cookie_count ?? 0) || undefined,
+            tokenHintCount: Number(item.token_hint_count ?? 0) || undefined,
+            statusCodes: Array.isArray(item.status_codes) ? item.status_codes.map(asBucket) : [],
+            requestKeys: Array.isArray(item.request_keys) ? item.request_keys.map((value: any) => String(value ?? "")) : [],
+            responseIndicators: Array.isArray(item.response_indicators) ? item.response_indicators.map((value: any) => String(value ?? "")) : [],
+            samplePacketIds: Array.isArray(item.sample_packet_ids) ? item.sample_packet_ids.map((value: any) => Number(value ?? 0)).filter((value: number) => value > 0) : [],
+            notes: Array.isArray(item.notes) ? item.notes.map((value: any) => String(value ?? "")) : [],
+          }))
+        : [],
+      attempts: Array.isArray(payload.attempts)
+        ? payload.attempts.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            responsePacketId: Number(item.response_packet_id ?? 0) || undefined,
+            streamId: Number(item.stream_id ?? 0),
+            time: String(item.time ?? "") || undefined,
+            responseTime: String(item.response_time ?? "") || undefined,
+            src: String(item.src ?? "") || undefined,
+            dst: String(item.dst ?? "") || undefined,
+            method: String(item.method ?? "") || undefined,
+            host: String(item.host ?? "") || undefined,
+            path: String(item.path ?? "") || undefined,
+            endpointLabel: String(item.endpoint_label ?? "") || undefined,
+            username: String(item.username ?? "") || undefined,
+            passwordPresent: Boolean(item.password_present),
+            tokenPresent: Boolean(item.token_present),
+            captchaPresent: Boolean(item.captcha_present),
+            requestKeys: Array.isArray(item.request_keys) ? item.request_keys.map((value: any) => String(value ?? "")) : [],
+            requestContentType: String(item.request_content_type ?? "") || undefined,
+            requestPreview: String(item.request_preview ?? "") || undefined,
+            statusCode: Number(item.status_code ?? 0) || undefined,
+            responseLocation: String(item.response_location ?? "") || undefined,
+            responseSetCookie: Boolean(item.response_set_cookie),
+            responseTokenHint: Boolean(item.response_token_hint),
+            responseIndicators: Array.isArray(item.response_indicators) ? item.response_indicators.map((value: any) => String(value ?? "")) : [],
+            responsePreview: String(item.response_preview ?? "") || undefined,
+            result: String(item.result ?? "") || undefined,
+            reason: String(item.reason ?? "") || undefined,
+            possibleBruteforce: Boolean(item.possible_bruteforce),
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: any) => String(value ?? "")) : [],
+    } as HTTPLoginAnalysis;
+  },
+
+  async getSMTPAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/tools/smtp-analysis", { signal });
+    return {
+      sessionCount: Number(payload.session_count ?? 0),
+      messageCount: Number(payload.message_count ?? 0),
+      authCount: Number(payload.auth_count ?? 0),
+      attachmentHintCount: Number(payload.attachment_hint_count ?? 0),
+      sessions: Array.isArray(payload.sessions)
+        ? payload.sessions.map((item: any) => ({
+            streamId: Number(item.stream_id ?? 0),
+            client: String(item.client ?? "") || undefined,
+            server: String(item.server ?? "") || undefined,
+            clientPort: Number(item.client_port ?? 0) || undefined,
+            serverPort: Number(item.server_port ?? 0) || undefined,
+            helo: String(item.helo ?? "") || undefined,
+            authMechanisms: Array.isArray(item.auth_mechanisms) ? item.auth_mechanisms.map((value: any) => String(value ?? "")) : [],
+            authUsername: String(item.auth_username ?? "") || undefined,
+            authPasswordSeen: Boolean(item.auth_password_seen),
+            mailFrom: Array.isArray(item.mail_from) ? item.mail_from.map((value: any) => String(value ?? "")) : [],
+            rcptTo: Array.isArray(item.rcpt_to) ? item.rcpt_to.map((value: any) => String(value ?? "")) : [],
+            commandCount: Number(item.command_count ?? 0),
+            messageCount: Number(item.message_count ?? 0),
+            attachmentHints: Number(item.attachment_hints ?? 0),
+            commands: Array.isArray(item.commands)
+              ? item.commands.map((row: any) => ({
+                  packetId: Number(row.packet_id ?? 0),
+                  time: String(row.time ?? "") || undefined,
+                  direction: String(row.direction ?? "") || undefined,
+                  command: String(row.command ?? "") || undefined,
+                  argument: String(row.argument ?? "") || undefined,
+                  statusCode: Number(row.status_code ?? 0) || undefined,
+                  summary: String(row.summary ?? "") || undefined,
+                }))
+              : [],
+            statusHints: Array.isArray(item.status_hints) ? item.status_hints.map((value: any) => String(value ?? "")) : [],
+            messages: Array.isArray(item.messages)
+              ? item.messages.map((row: any) => ({
+                  sequence: Number(row.sequence ?? 0),
+                  mailFrom: String(row.mail_from ?? "") || undefined,
+                  rcptTo: Array.isArray(row.rcpt_to) ? row.rcpt_to.map((value: any) => String(value ?? "")) : [],
+                  subject: String(row.subject ?? "") || undefined,
+                  from: String(row.from ?? "") || undefined,
+                  to: String(row.to ?? "") || undefined,
+                  date: String(row.date ?? "") || undefined,
+                  contentType: String(row.content_type ?? "") || undefined,
+                  boundary: String(row.boundary ?? "") || undefined,
+                  attachmentNames: Array.isArray(row.attachment_names) ? row.attachment_names.map((value: any) => String(value ?? "")) : [],
+                  bodyPreview: String(row.body_preview ?? "") || undefined,
+                  packetIds: Array.isArray(row.packet_ids) ? row.packet_ids.map((value: any) => Number(value ?? 0)).filter((value: number) => value > 0) : [],
+                }))
+              : [],
+            possibleCleartext: Boolean(item.possible_cleartext),
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: any) => String(value ?? "")) : [],
+    } as SMTPAnalysis;
+  },
+
+  async getMySQLAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/tools/mysql-analysis", { signal });
+    return {
+      sessionCount: Number(payload.session_count ?? 0),
+      loginCount: Number(payload.login_count ?? 0),
+      queryCount: Number(payload.query_count ?? 0),
+      errorCount: Number(payload.error_count ?? 0),
+      resultsetCount: Number(payload.resultset_count ?? 0),
+      sessions: Array.isArray(payload.sessions)
+        ? payload.sessions.map((item: any) => ({
+            streamId: Number(item.stream_id ?? 0),
+            client: String(item.client ?? "") || undefined,
+            server: String(item.server ?? "") || undefined,
+            clientPort: Number(item.client_port ?? 0) || undefined,
+            serverPort: Number(item.server_port ?? 0) || undefined,
+            serverVersion: String(item.server_version ?? "") || undefined,
+            connectionId: Number(item.connection_id ?? 0) || undefined,
+            username: String(item.username ?? "") || undefined,
+            database: String(item.database ?? "") || undefined,
+            authPlugin: String(item.auth_plugin ?? "") || undefined,
+            loginPacketId: Number(item.login_packet_id ?? 0) || undefined,
+            loginSuccess: item.login_packet_id ? Boolean(item.login_success) : undefined,
+            queryCount: Number(item.query_count ?? 0),
+            okCount: Number(item.ok_count ?? 0),
+            errCount: Number(item.err_count ?? 0),
+            resultsetCount: Number(item.resultset_count ?? 0),
+            commandTypes: Array.isArray(item.command_types) ? item.command_types.map((value: any) => String(value ?? "")) : [],
+            queries: Array.isArray(item.queries)
+              ? item.queries.map((row: any) => ({
+                  packetId: Number(row.packet_id ?? 0),
+                  time: String(row.time ?? "") || undefined,
+                  command: String(row.command ?? "") || undefined,
+                  sql: String(row.sql ?? "") || undefined,
+                  database: String(row.database ?? "") || undefined,
+                  responsePacketId: Number(row.response_packet_id ?? 0) || undefined,
+                  responseKind: String(row.response_kind ?? "") || undefined,
+                  responseCode: Number(row.response_code ?? 0) || undefined,
+                  responseSummary: String(row.response_summary ?? "") || undefined,
+                }))
+              : [],
+            serverEvents: Array.isArray(item.server_events)
+              ? item.server_events.map((row: any) => ({
+                  packetId: Number(row.packet_id ?? 0),
+                  time: String(row.time ?? "") || undefined,
+                  sequence: Number(row.sequence ?? 0) || undefined,
+                  kind: String(row.kind ?? "") || undefined,
+                  code: Number(row.code ?? 0) || undefined,
+                  summary: String(row.summary ?? "") || undefined,
+                }))
+              : [],
+            notes: Array.isArray(item.notes) ? item.notes.map((value: any) => String(value ?? "")) : [],
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: any) => String(value ?? "")) : [],
+    } as MySQLAnalysis;
+  },
+
+  async getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal) {
+    const payload = await request<any>("/api/tools/shiro-rememberme", {
+      method: "POST",
+      signal,
+      body: JSON.stringify({
+        candidate_keys: Array.isArray(candidateKeys) ? candidateKeys : [],
+      }),
+    });
+    return {
+      candidateCount: Number(payload.candidate_count ?? 0),
+      hitCount: Number(payload.hit_count ?? 0),
+      candidates: Array.isArray(payload.candidates)
+        ? payload.candidates.map((item: any) => ({
+            packetId: Number(item.packet_id ?? 0),
+            streamId: Number(item.stream_id ?? 0) || undefined,
+            time: String(item.time ?? "") || undefined,
+            src: String(item.src ?? "") || undefined,
+            dst: String(item.dst ?? "") || undefined,
+            host: String(item.host ?? "") || undefined,
+            path: String(item.path ?? "") || undefined,
+            sourceHeader: String(item.source_header ?? "") || undefined,
+            cookieName: String(item.cookie_name ?? "") || undefined,
+            cookieValue: String(item.cookie_value ?? "") || undefined,
+            cookiePreview: String(item.cookie_preview ?? "") || undefined,
+            decodeOK: Boolean(item.decode_ok),
+            encryptedLength: Number(item.encrypted_length ?? 0) || undefined,
+            aesBlockAligned: Boolean(item.aes_block_aligned),
+            possibleCBC: Boolean(item.possible_cbc),
+            possibleGCM: Boolean(item.possible_gcm),
+            keyResults: Array.isArray(item.key_results)
+              ? item.key_results.map((row: any) => ({
+                  label: String(row.label ?? ""),
+                  base64: String(row.base64 ?? "") || undefined,
+                  algorithm: String(row.algorithm ?? "") || undefined,
+                  hit: Boolean(row.hit),
+                  payloadClass: String(row.payload_class ?? "") || undefined,
+                  preview: String(row.preview ?? "") || undefined,
+                  reason: String(row.reason ?? "") || undefined,
+                }))
+              : [],
+            hitCount: Number(item.hit_count ?? 0) || undefined,
+            notes: Array.isArray(item.notes) ? item.notes.map((value: any) => String(value ?? "")) : [],
+          }))
+        : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: any) => String(value ?? "")) : [],
+    } as ShiroRememberMeAnalysis;
   },
 
   subscribeEvents(handlers: EventHandlers) {

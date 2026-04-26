@@ -1,6 +1,10 @@
 package tshark
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/gshark/sentinel/backend/internal/model"
+)
 
 func TestBuildModbusBitRangeReadCoilsResponseUsesRequestContext(t *testing.T) {
 	ctx, ok := buildModbusBitContext(1, "17", "10")
@@ -88,5 +92,79 @@ func TestBuildModbusBitRangeUsesExplicitBitFields(t *testing.T) {
 	}
 	if bitRange.Preview != "线圈 100-103 -> 1 0 1 1" {
 		t.Fatalf("bitRange.Preview = %q", bitRange.Preview)
+	}
+}
+
+func TestBuildModbusFunctionMutationRuleHits(t *testing.T) {
+	hits := buildModbusFunctionMutationRuleHits([]model.ModbusTransaction{
+		{
+			PacketID:     10,
+			Time:         "1.000000",
+			Source:       "10.0.0.10",
+			Destination:  "10.0.0.20",
+			FunctionCode: 3,
+			FunctionName: "读保持寄存器",
+			Kind:         "request",
+			Reference:    "40001",
+		},
+		{
+			PacketID:     11,
+			Time:         "1.100000",
+			Source:       "10.0.0.10",
+			Destination:  "10.0.0.20",
+			FunctionCode: 16,
+			FunctionName: "写多个寄存器",
+			Kind:         "request",
+			Reference:    "40001",
+		},
+	})
+
+	if len(hits) != 1 {
+		t.Fatalf("len(hits) = %d, want 1", len(hits))
+	}
+	if hits[0].Rule != "功能码突变" {
+		t.Fatalf("hits[0].Rule = %q, want 功能码突变", hits[0].Rule)
+	}
+	if hits[0].Level != "warning" {
+		t.Fatalf("hits[0].Level = %q, want warning", hits[0].Level)
+	}
+	if hits[0].PacketID != 11 {
+		t.Fatalf("hits[0].PacketID = %d, want 11", hits[0].PacketID)
+	}
+}
+
+func TestBuildModbusFunctionMutationRuleHitsIgnoresStableOrDifferentTargets(t *testing.T) {
+	hits := buildModbusFunctionMutationRuleHits([]model.ModbusTransaction{
+		{
+			PacketID:     10,
+			Source:       "10.0.0.10",
+			Destination:  "10.0.0.20",
+			FunctionCode: 3,
+			FunctionName: "读保持寄存器",
+			Kind:         "request",
+			Reference:    "40001",
+		},
+		{
+			PacketID:     11,
+			Source:       "10.0.0.10",
+			Destination:  "10.0.0.20",
+			FunctionCode: 3,
+			FunctionName: "读保持寄存器",
+			Kind:         "request",
+			Reference:    "40002",
+		},
+		{
+			PacketID:     12,
+			Source:       "10.0.0.10",
+			Destination:  "10.0.0.21",
+			FunctionCode: 16,
+			FunctionName: "写多个寄存器",
+			Kind:         "request",
+			Reference:    "40001",
+		},
+	})
+
+	if len(hits) != 0 {
+		t.Fatalf("len(hits) = %d, want 0", len(hits))
 	}
 }

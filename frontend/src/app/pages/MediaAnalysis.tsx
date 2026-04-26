@@ -1,5 +1,5 @@
 import { Clapperboard, Copy, Download, FileText, Headphones, Loader2, Play, Square, Video } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskItem, SpeechBatchTaskStatus, SpeechToTextStatus, TrafficBucket } from "../core/types";
+import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus, TrafficBucket } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 
@@ -181,6 +181,8 @@ export default function MediaAnalysis() {
   const [batchStarting, setBatchStarting] = useState(false);
   const [batchTokenStartedAt, setBatchTokenStartedAt] = useState<number | null>(null);
   const [progressClock, setProgressClock] = useState(() => Date.now());
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  const analysisSeqRef = useRef(0);
 
   const filteredSessions = useMemo(() => {
     if (activeTab === "all") return analysis.sessions;
@@ -216,21 +218,39 @@ export default function MediaAnalysis() {
     if (force && cacheKey) {
       mediaAnalysisCache.delete(cacheKey);
     }
+    analysisAbortRef.current?.abort();
+    const abortController = new AbortController();
+    analysisAbortRef.current = abortController;
+    const requestSeq = ++analysisSeqRef.current;
+    const isLatest = () => requestSeq === analysisSeqRef.current;
     void bridge
-      .getMediaAnalysis(force)
+      .getMediaAnalysis(force, abortController.signal)
       .then((payload) => {
+        if (!isLatest()) return;
         if (cacheKey) {
           mediaAnalysisCache.set(cacheKey, payload);
         }
         setAnalysis(payload);
       })
       .catch((err) => {
+        if (!isLatest() || abortController.signal.aborted) return;
         setError(err instanceof Error ? err.message : "媒体分析加载失败");
         setAnalysis(EMPTY_ANALYSIS);
       })
       .finally(() => {
-        setLoading(false);
+        if (analysisAbortRef.current === abortController) {
+          analysisAbortRef.current = null;
+        }
+        if (isLatest()) {
+          setLoading(false);
+        }
       });
+    return () => {
+      abortController.abort();
+      if (analysisAbortRef.current === abortController) {
+        analysisAbortRef.current = null;
+      }
+    };
   }, [backendConnected, cacheKey]);
 
   const ensureSpeechReady = useCallback(async () => {
@@ -405,8 +425,12 @@ export default function MediaAnalysis() {
 
   useEffect(() => {
     if (isPreloadingCapture) return;
-    refreshAnalysis();
+    return refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis]);
+
+  useEffect(() => () => {
+    analysisAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     setTranscriptions({});

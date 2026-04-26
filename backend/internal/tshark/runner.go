@@ -426,6 +426,9 @@ func StreamPackets(ctx context.Context, opts model.ParseOptions, onPacket func(m
 		lineBytes, readErr := reader.ReadBytes('\n')
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			_ = cmd.Wait()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return fmt.Errorf("read tshark output: %w", readErr)
 		}
 		if len(lineBytes) == 0 && errors.Is(readErr, io.EOF) {
@@ -484,6 +487,9 @@ func StreamPackets(ctx context.Context, opts model.ParseOptions, onPacket func(m
 	}
 
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		detail := strings.TrimSpace(stderr.String())
 		if detail != "" {
 			return fmt.Errorf("wait tshark: %w: %s", err, detail)
@@ -516,10 +522,20 @@ func StreamPacketsFast(ctx context.Context, opts model.ParseOptions, onPacket fu
 		lineBytes, readErr := reader.ReadBytes('\n')
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			_ = cmd.Wait()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return fmt.Errorf("read tshark fields output: %w", readErr)
 		}
 		if len(lineBytes) == 0 && errors.Is(readErr, io.EOF) {
 			break
+		}
+
+		select {
+		case <-ctx.Done():
+			_ = cmd.Wait()
+			return ctx.Err()
+		default:
 		}
 
 		line := strings.TrimSpace(string(lineBytes))
@@ -556,6 +572,9 @@ func StreamPacketsFast(ctx context.Context, opts model.ParseOptions, onPacket fu
 	}
 
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		detail := strings.TrimSpace(stderr.String())
 		if detail != "" {
 			return fmt.Errorf("wait tshark fields: %w: %s", err, detail)
@@ -588,10 +607,20 @@ func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket 
 		lineBytes, readErr := reader.ReadBytes('\n')
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			_ = cmd.Wait()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return fmt.Errorf("read tshark compat output: %w", readErr)
 		}
 		if len(lineBytes) == 0 && errors.Is(readErr, io.EOF) {
 			break
+		}
+
+		select {
+		case <-ctx.Done():
+			_ = cmd.Wait()
+			return ctx.Err()
+		default:
 		}
 
 		line := strings.TrimSpace(string(lineBytes))
@@ -628,6 +657,9 @@ func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket 
 	}
 
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		detail := strings.TrimSpace(stderr.String())
 		if detail != "" {
 			return fmt.Errorf("wait tshark compat fields: %w: %s", err, detail)
@@ -1216,6 +1248,33 @@ func buildDNSInfo(node map[string]any, layers map[string]any) string {
 }
 
 func ExportObjects(pcapPath, exportDir string) error {
+	return ExportObjectsContext(context.Background(), pcapPath, exportDir)
+}
+
+func ExportObjectsContext(ctx context.Context, pcapPath, exportDir string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd, err := CommandContext(ctx, "-r", pcapPath, "-q",
+		"--export-objects", "http,"+exportDir,
+		"--export-objects", "smb,"+exportDir,
+		"--export-objects", "tftp,"+exportDir,
+		"--export-objects", "dicom,"+exportDir,
+		"--export-objects", "imf,"+exportDir,
+	)
+	if err != nil {
+		return fmt.Errorf("resolve tshark for export objects: %w", err)
+	}
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	}
+	return nil
+}
+
+func ExportObjectsLegacy(pcapPath, exportDir string) error {
 	cmd, err := Command("-r", pcapPath, "-q",
 		"--export-objects", "http,"+exportDir,
 		"--export-objects", "smb,"+exportDir,

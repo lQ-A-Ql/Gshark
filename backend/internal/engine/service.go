@@ -26,6 +26,7 @@ type Service struct {
 	pluginManger *plugin.Manager
 
 	mu                      sync.RWMutex
+	loadMu                  sync.Mutex
 	packetStore             *packetStore
 	tlsConf                 model.TLSConfig
 	runID                   int64
@@ -156,8 +157,15 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		return errors.New("empty file path")
 	}
 
+	requestRunID := atomic.AddInt64(&s.runID, 1)
 	s.StopStreaming()
-	currentRunID := atomic.AddInt64(&s.runID, 1)
+	s.loadMu.Lock()
+	defer s.loadMu.Unlock()
+	if atomic.LoadInt64(&s.runID) != requestRunID {
+		return context.Canceled
+	}
+
+	currentRunID := requestRunID
 	runCtx, cancel := context.WithCancel(ctx)
 	s.mu.Lock()
 	s.cancel = cancel
@@ -387,6 +395,10 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	if processed > 0 {
 		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
 	}
+	if s.packetStore != nil {
+		log.Printf("engine: packet store path=%q rows=%d", s.packetStore.Path(), s.packetStore.Count())
+		s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", s.packetStore.Count()))
+	}
 	if opts.FastList && dropped > 0 {
 		s.emitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
 	}
@@ -452,12 +464,21 @@ func (s *Service) StopStreaming() {
 }
 
 func (s *Service) ClearCapture() error {
+	atomic.AddInt64(&s.runID, 1)
 	s.StopStreaming()
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.mu.Unlock()
+
+	s.loadMu.Lock()
+	defer s.loadMu.Unlock()
 
 	if s.packetStore != nil {
 		if err := s.packetStore.Reset(); err != nil {
 			return err
 		}
+		s.emitStatus("临时数据库已重置")
 	}
 
 	s.objMu.Lock()
@@ -477,7 +498,6 @@ func (s *Service) ClearCapture() error {
 	if s.pcap != "" {
 		tshark.ClearFieldScanCache(s.pcap)
 	}
-	s.cancelDisplayFilterCacheLocked()
 	s.pcap = ""
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
@@ -517,36 +537,41 @@ func (s *Service) Packets() []model.Packet {
 }
 
 func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]model.Packet, int, int, error) {
+	items, next, total, _, err := s.PacketsPageWithState(cursor, limit, filter)
+	return items, next, total, err
+}
+
+func (s *Service) PacketsPageWithState(cursor, limit int, filter string) ([]model.Packet, int, int, bool, error) {
 	if s.packetStore == nil {
-		return nil, 0, 0, nil
+		return nil, 0, 0, false, nil
 	}
 	filtered, filterErr := s.filteredPacketIndex(filter)
 	if filterErr == nil && filtered != nil {
-		ids, next, total, err := filtered.pageWindow(cursor, limit)
+		ids, next, total, pending, err := filtered.pageWindowState(cursor, limit)
 		if err != nil {
-			return []model.Packet{}, 0, 0, err
+			return []model.Packet{}, 0, 0, false, err
 		}
 		out, err := s.packetStore.PacketsByIDsSummary(ids)
 		if err != nil {
 			s.emitStatus("数据包分页查询失败: " + err.Error())
-			return []model.Packet{}, 0, 0, err
+			return []model.Packet{}, 0, 0, false, err
 		}
-		return out, next, total, nil
+		return out, next, total, pending, nil
 	}
 	if filterErr != nil {
-		return []model.Packet{}, 0, 0, filterErr
+		return []model.Packet{}, 0, 0, false, filterErr
 	}
 	if strings.TrimSpace(filter) != "" && s.hasCapturePath() {
-		return []model.Packet{}, 0, 0, nil
+		return []model.Packet{}, 0, 0, false, nil
 	}
 
 	predicate := compilePacketFilter(filter)
 	out, next, total, err := s.packetStore.PageSummaries(cursor, limit, predicate)
 	if err != nil {
 		s.emitStatus("数据包分页查询失败: " + err.Error())
-		return []model.Packet{}, 0, 0, err
+		return []model.Packet{}, 0, 0, false, err
 	}
-	return out, next, total, nil
+	return out, next, total, false, nil
 }
 
 func (s *Service) PacketsPage(cursor, limit int, filter string) ([]model.Packet, int, int) {
@@ -609,6 +634,13 @@ func (s *Service) Packet(packetID int64) (model.Packet, error) {
 }
 
 func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
+	return s.ThreatHuntWithContext(context.Background(), prefixes)
+}
+
+func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) []model.ThreatHit {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if len(prefixes) == 0 {
 		prefixes = s.getHuntingPrefixes()
 	}
@@ -632,6 +664,9 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 
 	if s.packetStore != nil {
 		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			hunter.Observe(packet)
 			if pluginRunner != nil {
 				batch = append(batch, packet)
@@ -643,6 +678,10 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 		})
 		flushPluginBatch()
 	}
+	if ctx.Err() != nil {
+		s.emitStatus("威胁分析已取消")
+		return nil
+	}
 	s.emitStatus("__progress__:threat:1:5:扫描数据包基础特征")
 
 	hits := hunter.Results()
@@ -652,10 +691,22 @@ func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 			s.emitStatus("plugin warning: " + warning)
 		}
 	}
+	if ctx.Err() != nil {
+		s.emitStatus("威胁分析已取消")
+		return nil
+	}
 	s.emitStatus("__progress__:threat:2:5:导出可疑对象")
-	objects := s.Objects()
+	objects := s.ObjectsWithContext(ctx)
+	if ctx.Err() != nil {
+		s.emitStatus("威胁分析已取消")
+		return nil
+	}
 	s.emitStatus("__progress__:threat:3:5:整理重组流与扫描目标")
-	hits = append(hits, s.cachedYaraHits(objects)...)
+	hits = append(hits, s.cachedYaraHitsWithContext(ctx, objects)...)
+	if ctx.Err() != nil {
+		s.emitStatus("威胁分析已取消")
+		return nil
+	}
 	s.emitStatus("__progress__:threat:4:5:执行 YARA 扫描")
 	hits = append(hits, StegoPrecheck(objects)...)
 	sort.Slice(hits, func(i, j int) bool {
@@ -743,6 +794,13 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 }
 
 func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
+	return s.cachedYaraHitsWithContext(context.Background(), objects)
+}
+
+func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model.ObjectFile) []model.ThreatHit {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	s.yaraMu.Lock()
 	defer s.yaraMu.Unlock()
 
@@ -773,8 +831,11 @@ func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
 		return out
 	}
 
-	hits, scanErr := BatchScanTargetsWithYaraConfig(targets, yc)
+	hits, scanErr := BatchScanTargetsWithYaraConfigContext(ctx, targets, yc)
 	if scanErr != nil {
+		if errors.Is(scanErr, context.Canceled) {
+			return nil
+		}
 		log.Printf("engine: yara scan failed: %v", scanErr)
 		s.emitStatus("YARA 扫描异常: " + scanErr.Error())
 		hits = append(hits, newYaraWarningHit(scanErr.Error()))
@@ -792,6 +853,13 @@ func (s *Service) cachedYaraHits(objects []model.ObjectFile) []model.ThreatHit {
 }
 
 func (s *Service) Objects() []model.ObjectFile {
+	return s.ObjectsWithContext(context.Background())
+}
+
+func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	s.objMu.Lock()
 	if s.objectsLoaded {
 		objects := s.objects
@@ -805,6 +873,9 @@ func (s *Service) Objects() []model.ObjectFile {
 	s.mu.RUnlock()
 
 	if pcapPath == "" {
+		return nil
+	}
+	if ctx.Err() != nil {
 		return nil
 	}
 
@@ -821,7 +892,10 @@ func (s *Service) Objects() []model.ObjectFile {
 		_ = os.RemoveAll(tempDir)
 	}()
 
-	if err := tshark.ExportObjects(pcapPath, tempDir); err != nil {
+	if err := tshark.ExportObjectsContext(ctx, pcapPath, tempDir); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
 		s.objMu.Lock()
 		s.mu.RLock()
 		currentPCAP := s.pcap
@@ -853,6 +927,9 @@ func (s *Service) Objects() []model.ObjectFile {
 	var objects []model.ObjectFile
 	var id int64 = 1
 	for _, entry := range entries {
+		if ctx.Err() != nil {
+			return nil
+		}
 		if entry.IsDir() {
 			continue
 		}
@@ -926,6 +1003,7 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 		s.mu.RUnlock()
 		stream := s.streamWithOverrides(key, cached)
 		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: http stream stream=%d source=cache chunks=%d", streamID, len(stream.Chunks))
 		return stream
 	}
@@ -938,6 +1016,7 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 		if len(stream.Chunks) > 0 || strings.TrimSpace(stream.Request) != "" || strings.TrimSpace(stream.Response) != "" {
 			stream = s.streamWithOverrides(key, stream)
 			stream.LoadMeta = newStreamLoadMeta("memory", false, false, false, 0)
+			s.applyOverrideCountToMeta(key, stream.LoadMeta)
 			s.cacheStream(key, stream)
 			log.Printf("engine: http stream stream=%d source=memory chunks=%d request_bytes=%d response_bytes=%d", streamID, len(stream.Chunks), len(stream.Request), len(stream.Response))
 			return stream
@@ -953,6 +1032,7 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 		if err == nil && (stream.Request != "" || stream.Response != "") {
 			stream = s.streamWithOverrides(key, stream)
 			stream.LoadMeta = newStreamLoadMeta("file", false, false, true, time.Since(startedAt))
+			s.applyOverrideCountToMeta(key, stream.LoadMeta)
 			s.cacheStream(key, stream)
 			log.Printf("engine: http stream stream=%d source=file-fallback chunks=%d tshark_ms=%d", streamID, len(stream.Chunks), stream.LoadMeta.TSharkMS)
 			return stream
@@ -980,6 +1060,7 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		s.mu.RUnlock()
 		stream := s.streamWithOverrides(key, cached)
 		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: raw stream protocol=%s stream=%d source=cache chunks=%d", normalized, streamID, len(stream.Chunks))
 		return stream
 	}
@@ -987,6 +1068,7 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		stream := s.streamWithOverrides(key, indexed)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.mu.RUnlock()
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		s.cacheStream(key, stream)
 		log.Printf("engine: raw stream protocol=%s stream=%d source=index chunks=%d", normalized, streamID, len(stream.Chunks))
 		return stream
@@ -1002,6 +1084,7 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		if err == nil && len(stream.Chunks) > 0 {
 			stream = s.streamWithOverrides(key, stream)
 			stream.LoadMeta = newStreamLoadMeta("file", false, false, true, time.Since(startedAt))
+			s.applyOverrideCountToMeta(key, stream.LoadMeta)
 			s.cacheStream(key, stream)
 			log.Printf("engine: raw stream protocol=%s stream=%d source=file-fallback chunks=%d tshark_ms=%d", normalized, streamID, len(stream.Chunks), stream.LoadMeta.TSharkMS)
 			return stream
@@ -1028,6 +1111,7 @@ func (s *Service) RawStreamPage(ctx context.Context, protocol string, streamID i
 		stream, next, total := cloneRawStreamWindow(s.streamWithOverrides(key, indexed), cursor, limit)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.mu.RUnlock()
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: raw stream page protocol=%s stream=%d source=index returned=%d total=%d next=%d", normalized, streamID, len(stream.Chunks), total, next)
 		return stream, next, total
 	}
@@ -1165,6 +1249,21 @@ func cloneChunkOverrideMap(in map[int]string) map[int]string {
 		out[index] = body
 	}
 	return out
+}
+
+func (s *Service) countStreamOverrides(key string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.streamOverrides[key])
+}
+
+func (s *Service) applyOverrideCountToMeta(key string, meta *model.StreamLoadMeta) {
+	if meta == nil {
+		return
+	}
+	if count := s.countStreamOverrides(key); count > 0 {
+		meta.OverrideCount = count
+	}
 }
 
 func applyChunkOverrides(stream model.ReassembledStream, overrides map[int]string) model.ReassembledStream {

@@ -293,7 +293,7 @@ export default function Workspace() {
   }
 
   return (
-    <div className="gshark-page-bg flex h-full flex-col overflow-hidden text-sm text-foreground">
+    <div className="bg-background flex h-full flex-col overflow-hidden text-sm text-foreground">
       <div className="flex items-center gap-2 border-b border-border bg-accent/40 px-3 py-2 shrink-0">
         <div className="flex w-[320px] items-center overflow-hidden rounded-md border border-border bg-background shadow-sm focus-within:border-blue-500">
           <FolderOpen className="ml-2 h-4 w-4 text-muted-foreground" />

@@ -140,7 +140,7 @@ export default function UdpStream() {
   }
 
   return (
-    <div className="gshark-page-bg relative flex h-full flex-col overflow-hidden text-sm text-foreground">
+    <div className="bg-background relative flex h-full flex-col overflow-hidden text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="rounded p-1 text-foreground transition-colors hover:bg-accent" title="返回上一页">
@@ -242,6 +242,13 @@ export default function UdpStream() {
                 : `UDP 流 stream eq ${streamView.id}`
             }
             tone="amber"
+            onApplyDecoded={selectedChunk && selectedChunkIndex >= 0
+              ? async (body) => {
+                  const patches = [{ index: selectedChunkIndex, body }];
+                  await persistStreamPayloads("UDP", streamView.id, patches);
+                  applyLocalPatches(patches);
+                }
+              : undefined}
             batchItems={streamView.chunks.map((chunk, index) => ({
               index,
               payload: chunk.body,
@@ -334,7 +341,8 @@ function formatLoadMeta(meta?: StreamLoadMeta): string {
   if (meta.loading) return "正在解析当前 UDP 流...";
   const source = meta.source || "unknown";
   const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
-  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}`;
+  const overrides = meta.overrideCount && meta.overrideCount > 0 ? ` / overrides ${meta.overrideCount}` : "";
+  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}${overrides}`;
 }
 
 const RawStreamChunkCard = memo(function RawStreamChunkCard({

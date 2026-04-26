@@ -1,5 +1,5 @@
 import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import type { DBCProfile, TrafficBucket, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
@@ -73,18 +73,18 @@ interface CanIdDataGroup {
 }
 
 export default function VehicleAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
+  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
   const [dbcProfiles, setDBCProfiles] = useState<DBCProfile[]>([]);
   const [dbcPathInput, setDBCPathInput] = useState("");
   const cacheKey = useMemo(() => {
-    if (!fileMeta.path) return "";
-    const dbcKey = dbcProfiles.map((item) => item.path).sort().join("|");
-    return `${fileMeta.path}::${totalPackets}::${dbcKey}`;
-  }, [dbcProfiles, fileMeta.path, totalPackets]);
+    return buildVehicleAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets, dbcProfiles);
+  }, [captureRevision, dbcProfiles, fileMeta.path, totalPackets]);
   const [analysis, setAnalysis] = useState<VehicleAnalysisData>(EMPTY_ANALYSIS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const canIdDataGroups = useMemo(() => buildCanIdDataGroups(analysis), [analysis]);
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const refreshAnalysis = useCallback((force = false) => {
     if (!backendConnected) {
@@ -101,22 +101,44 @@ export default function VehicleAnalysis() {
     }
     setLoading(true);
     setError("");
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
+    const requestSeq = ++requestSeqRef.current;
+    const isLatest = () => requestSeq === requestSeqRef.current;
     void bridge
-      .getVehicleAnalysis()
+      .getVehicleAnalysis(abortController.signal)
       .then((payload) => {
+        if (!isLatest()) return;
         if (cacheKey) {
           vehicleAnalysisCache.set(cacheKey, payload);
         }
         setAnalysis(payload);
       })
       .catch((err) => {
+        if (!isLatest() || abortController.signal.aborted) return;
         setError(err instanceof Error ? err.message : "车机流量分析加载失败");
         setAnalysis(EMPTY_ANALYSIS);
       })
       .finally(() => {
-        setLoading(false);
+        if (requestAbortRef.current === abortController) {
+          requestAbortRef.current = null;
+        }
+        if (isLatest()) {
+          setLoading(false);
+        }
       });
+    return () => {
+      abortController.abort();
+      if (requestAbortRef.current === abortController) {
+        requestAbortRef.current = null;
+      }
+    };
   }, [backendConnected, cacheKey]);
+
+  useEffect(() => () => {
+    requestAbortRef.current?.abort();
+  }, []);
 
   const refreshDBCProfiles = useCallback(() => {
     if (!backendConnected) {
@@ -170,7 +192,7 @@ export default function VehicleAnalysis() {
   useEffect(() => {
     if (isPreloadingCapture) return;
     refreshDBCProfiles();
-    refreshAnalysis();
+    return refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis, refreshDBCProfiles]);
 
   return (
@@ -691,4 +713,11 @@ export function buildCanIdDataGroups(analysis: VehicleAnalysisData): CanIdDataGr
       items: group.items.slice(0, MAX_CAN_DATA_LINES_PER_ID),
     };
   });
+}
+
+export function buildVehicleAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number, dbcProfiles: DBCProfile[]) {
+  const normalizedPath = filePath.trim();
+  if (!normalizedPath) return "";
+  const dbcKey = dbcProfiles.map((item) => item.path).sort().join("|");
+  return `${captureRevision}::${normalizedPath}::${totalPackets}::${dbcKey}`;
 }

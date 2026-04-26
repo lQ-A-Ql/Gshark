@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+const filteredPacketIndexMaxWait = 180 * time.Millisecond
 
 func newFilteredPacketIndex(cancel context.CancelFunc) *filteredPacketIndex {
 	index := &filteredPacketIndex{
@@ -50,6 +53,11 @@ func (f *filteredPacketIndex) stop() {
 }
 
 func (f *filteredPacketIndex) pageWindow(cursor, limit int) ([]int64, int, int, error) {
+	ids, next, total, _, err := f.pageWindowState(cursor, limit)
+	return ids, next, total, err
+}
+
+func (f *filteredPacketIndex) pageWindowState(cursor, limit int) ([]int64, int, int, bool, error) {
 	if limit <= 0 {
 		limit = 1000
 	}
@@ -61,30 +69,45 @@ func (f *filteredPacketIndex) pageWindow(cursor, limit int) ([]int64, int, int, 
 	}
 
 	target := cursor + limit + 1
+	deadline := time.Now().Add(filteredPacketIndexMaxWait)
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	for {
 		if f.err != nil {
-			return nil, 0, 0, f.err
+			return nil, 0, 0, false, f.err
 		}
 		if f.complete || len(f.ids) >= target {
 			break
 		}
+		remaining := time.Until(deadline)
+		if len(f.ids) > cursor && (len(f.ids) >= cursor+limit || remaining <= 0) {
+			break
+		}
+		if remaining <= 0 {
+			break
+		}
+		timer := time.AfterFunc(remaining, func() {
+			f.mu.Lock()
+			f.cond.Broadcast()
+			f.mu.Unlock()
+		})
 		f.cond.Wait()
+		timer.Stop()
 	}
 
 	if f.err != nil {
-		return nil, 0, 0, f.err
+		return nil, 0, 0, false, f.err
 	}
 
 	knownTotal := len(f.ids)
+	pending := !f.complete
 	if cursor >= knownTotal {
 		if f.complete {
-			return []int64{}, knownTotal, knownTotal, nil
+			return []int64{}, knownTotal, knownTotal, false, nil
 		}
-		return []int64{}, cursor, cursor + 1, nil
+		return []int64{}, cursor, cursor + 1, true, nil
 	}
 
 	end := cursor + limit
@@ -97,7 +120,10 @@ func (f *filteredPacketIndex) pageWindow(cursor, limit int) ([]int64, int, int, 
 	if !f.complete && knownTotal > end && total <= next {
 		total = next + 1
 	}
-	return window, next, total, nil
+	if !f.complete && total <= next {
+		total = next + 1
+	}
+	return window, next, total, pending, nil
 }
 
 func (f *filteredPacketIndex) pageCursor(packetID int64, limit int) (int, int, bool, error) {

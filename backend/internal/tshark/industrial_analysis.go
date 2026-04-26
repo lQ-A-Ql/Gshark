@@ -114,6 +114,7 @@ func BuildIndustrialAnalysisFromFile(filePath string) (model.IndustrialAnalysis,
 	stats.Conversations = sortConversationBuckets(conversationMap)
 	stats.SuspiciousWrites = buildModbusSuspiciousWrites(stats.Modbus.Transactions)
 	stats.ControlCommands = extractControlCommands(stats.Details)
+	stats.RuleHits = buildIndustrialRuleHits(stats)
 	stats.Notes = industrialNotes(stats)
 	return stats, nil
 }

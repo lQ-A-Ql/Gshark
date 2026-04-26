@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Binary, Bug, Cog, KeyRound, LoaderCircle, Search, ShieldAlert, Wand2 } from "lucide-react";
-import type { StreamDecodeResult, StreamDecoderKind } from "../core/types";
+import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 
 type DecoderSettings = {
@@ -44,6 +44,8 @@ type BatchDecodeProgress = {
   failed: number;
   currentLabel: string;
 };
+
+type DecoderApplyMode = "preview" | "derived" | "overwrite";
 
 const MAX_BATCH_FAILURE_DETAILS = 20;
 
@@ -102,6 +104,11 @@ export function StreamDecoderWorkbench({
   const [applyMessage, setApplyMessage] = useState("");
   const [batchProgress, setBatchProgress] = useState<BatchDecodeProgress | null>(null);
   const [batchFailureDetails, setBatchFailureDetails] = useState<string[]>([]);
+  const [inspection, setInspection] = useState<StreamPayloadInspection | null>(null);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
+  const [inspectionError, setInspectionError] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [applyMode, setApplyMode] = useState<DecoderApplyMode>("derived");
   const selectedBatchOrdinal = useMemo(() => {
     if (!batchItems || batchItems.length === 0) return 1;
     const hit = batchItems.findIndex((item) => item.index === selectedBatchIndex);
@@ -121,6 +128,11 @@ export function StreamDecoderWorkbench({
     setApplyMessage("");
     setBatchProgress(null);
     setBatchFailureDetails([]);
+    setInspection(null);
+    setInspectionError("");
+    setInspectionLoading(false);
+    setSelectedCandidateId("");
+    setApplyMode("derived");
   }, [payload, chunkLabel]);
 
   useEffect(() => {
@@ -129,6 +141,22 @@ export function StreamDecoderWorkbench({
   }, [selectedBatchOrdinal, batchItems?.length]);
 
   const preparedPayload = useMemo(() => normalizeTransportPayload(payload), [payload]);
+  const selectedCandidate = useMemo(
+    () => inspection?.candidates.find((item) => item.id === selectedCandidateId) ?? inspection?.candidates[0] ?? null,
+    [inspection, selectedCandidateId],
+  );
+  const effectivePayload = useMemo(() => {
+    const candidateValue = selectedCandidate?.value?.trim();
+    if (candidateValue) {
+      return candidateValue;
+    }
+    const normalized = inspection?.normalizedPayload?.trim();
+    if (normalized) {
+      return normalized;
+    }
+    return preparedPayload;
+  }, [inspection?.normalizedPayload, preparedPayload, selectedCandidate?.value]);
+  const candidateCount = inspection?.candidates.length ?? 0;
   const hasPayload = preparedPayload.trim().length > 0;
   const hasBatchMode = Boolean(batchItems && batchItems.length > 0 && onApplyDecodedBatch);
   const batchCount = batchItems?.length ?? 0;
@@ -137,6 +165,42 @@ export function StreamDecoderWorkbench({
     if (tone === "emerald") return "border-emerald-500/30 bg-emerald-500/10";
     return "border-blue-500/30 bg-blue-500/10";
   }, [tone]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!preparedPayload.trim()) {
+      setInspection(null);
+      setInspectionError("");
+      setInspectionLoading(false);
+      setSelectedCandidateId("");
+      return;
+    }
+    setInspectionLoading(true);
+    setInspectionError("");
+    void bridge.inspectStreamPayload(payload)
+      .then((next) => {
+        if (cancelled) return;
+        setInspection(next);
+        const suggested = next.suggestedCandidateId && next.candidates.some((item) => item.id === next.suggestedCandidateId)
+          ? next.suggestedCandidateId
+          : next.candidates[0]?.id ?? "";
+        setSelectedCandidateId(suggested);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setInspection(null);
+        setSelectedCandidateId("");
+        setInspectionError(error instanceof Error ? error.message : "payload 候选提取失败");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInspectionLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [payload, preparedPayload]);
 
   async function decodeOne(decoder: StreamDecoderKind, rawPayload: string) {
     const normalized = normalizeTransportPayload(rawPayload);
@@ -224,11 +288,15 @@ export function StreamDecoderWorkbench({
         return;
       }
 
-      const next = await decodeOne(decoder, payload);
+      const next = await decodeOne(decoder, effectivePayload);
       setResult(next);
-      if (onApplyDecoded && next.text.trim()) {
+      if (applyMode === "overwrite" && onApplyDecoded && next.text.trim()) {
         await onApplyDecoded(next.text);
         setApplyMessage(`已使用 ${next.summary} 覆盖当前片段并写回持久层`);
+      } else if (applyMode === "derived") {
+        setApplyMessage(`已基于${selectedCandidate?.label || "当前 payload"}生成衍生视图，可继续对照原文后再决定是否覆盖。`);
+      } else {
+        setApplyMessage("当前为仅预览模式，结果不会覆盖原始 payload。");
       }
     } catch (error) {
       setDecodeError(error instanceof Error ? error.message : "解码失败");
@@ -287,6 +355,144 @@ export function StreamDecoderWorkbench({
           />
           <SettingsButton onClick={() => setActiveSettings("godzilla")} />
         </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-border bg-background/80 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-foreground">候选提取与指纹识别</div>
+            <div className="text-xs text-muted-foreground">
+              自动从当前 payload 中提取 HTTP body / 表单参数 / Base64 / Hex 候选，并给出 webshell 家族提示。
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {inspection?.suggestedFamily && (
+              <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700">
+                家族：{inspection.suggestedFamily}
+              </span>
+            )}
+            {inspection?.suggestedDecoder && (
+              <button
+                type="button"
+                className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100"
+                onClick={() => {
+                  const decoder = asKnownDecoder(inspection.suggestedDecoder);
+                  if (decoder) {
+                    void runDecoder(decoder);
+                  }
+                }}
+              >
+                推荐解码：{inspection.suggestedDecoder}
+              </button>
+            )}
+            {typeof inspection?.confidence === "number" && inspection.confidence > 0 && (
+              <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                置信度 {inspection.confidence}%
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">覆盖策略</span>
+          <ApplyModeButton label="仅预览" active={applyMode === "preview"} onClick={() => setApplyMode("preview")} />
+          <ApplyModeButton label="衍生视图" active={applyMode === "derived"} onClick={() => setApplyMode("derived")} />
+          <ApplyModeButton label="覆盖原文" active={applyMode === "overwrite"} onClick={() => setApplyMode("overwrite")} />
+          {selectedCandidate && (
+            <span className="rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground">
+              当前候选：{selectedCandidate.label}
+            </span>
+          )}
+        </div>
+
+        {inspectionLoading && (
+          <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在识别候选 payload...</div>
+        )}
+        {inspectionError && (
+          <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700">{inspectionError}</div>
+        )}
+        {!inspectionLoading && !inspectionError && (
+          <div className="mt-3 space-y-3">
+            {inspection?.reasons && inspection.reasons.length > 0 && (
+              <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                <div className="mb-1 font-semibold text-foreground">识别依据</div>
+                <div className="flex flex-wrap gap-2">
+                  {inspection.reasons.map((reason) => (
+                    <span key={reason} className="rounded-md border border-border bg-background px-2 py-1">{reason}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {candidateCount > 0 ? (
+                inspection!.candidates.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    onClick={() => setSelectedCandidateId(candidate.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedCandidateId(candidate.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                      selectedCandidate?.id === candidate.id
+                        ? "border-blue-400 bg-blue-50 shadow-sm"
+                        : "border-border bg-card hover:border-blue-200 hover:bg-accent/50"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white">{candidate.kind}</span>
+                      {typeof candidate.confidence === "number" && candidate.confidence > 0 && (
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{candidate.confidence}%</span>
+                      )}
+                      {candidate.paramName && (
+                        <span className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">{candidate.paramName}</span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs font-semibold text-foreground">{candidate.label}</div>
+                    <div className="mt-1 line-clamp-3 break-all font-mono text-[11px] text-muted-foreground">{candidate.preview || candidate.value || "(empty)"}</div>
+                    {(candidate.decoderHints?.length ?? 0) > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {candidate.decoderHints!.map((hint) => (
+                          <button
+                            key={`${candidate.id}-${hint}`}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              const decoder = asKnownDecoder(hint);
+                              if (decoder) {
+                                void runDecoder(decoder);
+                              }
+                            }}
+                            className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700 hover:bg-blue-100"
+                          >
+                            {hint}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {(candidate.fingerprints?.length ?? 0) > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {candidate.fingerprints!.map((fingerprint) => (
+                          <span key={`${candidate.id}-${fingerprint}`} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                            {fingerprint}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground md:col-span-2 xl:col-span-3">
+                  当前片段未提取到明显候选，仍可直接对原始 payload 使用手动解码器。
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {hasBatchMode && (
@@ -513,12 +719,14 @@ export function StreamDecoderWorkbench({
 
       <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PayloadPane
-          title={preparedPayload === payload ? "原始 payload" : "原始 payload（已自动提取）"}
-          content={preparedPayload || "(empty payload)"}
+          title={selectedCandidate ? `候选 payload / ${selectedCandidate.label}` : preparedPayload === payload ? "原始 payload" : "原始 payload（已自动提取）"}
+          content={effectivePayload || "(empty payload)"}
           footer={
-            preparedPayload !== payload
-              ? "前端仅做轻量预处理；实际提取与解码以服务端规则为准"
-              : undefined
+            selectedCandidate
+              ? `原文长度 ${payload.length}，当前候选来源 ${selectedCandidate.kind}${selectedCandidate.paramName ? ` / ${selectedCandidate.paramName}` : ""}`
+              : preparedPayload !== payload
+                ? "前端仅做轻量预处理；实际提取与解码以服务端规则为准"
+                : undefined
           }
         />
         <PayloadPane
@@ -539,6 +747,23 @@ function clampBatchOrdinal(rawValue: string | number | undefined, total: number)
   const parsed = Number(String(rawValue ?? "").replace(/[^0-9]/g, ""));
   if (!Number.isFinite(parsed) || parsed <= 0) return 1;
   return Math.max(1, Math.min(total, Math.floor(parsed)));
+}
+
+function asKnownDecoder(value: unknown): StreamDecoderKind | null {
+  switch (String(value ?? "").trim().toLowerCase()) {
+    case "auto":
+      return "auto";
+    case "base64":
+      return "base64";
+    case "behinder":
+      return "behinder";
+    case "antsword":
+      return "antsword";
+    case "godzilla":
+      return "godzilla";
+    default:
+      return null;
+  }
 }
 
 function prepareDecoderInput(decoder: StreamDecoderKind, payload: string): string {
@@ -568,6 +793,30 @@ function DecoderButton({
       className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
     >
       {active ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+      {label}
+    </button>
+  );
+}
+
+function ApplyModeButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+        active
+          ? "border-blue-300 bg-blue-50 text-blue-700"
+          : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+      }`}
+    >
       {label}
     </button>
   );

@@ -160,7 +160,7 @@ export default function HttpStream() {
   };
 
   return (
-    <div className="gshark-page-bg relative flex h-full flex-col overflow-hidden text-sm text-foreground">
+    <div className="bg-background relative flex h-full flex-col overflow-hidden text-sm text-foreground">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
         <div className="flex items-center gap-3">
           <button
@@ -364,6 +364,11 @@ export default function HttpStream() {
                   payload={selectedChunk?.body ?? ""}
                   chunkLabel={selectedChunk ? `HTTP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "server" ? "响应" : "请求"}` : `HTTP 流 stream eq ${httpStream.id}`}
                   tone="emerald"
+                  onApplyDecoded={selectedChunk
+                    ? async (body) => {
+                        await persistStreamPayloads("HTTP", httpStream.id, [{ index: selectedChunk.streamIndex, body }]);
+                      }
+                    : undefined}
                   batchItems={allChunks.map((chunk) => ({
                     index: chunk.streamIndex,
                     payload: chunk.body,
@@ -386,7 +391,8 @@ function formatLoadMeta(meta?: StreamLoadMeta): string {
   if (meta.loading) return "正在解析当前 HTTP 流...";
   const source = meta.source || "unknown";
   const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
-  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}`;
+  const overrides = meta.overrideCount && meta.overrideCount > 0 ? ` / overrides ${meta.overrideCount}` : "";
+  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}${overrides}`;
 }
 
 const HTTPChunkCard = memo(function HTTPChunkCard({

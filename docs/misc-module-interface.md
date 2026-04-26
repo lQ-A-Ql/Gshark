@@ -114,6 +114,10 @@
 
 - `kind`: `builtin` 或 `custom`
 - `api_prefix`: 模块 API 前缀
+- `protocol_domain`: 模块面向的协议/场景域，例如 `HTTP / Shiro`
+- `supports_export`: 模块结果是否提供导出能力
+- `cancellable`: 模块执行能力位，表示前端请求支持中途取消或切换时自动中断；它不是协议语义，也不表示操作可回滚
+- `depends_on`: 模块依赖的基础能力，例如 `capture`、`http`、`ntlm`
 - `interface_schema`: 宿主托管的统一执行信息
 - `form_schema`: 宿主渲染统一卡片时使用的表单定义
 

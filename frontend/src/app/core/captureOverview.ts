@@ -93,7 +93,7 @@ export function buildCaptureOverview(input: CaptureOverviewInput): CaptureOvervi
     headline,
     summary,
     topProtocols,
-    quickFilters: buildQuickFilters(input, counts, topProtocols),
+    quickFilters: buildQuickFilters(counts, topProtocols),
     recommendations,
     suspiciousHits,
   };
@@ -203,7 +203,6 @@ function buildRecommendations(
 }
 
 function buildQuickFilters(
-  input: CaptureOverviewInput,
   counts: {
     suspicious: number;
     highRisk: number;

@@ -530,17 +530,21 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const pageStartRef = useRef(0);
   const packetPageSeqRef = useRef(0);
   const packetPageAbortRef = useRef<AbortController | null>(null);
+  const preloadPageAbortRef = useRef<AbortController | null>(null);
   const hasMorePacketsRef = useRef(false);
   const loadMoreScheduledRef = useRef<number | null>(null);
   const backendRetryTimerRef = useRef<number | null>(null);
   const parseFinishedRef = useRef(false);
   const parseErrorRef = useRef("");
   const preloadingRef = useRef(false);
+  const captureSeqRef = useRef(0);
+  const filterSeqRef = useRef(0);
   const captureWaitersRef = useRef(new Set<() => void>());
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
   const threatAnalysisSeqRef = useRef(0);
+  const threatAnalysisAbortRef = useRef<AbortController | null>(null);
   const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
   const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
   const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
@@ -591,6 +595,34 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         UDP: buildSwitchStat(streamSwitchDurationsRef.current.UDP, streamSwitchHitsRef.current.UDP),
       },
     });
+  }, []);
+
+  const cancelAllFrontendCaptureTasks = useCallback(() => {
+    packetPageSeqRef.current += 1;
+    packetPageAbortRef.current?.abort();
+    packetPageAbortRef.current = null;
+    preloadPageAbortRef.current?.abort();
+    preloadPageAbortRef.current = null;
+    threatAnalysisAbortRef.current?.abort();
+    threatAnalysisAbortRef.current = null;
+    httpRequestAbortRef.current?.abort();
+    tcpRequestAbortRef.current?.abort();
+    udpRequestAbortRef.current?.abort();
+    httpRequestAbortRef.current = null;
+    tcpRequestAbortRef.current = null;
+    udpRequestAbortRef.current = null;
+    httpSwitchSeqRef.current += 1;
+    tcpSwitchSeqRef.current += 1;
+    udpSwitchSeqRef.current += 1;
+    if (loadMoreScheduledRef.current != null) {
+      window.clearTimeout(loadMoreScheduledRef.current);
+      loadMoreScheduledRef.current = null;
+    }
+    if (refreshTimer.current != null) {
+      window.clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+    }
+    setIsPageLoading(false);
   }, []);
 
   const cancelPacketPageLoad = useCallback(() => {
@@ -1018,6 +1050,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     const capturePath = options?.capturePath ?? activeCapturePathRef.current;
     const seq = threatAnalysisSeqRef.current + 1;
     threatAnalysisSeqRef.current = seq;
+    threatAnalysisAbortRef.current?.abort();
+    const abortController = new AbortController();
+    threatAnalysisAbortRef.current = abortController;
     setIsThreatAnalysisLoading(true);
     setThreatAnalysisProgress((prev) => ({
       ...EMPTY_THREAT_ANALYSIS_PROGRESS,
@@ -1031,13 +1066,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       recent: ["准备威胁分析"],
     }));
     try {
-      const objects = await bridge.listObjects();
+      const objects = await bridge.listObjects(abortController.signal);
       if (threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
         return;
       }
       setExtractedObjects(objects);
 
-      const hits = await bridge.listThreatHits(["flag{", "ctf{"]);
+      const hits = await bridge.listThreatHits(["flag{", "ctf{"], abortController.signal);
       if (threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
         return;
       }
@@ -1045,12 +1080,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (!options?.quietSuccess) {
         setBackendStatus(`威胁分析已更新: ${hits.length} 条命中`);
       }
-    } catch {
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       if (threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
         setBackendStatus("威胁分析刷新失败");
         setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
       }
     } finally {
+      if (threatAnalysisAbortRef.current === abortController) {
+        threatAnalysisAbortRef.current = null;
+      }
       if (threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
         setIsThreatAnalysisLoading(false);
         setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
@@ -1569,6 +1616,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       return;
     }
 
+    const captureSeq = ++captureSeqRef.current;
+    filterSeqRef.current += 1;
     const effectiveFilter = filterOverride ?? displayFilter;
 
     try {
@@ -1577,8 +1626,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           ? { filePath: filePath.trim(), fileSize: 0, fileName: filePath.trim().split(/[\\/]/).pop() ?? "capture.pcapng" }
           : await bridge.openPcapFile();
 
+      cancelAllFrontendCaptureTasks();
       setIsFilterLoading(false);
-      cancelPacketPageLoad();
       setPackets([]);
       setTotalPackets(0);
       setPageStart(0);
@@ -1640,13 +1689,21 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       });
 
       await bridge.startStreamingPackets(opened.filePath, "");
+      if (captureSeq !== captureSeqRef.current) return;
       setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
 
       const waitDeadline = Date.now() + 120000;
       let firstPageLoaded = false;
-      while (Date.now() < waitDeadline) {
+      while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
         const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
-        const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter);
+        preloadPageAbortRef.current?.abort();
+        const probeAbort = new AbortController();
+        preloadPageAbortRef.current = probeAbort;
+        const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter, probeAbort.signal);
+        if (preloadPageAbortRef.current === probeAbort) {
+          preloadPageAbortRef.current = null;
+        }
+        if (captureSeq !== captureSeqRef.current) return;
         if (probePage.total > 0) {
           setTotalPackets(probePage.total);
           if (preloadTotalRef.current <= 0) {
@@ -1670,7 +1727,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
       }
 
-      const probePage = await bridge.listPacketsPage(0, 1, effectiveFilter);
+      if (captureSeq !== captureSeqRef.current) return;
+      preloadPageAbortRef.current?.abort();
+      const probeAbort = new AbortController();
+      preloadPageAbortRef.current = probeAbort;
+      const probePage = await bridge.listPacketsPage(0, 1, effectiveFilter, probeAbort.signal);
+      if (preloadPageAbortRef.current === probeAbort) {
+        preloadPageAbortRef.current = null;
+      }
+      if (captureSeq !== captureSeqRef.current) return;
       if (probePage.total === 0 && parseFinishedRef.current) {
         throw new Error(parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility");
       }
@@ -1681,19 +1746,30 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         await loadPacketPage(0, effectiveFilter);
       }
       await refreshStreamIndex();
+      if (captureSeq !== captureSeqRef.current) return;
       setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
       void refreshAnalysisResult({
         capturePath: opened.filePath,
         quietSuccess: true,
       });
     } catch (error) {
-      setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      if (captureSeq === captureSeqRef.current) {
+        setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
+      }
     } finally {
-      preloadingRef.current = false;
-      setIsPreloadingCapture(false);
-      wakeCaptureWaiters();
+      if (captureSeq === captureSeqRef.current) {
+        preloadingRef.current = false;
+        setIsPreloadingCapture(false);
+        wakeCaptureWaiters();
+      }
     }
-  }, [backendConnected, cancelPacketPageLoad, commitPacketPage, displayFilter, refreshAnalysisResult, refreshStreamIndex, rememberRecentCapture, waitForCaptureSignal, wakeCaptureWaiters]);
+  }, [backendConnected, cancelAllFrontendCaptureTasks, commitPacketPage, displayFilter, refreshAnalysisResult, refreshStreamIndex, rememberRecentCapture, waitForCaptureSignal, wakeCaptureWaiters]);
 
   const applyFilter = useCallback((value?: string) => {
     const nextFilter = value ?? displayFilter;
@@ -1702,10 +1778,23 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     }
 
     if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
+      const filterSeq = ++filterSeqRef.current;
       setIsFilterLoading(true);
       resetPacketViewport();
       setBackendStatus(nextFilter.trim() ? `正在应用过滤器: ${nextFilter}` : "正在重置过滤器");
-      void loadPacketPage(0, nextFilter, { finishFilterLoading: true });
+      void (async () => {
+        let page = await loadPacketPage(0, nextFilter);
+        const deadline = Date.now() + 10000;
+        while (filterSeq === filterSeqRef.current && page?.filtering && Date.now() < deadline) {
+          setBackendStatus(nextFilter.trim() ? `过滤器仍在后台扫描: ${nextFilter}` : "正在重置过滤器");
+          await new Promise((resolve) => window.setTimeout(resolve, 300));
+          page = await loadPacketPage(0, nextFilter);
+        }
+        if (filterSeq === filterSeqRef.current) {
+          setIsFilterLoading(false);
+          setBackendStatus(nextFilter.trim() ? `过滤器已应用: ${nextFilter}` : "过滤器已清空");
+        }
+      })();
     }
   }, [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
 
@@ -1713,10 +1802,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setDisplayFilter("");
 
     if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
+      const filterSeq = ++filterSeqRef.current;
       setIsFilterLoading(true);
       resetPacketViewport();
       setBackendStatus("正在重置过滤器");
-      void loadPacketPage(0, "", { finishFilterLoading: true });
+      void loadPacketPage(0, "").finally(() => {
+        if (filterSeq === filterSeqRef.current) {
+          setIsFilterLoading(false);
+          setBackendStatus("过滤器已清空");
+        }
+      });
     }
   }, [backendConnected, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
 
@@ -1742,9 +1837,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const stopCapture = useCallback(async () => {
     if (!backendConnected) return;
+    captureSeqRef.current += 1;
+    filterSeqRef.current += 1;
+    preloadingRef.current = false;
+    parseFinishedRef.current = true;
+    parseErrorRef.current = "";
     setIsFilterLoading(false);
-    cancelPacketPageLoad();
-    await bridge.closeCapture();
+    setIsPreloadingCapture(false);
+    cancelAllFrontendCaptureTasks();
+    wakeCaptureWaiters();
+    let closeError = "";
+    try {
+      await bridge.cancelMediaBatchTranscription().catch(() => null);
+      await bridge.closeCapture();
+    } catch (error) {
+      closeError = error instanceof Error ? error.message : "关闭抓包失败";
+    }
     setPackets([]);
     setTotalPackets(0);
     setPageStart(0);
@@ -1780,8 +1888,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setCaptureRevision((prev) => prev + 1);
     activeCapturePathRef.current = "";
     threatAnalysisSeqRef.current += 1;
-    setBackendStatus("当前抓包已关闭，临时数据库已清理");
-  }, [backendConnected]);
+    setBackendStatus(closeError ? `当前抓包已从界面移除；后端清理返回: ${closeError}` : "当前抓包已关闭，临时数据库已清理");
+  }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
 
   const protocolTree = useMemo(
     () => (selectedPacketLayers ? buildProtocolTreeFromLayers(selectedPacketLayers, selectedPacket) : buildProtocolTree(selectedPacket)),

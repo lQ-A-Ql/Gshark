@@ -68,13 +68,14 @@ export function CaptureMissionControl() {
     }
 
     let cancelled = false;
+    const abortController = new AbortController();
     setOverviewLoading(true);
     void Promise.all([
-      bridge.getGlobalTrafficStats().catch(() => null),
-      bridge.getIndustrialAnalysis().catch(() => null),
-      bridge.getVehicleAnalysis().catch(() => null),
-      bridge.getMediaAnalysis().catch(() => null),
-      bridge.getUSBAnalysis().catch(() => null),
+      bridge.getGlobalTrafficStats(abortController.signal).catch(() => null),
+      bridge.getIndustrialAnalysis(abortController.signal).catch(() => null),
+      bridge.getVehicleAnalysis(abortController.signal).catch(() => null),
+      bridge.getMediaAnalysis(false, abortController.signal).catch(() => null),
+      bridge.getUSBAnalysis(abortController.signal).catch(() => null),
     ]).then(([stats, industrial, vehicle, media, usb]) => {
       if (cancelled) return;
       const next = { stats, industrial, vehicle, media, usb };
@@ -88,6 +89,7 @@ export function CaptureMissionControl() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
     };
   }, [backendConnected, captureKey, isPreloadingCapture]);
 

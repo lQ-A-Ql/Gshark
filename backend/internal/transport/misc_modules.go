@@ -39,6 +39,62 @@ func (m miscRouteModule) RegisterRoutes(mux *http.ServeMux, server *Server) {
 func defaultMiscModules() []MiscModule {
 	return []MiscModule{
 		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "http-login-analysis",
+			Kind:            "builtin",
+			Title:           "HTTP 登录行为分析",
+			Summary:         "聚合 HTTP 登录/认证请求与响应，自动识别成功、失败、验证码/二次验证以及疑似爆破行为。",
+			Tags:            []string{"HTTP", "Login", "Auth", "Bruteforce"},
+			APIPrefix:       "/api/tools/http-login-analysis",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: true,
+			ProtocolDomain:  "HTTP / Auth",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"capture", "http"},
+		}, nil),
+		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "smtp-session-analysis",
+			Kind:            "builtin",
+			Title:           "SMTP 会话重建",
+			Summary:         "重建 SMTP 认证、MAIL FROM / RCPT TO、DATA 邮件内容与附件线索，输出结构化邮件会话视图。",
+			Tags:            []string{"SMTP", "Mail", "Attachment", "Auth"},
+			APIPrefix:       "/api/tools/smtp-analysis",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: true,
+			ProtocolDomain:  "SMTP / Mail",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"capture", "smtp"},
+		}, nil),
+		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "mysql-session-analysis",
+			Kind:            "builtin",
+			Title:           "MySQL 会话重建",
+			Summary:         "提取 MySQL 握手、登录用户名、默认数据库、查询语句与 OK/ERR/结果集响应，形成结构化会话视图。",
+			Tags:            []string{"MySQL", "DB", "Query", "Auth"},
+			APIPrefix:       "/api/tools/mysql-analysis",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: true,
+			ProtocolDomain:  "MySQL / Database",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"capture", "mysql"},
+		}, nil),
+		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "shiro-rememberme-analysis",
+			Kind:            "builtin",
+			Title:           "Shiro rememberMe 分析",
+			Summary:         "定位 rememberMe Cookie，判断 deleteMe 回收痕迹，测试历史默认/自定义 AES 密钥并预览疑似 Java 序列化载荷。",
+			Tags:            []string{"Shiro", "rememberMe", "Cookie", "Java", "Auth"},
+			APIPrefix:       "/api/tools/shiro-rememberme",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: true,
+			ProtocolDomain:  "HTTP / Shiro",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"capture", "http"},
+		}, nil),
+		NewMiscRouteModule(model.MiscModuleManifest{
 			ID:              "winrm-decrypt",
 			Kind:            "builtin",
 			Title:           "WinRM 解密辅助",
@@ -47,6 +103,10 @@ func defaultMiscModules() []MiscModule {
 			APIPrefix:       "/api/tools/winrm-decrypt",
 			DocsPath:        "docs/misc-module-interface.md",
 			RequiresCapture: true,
+			ProtocolDomain:  "NTLM / WinRM",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"capture", "http", "ntlm"},
 		}, func(mux *http.ServeMux, server *Server) {
 			mux.HandleFunc("/api/tools/winrm-decrypt", server.handleWinRMDecrypt)
 			mux.HandleFunc("/api/tools/winrm-decrypt/export", server.handleWinRMDecryptExport)
@@ -60,10 +120,27 @@ func defaultMiscModules() []MiscModule {
 			APIPrefix:       "/api/tools/smb3",
 			DocsPath:        "docs/misc-module-interface.md",
 			RequiresCapture: true,
+			ProtocolDomain:  "SMB3 / NTLM",
+			Cancellable:     false,
+			DependsOn:       []string{"capture", "ntlm"},
 		}, func(mux *http.ServeMux, server *Server) {
 			mux.HandleFunc("/api/tools/smb3-session-candidates", server.handleSMB3SessionCandidates)
 			mux.HandleFunc("/api/tools/smb3-random-session-key", server.handleSMB3RandomSessionKey)
 		}),
+		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "ntlm-session-materials",
+			Kind:            "builtin",
+			Title:           "NTLM 会话材料中心",
+			Summary:         "统一提取 HTTP / WinRM / SMB3 中的 NTLM challenge、NT proof、session key 与方向信息，并支持导出复盘。",
+			Tags:            []string{"NTLM", "HTTP", "WinRM", "SMB3"},
+			APIPrefix:       "/api/tools/ntlm-sessions",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: true,
+			ProtocolDomain:  "NTLM",
+			SupportsExport:  true,
+			Cancellable:     false,
+			DependsOn:       []string{"capture", "ntlm"},
+		}, nil),
 	}
 }
 
@@ -114,7 +191,9 @@ func (s *Server) miscModuleManifests() []model.MiscModuleManifest {
 		descriptor.Summary = strings.TrimSpace(descriptor.Summary)
 		descriptor.APIPrefix = strings.TrimSpace(descriptor.APIPrefix)
 		descriptor.DocsPath = strings.TrimSpace(descriptor.DocsPath)
+		descriptor.ProtocolDomain = strings.TrimSpace(descriptor.ProtocolDomain)
 		descriptor.Tags = append([]string(nil), descriptor.Tags...)
+		descriptor.DependsOn = append([]string(nil), descriptor.DependsOn...)
 		manifests = append(manifests, descriptor)
 	}
 	if s.miscPkgMgr != nil {

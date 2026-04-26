@@ -28,7 +28,7 @@ const winrmPreviewModeLabels: Record<WinRMPreviewMode, string> = {
   stderr: "仅看 Stderr",
 };
 
-export function WinRMDecryptModule({ module }: MiscModuleRendererProps) {
+export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const [winrmPort, setWinrmPort] = useState("5985");
   const [winrmAuthMode, setWinrmAuthMode] = useState<"password" | "nt_hash">("password");
@@ -54,6 +54,7 @@ export function WinRMDecryptModule({ module }: MiscModuleRendererProps) {
     }
     return renderWinRMPreviewMode(winrmExtractEntries, winrmPreviewMode);
   }, [winrmExtractEntries, winrmPreviewDialogText, winrmPreviewMode]);
+  const embedded = surfaceVariant === "embedded";
 
   async function runWinRM() {
     if (!hasCapture) {
@@ -132,8 +133,8 @@ export function WinRMDecryptModule({ module }: MiscModuleRendererProps) {
 
   return (
     <>
-      <Card className="min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm">
-        <CardHeader className="gap-2 border-b border-slate-100 bg-slate-50/70 pb-5">
+      <Card className={embedded ? "min-w-0 border-0 bg-transparent shadow-none" : "min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm"}>
+        <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
               <Terminal className="h-4 w-4" />
@@ -142,7 +143,7 @@ export function WinRMDecryptModule({ module }: MiscModuleRendererProps) {
           </div>
           <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 pt-6">
+        <CardContent className={embedded ? "space-y-6 px-0 pt-0" : "space-y-6 pt-6"}>
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="当前目标抓包" className="md:col-span-2">
               <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-600">

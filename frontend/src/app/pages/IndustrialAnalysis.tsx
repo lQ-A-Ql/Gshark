@@ -1,5 +1,5 @@
 import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData, TrafficBucket } from "../core/types";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
@@ -21,6 +21,7 @@ const EMPTY_ANALYSIS: IndustrialAnalysisData = {
     exceptionCodes: [],
     transactions: [],
   },
+  ruleHits: [],
   details: [],
   notes: [],
 };
@@ -39,14 +40,15 @@ const INDUSTRIAL_PROTOCOL_TAGS = [
 ];
 
 export default function IndustrialAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets } = useSentinel();
+  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
   const cacheKey = useMemo(() => {
-    if (!fileMeta.path) return "";
-    return `${fileMeta.path}::${totalPackets}`;
-  }, [fileMeta.path, totalPackets]);
+    return buildIndustrialAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets);
+  }, [captureRevision, fileMeta.path, totalPackets]);
   const [analysis, setAnalysis] = useState<IndustrialAnalysisData>(EMPTY_ANALYSIS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const refreshAnalysis = useCallback((force = false) => {
     if (!backendConnected) {
@@ -63,26 +65,48 @@ export default function IndustrialAnalysis() {
     }
     setLoading(true);
     setError("");
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
+    const requestSeq = ++requestSeqRef.current;
+    const isLatest = () => requestSeq === requestSeqRef.current;
     void bridge
-      .getIndustrialAnalysis()
+      .getIndustrialAnalysis(abortController.signal)
       .then((payload) => {
+        if (!isLatest()) return;
         if (cacheKey) {
           industrialAnalysisCache.set(cacheKey, payload);
         }
         setAnalysis(payload);
       })
       .catch((err) => {
+        if (!isLatest() || abortController.signal.aborted) return;
         setError(err instanceof Error ? err.message : "工控分析加载失败");
         setAnalysis(EMPTY_ANALYSIS);
       })
       .finally(() => {
-        setLoading(false);
+        if (requestAbortRef.current === abortController) {
+          requestAbortRef.current = null;
+        }
+        if (isLatest()) {
+          setLoading(false);
+        }
       });
-  }, [backendConnected, cacheKey]);
+    return () => {
+      abortController.abort();
+      if (requestAbortRef.current === abortController) {
+        requestAbortRef.current = null;
+      }
+    };
+  }, [backendConnected, cacheKey, captureRevision]);
+
+  useEffect(() => () => {
+    requestAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (isPreloadingCapture) return;
-    refreshAnalysis();
+    return refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis]);
 
   return (
@@ -151,6 +175,58 @@ export default function IndustrialAnalysis() {
           <BucketChart data={analysis.modbus.exceptionCodes} color="bg-rose-500" />
         </Panel>
       </div>
+
+      {(analysis.ruleHits?.length ?? 0) > 0 && (
+        <Panel title={`规则检测 / Modbus 异常命中 (${analysis.ruleHits!.length})`} className="mt-4">
+          <div className="mb-2 flex items-start gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>基于主从角色、功能码、数量字段、位长度一致性和高频写入行为生成规则命中，可直接定位可疑包与目标地址。</span>
+          </div>
+          <div className="max-h-[460px] overflow-auto">
+            <table className="w-full table-fixed border-collapse text-left text-xs">
+              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
+                <tr>
+                  <th className="w-20 px-3 py-2">等级</th>
+                  <th className="w-28 px-3 py-2">规则</th>
+                  <th className="w-20 px-3 py-2">包号</th>
+                  <th className="w-28 px-3 py-2">时间</th>
+                  <th className="w-32 px-3 py-2">源</th>
+                  <th className="w-32 px-3 py-2">目标</th>
+                  <th className="w-24 px-3 py-2">功能码</th>
+                  <th className="w-32 px-3 py-2">对象</th>
+                  <th className="w-40 px-3 py-2">证据</th>
+                  <th className="px-3 py-2">摘要</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.ruleHits!.map((item, idx) => (
+                  <tr key={`${item.rule}-${item.packetId}-${idx}`} className="border-b border-border/70 align-top">
+                    <td className="px-3 py-2">
+                      <span className={ruleLevelBadge(item.level)}>{item.level || "info"}</span>
+                    </td>
+                    <td className="px-3 py-2 font-medium">{item.rule}</td>
+                    <td className="px-3 py-2 font-mono text-muted-foreground">{item.packetId || "--"}</td>
+                    <td className="px-3 py-2 font-mono">{item.time || "--"}</td>
+                    <td className="px-3 py-2 break-all">{item.source || "--"}</td>
+                    <td className="px-3 py-2 break-all">{item.destination || "--"}</td>
+                    <td className="px-3 py-2">
+                      {item.functionCode ? (
+                        <div>
+                          <div className="font-mono">{String(item.functionCode).padStart(2, "0")}</div>
+                          {item.functionName && <div className="text-muted-foreground">{item.functionName}</div>}
+                        </div>
+                      ) : "--"}
+                    </td>
+                    <td className="px-3 py-2 font-mono break-all">{item.target || "--"}</td>
+                    <td className="px-3 py-2 break-all font-mono text-[11px] text-muted-foreground">{item.evidence || "--"}</td>
+                    <td className="px-3 py-2">{item.summary || "--"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
 
       <Panel title="分析提示" className="mt-4">
         <div className="space-y-2 text-sm">
@@ -372,6 +448,18 @@ function kindBadge(kind: string) {
   }
 }
 
+function ruleLevelBadge(level: string) {
+  switch (String(level ?? "").toLowerCase()) {
+    case "critical":
+    case "high":
+      return "rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700";
+    case "warning":
+      return "rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700";
+    default:
+      return "rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700";
+  }
+}
+
 function StatCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -457,4 +545,10 @@ function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<str
       </table>
     </div>
   );
+}
+
+export function buildIndustrialAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
+  const normalizedPath = filePath.trim();
+  if (!normalizedPath) return "";
+  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
 }

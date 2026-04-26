@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -27,33 +27,12 @@ function formatReleaseTime(value: string) {
   return parsed.toLocaleString("zh-CN", { hour12: false });
 }
 
-function statusTone(status: AppUpdateStatus | null) {
-  if (!status) {
-    return {
-      badge: "等待检查",
-      className: "border-slate-200 bg-slate-50 text-slate-700",
-    };
-  }
-  if (status.hasUpdate) {
-    return {
-      badge: "发现新版本",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
-    };
-  }
-  return {
-    badge: "已是最新版本",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  };
-}
-
 export default function UpdateCenter() {
   const [status, setStatus] = useState<AppUpdateStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState("");
   const [installProgress, setInstallProgress] = useState(0);
-
-  const tone = useMemo(() => statusTone(status), [status]);
 
   const refreshStatus = async () => {
     setLoading(true);

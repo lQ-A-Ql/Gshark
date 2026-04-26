@@ -60,10 +60,16 @@ func ScanFrameIDs(ctx context.Context, opts model.ParseOptions, onID func(int64)
 
 	if err := scanner.Err(); err != nil {
 		_ = cmd.Wait()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("scan tshark output: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		detail := strings.TrimSpace(stderr.String())
 		if detail != "" {
 			return fmt.Errorf("wait tshark: %w: %s", err, detail)

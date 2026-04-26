@@ -114,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/streams/raw", s.handleRawStream)
 	mux.HandleFunc("/api/streams/raw/page", s.handleRawStreamPage)
 	mux.HandleFunc("/api/streams/decode", s.handleStreamDecode)
+	mux.HandleFunc("/api/streams/inspect", s.handleStreamInspect)
 	mux.HandleFunc("/api/streams/payloads", s.handleStreamPayloads)
 	mux.HandleFunc("/api/streams/index", s.handleStreamIndex)
 	mux.HandleFunc("/api/packet/raw", s.handlePacketRaw)
@@ -138,6 +139,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/plugins/source", s.handlePluginSource)
 	mux.HandleFunc("/api/plugins/toggle", s.handleTogglePlugin)
 	mux.HandleFunc("/api/plugins/bulk", s.handleBulkPlugins)
+	mux.HandleFunc("/api/tools/ntlm-sessions", s.handleNTLMSessionMaterials)
+	mux.HandleFunc("/api/tools/http-login-analysis", s.handleHTTPLoginAnalysis)
+	mux.HandleFunc("/api/tools/smtp-analysis", s.handleSMTPAnalysis)
+	mux.HandleFunc("/api/tools/mysql-analysis", s.handleMySQLAnalysis)
+	mux.HandleFunc("/api/tools/shiro-rememberme", s.handleShiroRememberMeAnalysis)
 
 	return withCORS(s.withAuth(s.withAudit(mux)))
 }
@@ -318,6 +324,9 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		if err := s.svc.LoadPCAP(context.Background(), options); err != nil {
 			log.Printf("http: capture start failed file=%q err=%v", options.FilePath, err)
+			if err == context.Canceled {
+				return
+			}
 			s.hub.EmitError(err.Error())
 			return
 		}
@@ -408,6 +417,7 @@ type packetsPageResponse struct {
 	NextCursor int            `json:"next_cursor"`
 	Total      int            `json:"total"`
 	HasMore    bool           `json:"has_more"`
+	Filtering  bool           `json:"filtering"`
 }
 
 func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
@@ -415,7 +425,7 @@ func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
-	items, next, total, err := s.svc.PacketsPageWithError(cursor, limit, filter)
+	items, next, total, filtering, err := s.svc.PacketsPageWithState(cursor, limit, filter)
 	if err != nil {
 		if engine.IsDisplayFilterError(err) {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -429,6 +439,7 @@ func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
 		NextCursor: next,
 		Total:      total,
 		HasMore:    next < total,
+		Filtering:  filtering,
 	})
 }
 
@@ -476,7 +487,7 @@ func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHunting(w http.ResponseWriter, r *http.Request) {
 	prefixes := r.URL.Query()["prefix"]
-	writeJSON(w, http.StatusOK, s.svc.ThreatHunt(prefixes))
+	writeJSON(w, http.StatusOK, s.svc.ThreatHuntWithContext(r.Context(), prefixes))
 }
 
 func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
@@ -498,8 +509,8 @@ func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleObjects(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.Objects())
+func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.svc.ObjectsWithContext(r.Context()))
 }
 
 func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
@@ -1034,6 +1045,24 @@ func (s *Server) handleStreamDecode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) handleStreamInspect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	body := http.MaxBytesReader(w, r.Body, maxStreamDecodeBodySize)
+	defer body.Close()
+
+	var payload struct {
+		Payload string `json:"payload"`
+	}
+	if err := json.NewDecoder(body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	writeJSON(w, http.StatusOK, engine.InspectStreamPayload(payload.Payload))
+}
+
 func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1073,6 +1102,78 @@ func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleNTLMSessionMaterials(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.svc.ListNTLMSessionMaterials()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleHTTPLoginAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.svc.HTTPLoginAnalysis(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleSMTPAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.svc.SMTPAnalysis(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleMySQLAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.svc.MySQLAnalysis(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleShiroRememberMeAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req model.ShiroRememberMeRequest
+	if r.Method == http.MethodPost {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+			writeError(w, http.StatusBadRequest, "invalid payload")
+			return
+		}
+	}
+	rows, err := s.svc.ShiroRememberMeAnalysis(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
 }
 
 func (s *Server) handleAuditLogs(w http.ResponseWriter, r *http.Request) {

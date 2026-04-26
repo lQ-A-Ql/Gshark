@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Activity, BarChart3, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
@@ -31,14 +31,15 @@ const trafficStatsCache = new Map<string, GlobalTrafficStats>();
 
 export default function TrafficGraph() {
   const navigate = useNavigate();
-  const { totalPackets, backendConnected, isPreloadingCapture, fileMeta, setDisplayFilter, applyFilter } = useSentinel();
+  const { totalPackets, backendConnected, isPreloadingCapture, fileMeta, setDisplayFilter, applyFilter, captureRevision } = useSentinel();
   const captureCacheKey = useMemo(() => {
-    if (!fileMeta.path) return "";
-    return `${fileMeta.path}::${totalPackets}`;
-  }, [fileMeta.path, totalPackets]);
+    return buildTrafficStatsCacheKey(captureRevision, fileMeta.path, totalPackets);
+  }, [captureRevision, fileMeta.path, totalPackets]);
   const [stats, setStats] = useState<GlobalTrafficStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const refreshStats = useCallback((force = false) => {
     if (!backendConnected) {
@@ -57,18 +58,26 @@ export default function TrafficGraph() {
 
     setLoading(true);
     setError("");
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
+    const requestSeq = ++requestSeqRef.current;
+    const isLatest = () => requestSeq === requestSeqRef.current;
     void bridge
-      .getGlobalTrafficStats()
+      .getGlobalTrafficStats(abortController.signal)
       .then((payload) => {
+        if (!isLatest()) return;
         if (captureCacheKey) {
           trafficStatsCache.set(captureCacheKey, payload);
         }
         setStats(payload);
       })
       .catch(async (e) => {
+        if (!isLatest() || abortController.signal.aborted) return;
         // Backward compatibility for old backend without global stats endpoint.
         try {
           const packets = await bridge.listPackets();
+          if (!isLatest()) return;
           const fallback = buildStatsFromPackets(packets);
           if (captureCacheKey) {
             trafficStatsCache.set(captureCacheKey, fallback);
@@ -83,13 +92,28 @@ export default function TrafficGraph() {
         }
       })
       .finally(() => {
-        setLoading(false);
+        if (requestAbortRef.current === abortController) {
+          requestAbortRef.current = null;
+        }
+        if (isLatest()) {
+          setLoading(false);
+        }
       });
+    return () => {
+      abortController.abort();
+      if (requestAbortRef.current === abortController) {
+        requestAbortRef.current = null;
+      }
+    };
   }, [backendConnected, captureCacheKey]);
+
+  useEffect(() => () => {
+    requestAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (isPreloadingCapture) return;
-    refreshStats();
+    return refreshStats();
   }, [refreshStats, isPreloadingCapture]);
 
   const timeline = useMemo(() => stats.timeline, [stats.timeline]);
@@ -279,6 +303,12 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
     topDestPorts,
     topSrcPorts,
   };
+}
+
+export function buildTrafficStatsCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
+  const normalizedPath = filePath.trim();
+  if (!normalizedPath) return "";
+  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
 }
 
 function extractDomain(packet: Packet): string {

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
       sizeBytes: 2048,
     },
     totalPackets: 128,
+    captureRevision: 1,
   },
 }));
 
@@ -90,6 +91,7 @@ describe("UsbAnalysis", () => {
       path: `C:/captures/usb-${renderSeed}.pcapng`,
       name: `usb-${renderSeed}.pcapng`,
     };
+    mocks.sentinelState.captureRevision = renderSeed;
     mocks.getUSBAnalysis.mockReset();
     mocks.getUSBAnalysis.mockResolvedValue(createAnalysis());
   });

@@ -63,8 +63,15 @@ func BatchScanObjectsWithYaraConfig(objects []model.ObjectFile, yc model.YaraCon
 }
 
 func BatchScanTargetsWithYaraConfig(targets []yaraScanTarget, yc model.YaraConfig) ([]model.ThreatHit, error) {
+	return BatchScanTargetsWithYaraConfigContext(context.Background(), targets, yc)
+}
+
+func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yaraScanTarget, yc model.YaraConfig) ([]model.ThreatHit, error) {
 	if len(targets) == 0 || !yc.Enabled {
 		return nil, nil
+	}
+	if parent == nil {
+		parent = context.Background()
 	}
 
 	yaraExe, err := resolveYaraExecutable(yc.Bin)
@@ -78,7 +85,7 @@ func BatchScanTargetsWithYaraConfig(targets []yaraScanTarget, yc model.YaraConfi
 	}
 
 	timeout := resolveYaraTimeout(yc.TimeoutMS)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	byPath, byBase := buildYaraTargetLookup(targets)
@@ -104,6 +111,12 @@ func BatchScanTargetsWithYaraConfig(targets []yaraScanTarget, yc model.YaraConfi
 	var firstErr error
 
 	for _, dir := range dirs {
+		if ctx.Err() != nil {
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			break
+		}
 		output, runErr := runYaraCommand(ctx, yaraExe, bundle.path, dir)
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
