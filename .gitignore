@@ -43,3 +43,4 @@ build/
 *.sqlite
 *.sqlite3
 
+docs/ctf-neta-module-audit-and-development-report*
