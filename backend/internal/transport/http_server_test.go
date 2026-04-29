@@ -177,6 +177,29 @@ func TestHandleC2AnalysisReturnsSkeleton(t *testing.T) {
 	}
 }
 
+func TestHandleAPTAnalysisReturnsSkeleton(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	req := httptest.NewRequest(http.MethodGet, "/api/apt-analysis", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleAPTAnalysis(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected apt analysis endpoint to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload model.APTAnalysis
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode apt analysis payload: %v", err)
+	}
+	if payload.Evidence == nil || len(payload.Profiles) == 0 {
+		t.Fatalf("expected initialized apt payload, got %+v", payload)
+	}
+	if payload.Profiles[0].ID != "silver-fox" {
+		t.Fatalf("expected silver fox profile placeholder, got %+v", payload.Profiles)
+	}
+}
+
 func TestHandleMiscModulesReturnsBuiltinsAndCustomModules(t *testing.T) {
 	server := NewServer(nil, NewHub())
 	err := server.RegisterMiscModule(NewMiscRouteModule(model.MiscModuleManifest{

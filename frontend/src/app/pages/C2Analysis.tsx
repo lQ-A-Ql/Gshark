@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type React
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { PageShell } from "../components/PageShell";
+import { Sparkline } from "../components/Sparkline";
 import { cn } from "../components/ui/utils";
 import type { C2DNSAggregate, C2FamilyAnalysis, C2HTTPEndpointAggregate, C2IndicatorRecord, C2SampleAnalysis, C2StreamAggregate, TrafficBucket } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
@@ -455,6 +456,32 @@ function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[] }) {
               </td>
               <td className="space-y-2 px-3 py-2">
                 <div className="leading-5 text-slate-700">{item.summary || "--"}</div>
+                {(item.scoreFactors ?? []).length > 0 && (
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-3 py-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-400">Scoring Factors</div>
+                    <div className="space-y-1">
+                      {(item.scoreFactors ?? []).map((sf) => (
+                        <div key={sf.name} className="flex items-start gap-2 text-[11px]">
+                          <span className={cn(
+                            "mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full",
+                            sf.direction === "positive" ? "bg-emerald-500" : "bg-amber-500"
+                          )} />
+                          <div>
+                            <span className="font-semibold text-slate-700">{sf.name}</span>
+                            <span className="ml-1 text-slate-400">({sf.direction === "positive" ? "+" : ""}{sf.weight})</span>
+                            {sf.summary && <div className="text-slate-500">{sf.summary}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(item.signalTags ?? []).length > 0 && (
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/50 px-3 py-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Signal Tags</div>
+                    <TagLine values={item.signalTags ?? []} />
+                  </div>
+                )}
                 <div className="grid gap-1 text-[11px] text-slate-500 md:grid-cols-2">
                   <div className="break-all">
                     <span className="font-semibold text-slate-400">Streams </span>

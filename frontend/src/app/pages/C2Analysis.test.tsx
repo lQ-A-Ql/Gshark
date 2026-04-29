@@ -121,6 +121,12 @@ describe("C2Analysis", () => {
             streams: [7],
             packets: [42, 43, 44, 45],
             confidence: 76,
+            signalTags: ["stable-interval", "get-post-tasking-shape", "non-browser-context"],
+            scoreFactors: [
+              { name: "stable-interval", weight: 10, direction: "positive", summary: "稳定时间间隔表明周期性通信" },
+              { name: "get-post-tasking-shape", weight: 8, direction: "positive", summary: "GET/POST 组合符合任务下发与结果回传模式" },
+              { name: "non-browser-context", weight: 3, direction: "positive", summary: "非浏览器上下文" },
+            ],
             summary: "4 HTTP 候选 · GET=2 · POST=2 · avg=60.0s · jitter=0%",
           },
         ],
@@ -232,6 +238,10 @@ describe("C2Analysis", () => {
       expect(screen.getAllByText("60.0s").length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("GET:2")).toBeInTheDocument();
       expect(screen.getByText("POST:2")).toBeInTheDocument();
+      expect(screen.getByText("Scoring Factors")).toBeInTheDocument();
+      expect(screen.getAllByText("stable-interval").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("get-post-tasking-shape").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("non-browser-context").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByRole("button", { name: /定位到包/ }).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByRole("button", { name: /打开关联流/ }).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByRole("button", { name: /Host/ }).length).toBeGreaterThanOrEqual(1);

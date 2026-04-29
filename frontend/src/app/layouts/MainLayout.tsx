@@ -6,6 +6,7 @@ import {
   Bug,
   Car,
   Clapperboard,
+  Crosshair,
   Factory,
   FileDown,
   FolderOpen,
@@ -44,6 +45,7 @@ const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "主工作区", theme: "blue" },
   { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱", theme: "indigo" },
   { path: "/c2-analysis", icon: Bug, label: "C2 样本分析", theme: "rose" },
+  { path: "/apt-analysis", icon: Crosshair, label: "APT 组织画像", theme: "indigo" },
   { path: "/traffic-graph", icon: BarChart3, label: "流量图", theme: "amber" },
   { path: "/industrial-analysis", icon: Factory, label: "工控分析", theme: "blue" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析", theme: "emerald" },
@@ -332,6 +334,7 @@ export function MainLayout() {
                 <MenuGroup label="分析">
                   <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
                   <MenuItem onClick={() => navigate("/c2-analysis")}>C2 样本分析</MenuItem>
+                  <MenuItem onClick={() => navigate("/apt-analysis")}>APT 组织画像</MenuItem>
                   <MenuItem
                     onClick={() => {
                       setDisplayFilter("http");

@@ -674,42 +674,51 @@ type C2BeaconPattern struct {
 	Summary    string `json:"summary"`
 }
 
+type C2ScoreFactor struct {
+	Name      string `json:"name"`
+	Weight    int    `json:"weight"`
+	Direction string `json:"direction"`
+	Summary   string `json:"summary,omitempty"`
+}
+
 type C2HTTPEndpointAggregate struct {
-	Host                string          `json:"host"`
-	URI                 string          `json:"uri"`
-	Channel             string          `json:"channel,omitempty"`
-	Total               int             `json:"total"`
-	GetCount            int             `json:"get_count"`
-	PostCount           int             `json:"post_count"`
-	Methods             []TrafficBucket `json:"methods"`
-	FirstTime           string          `json:"first_time,omitempty"`
-	LastTime            string          `json:"last_time,omitempty"`
-	AvgInterval         string          `json:"avg_interval,omitempty"`
-	Jitter              string          `json:"jitter,omitempty"`
-	Streams             []int64         `json:"streams,omitempty"`
-	Packets             []int64         `json:"packets,omitempty"`
-	RepresentativePacket int64          `json:"representative_packet,omitempty"`
-	Confidence          int             `json:"confidence,omitempty"`
-	Summary             string          `json:"summary"`
+	Host                 string          `json:"host"`
+	URI                  string          `json:"uri"`
+	Channel              string          `json:"channel,omitempty"`
+	Total                int             `json:"total"`
+	GetCount             int             `json:"get_count"`
+	PostCount            int             `json:"post_count"`
+	Methods              []TrafficBucket `json:"methods"`
+	FirstTime            string          `json:"first_time,omitempty"`
+	LastTime             string          `json:"last_time,omitempty"`
+	AvgInterval          string          `json:"avg_interval,omitempty"`
+	Jitter               string          `json:"jitter,omitempty"`
+	Streams              []int64         `json:"streams,omitempty"`
+	Packets              []int64         `json:"packets,omitempty"`
+	RepresentativePacket int64           `json:"representative_packet,omitempty"`
+	Confidence           int             `json:"confidence,omitempty"`
+	SignalTags           []string        `json:"signal_tags,omitempty"`
+	ScoreFactors         []C2ScoreFactor `json:"score_factors,omitempty"`
+	Summary              string          `json:"summary"`
 }
 
 type C2DNSAggregate struct {
-	QName           string          `json:"qname"`
-	Total           int             `json:"total"`
-	MaxLabelLength  int             `json:"max_label_length"`
-	QueryTypes      []TrafficBucket `json:"query_types"`
-	TxtCount        int             `json:"txt_count"`
-	NullCount       int             `json:"null_count"`
-	CnameCount      int             `json:"cname_count"`
-	RequestCount    int             `json:"request_count"`
-	ResponseCount   int             `json:"response_count"`
-	FirstTime       string          `json:"first_time,omitempty"`
-	LastTime        string          `json:"last_time,omitempty"`
-	AvgInterval     string          `json:"avg_interval,omitempty"`
-	Jitter          string          `json:"jitter,omitempty"`
-	Packets         []int64         `json:"packets,omitempty"`
-	Confidence      int             `json:"confidence,omitempty"`
-	Summary         string          `json:"summary"`
+	QName          string          `json:"qname"`
+	Total          int             `json:"total"`
+	MaxLabelLength int             `json:"max_label_length"`
+	QueryTypes     []TrafficBucket `json:"query_types"`
+	TxtCount       int             `json:"txt_count"`
+	NullCount      int             `json:"null_count"`
+	CnameCount     int             `json:"cname_count"`
+	RequestCount   int             `json:"request_count"`
+	ResponseCount  int             `json:"response_count"`
+	FirstTime      string          `json:"first_time,omitempty"`
+	LastTime       string          `json:"last_time,omitempty"`
+	AvgInterval    string          `json:"avg_interval,omitempty"`
+	Jitter         string          `json:"jitter,omitempty"`
+	Packets        []int64         `json:"packets,omitempty"`
+	Confidence     int             `json:"confidence,omitempty"`
+	Summary        string          `json:"summary"`
 }
 
 type C2StreamAggregate struct {
@@ -756,6 +765,60 @@ type C2SampleAnalysis struct {
 	CS                  C2FamilyAnalysis       `json:"cs"`
 	VShell              C2FamilyAnalysis       `json:"vshell"`
 	Notes               []string               `json:"notes"`
+}
+
+type APTEvidenceRecord struct {
+	PacketID            int64    `json:"packet_id"`
+	StreamID            int64    `json:"stream_id,omitempty"`
+	Time                string   `json:"time,omitempty"`
+	ActorID             string   `json:"actor_id,omitempty"`
+	ActorName           string   `json:"actor_name,omitempty"`
+	SourceModule        string   `json:"source_module,omitempty"`
+	Family              string   `json:"family,omitempty"`
+	EvidenceType        string   `json:"evidence_type,omitempty"`
+	EvidenceValue       string   `json:"evidence_value,omitempty"`
+	Confidence          int      `json:"confidence,omitempty"`
+	Source              string   `json:"source,omitempty"`
+	Destination         string   `json:"destination,omitempty"`
+	Host                string   `json:"host,omitempty"`
+	URI                 string   `json:"uri,omitempty"`
+	SampleFamily        string   `json:"sample_family,omitempty"`
+	CampaignStage       string   `json:"campaign_stage,omitempty"`
+	TransportTraits     []string `json:"transport_traits,omitempty"`
+	InfrastructureHints []string `json:"infrastructure_hints,omitempty"`
+	TTPTags             []string `json:"ttp_tags,omitempty"`
+	Tags                []string `json:"tags,omitempty"`
+	Summary             string   `json:"summary"`
+	Evidence            string   `json:"evidence,omitempty"`
+}
+
+type APTActorProfile struct {
+	ID                  string          `json:"id"`
+	Name                string          `json:"name"`
+	Aliases             []string        `json:"aliases,omitempty"`
+	Summary             string          `json:"summary"`
+	Confidence          int             `json:"confidence,omitempty"`
+	EvidenceCount       int             `json:"evidence_count"`
+	SampleFamilies      []TrafficBucket `json:"sample_families"`
+	CampaignStages      []TrafficBucket `json:"campaign_stages"`
+	TransportTraits     []TrafficBucket `json:"transport_traits"`
+	InfrastructureHints []TrafficBucket `json:"infrastructure_hints"`
+	RelatedC2Families   []TrafficBucket `json:"related_c2_families"`
+	TTPTags             []TrafficBucket `json:"ttp_tags"`
+	Notes               []string        `json:"notes"`
+}
+
+type APTAnalysis struct {
+	TotalEvidence       int                 `json:"total_evidence"`
+	Actors              []TrafficBucket     `json:"actors"`
+	SampleFamilies      []TrafficBucket     `json:"sample_families"`
+	CampaignStages      []TrafficBucket     `json:"campaign_stages"`
+	TransportTraits     []TrafficBucket     `json:"transport_traits"`
+	InfrastructureHints []TrafficBucket     `json:"infrastructure_hints"`
+	RelatedC2Families   []TrafficBucket     `json:"related_c2_families"`
+	Profiles            []APTActorProfile   `json:"profiles"`
+	Evidence            []APTEvidenceRecord `json:"evidence"`
+	Notes               []string            `json:"notes"`
 }
 
 type ModbusBitRange struct {

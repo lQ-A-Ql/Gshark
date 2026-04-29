@@ -2,7 +2,7 @@ import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./ui/utils";
 
-type AnalysisHeroTheme = "blue" | "emerald" | "rose" | "cyan" | "amber";
+type AnalysisHeroTheme = "blue" | "emerald" | "rose" | "cyan" | "amber" | "indigo";
 
 interface AnalysisHeroProps {
   icon: ReactNode;
@@ -32,6 +32,13 @@ const themeClasses: Record<
     badgeStyle: "border-blue-100 bg-blue-50/90 text-blue-700",
     accent: "from-blue-400/18 via-indigo-400/10 to-transparent",
     action: "border-blue-200/80 bg-blue-50/80 text-blue-700 hover:border-blue-300 hover:bg-blue-100/80",
+  },
+  indigo: {
+    iconWrap: "border-indigo-200 bg-indigo-50/90",
+    iconText: "text-indigo-600",
+    badgeStyle: "border-indigo-100 bg-indigo-50/90 text-indigo-700",
+    accent: "from-indigo-400/18 via-violet-400/10 to-transparent",
+    action: "border-indigo-200/80 bg-indigo-50/80 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100/80",
   },
   emerald: {
     iconWrap: "border-emerald-200 bg-emerald-50/90",

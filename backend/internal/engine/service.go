@@ -39,6 +39,7 @@ type Service struct {
 	mediaAnalysis           *model.MediaAnalysis
 	usbAnalysis             *model.USBAnalysis
 	c2Analysis              *model.C2SampleAnalysis
+	aptAnalysis             *model.APTAnalysis
 	vehicleDBCDefs          []*tshark.DBCDatabase
 	streamCache             map[string]model.ReassembledStream
 	streamCacheOrder        []string
@@ -216,6 +217,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
 	s.c2Analysis = nil
+	s.aptAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}
@@ -509,6 +511,7 @@ func (s *Service) ClearCapture() error {
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
 	s.c2Analysis = nil
+	s.aptAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}
@@ -1815,6 +1818,294 @@ func emptyC2SampleAnalysis() model.C2SampleAnalysis {
 		},
 		Notes: []string{},
 	}
+}
+
+func (s *Service) APTAnalysis(ctx context.Context) (model.APTAnalysis, error) {
+	if err := ctx.Err(); err != nil {
+		return model.APTAnalysis{}, err
+	}
+
+	s.mu.RLock()
+	cached := s.aptAnalysis
+	pcap := strings.TrimSpace(s.pcap)
+	s.mu.RUnlock()
+
+	if cached != nil {
+		return *cached, nil
+	}
+
+	analysis := emptyAPTAnalysis()
+	if pcap == "" {
+		analysis.Notes = append(analysis.Notes, "当前未加载抓包，APT 组织画像页仅显示独立骨架与 Silver Fox 预留模型。")
+	} else {
+		c2, err := s.C2SampleAnalysis(ctx)
+		if err != nil {
+			return model.APTAnalysis{}, err
+		}
+		analysis = buildAPTAnalysisFromC2(c2)
+		threatHits := s.ThreatHuntWithContext(ctx, nil)
+		if len(threatHits) > 0 {
+			analysis = buildAPTAnalysisFromThreatHits(threatHits, analysis)
+		}
+		objects := s.ObjectsWithContext(ctx)
+		if len(objects) > 0 {
+			analysis = buildAPTAnalysisFromObjects(objects, analysis)
+		}
+		analysis.Notes = append(analysis.Notes,
+			"APT 页消费 C2、Threat Hunting 与 Object Export 三个模块的证据。",
+			"Silver Fox / 银狐作为首个预置 actor profile；ValleyRAT、Winos 4.0、Gh0st 系、HFS 下载链与 fallback C2 作为后续规则接入口。",
+		)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return model.APTAnalysis{}, err
+	}
+
+	s.mu.Lock()
+	if s.aptAnalysis == nil {
+		s.aptAnalysis = &analysis
+	}
+	out := *s.aptAnalysis
+	s.mu.Unlock()
+	return out, nil
+}
+
+func emptyAPTAnalysis() model.APTAnalysis {
+	return model.APTAnalysis{
+		TotalEvidence:       0,
+		Actors:              []model.TrafficBucket{},
+		SampleFamilies:      []model.TrafficBucket{},
+		CampaignStages:      []model.TrafficBucket{},
+		TransportTraits:     []model.TrafficBucket{},
+		InfrastructureHints: []model.TrafficBucket{},
+		RelatedC2Families:   []model.TrafficBucket{},
+		Profiles: []model.APTActorProfile{
+			emptySilverFoxProfile(),
+		},
+		Evidence: []model.APTEvidenceRecord{},
+		Notes:    []string{},
+	}
+}
+
+func emptySilverFoxProfile() model.APTActorProfile {
+	return model.APTActorProfile{
+		ID:            "silver-fox",
+		Name:          "Silver Fox / 银狐",
+		Aliases:       []string{"Swimming Snake", "银狐", "Silver Fox"},
+		Summary:       "预置 APT 画像骨架：用于承载 ValleyRAT / Winos 4.0 / Gh0st 系、HFS 下载链、HTTPS/TCP C2、fallback C2 与周期回连等后续证据。",
+		Confidence:    0,
+		EvidenceCount: 0,
+		SampleFamilies: []model.TrafficBucket{
+			{Label: "ValleyRAT", Count: 0},
+			{Label: "Winos 4.0", Count: 0},
+			{Label: "Gh0st variant", Count: 0},
+		},
+		CampaignStages: []model.TrafficBucket{
+			{Label: "delivery", Count: 0},
+			{Label: "downloader", Count: 0},
+			{Label: "rat-c2", Count: 0},
+		},
+		TransportTraits: []model.TrafficBucket{
+			{Label: "https-c2", Count: 0},
+			{Label: "tcp-long-connection", Count: 0},
+			{Label: "periodic-callback", Count: 0},
+		},
+		InfrastructureHints: []model.TrafficBucket{
+			{Label: "hfs-download-chain", Count: 0},
+			{Label: "fallback-c2", Count: 0},
+			{Label: "custom-high-port", Count: 0},
+		},
+		RelatedC2Families: []model.TrafficBucket{},
+		TTPTags: []model.TrafficBucket{
+			{Label: "multi-stage-delivery", Count: 0},
+			{Label: "encrypted-c2", Count: 0},
+			{Label: "rat-family", Count: 0},
+		},
+		Notes: []string{
+			"组织画像默认不直接等同于样本家族；只有流量侧证据、样本解析证据与投递链证据交叉后才应提升归因置信度。",
+			"端口、路径、单个 IOC 仅作为弱观察位，不能单独作为 Silver Fox 归因结论。",
+		},
+	}
+}
+
+func buildAPTAnalysisFromC2(c2 model.C2SampleAnalysis) model.APTAnalysis {
+	analysis := emptyAPTAnalysis()
+	actorCounts := map[string]int{}
+	sampleFamilies := map[string]int{}
+	campaignStages := map[string]int{}
+	transportTraits := map[string]int{}
+	infrastructureHints := map[string]int{}
+	relatedC2Families := map[string]int{}
+	ttpTags := map[string]int{}
+	profiles := map[string]*model.APTActorProfile{
+		"silver-fox": cloneAPTActorProfile(emptySilverFoxProfile()),
+	}
+
+	consume := func(records []model.C2IndicatorRecord) {
+		for _, item := range records {
+			actors := normalizeActorHints(item.ActorHints, item.SampleFamily)
+			if len(actors) == 0 {
+				continue
+			}
+			for _, actorName := range actors {
+				actorID := aptActorID(actorName)
+				profile := profiles[actorID]
+				if profile == nil {
+					profile = &model.APTActorProfile{
+						ID:                  actorID,
+						Name:                actorName,
+						Aliases:             []string{},
+						Summary:             "由 C2 技术证据临时聚合出的 APT 候选画像，仍需人工复核。",
+						SampleFamilies:      []model.TrafficBucket{},
+						CampaignStages:      []model.TrafficBucket{},
+						TransportTraits:     []model.TrafficBucket{},
+						InfrastructureHints: []model.TrafficBucket{},
+						RelatedC2Families:   []model.TrafficBucket{},
+						TTPTags:             []model.TrafficBucket{},
+						Notes:               []string{"临时 actor hint：尚未接入正式组织画像基线。"},
+					}
+					profiles[actorID] = profile
+				}
+				actorCounts[profile.Name]++
+				profile.EvidenceCount++
+				if item.Confidence > profile.Confidence {
+					profile.Confidence = item.Confidence
+				}
+				if item.SampleFamily != "" {
+					sampleFamilies[item.SampleFamily]++
+				}
+				if item.CampaignStage != "" {
+					campaignStages[item.CampaignStage]++
+				}
+				for _, value := range item.TransportTraits {
+					if strings.TrimSpace(value) != "" {
+						transportTraits[value]++
+					}
+				}
+				for _, value := range item.InfrastructureHints {
+					if strings.TrimSpace(value) != "" {
+						infrastructureHints[value]++
+					}
+				}
+				if item.Family != "" {
+					relatedC2Families[item.Family]++
+				}
+				for _, value := range item.TTPTags {
+					if strings.TrimSpace(value) != "" {
+						ttpTags[value]++
+					}
+				}
+				analysis.Evidence = append(analysis.Evidence, model.APTEvidenceRecord{
+					PacketID:            item.PacketID,
+					StreamID:            item.StreamID,
+					Time:                item.Time,
+					ActorID:             profile.ID,
+					ActorName:           profile.Name,
+					SourceModule:        "c2-analysis",
+					Family:              item.Family,
+					EvidenceType:        c2FirstNonEmpty(item.IndicatorType, "c2-indicator"),
+					EvidenceValue:       item.IndicatorValue,
+					Confidence:          item.Confidence,
+					Source:              item.Source,
+					Destination:         item.Destination,
+					Host:                item.Host,
+					URI:                 item.URI,
+					SampleFamily:        item.SampleFamily,
+					CampaignStage:       item.CampaignStage,
+					TransportTraits:     item.TransportTraits,
+					InfrastructureHints: item.InfrastructureHints,
+					TTPTags:             item.TTPTags,
+					Tags:                item.Tags,
+					Summary:             item.Summary,
+					Evidence:            item.Evidence,
+				})
+			}
+		}
+	}
+	consume(c2.CS.Candidates)
+	consume(c2.VShell.Candidates)
+
+	for _, profile := range profiles {
+		profile.SampleFamilies = mergeAPTProfileBuckets(profile.SampleFamilies, sampleFamilies)
+		profile.CampaignStages = mergeAPTProfileBuckets(profile.CampaignStages, campaignStages)
+		profile.TransportTraits = mergeAPTProfileBuckets(profile.TransportTraits, transportTraits)
+		profile.InfrastructureHints = mergeAPTProfileBuckets(profile.InfrastructureHints, infrastructureHints)
+		profile.RelatedC2Families = mergeAPTProfileBuckets(profile.RelatedC2Families, relatedC2Families)
+		profile.TTPTags = mergeAPTProfileBuckets(profile.TTPTags, ttpTags)
+		analysis.Profiles = appendOrReplaceAPTProfile(analysis.Profiles, *profile)
+	}
+	sort.SliceStable(analysis.Profiles, func(i, j int) bool {
+		if analysis.Profiles[i].EvidenceCount == analysis.Profiles[j].EvidenceCount {
+			return analysis.Profiles[i].Name < analysis.Profiles[j].Name
+		}
+		return analysis.Profiles[i].EvidenceCount > analysis.Profiles[j].EvidenceCount
+	})
+
+	analysis.TotalEvidence = len(analysis.Evidence)
+	analysis.Actors = bucketsFromMap(actorCounts, 16)
+	analysis.SampleFamilies = bucketsFromMap(sampleFamilies, 24)
+	analysis.CampaignStages = bucketsFromMap(campaignStages, 24)
+	analysis.TransportTraits = bucketsFromMap(transportTraits, 24)
+	analysis.InfrastructureHints = bucketsFromMap(infrastructureHints, 24)
+	analysis.RelatedC2Families = bucketsFromMap(relatedC2Families, 12)
+	return analysis
+}
+
+func cloneAPTActorProfile(profile model.APTActorProfile) *model.APTActorProfile {
+	out := profile
+	return &out
+}
+
+func normalizeActorHints(hints []string, sampleFamily string) []string {
+	values := make([]string, 0, len(hints)+1)
+	for _, hint := range hints {
+		if trimmed := strings.TrimSpace(hint); trimmed != "" {
+			values = append(values, trimmed)
+		}
+	}
+	family := strings.ToLower(strings.TrimSpace(sampleFamily))
+	if family == "valleyrat" || strings.Contains(family, "winos") || strings.Contains(family, "gh0st") {
+		values = append(values, "Silver Fox / 银狐")
+	}
+	return uniqueStrings(values)
+}
+
+func aptActorID(name string) string {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if strings.Contains(lower, "silver") || strings.Contains(name, "银狐") || strings.Contains(lower, "swimming snake") {
+		return "silver-fox"
+	}
+	replacer := strings.NewReplacer(" ", "-", "/", "-", "\\", "-", "_", "-", "：", "-", ":", "-", "(", "", ")", "")
+	id := strings.Trim(replacer.Replace(lower), "-")
+	if id == "" {
+		return "unknown-actor"
+	}
+	return id
+}
+
+func mergeAPTProfileBuckets(base []model.TrafficBucket, counts map[string]int) []model.TrafficBucket {
+	merged := map[string]int{}
+	for _, item := range base {
+		if strings.TrimSpace(item.Label) != "" {
+			merged[item.Label] += item.Count
+		}
+	}
+	for label, count := range counts {
+		if strings.TrimSpace(label) != "" {
+			merged[label] += count
+		}
+	}
+	return bucketsFromMap(merged, 24)
+}
+
+func appendOrReplaceAPTProfile(items []model.APTActorProfile, next model.APTActorProfile) []model.APTActorProfile {
+	for i := range items {
+		if items[i].ID == next.ID {
+			items[i] = next
+			return items
+		}
+	}
+	return append(items, next)
 }
 
 func (s *Service) MediaArtifact(token string) (string, string, error) {

@@ -41,46 +41,60 @@ type c2AnalysisBuilder struct {
 }
 
 type c2HTTPObservation struct {
-	packet     model.Packet
-	method     string
-	path       string
-	host       string
-	channel    string
-	userAgent  string
-	evidence   string
-	confidence int
-	tags       []string
-}
-
-type c2DNSObservation struct {
 	packet      model.Packet
-	qname       string
-	maxLabel    int
-	queryType   string
-	isTXT       bool
-	isNull      bool
-	isCNAME     bool
-	isResponse  bool
+	method      string
+	path        string
+	host        string
+	channel     string
+	userAgent   string
+	statusCode  int
+	contentType string
+	responseSize int
+	evidence    string
 	confidence  int
 	tags        []string
 }
 
+type c2DNSObservation struct {
+	packet     model.Packet
+	qname      string
+	maxLabel   int
+	queryType  string
+	isTXT      bool
+	isNull     bool
+	isCNAME    bool
+	isResponse bool
+	confidence int
+	tags       []string
+}
+
 type c2VShellStreamWork struct {
-	streamID     int64
-	protocol     string
-	packets      []model.Packet
-	archMarkers  map[string]int
-	lengthPrefix int
-	shortPackets int
-	longPackets  int
-	transitions  int
-	lastKind     string
-	heartbeatAvg string
-	heartbeatJit string
-	hasWebSocket bool
-	wsParams     string
+	streamID      int64
+	protocol      string
+	packets       []model.Packet
+	archMarkers   map[string]int
+	lengthPrefix  int
+	shortPackets  int
+	longPackets   int
+	transitions   int
+	lastKind      string
+	heartbeatAvg  string
+	heartbeatJit  string
+	hasWebSocket  bool
+	wsParams      string
 	listenerHints map[string]int
-	confidence   int
+	confidence    int
+}
+
+type c2APTEnrichment struct {
+	actorHints          []string
+	sampleFamily        string
+	campaignStage       string
+	transportTraits     []string
+	infrastructureHints []string
+	ttpTags             []string
+	tags                []string
+	confidence          int
 }
 
 func buildC2SampleAnalysisFromPackets(ctx context.Context, packets []model.Packet) (model.C2SampleAnalysis, error) {
@@ -152,6 +166,9 @@ func (b *c2AnalysisBuilder) inspectHTTPPacket(packet model.Packet, payloadText s
 	headers := extractHTTPHeaders(payloadText)
 	host := strings.TrimSpace(headers["Host"])
 	userAgent := strings.TrimSpace(headerValueCI(headers, "User-Agent"))
+	contentType := strings.TrimSpace(headerValueCI(headers, "Content-Type"))
+	statusCode := extractHTTPStatusCode(payloadText)
+	responseSize := len(payloadText)
 	headerHints := []string{}
 	if userAgent != "" {
 		headerHints = append(headerHints, "ua="+truncateC2(userAgent, 80))
@@ -162,22 +179,24 @@ func (b *c2AnalysisBuilder) inspectHTTPPacket(packet model.Packet, payloadText s
 	if method != "" {
 		channel := httpChannel(packet)
 		obs := c2HTTPObservation{
-			packet:     packet,
-			method:     strings.ToUpper(method),
-			path:       path,
-			host:       host,
-			channel:    channel,
-			userAgent:  userAgent,
-			evidence:   strings.Join(headerHints, "; "),
-			confidence: 30,
-			tags:       []string{"http", "malleable-profile-weak", "needs-correlation"},
+			packet:      packet,
+			method:      strings.ToUpper(method),
+			path:        path,
+			host:        host,
+			channel:     channel,
+			userAgent:   userAgent,
+			statusCode:  statusCode,
+			contentType: contentType,
+			responseSize: responseSize,
+			evidence:    strings.Join(headerHints, "; "),
+			confidence:  30,
+			tags:        []string{"http", "malleable-profile-weak", "needs-correlation"},
+		}
+		if ok, confidence, tags := strongCSHTTPStaticSignal(obs); ok {
+			obs.confidence = confidence
+			obs.tags = uniqueStrings(append(obs.tags, tags...))
 		}
 		b.httpObservations = append(b.httpObservations, obs)
-		if ok, confidence, tags := strongCSHTTPStaticSignal(obs); ok {
-			b.emitCSHTTPCandidate(obs, confidence,
-				"HTTP/HTTPS Beacon 静态强线索候选：仅因 URI/Header 命中不会直接定性，仍需结合 Host/URI 聚合与周期性复核。 "+obs.evidence,
-				tags)
-		}
 	}
 
 	if path != "" {
@@ -226,7 +245,7 @@ func (b *c2AnalysisBuilder) inspectDNSPacket(packet model.Packet, text string) {
 	}
 	maxLabel := maxDNSLabelLength(qname)
 	upperText := strings.ToUpper(text)
-	
+
 	queryType := "A"
 	isTXT := strings.Contains(upperText, " TXT ")
 	isNull := strings.Contains(upperText, " NULL ")
@@ -238,9 +257,9 @@ func (b *c2AnalysisBuilder) inspectDNSPacket(packet model.Packet, text string) {
 	} else if isCNAME {
 		queryType = "CNAME"
 	}
-	
+
 	isResponse := strings.Contains(upperText, "RESPONSE") || strings.Contains(upperText, "RESP ")
-	
+
 	obs := c2DNSObservation{
 		packet:     packet,
 		qname:      qname,
@@ -253,14 +272,14 @@ func (b *c2AnalysisBuilder) inspectDNSPacket(packet model.Packet, text string) {
 		confidence: 28,
 		tags:       []string{"dns"},
 	}
-	
+
 	if maxLabel >= 45 || isTXT {
 		obs.confidence = 58
 		obs.tags = append(obs.tags, "long-label-or-txt")
 	}
-	
+
 	b.dnsObservations = append(b.dnsObservations, obs)
-	
+
 	tags := []string{"dns"}
 	confidence := 28
 	indicatorType := "dns-presence"
@@ -367,6 +386,68 @@ func strongCSHTTPStaticSignal(obs c2HTTPObservation) (bool, int, []string) {
 	return false, 0, nil
 }
 
+func c2LooksLikeBrowserUA(userAgent string) bool {
+	ua := strings.ToLower(strings.TrimSpace(userAgent))
+	if ua == "" {
+		return false
+	}
+	browserTokens := []string{"mozilla/", "chrome/", "safari/", "firefox/", "edg/", "edge/", "opr/"}
+	for _, token := range browserTokens {
+		if strings.Contains(ua, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func c2CSPeriodicStreamEligible(packets []model.Packet) bool {
+	hasHTTPOrTLS := false
+	browserUA := 0
+	nonBrowserContext := 0
+	methods := map[string]int{}
+	staticShape := false
+	for _, packet := range packets {
+		protocol := strings.ToUpper(strings.TrimSpace(c2FirstNonEmpty(packet.DisplayProtocol, packet.Protocol)))
+		if strings.Contains(protocol, "TLS") || packet.SourcePort == 443 || packet.DestPort == 443 {
+			hasHTTPOrTLS = true
+			nonBrowserContext++
+		}
+		if !isHTTPLikePacket(packet) {
+			continue
+		}
+		hasHTTPOrTLS = true
+		payloadText := decodeHTTPPayloadText(packet.Payload)
+		headers := extractHTTPHeaders(payloadText)
+		obs := c2HTTPObservation{
+			packet:    packet,
+			method:    strings.ToUpper(httpLoginMethod(packet)),
+			path:      httpRequestPath(packet, payloadText),
+			host:      strings.TrimSpace(headers["Host"]),
+			channel:   httpChannel(packet),
+			userAgent: strings.TrimSpace(headerValueCI(headers, "User-Agent")),
+		}
+		if obs.method != "" {
+			methods[obs.method]++
+		}
+		if ok, _, _ := strongCSHTTPStaticSignal(obs); ok {
+			staticShape = true
+		}
+		if c2LooksLikeBrowserUA(obs.userAgent) {
+			browserUA++
+		} else {
+			nonBrowserContext++
+		}
+	}
+	if !hasHTTPOrTLS {
+		return false
+	}
+	allBrowserContext := browserUA > 0 && nonBrowserContext == 0
+	if allBrowserContext && !(methods["GET"] > 0 && methods["POST"] > 0 && staticShape) {
+		return false
+	}
+	return true
+}
+
 func (b *c2AnalysisBuilder) promoteCSHTTPObservations() {
 	if len(b.httpObservations) == 0 {
 		return
@@ -386,9 +467,18 @@ func (b *c2AnalysisBuilder) promoteCSHTTPObservations() {
 			continue
 		}
 		methods := map[string]int{}
+		statusCodes := map[int]int{}
+		contentTypes := map[string]int{}
 		times := []float64{}
 		for _, obs := range group {
 			methods[obs.method]++
+			if obs.statusCode > 0 {
+				statusCodes[obs.statusCode]++
+			}
+			if obs.contentType != "" {
+				ct := strings.ToLower(strings.SplitN(obs.contentType, ";", 2)[0])
+				contentTypes[ct]++
+			}
 			if ts, ok := parseC2ClockSeconds(obs.packet.Timestamp); ok {
 				times = append(times, ts)
 			}
@@ -402,14 +492,78 @@ func (b *c2AnalysisBuilder) promoteCSHTTPObservations() {
 		}
 		avg, jitter := avgAndJitter(intervals)
 		hasStableRepeat := len(intervals) >= 3 && avg >= 5 && jitter <= 0.35
-		hasHighVolume := len(group) >= 6
-		if !hasStableRepeat && !hasHighVolume {
+		hasHighVolume := len(group) >= 8
+		hasBalancedMethods := methods["GET"] > 0 && methods["POST"] > 0
+		staticCount := 0
+		browserUA := 0
+		nonBrowserContext := 0
+		for _, obs := range group {
+			if ok, _, _ := strongCSHTTPStaticSignal(obs); ok {
+				staticCount++
+			}
+			if c2LooksLikeBrowserUA(obs.userAgent) {
+				browserUA++
+			} else {
+				nonBrowserContext++
+			}
+		}
+		hasStaticProfileShape := staticCount >= 2 || (staticCount > 0 && hasStableRepeat)
+		allBrowserContext := browserUA > 0 && nonBrowserContext == 0
+		statusCodeStability := 0
+		if len(statusCodes) > 0 {
+			maxCount := 0
+			for _, count := range statusCodes {
+				if count > maxCount {
+					maxCount = count
+				}
+			}
+			statusCodeStability = maxCount * 100 / len(group)
+		}
+		contentTypeStability := 0
+		if len(contentTypes) > 0 {
+			maxCount := 0
+			for _, count := range contentTypes {
+				if count > maxCount {
+					maxCount = count
+				}
+			}
+			contentTypeStability = maxCount * 100 / len(group)
+		}
+		signalScore := 0
+		if hasStableRepeat {
+			signalScore += 2
+		}
+		if hasBalancedMethods {
+			signalScore += 2
+		}
+		if hasStaticProfileShape {
+			signalScore++
+		}
+		if hasHighVolume {
+			signalScore++
+		}
+		if nonBrowserContext > 0 {
+			signalScore++
+		}
+		if statusCodeStability >= 80 {
+			signalScore++
+		}
+		if contentTypeStability >= 80 {
+			signalScore++
+		}
+		if allBrowserContext {
+			signalScore -= 2
+		}
+		if signalScore < 4 || (!hasStableRepeat && !hasBalancedMethods) {
+			continue
+		}
+		if allBrowserContext && !(hasStableRepeat && hasBalancedMethods && hasStaticProfileShape) {
 			continue
 		}
 		confidence := 54
 		tags := []string{"http", "endpoint-repeat", "correlated-signal"}
 		reason := fmt.Sprintf("Host/URI 重复通信提升为 CS HTTP 候选：samples=%d", len(group))
-		if methods["GET"] > 0 && methods["POST"] > 0 {
+		if hasBalancedMethods {
 			confidence += 8
 			tags = append(tags, "get-post-tasking-shape")
 			reason += fmt.Sprintf(" GET=%d POST=%d", methods["GET"], methods["POST"])
@@ -418,6 +572,33 @@ func (b *c2AnalysisBuilder) promoteCSHTTPObservations() {
 			confidence += 8
 			tags = append(tags, "stable-interval")
 			reason += fmt.Sprintf(" avg=%.1fs jitter=%.0f%%", avg, jitter*100)
+		}
+		if hasStaticProfileShape {
+			confidence += 4
+			tags = append(tags, "default-profile-like")
+			reason += fmt.Sprintf(" static=%d", staticCount)
+		}
+		if hasHighVolume {
+			confidence += 3
+			tags = append(tags, "high-volume-repeat")
+		}
+		if nonBrowserContext > 0 {
+			confidence += 3
+			tags = append(tags, "non-browser-context")
+		}
+		if statusCodeStability >= 80 {
+			confidence += 3
+			tags = append(tags, "stable-status-code")
+			reason += fmt.Sprintf(" status_stable=%d%%", statusCodeStability)
+		}
+		if contentTypeStability >= 80 {
+			confidence += 2
+			tags = append(tags, "stable-content-type")
+			reason += fmt.Sprintf(" ct_stable=%d%%", contentTypeStability)
+		}
+		if allBrowserContext {
+			confidence -= 8
+			tags = append(tags, "browser-context-penalty")
 		}
 		for _, obs := range group {
 			b.emitCSHTTPCandidate(obs, clampConfidence(confidence), reason+" "+obs.evidence, tags)
@@ -491,6 +672,9 @@ func (b *c2AnalysisBuilder) inspectPeriodicStream(packets []model.Packet) {
 		tags = append(tags, "silverfox-60s-compatible")
 		confidence = 66
 	}
+	if !c2CSPeriodicStreamEligible(packets) {
+		return
+	}
 	b.addCSCandidate(packet, httpChannel(packet), "beacon-interval", summary, confidence,
 		fmt.Sprintf("samples=%d avg=%.2fs jitter=%.2f", len(intervals), avg, jitter), tags, []string{"SilverFox-compatible-field"})
 	b.result.CS.BeaconPatterns = append(b.result.CS.BeaconPatterns, model.C2BeaconPattern{
@@ -544,6 +728,7 @@ func (b *c2AnalysisBuilder) inspectVShellShortLongStream(packets []model.Packet)
 }
 
 func (b *c2AnalysisBuilder) addCSCandidate(packet model.Packet, channel, indicatorType, summary string, confidence int, evidence string, tags []string, actorHints []string) {
+	enrichment := c2APTEnrichmentForCandidate(packet, channel, indicatorType, evidence, tags)
 	b.result.CS.Candidates = append(b.result.CS.Candidates, model.C2IndicatorRecord{
 		PacketID:              packet.ID,
 		StreamID:              packet.StreamID,
@@ -560,16 +745,26 @@ func (b *c2AnalysisBuilder) addCSCandidate(packet model.Packet, channel, indicat
 		Confidence:            clampConfidence(confidence),
 		Summary:               summary,
 		Evidence:              evidence,
-		Tags:                  uniqueStrings(tags),
-		ActorHints:            uniqueStrings(actorHints),
-		TransportTraits:       uniqueStrings([]string{c2FirstNonEmpty(channel, "unknown")}),
-		InfrastructureHints:   uniqueStrings(c2InfraHints(packet)),
-		AttributionConfidence: 0,
+		Tags:                  uniqueStrings(append(tags, enrichment.tags...)),
+		ActorHints:            uniqueStrings(append(actorHints, enrichment.actorHints...)),
+		SampleFamily:          enrichment.sampleFamily,
+		CampaignStage:         enrichment.campaignStage,
+		TransportTraits:       uniqueStrings(append([]string{c2FirstNonEmpty(channel, "unknown")}, enrichment.transportTraits...)),
+		InfrastructureHints:   uniqueStrings(append(c2InfraHints(packet), enrichment.infrastructureHints...)),
+		TTPTags:               uniqueStrings(enrichment.ttpTags),
+		AttributionConfidence: enrichment.confidence,
 	})
 	b.bump("CS", channel, indicatorType, packet, b.csChannels, b.csIndicators, b.csConversations, b.csRelatedActors, b.csDeliveryChains)
 }
 
 func (b *c2AnalysisBuilder) addVShellCandidate(packet model.Packet, channel, indicatorType, summary string, confidence int, evidence string, tags []string, actorHints []string, sampleFamily, campaignStage string, transportTraits []string) {
+	enrichment := c2APTEnrichmentForCandidate(packet, channel, indicatorType, evidence, tags)
+	if strings.TrimSpace(sampleFamily) == "" {
+		sampleFamily = enrichment.sampleFamily
+	}
+	if strings.TrimSpace(campaignStage) == "" {
+		campaignStage = enrichment.campaignStage
+	}
 	b.result.VShell.Candidates = append(b.result.VShell.Candidates, model.C2IndicatorRecord{
 		PacketID:              packet.ID,
 		StreamID:              packet.StreamID,
@@ -586,13 +781,14 @@ func (b *c2AnalysisBuilder) addVShellCandidate(packet model.Packet, channel, ind
 		Confidence:            clampConfidence(confidence),
 		Summary:               summary,
 		Evidence:              evidence,
-		Tags:                  uniqueStrings(tags),
-		ActorHints:            uniqueStrings(actorHints),
+		Tags:                  uniqueStrings(append(tags, enrichment.tags...)),
+		ActorHints:            uniqueStrings(append(actorHints, enrichment.actorHints...)),
 		SampleFamily:          sampleFamily,
 		CampaignStage:         campaignStage,
-		TransportTraits:       uniqueStrings(append([]string{c2FirstNonEmpty(channel, "unknown")}, transportTraits...)),
-		InfrastructureHints:   uniqueStrings(c2InfraHints(packet)),
-		AttributionConfidence: 0,
+		TransportTraits:       uniqueStrings(append(append([]string{c2FirstNonEmpty(channel, "unknown")}, transportTraits...), enrichment.transportTraits...)),
+		InfrastructureHints:   uniqueStrings(append(c2InfraHints(packet), enrichment.infrastructureHints...)),
+		TTPTags:               uniqueStrings(enrichment.ttpTags),
+		AttributionConfidence: enrichment.confidence,
 	})
 	b.bump("VShell", channel, indicatorType, packet, b.vshellChannels, b.vshellIndicators, b.vshellConversations, b.vshellRelatedActors, b.vshellDeliveryChains)
 }
@@ -610,6 +806,99 @@ func (b *c2AnalysisBuilder) bump(family, channel, indicator string, packet model
 			relatedActors["SilverFox-compatible"]++
 		}
 	}
+}
+
+func c2APTEnrichmentForCandidate(packet model.Packet, channel, indicatorType, evidence string, tags []string) c2APTEnrichment {
+	out := c2APTEnrichment{}
+	channel = strings.ToLower(strings.TrimSpace(channel))
+	indicatorType = strings.ToLower(strings.TrimSpace(indicatorType))
+	text := strings.ToLower(strings.Join([]string{
+		packet.Info,
+		packet.Payload,
+		c2HostFromPacket(packet),
+		c2URIFromPacket(packet),
+		evidence,
+		strings.Join(tags, " "),
+	}, "\n"))
+
+	if channel == "https" || packet.SourcePort == 443 || packet.DestPort == 443 || strings.Contains(text, "https") {
+		out.transportTraits = append(out.transportTraits, "https-c2")
+		out.ttpTags = append(out.ttpTags, "encrypted-c2")
+	}
+	if channel == "tcp" || strings.Contains(strings.ToLower(packet.Protocol), "tcp") {
+		out.transportTraits = append(out.transportTraits, "tcp")
+	}
+	if strings.Contains(indicatorType, "beacon") || strings.Contains(indicatorType, "heartbeat") || strings.Contains(text, "periodic") || strings.Contains(text, "60s") {
+		out.transportTraits = append(out.transportTraits, "periodic-callback")
+		out.ttpTags = append(out.ttpTags, "command-and-control")
+		if out.campaignStage == "" {
+			out.campaignStage = "rat-c2"
+		}
+	}
+	if packet.SourcePort == 18856 || packet.DestPort == 18856 || packet.SourcePort == 9899 || packet.DestPort == 9899 {
+		out.actorHints = append(out.actorHints, "Silver Fox / 银狐")
+		out.infrastructureHints = append(out.infrastructureHints, "custom-high-port", "silverfox-case-port-weak", "fallback-c2")
+		out.transportTraits = append(out.transportTraits, "tcp-long-connection")
+		out.ttpTags = append(out.ttpTags, "rat-family")
+		out.tags = append(out.tags, "silverfox-case-port-weak")
+		out.confidence = maxInt(out.confidence, 35)
+		if out.sampleFamily == "" {
+			out.sampleFamily = "ValleyRAT/Winos-compatible"
+		}
+		if out.campaignStage == "" {
+			out.campaignStage = "rat-c2"
+		}
+	}
+	if c2LooksLikeHFSDeliveryText(text) {
+		out.actorHints = append(out.actorHints, "Silver Fox / 银狐")
+		out.infrastructureHints = append(out.infrastructureHints, "hfs-download-chain", "hfs-delivery")
+		out.ttpTags = append(out.ttpTags, "multi-stage-delivery")
+		out.tags = append(out.tags, "hfs-download-chain")
+		out.confidence = maxInt(out.confidence, 42)
+		if out.sampleFamily == "" {
+			out.sampleFamily = "ValleyRAT/Winos-compatible"
+		}
+		out.campaignStage = "delivery"
+	}
+	if strings.Contains(text, "valleyrat") {
+		out.actorHints = append(out.actorHints, "Silver Fox / 银狐")
+		out.sampleFamily = "ValleyRAT"
+		out.tags = append(out.tags, "valleyrat-family-hint")
+		out.confidence = maxInt(out.confidence, 48)
+	}
+	if strings.Contains(text, "winos") {
+		out.actorHints = append(out.actorHints, "Silver Fox / 银狐")
+		out.sampleFamily = "Winos 4.0"
+		out.tags = append(out.tags, "winos-family-hint")
+		out.confidence = maxInt(out.confidence, 48)
+	}
+	if strings.Contains(text, "gh0st") || strings.Contains(text, "ghost rat") {
+		out.actorHints = append(out.actorHints, "Silver Fox / 银狐")
+		out.sampleFamily = "Gh0st variant"
+		out.tags = append(out.tags, "gh0st-family-hint")
+		out.confidence = maxInt(out.confidence, 44)
+	}
+	if len(out.actorHints) > 0 && out.campaignStage == "" {
+		out.campaignStage = "rat-c2"
+	}
+	out.actorHints = uniqueStrings(out.actorHints)
+	out.transportTraits = uniqueStrings(out.transportTraits)
+	out.infrastructureHints = uniqueStrings(out.infrastructureHints)
+	out.ttpTags = uniqueStrings(out.ttpTags)
+	out.tags = uniqueStrings(out.tags)
+	return out
+}
+
+func c2LooksLikeHFSDeliveryText(text string) bool {
+	text = strings.ToLower(strings.TrimSpace(text))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, " hfs") ||
+		strings.Contains(text, "hfs/") ||
+		strings.Contains(text, "http file server") ||
+		strings.Contains(text, "httpfileserver") ||
+		strings.Contains(text, "rejetto")
 }
 
 func (b *c2AnalysisBuilder) finish() {
@@ -639,9 +928,9 @@ func (b *c2AnalysisBuilder) finish() {
 	b.result.VShell.StreamAggregates = buildVShellStreamAggregates(b.vshellStreamData, 16)
 
 	if len(b.result.CS.Candidates) == 0 {
-		b.result.CS.Notes = append(b.result.CS.Notes, "未发现 CS 候选；当前规则会抑制一次性普通 HTTP 请求，仅提升强静态线索、重复 Host/URI、DNS 长标签/TXT、SMB pivot 占位与周期性 beacon。")
+		b.result.CS.Notes = append(b.result.CS.Notes, "未发现 CS 候选；当前规则会抑制一次性普通 HTTP 请求与浏览器轮询，仅在周期性、GET/POST 互补、默认 profile 形态、非浏览器上下文等多信号组合满足时提升 HTTP 候选。")
 	} else {
-		b.result.CS.Notes = append(b.result.CS.Notes, "CS 结果是候选证据：Malleable C2 可自定义 URI/Header/UA；普通一次性 GET/POST 已默认抑制，HTTP 候选优先来自强静态线索、重复 Host/URI 或周期行为。")
+		b.result.CS.Notes = append(b.result.CS.Notes, "CS 结果是候选证据：Malleable C2 可自定义 URI/Header/UA；HTTP 候选已采用多信号门槛，静态 URI/Header、重复 Host/URI、周期性与非浏览器上下文需组合复核。")
 	}
 	if len(b.result.VShell.Candidates) == 0 {
 		b.result.VShell.Notes = append(b.result.VShell.Notes, "未发现 VShell 候选；当前规则覆盖 WebSocket 参数、l64/w64 架构标记、4 字节长度前缀、短长包交替和约 10 秒心跳。")
@@ -664,6 +953,15 @@ type c2EndpointAggregateWork struct {
 	postPacket  int64
 	confidence  int
 	indicatorTy []string
+	signalTags  []string
+	scoreFactorMap map[string]*c2ScoreFactorWork
+}
+
+type c2ScoreFactorWork struct {
+	name      string
+	weight    int
+	direction string
+	summaries map[string]struct{}
 }
 
 func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) []model.C2HTTPEndpointAggregate {
@@ -698,6 +996,7 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 				uri:     uri,
 				channel: c2FirstNonEmpty(channel, "http"),
 				methods: map[string]int{},
+				scoreFactorMap: map[string]*c2ScoreFactorWork{},
 			}
 			work[key] = item
 		}
@@ -721,6 +1020,26 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 		}
 		if strings.TrimSpace(candidate.IndicatorType) != "" {
 			item.indicatorTy = append(item.indicatorTy, candidate.IndicatorType)
+		}
+		item.signalTags = append(item.signalTags, candidate.Tags...)
+		for _, tag := range candidate.Tags {
+			dir, weight, summary := classifyScoreFactor(tag)
+			if dir == "" {
+				continue
+			}
+			sf, ok := item.scoreFactorMap[tag]
+			if !ok {
+				sf = &c2ScoreFactorWork{
+					name:      tag,
+					weight:    weight,
+					direction: dir,
+					summaries: map[string]struct{}{},
+				}
+				item.scoreFactorMap[tag] = sf
+			}
+			if summary != "" {
+				sf.summaries[summary] = struct{}{}
+			}
 		}
 		if candidate.Time != "" {
 			if item.firstTime == "" || candidate.Time < item.firstTime {
@@ -772,23 +1091,26 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 		if representativePacket <= 0 && len(item.packets) > 0 {
 			representativePacket = item.packets[0]
 		}
+		scoreFactors := buildScoreFactorsFromMap(item.scoreFactorMap)
 		out = append(out, model.C2HTTPEndpointAggregate{
-			Host:                item.host,
-			URI:                 item.uri,
-			Channel:             item.channel,
-			Total:               item.total,
-			GetCount:            item.methods["GET"],
-			PostCount:           item.methods["POST"],
-			Methods:             bucketsFromMap(item.methods, 8),
-			FirstTime:           item.firstTime,
-			LastTime:            item.lastTime,
-			AvgInterval:         avgInterval,
-			Jitter:              jitterText,
-			Streams:             limitInt64List(uniqueInt64s(item.streams), 12),
-			Packets:             limitInt64List(uniqueInt64s(item.packets), 24),
+			Host:                 item.host,
+			URI:                  item.uri,
+			Channel:              item.channel,
+			Total:                item.total,
+			GetCount:             item.methods["GET"],
+			PostCount:            item.methods["POST"],
+			Methods:              bucketsFromMap(item.methods, 8),
+			FirstTime:            item.firstTime,
+			LastTime:             item.lastTime,
+			AvgInterval:          avgInterval,
+			Jitter:               jitterText,
+			Streams:              limitInt64List(uniqueInt64s(item.streams), 12),
+			Packets:              limitInt64List(uniqueInt64s(item.packets), 24),
 			RepresentativePacket: representativePacket,
-			Confidence:          clampConfidence(confidence),
-			Summary:             strings.Join(summaryParts, " · "),
+			Confidence:           clampConfidence(confidence),
+			SignalTags:           limitStringList(uniqueStrings(item.signalTags), 12),
+			ScoreFactors:         scoreFactors,
+			Summary:              strings.Join(summaryParts, " · "),
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -807,20 +1129,20 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 }
 
 type c2DNSAggregateWork struct {
-	qname       string
-	total       int
-	maxLabel    int
-	queryTypes  map[string]int
-	txtCount    int
-	nullCount   int
-	cnameCount  int
-	requestCount int
+	qname         string
+	total         int
+	maxLabel      int
+	queryTypes    map[string]int
+	txtCount      int
+	nullCount     int
+	cnameCount    int
+	requestCount  int
 	responseCount int
-	firstTime   string
-	lastTime    string
-	times       []float64
-	packets     []int64
-	confidence  int
+	firstTime     string
+	lastTime      string
+	times         []float64
+	packets       []int64
+	confidence    int
 }
 
 func buildCSDNSAggregates(observations []c2DNSObservation, limit int) []model.C2DNSAggregate {
@@ -1120,7 +1442,7 @@ func c2InfraHints(packet model.Packet) []string {
 		}
 	}
 	if strings.Contains(strings.ToLower(packet.Info), "hfs") || strings.Contains(strings.ToLower(packet.Payload), "hfs") {
-		hints = append(hints, "hfs-delivery")
+		hints = append(hints, "hfs-delivery", "hfs-download-chain")
 	}
 	return hints
 }
@@ -1305,6 +1627,13 @@ func limitInt64List(values []int64, limit int) []int64 {
 	return values
 }
 
+func limitStringList(values []string, limit int) []string {
+	if limit > 0 && len(values) > limit {
+		return values[:limit]
+	}
+	return values
+}
+
 func truncateC2(value string, limit int) string {
 	value = strings.TrimSpace(value)
 	if limit <= 0 || len(value) <= limit {
@@ -1321,4 +1650,87 @@ func clampConfidence(value int) int {
 		return 100
 	}
 	return value
+}
+
+func classifyScoreFactor(tag string) (direction string, weight int, summary string) {
+	lower := strings.ToLower(strings.TrimSpace(tag))
+	switch {
+	case strings.Contains(lower, "stable-interval"):
+		return "positive", 10, "稳定时间间隔表明周期性通信"
+	case strings.Contains(lower, "get-post-tasking-shape"):
+		return "positive", 8, "GET/POST 组合符合任务下发与结果回传模式"
+	case strings.Contains(lower, "endpoint-repeat"):
+		return "positive", 6, "同一端点重复通信"
+	case strings.Contains(lower, "correlated-signal"):
+		return "positive", 5, "多信号关联提升"
+	case strings.Contains(lower, "default-profile-like"):
+		return "positive", 4, "类似默认 Malleable C2 profile"
+	case strings.Contains(lower, "stable-status-code"):
+		return "positive", 3, "HTTP 状态码稳定"
+	case strings.Contains(lower, "stable-content-type"):
+		return "positive", 2, "Content-Type 稳定"
+	case strings.Contains(lower, "non-browser-context"):
+		return "positive", 3, "非浏览器上下文"
+	case strings.Contains(lower, "periodic"):
+		return "positive", 7, "周期性通信模式"
+	case strings.Contains(lower, "beacon-like"):
+		return "positive", 6, "Beacon 行为特征"
+	case strings.Contains(lower, "browser-context"):
+		return "negative", -4, "浏览器上下文，降低置信度"
+	case strings.Contains(lower, "needs-correlation"):
+		return "negative", -2, "需要进一步关联确认"
+	case strings.Contains(lower, "weak-signal"):
+		return "negative", -1, "弱信号"
+	case strings.Contains(lower, "malleable-profile-weak"):
+		return "negative", -1, "Malleable C2 弱特征"
+	default:
+		return "", 0, ""
+	}
+}
+
+func buildScoreFactorsFromMap(factorMap map[string]*c2ScoreFactorWork) []model.C2ScoreFactor {
+	if len(factorMap) == 0 {
+		return nil
+	}
+	out := make([]model.C2ScoreFactor, 0, len(factorMap))
+	for _, sf := range factorMap {
+		summaryParts := make([]string, 0, len(sf.summaries))
+		for s := range sf.summaries {
+			summaryParts = append(summaryParts, s)
+		}
+		sort.Strings(summaryParts)
+		out = append(out, model.C2ScoreFactor{
+			Name:      sf.name,
+			Weight:    sf.weight,
+			Direction: sf.direction,
+			Summary:   strings.Join(summaryParts, "; "),
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Direction != out[j].Direction {
+			return out[i].Direction == "positive"
+		}
+		return out[i].Weight > out[j].Weight
+	})
+	return out
+}
+
+func extractHTTPStatusCode(payload string) int {
+	lines := strings.SplitN(payload, "\n", 2)
+	if len(lines) == 0 {
+		return 0
+	}
+	firstLine := strings.TrimSpace(lines[0])
+	if !strings.HasPrefix(firstLine, "HTTP/") {
+		return 0
+	}
+	parts := strings.SplitN(firstLine, " ", 3)
+	if len(parts) < 2 {
+		return 0
+	}
+	code, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0
+	}
+	return code
 }

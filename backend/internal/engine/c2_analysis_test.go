@@ -36,6 +36,37 @@ func TestServiceC2SampleAnalysisHonorsContextCancel(t *testing.T) {
 	}
 }
 
+func TestServiceAPTAnalysisReturnsSkeleton(t *testing.T) {
+	svc := NewService(nil, nil)
+
+	analysis, err := svc.APTAnalysis(context.Background())
+	if err != nil {
+		t.Fatalf("APTAnalysis() error = %v", err)
+	}
+	if analysis.TotalEvidence != 0 {
+		t.Fatalf("expected zero evidence, got %d", analysis.TotalEvidence)
+	}
+	if analysis.Evidence == nil || len(analysis.Profiles) == 0 {
+		t.Fatalf("expected initialized apt skeleton, got %+v", analysis)
+	}
+	if analysis.Profiles[0].ID != "silver-fox" {
+		t.Fatalf("expected silver fox baseline profile, got %+v", analysis.Profiles)
+	}
+	if len(analysis.Notes) == 0 {
+		t.Fatalf("expected explanatory notes for apt skeleton")
+	}
+}
+
+func TestServiceAPTAnalysisHonorsContextCancel(t *testing.T) {
+	svc := NewService(nil, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := svc.APTAnalysis(ctx); err == nil {
+		t.Fatalf("expected canceled context error")
+	}
+}
+
 func TestBuildC2SampleAnalysisDetectsVShellWebSocketHandshake(t *testing.T) {
 	packets := []model.Packet{
 		{
@@ -93,9 +124,11 @@ func TestBuildC2SampleAnalysisDetectsVShellTCPShapes(t *testing.T) {
 
 func TestBuildC2SampleAnalysisDetectsCSHTTPAndDNS(t *testing.T) {
 	packets := []model.Packet{
-		{ID: 1, Timestamp: "12:00:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "GET /jquery.min.js HTTP/1.1", Payload: "GET /jquery.min.js HTTP/1.1\r\nHost: cdn.demo\r\nUser-Agent: Mozilla/5.0\r\n\r\n", StreamID: 3},
+		{ID: 1, Timestamp: "12:00:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "GET /submit.php?id=1 HTTP/1.1", Payload: "GET /submit.php?id=1 HTTP/1.1\r\nHost: cdn.demo\r\n\r\n", StreamID: 3},
 		{ID: 2, Timestamp: "12:01:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "POST /submit.php?id=1 HTTP/1.1", Payload: "POST /submit.php?id=1 HTTP/1.1\r\nHost: cdn.demo\r\n\r\nabc", StreamID: 3},
-		{ID: 3, Timestamp: "12:01:01.000000", SourceIP: "10.0.0.5", SourcePort: 53000, DestIP: "8.8.8.8", DestPort: 53, Protocol: "DNS", Info: "Standard query TXT abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz.example.com"},
+		{ID: 3, Timestamp: "12:02:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "GET /submit.php?id=1 HTTP/1.1", Payload: "GET /submit.php?id=1 HTTP/1.1\r\nHost: cdn.demo\r\n\r\n", StreamID: 3},
+		{ID: 4, Timestamp: "12:03:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "POST /submit.php?id=1 HTTP/1.1", Payload: "POST /submit.php?id=1 HTTP/1.1\r\nHost: cdn.demo\r\n\r\nabc", StreamID: 3},
+		{ID: 5, Timestamp: "12:03:01.000000", SourceIP: "10.0.0.5", SourcePort: 53000, DestIP: "8.8.8.8", DestPort: 53, Protocol: "DNS", Info: "Standard query TXT abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz.example.com"},
 	}
 
 	analysis, err := buildC2SampleAnalysisFromPackets(context.Background(), packets)
@@ -110,6 +143,52 @@ func TestBuildC2SampleAnalysisDetectsCSHTTPAndDNS(t *testing.T) {
 	}
 	if !hasC2Indicator(analysis.CS.Candidates, "dns-beacon-shape") {
 		t.Fatalf("expected DNS beacon shape candidate")
+	}
+}
+
+func TestBuildC2SampleAnalysisSuppressesBrowserPollingAsCSHTTP(t *testing.T) {
+	packets := []model.Packet{}
+	for i := 0; i < 8; i++ {
+		packets = append(packets, model.Packet{
+			ID:         int64(70 + i),
+			Timestamp:  "12:0" + string(rune('0'+i)) + ":00.000000",
+			SourceIP:   "10.0.0.5",
+			SourcePort: 50100,
+			DestIP:     "93.184.216.34",
+			DestPort:   80,
+			Protocol:   "HTTP",
+			Info:       "GET /api/poll HTTP/1.1",
+			Payload:    "GET /api/poll HTTP/1.1\r\nHost: app.example.test\r\nUser-Agent: Mozilla/5.0 Chrome/120.0 Safari/537.36\r\n\r\n",
+			StreamID:   13,
+		})
+	}
+
+	analysis, err := buildC2SampleAnalysisFromPackets(context.Background(), packets)
+	if err != nil {
+		t.Fatalf("buildC2SampleAnalysisFromPackets() error = %v", err)
+	}
+	if hasC2Indicator(analysis.CS.Candidates, "http-beacon-shape") || hasC2Indicator(analysis.CS.Candidates, "beacon-interval") {
+		t.Fatalf("browser polling should not be promoted to CS candidates: %+v", analysis.CS.Candidates)
+	}
+	if len(analysis.CS.HostURIAggregates) != 0 {
+		t.Fatalf("browser polling should not form CS Host/URI aggregates: %+v", analysis.CS.HostURIAggregates)
+	}
+}
+
+func TestBuildC2SampleAnalysisSuppressesRawTCPPeriodicAsCS(t *testing.T) {
+	packets := []model.Packet{
+		{ID: 91, Timestamp: "12:00:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 9001, Protocol: "TCP", Payload: "aa", StreamID: 21},
+		{ID: 92, Timestamp: "12:01:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 9001, Protocol: "TCP", Payload: "bb", StreamID: 21},
+		{ID: 93, Timestamp: "12:02:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 9001, Protocol: "TCP", Payload: "cc", StreamID: 21},
+		{ID: 94, Timestamp: "12:03:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 9001, Protocol: "TCP", Payload: "dd", StreamID: 21},
+	}
+
+	analysis, err := buildC2SampleAnalysisFromPackets(context.Background(), packets)
+	if err != nil {
+		t.Fatalf("buildC2SampleAnalysisFromPackets() error = %v", err)
+	}
+	if hasC2Indicator(analysis.CS.Candidates, "beacon-interval") {
+		t.Fatalf("raw TCP periodic stream should not be promoted as CS beacon: %+v", analysis.CS.Candidates)
 	}
 }
 
@@ -156,6 +235,9 @@ func TestBuildC2SampleAnalysisBuildsCSHostURIAggregates(t *testing.T) {
 	if got.AvgInterval != "60.0s" || got.Jitter != "0%" {
 		t.Fatalf("unexpected timing profile: %+v", got)
 	}
+	if !stringSliceContains(got.SignalTags, "stable-interval") || !stringSliceContains(got.SignalTags, "get-post-tasking-shape") {
+		t.Fatalf("expected scoring signal tags, got %+v", got.SignalTags)
+	}
 	if len(got.Streams) != 1 || got.Streams[0] != 8 || len(got.Packets) != 4 {
 		t.Fatalf("unexpected stream/packet refs: %+v", got)
 	}
@@ -193,9 +275,56 @@ func TestBuildC2SampleAnalysisBuildsCSDNSAggregates(t *testing.T) {
 	}
 }
 
+func TestBuildC2SampleAnalysisAnnotatesSilverFoxCompatibleHTTP(t *testing.T) {
+	packets := []model.Packet{
+		{ID: 61, Timestamp: "12:00:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 443, Protocol: "HTTP", Info: "GET /api/checkin HTTP/1.1", Payload: "GET /api/checkin HTTP/1.1\r\nHost: hfs.demo\r\nUser-Agent: Winos updater\r\nX-Server: HFS/2.3\r\n\r\n", StreamID: 16},
+		{ID: 62, Timestamp: "12:01:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 443, Protocol: "HTTP", Info: "POST /api/checkin HTTP/1.1", Payload: "POST /api/checkin HTTP/1.1\r\nHost: hfs.demo\r\nUser-Agent: Winos updater\r\nX-Server: HFS/2.3\r\n\r\nabc", StreamID: 16},
+		{ID: 63, Timestamp: "12:02:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 443, Protocol: "HTTP", Info: "GET /api/checkin HTTP/1.1", Payload: "GET /api/checkin HTTP/1.1\r\nHost: hfs.demo\r\nUser-Agent: Winos updater\r\nX-Server: HFS/2.3\r\n\r\n", StreamID: 16},
+		{ID: 64, Timestamp: "12:03:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 443, Protocol: "HTTP", Info: "POST /api/checkin HTTP/1.1", Payload: "POST /api/checkin HTTP/1.1\r\nHost: hfs.demo\r\nUser-Agent: Winos updater\r\nX-Server: HFS/2.3\r\n\r\nabc", StreamID: 16},
+	}
+
+	analysis, err := buildC2SampleAnalysisFromPackets(context.Background(), packets)
+	if err != nil {
+		t.Fatalf("buildC2SampleAnalysisFromPackets() error = %v", err)
+	}
+	if !hasC2Indicator(analysis.CS.Candidates, "http-beacon-shape") {
+		t.Fatalf("expected HTTP beacon shape candidate")
+	}
+	found := false
+	for _, item := range analysis.CS.Candidates {
+		if item.SampleFamily == "Winos 4.0" &&
+			stringSliceContains(item.ActorHints, "Silver Fox / 银狐") &&
+			stringSliceContains(item.InfrastructureHints, "hfs-download-chain") &&
+			stringSliceContains(item.TransportTraits, "https-c2") &&
+			stringSliceContains(item.TTPTags, "multi-stage-delivery") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Silver Fox compatible metadata, got %+v", analysis.CS.Candidates)
+	}
+	apt := buildAPTAnalysisFromC2(analysis)
+	if apt.TotalEvidence == 0 || len(apt.Actors) == 0 {
+		t.Fatalf("expected APT evidence from C2 metadata, got %+v", apt)
+	}
+	if apt.Evidence[0].SourceModule != "c2-analysis" {
+		t.Fatalf("expected c2-analysis source module, got %+v", apt.Evidence[0])
+	}
+}
+
 func hasC2Indicator(items []model.C2IndicatorRecord, indicator string) bool {
 	for _, item := range items {
 		if item.IndicatorType == indicator {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSliceContains(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
 			return true
 		}
 	}
