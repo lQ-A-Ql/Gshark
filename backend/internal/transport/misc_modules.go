@@ -39,6 +39,20 @@ func (m miscRouteModule) RegisterRoutes(mux *http.ServeMux, server *Server) {
 func defaultMiscModules() []MiscModule {
 	return []MiscModule{
 		NewMiscRouteModule(model.MiscModuleManifest{
+			ID:              "payload-webshell-decoder",
+			Kind:            "builtin",
+			Title:           "Payload / WebShell 解码工作台",
+			Summary:         "手动识别 HTTP body、表单参数、multipart、Base64、Hex 与常见 WebShell 编码/密文候选，集中执行实验性解码和结果导出。",
+			Tags:            []string{"Payload", "WebShell", "Decode", "Base64", "Behinder", "AntSword", "Godzilla"},
+			APIPrefix:       "/api/streams",
+			DocsPath:        "docs/misc-module-interface.md",
+			RequiresCapture: false,
+			ProtocolDomain:  "Payload / WebShell",
+			SupportsExport:  true,
+			Cancellable:     true,
+			DependsOn:       []string{"payload", "decode"},
+		}, nil),
+		NewMiscRouteModule(model.MiscModuleManifest{
 			ID:              "http-login-analysis",
 			Kind:            "builtin",
 			Title:           "HTTP 登录行为分析",

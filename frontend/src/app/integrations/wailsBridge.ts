@@ -1,6 +1,7 @@
 import type {
   AppUpdateStatus,
   BinaryStream,
+  C2SampleAnalysis,
   DBCProfile,
   DecryptionConfig,
   ExtractedObject,
@@ -156,8 +157,8 @@ export interface BackendBridge {
   getHttpStream(streamId: number, signal?: AbortSignal): Promise<HttpStream>;
   getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
   getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
-  decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>): Promise<StreamDecodeResult>;
-  inspectStreamPayload(payload: string): Promise<StreamPayloadInspection>;
+  decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>, signal?: AbortSignal): Promise<StreamDecodeResult>;
+  inspectStreamPayload(payload: string, signal?: AbortSignal): Promise<StreamPayloadInspection>;
   updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal): Promise<HttpStream | BinaryStream>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
   getPacketRawHex(packetId: number): Promise<string>;
@@ -172,6 +173,7 @@ export interface BackendBridge {
   cancelMediaBatchTranscription(): Promise<SpeechBatchTaskStatus>;
   exportMediaBatchTranscription(format: "txt" | "json"): Promise<void>;
   getUSBAnalysis(signal?: AbortSignal): Promise<USBAnalysis>;
+  getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   getMediaPlaybackBlob(token: string): Promise<Blob>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
@@ -792,9 +794,10 @@ export const bridge: BackendBridge = {
     return asBinaryStream(stream, protocol);
   },
 
-  async decodeStreamPayload(decoder: string, payload: string, options: Record<string, unknown> = {}) {
+  async decodeStreamPayload(decoder: string, payload: string, options: Record<string, unknown> = {}, signal?: AbortSignal) {
     const result = await request<any>("/api/streams/decode", {
       method: "POST",
+      signal,
       body: JSON.stringify({
         decoder,
         payload,
@@ -807,12 +810,17 @@ export const bridge: BackendBridge = {
       text: String(result.text ?? ""),
       bytesHex: String(result.bytes_hex ?? ""),
       encoding: String(result.encoding ?? ""),
+      confidence: Number(result.confidence ?? 0) || undefined,
+      warnings: Array.isArray(result.warnings) ? result.warnings.map((item: unknown) => String(item ?? "")) : [],
+      signals: Array.isArray(result.signals) ? result.signals.map((item: unknown) => String(item ?? "")) : [],
+      attemptErrors: Array.isArray(result.attempt_errors) ? result.attempt_errors.map((item: unknown) => String(item ?? "")) : [],
     };
   },
 
-  async inspectStreamPayload(payload: string) {
+  async inspectStreamPayload(payload: string, signal?: AbortSignal) {
     const result = await request<any>("/api/streams/inspect", {
       method: "POST",
+      signal,
       body: JSON.stringify({ payload }),
     });
     return {
@@ -1414,6 +1422,120 @@ export const bridge: BackendBridge = {
       },
       notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
     };
+  },
+
+  async getC2SampleAnalysis(signal?: AbortSignal) {
+    const payload = await request<any>("/api/c2-analysis", { signal });
+    const asC2Record = (item: any) => ({
+      packetId: Number(item.packet_id ?? 0),
+      streamId: Number(item.stream_id ?? 0) || undefined,
+      time: String(item.time ?? "") || undefined,
+      family: String(item.family ?? "cs") === "vshell" ? "vshell" : "cs",
+      channel: String(item.channel ?? "") || undefined,
+      source: String(item.source ?? "") || undefined,
+      destination: String(item.destination ?? "") || undefined,
+      host: String(item.host ?? "") || undefined,
+      uri: String(item.uri ?? "") || undefined,
+      method: String(item.method ?? "") || undefined,
+      indicatorType: String(item.indicator_type ?? "") || undefined,
+      indicatorValue: String(item.indicator_value ?? "") || undefined,
+      confidence: Number(item.confidence ?? 0) || undefined,
+      summary: String(item.summary ?? ""),
+      evidence: String(item.evidence ?? "") || undefined,
+      tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
+      actorHints: Array.isArray(item.actor_hints) ? item.actor_hints.map((value: unknown) => String(value ?? "")) : [],
+      sampleFamily: String(item.sample_family ?? "") || undefined,
+      campaignStage: String(item.campaign_stage ?? "") || undefined,
+      transportTraits: Array.isArray(item.transport_traits) ? item.transport_traits.map((value: unknown) => String(value ?? "")) : [],
+      infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map((value: unknown) => String(value ?? "")) : [],
+      ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map((value: unknown) => String(value ?? "")) : [],
+      attributionConfidence: Number(item.attribution_confidence ?? 0) || undefined,
+    });
+    const asC2BeaconPattern = (item: any) => ({
+      name: String(item.name ?? ""),
+      value: String(item.value ?? ""),
+      confidence: Number(item.confidence ?? 0) || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asC2HTTPEndpointAggregate = (item: any) => ({
+      host: String(item.host ?? ""),
+      uri: String(item.uri ?? ""),
+      channel: String(item.channel ?? "") || undefined,
+      total: Number(item.total ?? 0),
+      getCount: Number(item.get_count ?? 0),
+      postCount: Number(item.post_count ?? 0),
+      methods: Array.isArray(item.methods) ? item.methods.map(asBucket) : [],
+      firstTime: String(item.first_time ?? "") || undefined,
+      lastTime: String(item.last_time ?? "") || undefined,
+      avgInterval: String(item.avg_interval ?? "") || undefined,
+      jitter: String(item.jitter ?? "") || undefined,
+      streams: Array.isArray(item.streams) ? item.streams.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
+      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
+      representativePacket: Number(item.representative_packet ?? 0) || undefined,
+      confidence: Number(item.confidence ?? 0) || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asC2DNSAggregate = (item: any) => ({
+      qname: String(item.qname ?? ""),
+      total: Number(item.total ?? 0),
+      maxLabelLength: Number(item.max_label_length ?? 0),
+      queryTypes: Array.isArray(item.query_types) ? item.query_types.map(asBucket) : [],
+      txtCount: Number(item.txt_count ?? 0),
+      nullCount: Number(item.null_count ?? 0),
+      cnameCount: Number(item.cname_count ?? 0),
+      requestCount: Number(item.request_count ?? 0),
+      responseCount: Number(item.response_count ?? 0),
+      firstTime: String(item.first_time ?? "") || undefined,
+      lastTime: String(item.last_time ?? "") || undefined,
+      avgInterval: String(item.avg_interval ?? "") || undefined,
+      jitter: String(item.jitter ?? "") || undefined,
+      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
+      confidence: Number(item.confidence ?? 0) || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asC2StreamAggregate = (item: any) => ({
+      streamId: Number(item.stream_id ?? 0),
+      protocol: String(item.protocol ?? "") || undefined,
+      totalPackets: Number(item.total_packets ?? 0),
+      archMarkers: Array.isArray(item.arch_markers) ? item.arch_markers.map(asBucket) : [],
+      lengthPrefixCount: Number(item.length_prefix_count ?? 0),
+      shortPackets: Number(item.short_packets ?? 0),
+      longPackets: Number(item.long_packets ?? 0),
+      transitions: Number(item.transitions ?? 0),
+      heartbeatAvg: String(item.heartbeat_avg ?? "") || undefined,
+      heartbeatJitter: String(item.heartbeat_jitter ?? "") || undefined,
+      hasWebSocket: Boolean(item.has_websocket),
+      wsParams: String(item.ws_params ?? "") || undefined,
+      listenerHints: Array.isArray(item.listener_hints) ? item.listener_hints.map(asBucket) : [],
+      firstTime: String(item.first_time ?? "") || undefined,
+      lastTime: String(item.last_time ?? "") || undefined,
+      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
+      confidence: Number(item.confidence ?? 0) || undefined,
+      summary: String(item.summary ?? ""),
+    });
+    const asC2Family = (item: any) => ({
+      candidateCount: Number(item.candidate_count ?? 0),
+      matchedRuleCount: Number(item.matched_rule_count ?? 0),
+      channels: Array.isArray(item.channels) ? item.channels.map(asBucket) : [],
+      indicators: Array.isArray(item.indicators) ? item.indicators.map(asBucket) : [],
+      conversations: Array.isArray(item.conversations) ? item.conversations.map(asConversation) : [],
+      beaconPatterns: Array.isArray(item.beacon_patterns) ? item.beacon_patterns.map(asC2BeaconPattern) : [],
+      hostUriAggregates: Array.isArray(item.host_uri_aggregates) ? item.host_uri_aggregates.map(asC2HTTPEndpointAggregate) : [],
+      dnsAggregates: Array.isArray(item.dns_aggregates) ? item.dns_aggregates.map(asC2DNSAggregate) : [],
+      streamAggregates: Array.isArray(item.stream_aggregates) ? item.stream_aggregates.map(asC2StreamAggregate) : [],
+      candidates: Array.isArray(item.candidates) ? item.candidates.map(asC2Record) : [],
+      notes: Array.isArray(item.notes) ? item.notes.map((value: unknown) => String(value ?? "")) : [],
+      relatedActors: Array.isArray(item.related_actors) ? item.related_actors.map(asBucket) : [],
+      deliveryChains: Array.isArray(item.delivery_chains) ? item.delivery_chains.map(asBucket) : [],
+    });
+    return {
+      totalMatchedPackets: Number(payload.total_matched_packets ?? 0),
+      families: Array.isArray(payload.families) ? payload.families.map(asBucket) : [],
+      conversations: Array.isArray(payload.conversations) ? payload.conversations.map(asConversation) : [],
+      cs: asC2Family(payload.cs ?? {}),
+      vshell: asC2Family(payload.vshell ?? {}),
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: unknown) => String(value ?? "")) : [],
+    } as C2SampleAnalysis;
   },
 
   async downloadMediaArtifact(token: string, filename: string) {

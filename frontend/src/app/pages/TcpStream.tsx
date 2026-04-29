@@ -5,7 +5,6 @@ import { useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
-import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";
 
 type RawViewMode = "ascii" | "hex" | "raw";
@@ -36,7 +35,7 @@ export default function TcpStream() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { tcpStream, selectedPacket, streamIds, setActiveStream, persistStreamPayloads, streamSwitchMetrics } = useSentinel();
+  const { tcpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
 
   useEffect(() => {
     setStreamView({
@@ -120,17 +119,6 @@ export default function TcpStream() {
     } finally {
       setLoadingMore(false);
     }
-  }
-
-  function applyLocalPatches(patches: Array<{ index: number; body: string }>) {
-    if (patches.length === 0) return;
-    const patchMap = new Map<number, string>(patches.map((patch) => [patch.index, patch.body]));
-    setStreamView((prev) => ({
-      ...prev,
-      chunks: prev.chunks.map((chunk, index) => (
-        patchMap.has(index) ? { ...chunk, body: patchMap.get(index) ?? chunk.body } : chunk
-      )),
-    }));
   }
 
   function exportAll() {
@@ -218,7 +206,7 @@ export default function TcpStream() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-foreground">当前片段</div>
-                <div className="text-[11px] text-muted-foreground">右侧固定查看当前 TCP payload，便于边浏览边解码</div>
+                <div className="text-[11px] text-muted-foreground">右侧固定查看当前 TCP payload，解码类实验工具已收敛到 MISC 工作台</div>
               </div>
               {selectedChunk && (
                 <span className={cn(
@@ -256,32 +244,6 @@ export default function TcpStream() {
               </div>
             )}
           </div>
-          <StreamDecoderWorkbench
-            payload={selectedChunk?.body ?? ""}
-            chunkLabel={
-              selectedChunk
-                ? `TCP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
-                : `TCP 流 stream eq ${streamView.id}`
-            }
-            tone="blue"
-            onApplyDecoded={selectedChunk && selectedChunkIndex >= 0
-              ? async (body) => {
-                  const patches = [{ index: selectedChunkIndex, body }];
-                  await persistStreamPayloads("TCP", streamView.id, patches);
-                  applyLocalPatches(patches);
-                }
-              : undefined}
-            batchItems={streamView.chunks.map((chunk, index) => ({
-              index,
-              payload: chunk.body,
-              label: `#${chunk.packetId} ${chunk.direction === "client" ? "client->server" : "server->client"}`,
-            }))}
-            selectedBatchIndex={selectedChunkIndex}
-            onApplyDecodedBatch={async (patches) => {
-              await persistStreamPayloads("TCP", streamView.id, patches);
-              applyLocalPatches(patches);
-            }}
-          />
         </div>
       </div>
 

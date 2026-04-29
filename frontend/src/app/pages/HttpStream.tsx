@@ -12,7 +12,6 @@ import { ungzip } from "pako";
 import { cn } from "../components/ui/utils";
 import { useSentinel } from "../state/SentinelContext";
 import type { StreamLoadMeta } from "../core/types";
-import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 
 type HTTPChunk = {
   key: string;
@@ -34,7 +33,6 @@ export default function HttpStream() {
     selectedPacket,
     streamIds,
     setActiveStream,
-    persistStreamPayloads,
     streamSwitchMetrics,
   } = useSentinel();
   const [viewMode, setViewMode] = useState<HTTPViewMode>("formatted");
@@ -360,23 +358,6 @@ export default function HttpStream() {
                     </div>
                   )}
                 </div>
-                <StreamDecoderWorkbench
-                  payload={selectedChunk?.body ?? ""}
-                  chunkLabel={selectedChunk ? `HTTP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "server" ? "响应" : "请求"}` : `HTTP 流 stream eq ${httpStream.id}`}
-                  tone="emerald"
-                  onApplyDecoded={selectedChunk
-                    ? async (body) => {
-                        await persistStreamPayloads("HTTP", httpStream.id, [{ index: selectedChunk.streamIndex, body }]);
-                      }
-                    : undefined}
-                  batchItems={allChunks.map((chunk) => ({
-                    index: chunk.streamIndex,
-                    payload: chunk.body,
-                    label: `#${chunk.packetId || chunk.streamIndex + 1} ${chunk.direction === "server" ? "response" : "request"}`,
-                  }))}
-                  selectedBatchIndex={selectedChunk?.streamIndex ?? 0}
-                  onApplyDecodedBatch={(patches) => persistStreamPayloads("HTTP", httpStream.id, patches)}
-                />
               </div>
             </div>
           )}

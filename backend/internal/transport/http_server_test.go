@@ -157,6 +157,26 @@ func TestHandleAuditLogsReturnsRecordedEntries(t *testing.T) {
 	}
 }
 
+func TestHandleC2AnalysisReturnsSkeleton(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	req := httptest.NewRequest(http.MethodGet, "/api/c2-analysis", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleC2Analysis(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected c2 analysis endpoint to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload model.C2SampleAnalysis
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode c2 analysis payload: %v", err)
+	}
+	if payload.CS.Candidates == nil || payload.VShell.Candidates == nil {
+		t.Fatalf("expected initialized family payload, got %+v", payload)
+	}
+}
+
 func TestHandleMiscModulesReturnsBuiltinsAndCustomModules(t *testing.T) {
 	server := NewServer(nil, NewHub())
 	err := server.RegisterMiscModule(NewMiscRouteModule(model.MiscModuleManifest{
@@ -194,6 +214,16 @@ func TestHandleMiscModulesReturnsBuiltinsAndCustomModules(t *testing.T) {
 	}
 	if !containsMiscModule(payload, "winrm-decrypt") {
 		t.Fatalf("expected built-in winrm module in payload: %+v", payload)
+	}
+	payloadDecoder, ok := findMiscModule(payload, "payload-webshell-decoder")
+	if !ok {
+		t.Fatalf("expected built-in payload decoder module in payload: %+v", payload)
+	}
+	if payloadDecoder.APIPrefix != "/api/streams" || payloadDecoder.RequiresCapture || !payloadDecoder.SupportsExport || !payloadDecoder.Cancellable {
+		t.Fatalf("unexpected payload decoder manifest: %+v", payloadDecoder)
+	}
+	if payloadDecoder.ProtocolDomain != "Payload / WebShell" {
+		t.Fatalf("unexpected payload decoder protocol domain: %+v", payloadDecoder)
 	}
 	if !containsMiscModule(payload, "smb3-session-key") {
 		t.Fatalf("expected built-in smb3 module in payload: %+v", payload)
@@ -417,12 +447,17 @@ func drainEvents(ch chan event) []event {
 }
 
 func containsMiscModule(items []model.MiscModuleManifest, id string) bool {
+	_, ok := findMiscModule(items, id)
+	return ok
+}
+
+func findMiscModule(items []model.MiscModuleManifest, id string) (model.MiscModuleManifest, bool) {
 	for _, item := range items {
 		if item.ID == id {
-			return true
+			return item, true
 		}
 	}
-	return false
+	return model.MiscModuleManifest{}, false
 }
 
 func testMiscModuleZip(t *testing.T, moduleID string) []byte {

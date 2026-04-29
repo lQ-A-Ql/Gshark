@@ -37,6 +37,22 @@ func TestDecodeStreamPayloadBase64FromColonHexASCII(t *testing.T) {
 	}
 }
 
+func TestDecodeStreamPayloadBase64URL(t *testing.T) {
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "base64",
+		Payload: base64.RawURLEncoding.EncodeToString([]byte("~~~~~~~~~~~~~~~~")),
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(base64url) error = %v", err)
+	}
+	if result.Text != "~~~~~~~~~~~~~~~~" {
+		t.Fatalf("unexpected decoded base64url text: %q", result.Text)
+	}
+	if result.Confidence <= 0 {
+		t.Fatalf("expected confidence to be populated, got %d", result.Confidence)
+	}
+}
+
 func TestDecodeStreamPayloadAntSword(t *testing.T) {
 	payload := "pass=" + url.QueryEscape(base64.StdEncoding.EncodeToString([]byte("echo('ok');")))
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
@@ -553,6 +569,51 @@ func TestDecodeStreamPayloadAutoStillAcceptsHighConfidence(t *testing.T) {
 	if !strings.Contains(result.Text, "<?php") {
 		t.Fatalf("unexpected auto high confidence result: %q", result.Text)
 	}
+	if result.Decoder != "auto" {
+		t.Fatalf("auto result decoder = %q, want auto", result.Decoder)
+	}
+	if result.Confidence < 70 {
+		t.Fatalf("auto confidence = %d, want >= 70", result.Confidence)
+	}
+	if !hasStringPrefix(result.Signals, "auto-score:") {
+		t.Fatalf("expected auto score signal, got signals=%#v", result.Signals)
+	}
+}
+
+func TestDecodeStreamPayloadAutoLowConfidenceIncludesAttemptStages(t *testing.T) {
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "auto",
+		Payload: base64.StdEncoding.EncodeToString([]byte("test")),
+	})
+	if err == nil {
+		t.Fatal("expected auto low-confidence error")
+	}
+	if !strings.Contains(err.Error(), "失败阶段") {
+		t.Fatalf("expected failure-stage details, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Behinder") && !strings.Contains(err.Error(), "Godzilla") {
+		t.Fatalf("expected webshell decoder attempt detail, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadBehinderCBCInvalidBlockLengthIsReadable(t *testing.T) {
+	pass := "rebeyond"
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "behinder",
+		Payload: base64.StdEncoding.EncodeToString([]byte("not-aes-block")),
+		Options: map[string]any{
+			"pass":              pass,
+			"deriveKeyFromPass": true,
+			"inputEncoding":     "base64",
+			"cipherMode":        "cbc",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected AES block length error")
+	}
+	if !strings.Contains(err.Error(), "AES-CBC 密文长度非法") {
+		t.Fatalf("expected readable AES-CBC length error, got: %v", err)
+	}
 }
 
 func TestLooksLikeHTTPMessageRecognizesPut(t *testing.T) {
@@ -616,6 +677,15 @@ func TestDecodeAntSwordChr(t *testing.T) {
 	if result != "Hello" {
 		t.Fatalf("decodeAntSwordChr = %q, want Hello", result)
 	}
+}
+
+func hasStringPrefix(items []string, prefix string) bool {
+	for _, item := range items {
+		if strings.HasPrefix(item, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func encryptAESCBCForTest(plain, key, iv []byte) []byte {

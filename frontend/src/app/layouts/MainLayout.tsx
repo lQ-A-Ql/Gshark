@@ -3,6 +3,7 @@ import {
   Activity,
   BarChart3,
   Box,
+  Bug,
   Car,
   Clapperboard,
   Factory,
@@ -22,7 +23,7 @@ import {
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import logoImg from "../../assets/logo.png";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 import {
   Sidebar,
@@ -42,6 +43,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "主工作区", theme: "blue" },
   { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱", theme: "indigo" },
+  { path: "/c2-analysis", icon: Bug, label: "C2 样本分析", theme: "rose" },
   { path: "/traffic-graph", icon: BarChart3, label: "流量图", theme: "amber" },
   { path: "/industrial-analysis", icon: Factory, label: "工控分析", theme: "blue" },
   { path: "/vehicle-analysis", icon: Car, label: "车机分析", theme: "emerald" },
@@ -111,6 +113,10 @@ const PAGE_THEMES = {
 } as const;
 
 type PageThemeName = keyof typeof PAGE_THEMES;
+type BackgroundFadeState = {
+  key: string;
+  style: CSSProperties;
+};
 
 function themeForPath(pathname: string): (typeof PAGE_THEMES)[PageThemeName] {
   const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme
@@ -123,6 +129,9 @@ export function MainLayout() {
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tlsDialogOpen, setTlsDialogOpen] = useState(false);
+  const [backgroundFade, setBackgroundFade] = useState<BackgroundFadeState | null>(null);
+  const backgroundRouteRef = useRef(location.pathname);
+  const backgroundThemeStyleRef = useRef<CSSProperties | null>(null);
   const {
     fileMeta,
     filteredPackets,
@@ -253,6 +262,26 @@ export function MainLayout() {
     "--gshark-bg-accent-2": activeTheme.accent2,
   } as CSSProperties;
 
+  useLayoutEffect(() => {
+    const previousStyle = backgroundThemeStyleRef.current;
+    if (backgroundRouteRef.current !== location.pathname && previousStyle) {
+      setBackgroundFade({
+        key: location.pathname,
+        style: { ...previousStyle },
+      });
+    }
+
+    backgroundRouteRef.current = location.pathname;
+    backgroundThemeStyleRef.current = pageThemeStyle;
+  }, [
+    location.pathname,
+    activeTheme.accent,
+    activeTheme.accent2,
+    activeTheme.base,
+    activeTheme.bottom,
+    activeTheme.top,
+  ]);
+
   return (
     <SidebarProvider
       open={settingsOpen}
@@ -302,6 +331,7 @@ export function MainLayout() {
 
                 <MenuGroup label="分析">
                   <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
+                  <MenuItem onClick={() => navigate("/c2-analysis")}>C2 样本分析</MenuItem>
                   <MenuItem
                     onClick={() => {
                       setDisplayFilter("http");
@@ -381,8 +411,19 @@ export function MainLayout() {
             })}
           </aside>
 
-          <main className="gshark-page-bg relative flex min-w-0 flex-1 flex-col overflow-hidden">
-            <Outlet />
+          <main className="gshark-page-bg gshark-theme-main relative flex min-w-0 flex-1 flex-col overflow-hidden">
+            {backgroundFade ? (
+              <div
+                key={backgroundFade.key}
+                aria-hidden="true"
+                className="gshark-page-bg gshark-theme-fade"
+                style={backgroundFade.style}
+                onAnimationEnd={() => setBackgroundFade(null)}
+              />
+            ) : null}
+            <div key={location.pathname} className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden">
+              <Outlet />
+            </div>
           </main>
         </div>
 

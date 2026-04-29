@@ -19,11 +19,15 @@ type StreamDecodeRequest struct {
 }
 
 type StreamDecodeResult struct {
-	Decoder  string `json:"decoder"`
-	Summary  string `json:"summary"`
-	Text     string `json:"text"`
-	BytesHex string `json:"bytes_hex"`
-	Encoding string `json:"encoding"`
+	Decoder       string   `json:"decoder"`
+	Summary       string   `json:"summary"`
+	Text          string   `json:"text"`
+	BytesHex      string   `json:"bytes_hex"`
+	Encoding      string   `json:"encoding"`
+	Confidence    int      `json:"confidence,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+	Signals       []string `json:"signals,omitempty"`
+	AttemptErrors []string `json:"attempt_errors,omitempty"`
 }
 
 var (
@@ -183,13 +187,66 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 }
 
 func buildDecodeResult(decoder, summary string, data []byte, encoding string) StreamDecodeResult {
+	text := bytesToDisplayText(data)
 	return StreamDecodeResult{
-		Decoder:  decoder,
-		Summary:  summary,
-		Text:     bytesToDisplayText(data),
-		BytesHex: bytesToColonHex(data),
-		Encoding: encoding,
+		Decoder:    decoder,
+		Summary:    summary,
+		Text:       text,
+		BytesHex:   bytesToColonHex(data),
+		Encoding:   encoding,
+		Confidence: confidenceForDecodedText(text, data, encoding),
+		Warnings:   warningsForDecodedText(text, data),
+		Signals:    signalsForDecodedText(decoder, text, encoding),
 	}
+}
+
+func confidenceForDecodedText(text string, data []byte, encoding string) int {
+	score := scoreDecodedText(text)
+	if score < 0 {
+		if len(data) > 0 {
+			return 20
+		}
+		return 0
+	}
+	confidence := score + 35
+	switch strings.ToLower(strings.TrimSpace(encoding)) {
+	case "base64", "hex", "chr", "rot13":
+		confidence += 8
+	case "plain":
+		confidence -= 12
+	}
+	return clampInt(confidence, 1, 99)
+}
+
+func warningsForDecodedText(text string, data []byte) []string {
+	warnings := make([]string, 0, 3)
+	if len(data) == 0 {
+		return []string{"解码结果为空，建议检查候选值或密钥参数。"}
+	}
+	if strings.TrimSpace(text) == "" {
+		warnings = append(warnings, "解码后无可展示文本，可能仍是二进制或密钥/算法不匹配。")
+	}
+	if strings.Contains(text, "\x00") || !looksMostlyPrintable([]byte(text)) {
+		warnings = append(warnings, "结果可打印率偏低，非 Base64 解码需人工复核。")
+	}
+	if len(text) > 0 && scoreDecodedText(text) < 35 {
+		warnings = append(warnings, "结果文本特征较弱，不应直接视为成功解密。")
+	}
+	return warnings
+}
+
+func signalsForDecodedText(decoder, text, encoding string) []string {
+	signals := []string{
+		"decoder:" + strings.ToLower(strings.TrimSpace(decoder)),
+		"encoding:" + strings.ToLower(strings.TrimSpace(encoding)),
+	}
+	lower := strings.ToLower(text)
+	for _, keyword := range []string{"<?php", "eval(", "assert", "system(", "exec(", "base64_decode", "cmd", "whoami"} {
+		if strings.Contains(lower, keyword) {
+			signals = append(signals, "keyword:"+keyword)
+		}
+	}
+	return dedupeDecodeStrings(signals)
 }
 
 func extractPayloadCandidate(raw, pass string, extractParam bool) string {
@@ -733,4 +790,31 @@ func optionsIntDefault(options map[string]any, key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func clampInt(value, minValue, maxValue int) int {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
+}
+
+func dedupeDecodeStrings(items []string) []string {
+	seen := make(map[string]struct{}, len(items))
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }

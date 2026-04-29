@@ -116,6 +116,10 @@ export interface StreamDecodeResult {
   text: string;
   bytesHex: string;
   encoding: string;
+  confidence?: number;
+  warnings?: string[];
+  signals?: string[];
+  attemptErrors?: string[];
 }
 
 export interface StreamPayloadCandidate {
@@ -617,6 +621,123 @@ export interface AnalysisConversation {
   label: string;
   protocol?: string;
   count: number;
+}
+
+export interface C2IndicatorRecord {
+  packetId: number;
+  streamId?: number;
+  time?: string;
+  family: "cs" | "vshell";
+  channel?: string;
+  source?: string;
+  destination?: string;
+  host?: string;
+  uri?: string;
+  method?: string;
+  indicatorType?: string;
+  indicatorValue?: string;
+  confidence?: number;
+  summary: string;
+  evidence?: string;
+  tags?: string[];
+  actorHints?: string[];
+  sampleFamily?: string;
+  campaignStage?: string;
+  transportTraits?: string[];
+  infrastructureHints?: string[];
+  ttpTags?: string[];
+  attributionConfidence?: number;
+}
+
+  export interface C2BeaconPattern {
+    name: string;
+    value: string;
+    confidence?: number;
+    summary: string;
+  }
+
+  export interface C2HTTPEndpointAggregate {
+    host: string;
+    uri: string;
+    channel?: string;
+    total: number;
+    getCount: number;
+    postCount: number;
+    methods: TrafficBucket[];
+    firstTime?: string;
+    lastTime?: string;
+    avgInterval?: string;
+    jitter?: string;
+    streams?: number[];
+    packets?: number[];
+    representativePacket?: number;
+    confidence?: number;
+    summary: string;
+  }
+  
+  export interface C2DNSAggregate {
+    qname: string;
+    total: number;
+    maxLabelLength: number;
+    queryTypes: TrafficBucket[];
+    txtCount: number;
+    nullCount: number;
+    cnameCount: number;
+    requestCount: number;
+    responseCount: number;
+    firstTime?: string;
+    lastTime?: string;
+    avgInterval?: string;
+    jitter?: string;
+    packets?: number[];
+    confidence?: number;
+    summary: string;
+  }
+
+  export interface C2StreamAggregate {
+    streamId: number;
+    protocol?: string;
+    totalPackets: number;
+    archMarkers?: TrafficBucket[];
+    lengthPrefixCount: number;
+    shortPackets: number;
+    longPackets: number;
+    transitions: number;
+    heartbeatAvg?: string;
+    heartbeatJitter?: string;
+    hasWebSocket: boolean;
+    wsParams?: string;
+    listenerHints?: TrafficBucket[];
+    firstTime?: string;
+    lastTime?: string;
+    packets?: number[];
+    confidence?: number;
+    summary: string;
+  }
+
+  export interface C2FamilyAnalysis {
+    candidateCount: number;
+    matchedRuleCount: number;
+    channels: TrafficBucket[];
+    indicators: TrafficBucket[];
+    conversations: AnalysisConversation[];
+    beaconPatterns?: C2BeaconPattern[];
+    hostUriAggregates?: C2HTTPEndpointAggregate[];
+    dnsAggregates?: C2DNSAggregate[];
+    streamAggregates?: C2StreamAggregate[];
+    candidates: C2IndicatorRecord[];
+    notes: string[];
+    relatedActors?: TrafficBucket[];
+  deliveryChains?: TrafficBucket[];
+}
+
+export interface C2SampleAnalysis {
+  totalMatchedPackets: number;
+  families: TrafficBucket[];
+  conversations: AnalysisConversation[];
+  cs: C2FamilyAnalysis;
+  vshell: C2FamilyAnalysis;
+  notes: string[];
 }
 
 export interface ModbusBitRange {

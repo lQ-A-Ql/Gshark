@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -125,6 +126,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/vehicle/dbc", s.handleVehicleDBC)
 	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
 	mux.HandleFunc("/api/analysis/usb", s.handleUSBAnalysis)
+	mux.HandleFunc("/api/c2-analysis", s.handleC2Analysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/analysis/media/play", s.handleMediaArtifactPlayback)
 	mux.HandleFunc("/api/analysis/media/transcribe", s.handleMediaArtifactTranscription)
@@ -616,6 +618,19 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUSBAnalysis(w http.ResponseWriter, _ *http.Request) {
 	analysis, err := s.svc.USBAnalysis()
 	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, analysis)
+}
+
+func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
+	analysis, err := s.svc.C2SampleAnalysis(r.Context())
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			writeError(w, http.StatusRequestTimeout, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

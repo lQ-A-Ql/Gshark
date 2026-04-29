@@ -17,7 +17,6 @@ import { buildCaptureOverview, type CaptureRecommendation } from "../core/captur
 import type { GlobalTrafficStats, IndustrialAnalysis, MediaAnalysis, USBAnalysis, VehicleAnalysis } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
-import { StreamDecoderWorkbench } from "./StreamDecoderWorkbench";
 
 interface OverviewBundle {
   stats: GlobalTrafficStats | null;
@@ -349,7 +348,7 @@ export function CaptureMissionControl() {
             <div>
               <div className="text-sm font-semibold text-slate-900">Payload 快速解码</div>
               <div className="mt-1 text-xs text-slate-500">
-                当前选中数据包就能直接尝试 Base64、Behinder、AntSword、Godzilla 解码；如果需要更长上下文，再打开关联流继续分析。
+                解码与 WebShell 候选识别已收敛到 MISC 工具箱；首屏仅保留当前包上下文和跳转入口，避免工作区过载。
               </div>
             </div>
             {selectedPacket && (
@@ -366,12 +365,19 @@ export function CaptureMissionControl() {
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 )}
+                <button
+                  onClick={() => navigate("/misc")}
+                  className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-100"
+                >
+                  打开 MISC 解码工作台
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
           </div>
 
           {selectedPacket ? (
-            <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-semibold text-slate-900">当前数据包上下文</div>
                 <div className="mt-3 space-y-3 text-xs">
@@ -381,15 +387,27 @@ export function CaptureMissionControl() {
                   <InfoRow label="说明" value={selectedPacket.info || "(no info)"} />
                 </div>
               </div>
-              <StreamDecoderWorkbench
-                payload={selectedPacket.payload ?? ""}
-                chunkLabel={`当前数据包 #${selectedPacket.id}`}
-                tone="blue"
-              />
+              <div className="rounded-[24px] border border-cyan-100 bg-cyan-50/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Payload 预览</div>
+                    <div className="mt-1 text-xs text-slate-500">如需识别候选或尝试解码，请在 MISC 工作台中手动粘贴该 payload。</div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/misc")}
+                    className="shrink-0 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                  >
+                    去 MISC
+                  </button>
+                </div>
+                <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-cyan-100 bg-white/90 px-3 py-2 font-mono text-[11px] leading-5 text-slate-600">
+                  {selectedPacket.payload || "(empty payload)"}
+                </pre>
+              </div>
             </div>
           ) : (
             <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs leading-5 text-slate-500">
-              选中一条数据包后，这里会直接出现 payload 解码工作台。
+              选中一条数据包后，这里会展示 payload 预览；完整解码请前往 MISC 工具箱。
             </div>
           )}
         </div>

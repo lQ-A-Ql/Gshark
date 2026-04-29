@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildC2SampleAnalysisCacheKey } from "./C2Analysis";
 import { buildIndustrialAnalysisCacheKey } from "./IndustrialAnalysis";
 import { buildTrafficStatsCacheKey } from "./TrafficGraph";
 import { buildUSBAnalysisCacheKey } from "./UsbAnalysis";
@@ -17,6 +18,10 @@ describe("analysis cache keys", () => {
     expect(buildUSBAnalysisCacheKey(9, "C:/captures/usb.pcapng", 64)).toBe("9::C:/captures/usb.pcapng::64");
   });
 
+  it("includes capture revision for c2 analysis", () => {
+    expect(buildC2SampleAnalysisCacheKey(11, "C:/captures/c2.pcapng", 96)).toBe("11::C:/captures/c2.pcapng::96");
+  });
+
   it("includes sorted dbc profiles for vehicle analysis", () => {
     expect(buildVehicleAnalysisCacheKey(5, "C:/captures/vehicle.pcapng", 512, [
       { path: "z.dbc", name: "Z", messageCount: 1, signalCount: 1 },
@@ -28,6 +33,7 @@ describe("analysis cache keys", () => {
     expect(buildIndustrialAnalysisCacheKey(1, "", 1)).toBe("");
     expect(buildTrafficStatsCacheKey(1, "   ", 1)).toBe("");
     expect(buildUSBAnalysisCacheKey(1, "", 1)).toBe("");
+    expect(buildC2SampleAnalysisCacheKey(1, "   ", 1)).toBe("");
     expect(buildVehicleAnalysisCacheKey(1, "", 1, [])).toBe("");
   });
 });

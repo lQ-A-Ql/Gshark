@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   getMySQLAnalysis: vi.fn(),
   getSMTPAnalysis: vi.fn(),
   getShiroRememberMeAnalysis: vi.fn(),
+  decodeStreamPayload: vi.fn(),
+  inspectStreamPayload: vi.fn(),
   listNTLMSessionMaterials: vi.fn(),
   listSMB3SessionCandidates: vi.fn(),
   generateSMB3RandomSessionKey: vi.fn(),
@@ -43,6 +45,8 @@ vi.mock("../integrations/wailsBridge", () => ({
     getMySQLAnalysis: mocks.getMySQLAnalysis,
     getSMTPAnalysis: mocks.getSMTPAnalysis,
     getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
+    decodeStreamPayload: mocks.decodeStreamPayload,
+    inspectStreamPayload: mocks.inspectStreamPayload,
     listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
     listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
     generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
@@ -85,6 +89,8 @@ describe("MiscTools SMB3 session candidates", () => {
     mocks.getMySQLAnalysis.mockReset();
     mocks.getSMTPAnalysis.mockReset();
     mocks.getShiroRememberMeAnalysis.mockReset();
+    mocks.decodeStreamPayload.mockReset();
+    mocks.inspectStreamPayload.mockReset();
     mocks.listNTLMSessionMaterials.mockReset();
     mocks.listSMB3SessionCandidates.mockReset();
     mocks.generateSMB3RandomSessionKey.mockReset();
@@ -259,6 +265,38 @@ describe("MiscTools SMB3 session candidates", () => {
       ],
       notes: ["Shiro note"],
     });
+    mocks.inspectStreamPayload.mockResolvedValue({
+      normalizedPayload: "pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+      candidates: [
+        {
+          id: "form-0",
+          label: "参数 pass",
+          kind: "form",
+          paramName: "pass",
+          value: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+          preview: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+          confidence: 88,
+          decoderHints: ["antsword", "base64"],
+          fingerprints: ["script-after-base64"],
+        },
+      ],
+      suggestedCandidateId: "form-0",
+      suggestedDecoder: "antsword",
+      suggestedFamily: "antsword_like",
+      confidence: 88,
+      reasons: ["Base64 解码后出现 assert/eval 等脚本特征。"],
+    });
+    mocks.decodeStreamPayload.mockResolvedValue({
+      decoder: "base64",
+      summary: "Base64 自动解码",
+      text: "assert($_POST['cmd']);",
+      bytesHex: "61:73:73:65:72:74",
+      encoding: "base64",
+      confidence: 96,
+      warnings: ["实验性 webshell 解码，需人工复核。"],
+      signals: ["keyword:assert"],
+      attemptErrors: ["Behinder (ECB): AES-ECB 密文长度非法"],
+    });
     mocks.listNTLMSessionMaterials.mockResolvedValue([
       {
         protocol: "HTTP",
@@ -313,6 +351,20 @@ describe("MiscTools SMB3 session candidates", () => {
         supportsExport: true,
         cancellable: true,
         dependsOn: ["capture", "http"],
+      },
+      {
+        id: "payload-webshell-decoder",
+        kind: "builtin",
+        title: "Payload / WebShell 解码工作台",
+        summary: "payload decoder summary",
+        tags: ["Payload", "WebShell", "Decode", "Base64"],
+        apiPrefix: "/api/streams",
+        docsPath: "docs/misc-module-interface.md",
+        requiresCapture: false,
+        protocolDomain: "Payload / WebShell",
+        supportsExport: true,
+        cancellable: true,
+        dependsOn: ["payload", "decode"],
       },
       {
         id: "mysql-session-analysis",
@@ -427,6 +479,71 @@ describe("MiscTools SMB3 session candidates", () => {
         displayLabel: "0x1122334455667788 | Guest | 10.0.0.10 -> 10.0.0.20 | 帧 #102",
       },
     ]);
+  });
+
+  it("renders the MISC payload decoder workbench and decodes a Base64 candidate", async () => {
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    fireEvent.click(screen.getByRole("button", { name: "示例" }));
+    fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
+
+    await waitFor(() => {
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==", expect.any(AbortSignal));
+    });
+    expect(await screen.findByText("参数 pass")).toBeInTheDocument();
+    expect(screen.getByText("实验性 webshell 解码，需人工复核")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Base64" }));
+
+    await waitFor(() => {
+      expect(mocks.decodeStreamPayload).toHaveBeenCalledWith(
+        "base64",
+        "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        {},
+        expect.any(AbortSignal),
+      );
+    });
+    expect(await screen.findByText("assert($_POST['cmd']);")).toBeInTheDocument();
+    expect(screen.getByText("置信度 96%")).toBeInTheDocument();
+    expect(screen.getByText("keyword:assert")).toBeInTheDocument();
+    expect(screen.getByText("Behinder (ECB): AES-ECB 密文长度非法")).toBeInTheDocument();
+  });
+
+  it("keeps low-confidence auto detection as an explicit review state", async () => {
+    mocks.inspectStreamPayload.mockResolvedValueOnce({
+      normalizedPayload: "just-random-text",
+      candidates: [
+        {
+          id: "payload-0",
+          label: "当前 payload",
+          kind: "payload",
+          value: "just-random-text",
+          confidence: 15,
+          decoderHints: ["auto"],
+          fingerprints: [],
+        },
+      ],
+      suggestedCandidateId: "payload-0",
+      suggestedDecoder: "auto",
+      suggestedFamily: "plain",
+      confidence: 15,
+      reasons: ["已提取出可操作 payload 候选。"],
+    });
+    mocks.decodeStreamPayload.mockRejectedValueOnce(new Error("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空"));
+
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    fireEvent.change(screen.getByPlaceholderText(/POST \/shell\.php/), { target: { value: "just-random-text" } });
+    fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
+
+    expect(await screen.findByText("当前 payload")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "自动检测" }));
+
+    expect(await screen.findByText("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空")).toBeInTheDocument();
   });
 
   it("loads candidates and renders detailed selector options", async () => {

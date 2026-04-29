@@ -204,13 +204,19 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 
 	var bestResult StreamDecodeResult
 	bestScore := -1
+	attemptErrors := make([]string, 0, len(attempts))
 
 	for _, a := range attempts {
 		result, err := a.fn()
 		if err != nil {
+			attemptErrors = append(attemptErrors, fmt.Sprintf("%s: %v", a.name, err))
 			continue
 		}
 		score := scoreDecodeAttempt(a.name, result)
+		if score < 0 {
+			attemptErrors = append(attemptErrors, fmt.Sprintf("%s: 结果不可读或为空", a.name))
+			continue
+		}
 		if score > bestScore {
 			bestScore = score
 			bestResult = result
@@ -219,11 +225,15 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 	}
 
 	if bestScore < 0 {
-		return StreamDecodeResult{}, errors.New("自动检测未找到有效解码结果，请手动选择解码器")
+		return StreamDecodeResult{}, fmt.Errorf("自动检测未找到有效解码结果，请手动选择解码器；失败阶段：%s", strings.Join(attemptErrors, "；"))
 	}
 	if bestScore < 35 {
-		return StreamDecodeResult{}, errors.New("自动检测置信度不足，请手动选择解码器")
+		return StreamDecodeResult{}, fmt.Errorf("自动检测置信度不足，请手动选择解码器；最佳分数 %d；失败阶段：%s", bestScore, strings.Join(attemptErrors, "；"))
 	}
+	bestResult.Decoder = "auto"
+	bestResult.Confidence = clampInt(bestScore+20, 1, 99)
+	bestResult.AttemptErrors = attemptErrors
+	bestResult.Signals = dedupeDecodeStrings(append(bestResult.Signals, fmt.Sprintf("auto-score:%d", bestScore)))
 	return bestResult, nil
 }
 

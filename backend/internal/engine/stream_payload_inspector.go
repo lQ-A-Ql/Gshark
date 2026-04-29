@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -17,12 +18,12 @@ var (
 )
 
 type payloadFingerprint struct {
-	Family         string
-	Confidence     int
-	Suggested      string
-	Reasons        []string
-	Fingerprints   []string
-	DecoderHints   []string
+	Family       string
+	Confidence   int
+	Suggested    string
+	Reasons      []string
+	Fingerprints []string
+	DecoderHints []string
 }
 
 func InspectStreamPayload(raw string) model.StreamPayloadInspection {
@@ -105,6 +106,13 @@ func collectInspectionCandidates(raw, normalized string) []model.StreamPayloadCa
 		label := "分段字段"
 		if item.paramName != "" {
 			label = "分段字段 " + item.paramName
+		}
+		add(label, item.kind, item.paramName, item.value)
+	}
+	for _, item := range collectJSONCandidates(normalized) {
+		label := "JSON 字段"
+		if item.paramName != "" {
+			label = "JSON 字段 " + item.paramName
 		}
 		add(label, item.kind, item.paramName, item.value)
 	}
@@ -240,6 +248,64 @@ func collectMultipartCandidates(candidate string) []inspectionParamCandidate {
 		})
 	}
 	return out
+}
+
+func collectJSONCandidates(candidate string) []inspectionParamCandidate {
+	text := strings.TrimSpace(candidate)
+	if text == "" || !(strings.HasPrefix(text, "{") || strings.HasPrefix(text, "[")) {
+		return nil
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(text), &decoded); err != nil {
+		return nil
+	}
+	out := make([]inspectionParamCandidate, 0, 8)
+	collectJSONCandidateValues(decoded, "", &out)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].paramName != out[j].paramName {
+			return out[i].paramName < out[j].paramName
+		}
+		return len(out[i].value) > len(out[j].value)
+	})
+	if len(out) > 12 {
+		return out[:12]
+	}
+	return out
+}
+
+func collectJSONCandidateValues(value any, path string, out *[]inspectionParamCandidate) {
+	switch typed := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			nextPath := key
+			if path != "" {
+				nextPath = path + "." + key
+			}
+			collectJSONCandidateValues(typed[key], nextPath, out)
+		}
+	case []any:
+		for idx, item := range typed {
+			if idx >= 8 {
+				return
+			}
+			nextPath := fmt.Sprintf("%s[%d]", path, idx)
+			collectJSONCandidateValues(item, nextPath, out)
+		}
+	case string:
+		trimmed := strings.TrimSpace(typed)
+		if len(trimmed) >= 8 {
+			*out = append(*out, inspectionParamCandidate{
+				kind:      "json",
+				paramName: path,
+				value:     trimmed,
+			})
+		}
+	}
 }
 
 func extractEmbeddedHexCandidate(raw string) string {

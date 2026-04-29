@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Binary, Bug, Cog, KeyRound, LoaderCircle, Search, ShieldAlert, Wand2 } from "lucide-react";
 import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
@@ -109,6 +109,8 @@ export function StreamDecoderWorkbench({
   const [inspectionError, setInspectionError] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [applyMode, setApplyMode] = useState<DecoderApplyMode>("derived");
+  const activeDecodeAbortRef = useRef<AbortController | null>(null);
+  const canOverwrite = Boolean(onApplyDecoded);
   const selectedBatchOrdinal = useMemo(() => {
     if (!batchItems || batchItems.length === 0) return 1;
     const hit = batchItems.findIndex((item) => item.index === selectedBatchIndex);
@@ -122,6 +124,8 @@ export function StreamDecoderWorkbench({
   }, [settings]);
 
   useEffect(() => {
+    activeDecodeAbortRef.current?.abort();
+    activeDecodeAbortRef.current = null;
     setResult(null);
     setDecodeError("");
     setRunningDecoder(null);
@@ -134,6 +138,16 @@ export function StreamDecoderWorkbench({
     setSelectedCandidateId("");
     setApplyMode("derived");
   }, [payload, chunkLabel]);
+
+  useEffect(() => () => {
+    activeDecodeAbortRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!canOverwrite && applyMode === "overwrite") {
+      setApplyMode("derived");
+    }
+  }, [applyMode, canOverwrite]);
 
   useEffect(() => {
     setRangeStart(String(selectedBatchOrdinal));
@@ -168,6 +182,7 @@ export function StreamDecoderWorkbench({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     if (!preparedPayload.trim()) {
       setInspection(null);
       setInspectionError("");
@@ -177,7 +192,7 @@ export function StreamDecoderWorkbench({
     }
     setInspectionLoading(true);
     setInspectionError("");
-    void bridge.inspectStreamPayload(payload)
+    void bridge.inspectStreamPayload(payload, controller.signal)
       .then((next) => {
         if (cancelled) return;
         setInspection(next);
@@ -188,6 +203,7 @@ export function StreamDecoderWorkbench({
       })
       .catch((error) => {
         if (cancelled) return;
+        if (isAbortError(error)) return;
         setInspection(null);
         setSelectedCandidateId("");
         setInspectionError(error instanceof Error ? error.message : "payload 候选提取失败");
@@ -199,10 +215,11 @@ export function StreamDecoderWorkbench({
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [payload, preparedPayload]);
 
-  async function decodeOne(decoder: StreamDecoderKind, rawPayload: string) {
+  async function decodeOne(decoder: StreamDecoderKind, rawPayload: string, signal?: AbortSignal) {
     const normalized = normalizeTransportPayload(rawPayload);
     if (!normalized.trim()) {
       throw new Error("当前 payload 为空，无法解码");
@@ -212,7 +229,14 @@ export function StreamDecoderWorkbench({
         decoder === "antsword" ? settings.antsword :
           decoder === "godzilla" ? settings.godzilla :
             {};
-    return bridge.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options);
+    return bridge.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options, signal);
+  }
+
+  function cancelDecode() {
+    activeDecodeAbortRef.current?.abort();
+    setRunningDecoder(null);
+    setDecodeError("解码已取消");
+    setBatchProgress(null);
   }
 
   async function runDecoder(decoder: StreamDecoderKind) {
@@ -221,6 +245,9 @@ export function StreamDecoderWorkbench({
       return;
     }
 
+    activeDecodeAbortRef.current?.abort();
+    const controller = new AbortController();
+    activeDecodeAbortRef.current = controller;
     setRunningDecoder(decoder);
     setDecodeError("");
     setApplyMessage("");
@@ -250,7 +277,10 @@ export function StreamDecoderWorkbench({
           const item = selected[idx];
           setBatchProgress((prev) => prev ? { ...prev, currentLabel: item.label } : prev);
           try {
-            const next = await decodeOne(decoder, item.payload);
+            if (controller.signal.aborted) {
+              throw new Error("解码已取消");
+            }
+            const next = await decodeOne(decoder, item.payload, controller.signal);
             lastResult = next;
             if (next.text.trim()) {
               patches.push({ index: item.index, body: next.text });
@@ -288,7 +318,7 @@ export function StreamDecoderWorkbench({
         return;
       }
 
-      const next = await decodeOne(decoder, effectivePayload);
+      const next = await decodeOne(decoder, effectivePayload, controller.signal);
       setResult(next);
       if (applyMode === "overwrite" && onApplyDecoded && next.text.trim()) {
         await onApplyDecoded(next.text);
@@ -299,11 +329,16 @@ export function StreamDecoderWorkbench({
         setApplyMessage("当前为仅预览模式，结果不会覆盖原始 payload。");
       }
     } catch (error) {
-      setDecodeError(error instanceof Error ? error.message : "解码失败");
+      if (activeDecodeAbortRef.current === controller) {
+        setDecodeError(isAbortError(error) ? "解码已取消" : error instanceof Error ? error.message : "解码失败");
+      }
     } finally {
-      setRunningDecoder(null);
-      if (!hasBatchMode) {
-        setBatchProgress(null);
+      if (activeDecodeAbortRef.current === controller) {
+        activeDecodeAbortRef.current = null;
+        setRunningDecoder(null);
+        if (!hasBatchMode) {
+          setBatchProgress(null);
+        }
       }
     }
   }
@@ -354,6 +389,15 @@ export function StreamDecoderWorkbench({
             onClick={() => void runDecoder("godzilla")}
           />
           <SettingsButton onClick={() => setActiveSettings("godzilla")} />
+          {runningDecoder && (
+            <button
+              type="button"
+              onClick={cancelDecode}
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition-colors hover:bg-rose-100"
+            >
+              取消
+            </button>
+          )}
         </div>
       </div>
 
@@ -397,7 +441,13 @@ export function StreamDecoderWorkbench({
           <span className="text-xs font-medium text-muted-foreground">覆盖策略</span>
           <ApplyModeButton label="仅预览" active={applyMode === "preview"} onClick={() => setApplyMode("preview")} />
           <ApplyModeButton label="衍生视图" active={applyMode === "derived"} onClick={() => setApplyMode("derived")} />
-          <ApplyModeButton label="覆盖原文" active={applyMode === "overwrite"} onClick={() => setApplyMode("overwrite")} />
+          {canOverwrite ? (
+            <ApplyModeButton label="覆盖原文" active={applyMode === "overwrite"} onClick={() => setApplyMode("overwrite")} />
+          ) : (
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+              MISC 分析模式，不写回抓包
+            </span>
+          )}
           {selectedCandidate && (
             <span className="rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground">
               当前候选：{selectedCandidate.label}
@@ -735,6 +785,10 @@ export function StreamDecoderWorkbench({
           error={Boolean(decodeError)}
           loading={Boolean(runningDecoder)}
           bytesHex={result?.bytesHex}
+          confidence={result?.confidence}
+          warnings={result?.warnings}
+          signals={result?.signals}
+          attemptErrors={result?.attemptErrors}
           footer={applyMessage || undefined}
         />
       </div>
@@ -930,6 +984,10 @@ function PayloadPane({
   error = false,
   loading = false,
   bytesHex,
+  confidence,
+  warnings,
+  signals,
+  attemptErrors,
   footer,
 }: {
   title: string;
@@ -937,17 +995,59 @@ function PayloadPane({
   error?: boolean;
   loading?: boolean;
   bytesHex?: string;
+  confidence?: number;
+  warnings?: string[];
+  signals?: string[];
+  attemptErrors?: string[];
   footer?: string;
 }) {
+  const downloadable = content.trim().length > 0 && content !== "点击上方解码器开始分析";
+
+  function copyContent() {
+    if (!downloadable) return;
+    void navigator.clipboard?.writeText(content);
+  }
+
+  function exportContent() {
+    if (!downloadable) return;
+    downloadText(`payload-decode-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`, content);
+  }
+
   return (
     <div className="rounded-lg border border-border bg-background/90 p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-semibold text-foreground">{title}</div>
-        {loading && <span className="text-[11px] text-blue-600">解码中...</span>}
+        <div className="flex items-center gap-2">
+          {typeof confidence === "number" && confidence > 0 && (
+            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+              置信度 {confidence}%
+            </span>
+          )}
+          {loading && <span className="text-[11px] text-blue-600">解码中...</span>}
+          {downloadable && (
+            <>
+              <button type="button" onClick={copyContent} className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+                复制
+              </button>
+              <button type="button" onClick={exportContent} className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+                导出
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <pre className={`max-h-72 min-w-0 overflow-auto whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs leading-5 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-border bg-card text-foreground"}`}>
         {content}
       </pre>
+      {(warnings?.length ?? 0) > 0 && (
+        <TagList title="警告" items={warnings!} tone="amber" />
+      )}
+      {(signals?.length ?? 0) > 0 && (
+        <TagList title="信号" items={signals!} tone="blue" />
+      )}
+      {(attemptErrors?.length ?? 0) > 0 && (
+        <TagList title="自动检测失败阶段" items={attemptErrors!} tone="rose" />
+      )}
       {bytesHex && !error && (
         <div className="mt-2 rounded-md border border-border bg-card px-3 py-2">
           <div className="mb-1 text-[11px] font-semibold text-muted-foreground">Hex</div>
@@ -957,6 +1057,39 @@ function PayloadPane({
       {footer && <div className="mt-2 text-[11px] text-blue-700 dark:text-blue-300">{footer}</div>}
     </div>
   );
+}
+
+function TagList({ title, items, tone }: { title: string; items: string[]; tone: "amber" | "blue" | "rose" }) {
+  const toneClass =
+    tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-700" :
+      tone === "rose" ? "border-rose-200 bg-rose-50 text-rose-700" :
+        "border-blue-200 bg-blue-50 text-blue-700";
+  return (
+    <div className="mt-2 rounded-md border border-border bg-card px-3 py-2">
+      <div className="mb-1 text-[11px] font-semibold text-muted-foreground">{title}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <span key={`${title}-${item}`} className={`rounded border px-2 py-0.5 text-[11px] ${toneClass}`}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function downloadText(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 const HTTP_METHOD_PREFIXES = ["GET ", "POST ", "PUT ", "DELETE ", "PATCH ", "HEAD ", "OPTIONS ", "CONNECT ", "TRACE "];

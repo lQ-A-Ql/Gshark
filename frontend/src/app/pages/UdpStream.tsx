@@ -5,7 +5,6 @@ import { useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
-import { StreamDecoderWorkbench } from "../components/StreamDecoderWorkbench";
 import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";
 
 type RawViewMode = "ascii" | "hex" | "raw";
@@ -34,7 +33,7 @@ export default function UdpStream() {
   const consumedRouteStreamIdRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { udpStream, selectedPacket, streamIds, setActiveStream, persistStreamPayloads, streamSwitchMetrics } = useSentinel();
+  const { udpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
   const currentIndex = streamIds.udp.findIndex((id) => id === streamView.id);
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.udp.length || 1}` : `-- / ${streamIds.udp.length || 0}`;
   const hasPrev = currentIndex > 0;
@@ -115,17 +114,6 @@ export default function UdpStream() {
     }
   }
 
-  function applyLocalPatches(patches: Array<{ index: number; body: string }>) {
-    if (patches.length === 0) return;
-    const patchMap = new Map<number, string>(patches.map((patch) => [patch.index, patch.body]));
-    setStreamView((prev) => ({
-      ...prev,
-      chunks: prev.chunks.map((chunk, index) => (
-        patchMap.has(index) ? { ...chunk, body: patchMap.get(index) ?? chunk.body } : chunk
-      )),
-    }));
-  }
-
   function exportAll() {
     const content = streamView.chunks
       .map((chunk) => `--- ${chunk.direction === "client" ? "CLIENT -> SERVER" : "SERVER -> CLIENT"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
@@ -204,7 +192,7 @@ export default function UdpStream() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-foreground">当前片段</div>
-                <div className="text-[11px] text-muted-foreground">固定查看当前 UDP payload，便于快速对照解码结果</div>
+                <div className="text-[11px] text-muted-foreground">固定查看当前 UDP payload，解码类实验工具已收敛到 MISC 工作台</div>
               </div>
               {selectedChunk && (
                 <span className={cn(
@@ -234,32 +222,6 @@ export default function UdpStream() {
               </div>
             )}
           </div>
-          <StreamDecoderWorkbench
-            payload={selectedChunk?.body ?? ""}
-            chunkLabel={
-              selectedChunk
-                ? `UDP 片段 #${selectedChunk.packetId} / ${selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}`
-                : `UDP 流 stream eq ${streamView.id}`
-            }
-            tone="amber"
-            onApplyDecoded={selectedChunk && selectedChunkIndex >= 0
-              ? async (body) => {
-                  const patches = [{ index: selectedChunkIndex, body }];
-                  await persistStreamPayloads("UDP", streamView.id, patches);
-                  applyLocalPatches(patches);
-                }
-              : undefined}
-            batchItems={streamView.chunks.map((chunk, index) => ({
-              index,
-              payload: chunk.body,
-              label: `#${chunk.packetId} ${chunk.direction === "client" ? "client->server" : "server->client"}`,
-            }))}
-            selectedBatchIndex={selectedChunkIndex}
-            onApplyDecodedBatch={async (patches) => {
-              await persistStreamPayloads("UDP", streamView.id, patches);
-              applyLocalPatches(patches);
-            }}
-          />
         </div>
       </div>
 

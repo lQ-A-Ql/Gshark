@@ -3,6 +3,7 @@ import {
   Database,
   KeyRound,
   Mail,
+  Binary,
   Shield,
   Upload,
   Wrench,
@@ -17,9 +18,9 @@ import { resolveMiscModuleRenderer } from "../misc/registry";
 import { ErrorBlock } from "../misc/ui";
 import { cn } from "../components/ui/utils";
 
-type MiscCategory = "Misc" | "Modules" | "WinRM" | "SMB3";
+type MiscCategory = "Misc" | "Payload" | "Modules" | "WinRM" | "SMB3";
 
-const categoryOptions: MiscCategory[] = ["Misc", "Modules", "WinRM", "SMB3"];
+const categoryOptions: MiscCategory[] = ["Misc", "Payload", "Modules", "WinRM", "SMB3"];
 
 export default function MiscTools() {
   const [modules, setModules] = useState<MiscModuleManifest[]>([]);
@@ -292,6 +293,8 @@ function matchesCategory(module: MiscModuleManifest, category: MiscCategory) {
   switch (category) {
     case "Modules":
       return module.kind === "custom";
+    case "Payload":
+      return haystack.includes("payload") || haystack.includes("webshell") || haystack.includes("decode") || haystack.includes("base64");
     case "WinRM":
       return haystack.includes("winrm") || haystack.includes("ntlm");
     case "SMB3":
@@ -311,6 +314,9 @@ function resolveModuleIcon(module: MiscModuleManifest): { Icon: LucideIcon; surf
   }
   if (haystack.includes("smtp") || haystack.includes("mail")) {
     return { Icon: Mail, surface: "border-sky-200 bg-sky-50", text: "text-sky-700" };
+  }
+  if (haystack.includes("payload") || haystack.includes("webshell") || haystack.includes("decode") || haystack.includes("base64")) {
+    return { Icon: Binary, surface: "border-cyan-200 bg-cyan-50", text: "text-cyan-700" };
   }
   if (haystack.includes("ntlm") || haystack.includes("smb3") || haystack.includes("winrm")) {
     return { Icon: KeyRound, surface: "border-violet-200 bg-violet-50", text: "text-violet-700" };

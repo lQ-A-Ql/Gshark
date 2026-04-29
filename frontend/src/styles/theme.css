@@ -162,6 +162,87 @@
       auto,
       auto,
       auto;
+    transition:
+      background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-position 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .gshark-theme-main {
+    isolation: isolate;
+  }
+
+  .gshark-theme-main > :not(.gshark-theme-fade) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .gshark-theme-fade {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    animation: gshark-bg-fade-out 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, filter;
+  }
+
+  .gshark-route-transition {
+    animation: gshark-route-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform-origin: 50% 0%;
+    will-change: opacity, transform, filter;
+  }
+}
+
+@keyframes gshark-bg-fade-out {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  62% {
+    opacity: 0.36;
+    filter: blur(1.5px);
+  }
+
+  100% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+@keyframes gshark-route-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+    filter: blur(3px);
+  }
+
+  72% {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gshark-page-bg {
+    transition: none;
+  }
+
+  .gshark-theme-fade {
+    display: none;
+    animation: none;
+    filter: none;
+  }
+
+  .gshark-route-transition {
+    animation: none;
+    transform: none;
+    filter: none;
   }
 }
 

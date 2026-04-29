@@ -38,6 +38,7 @@ type Service struct {
 	vehicleAnalysis         *model.VehicleAnalysis
 	mediaAnalysis           *model.MediaAnalysis
 	usbAnalysis             *model.USBAnalysis
+	c2Analysis              *model.C2SampleAnalysis
 	vehicleDBCDefs          []*tshark.DBCDatabase
 	streamCache             map[string]model.ReassembledStream
 	streamCacheOrder        []string
@@ -214,6 +215,7 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	s.vehicleAnalysis = nil
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
+	s.c2Analysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}
@@ -506,6 +508,7 @@ func (s *Service) ClearCapture() error {
 	s.vehicleAnalysis = nil
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
+	s.c2Analysis = nil
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}
@@ -1730,6 +1733,88 @@ func (s *Service) USBAnalysis() (model.USBAnalysis, error) {
 	out := *s.usbAnalysis
 	s.mu.Unlock()
 	return out, nil
+}
+
+func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error) {
+	if err := ctx.Err(); err != nil {
+		return model.C2SampleAnalysis{}, err
+	}
+
+	s.mu.RLock()
+	cached := s.c2Analysis
+	pcap := strings.TrimSpace(s.pcap)
+	s.mu.RUnlock()
+
+	if cached != nil {
+		return *cached, nil
+	}
+
+	var analysis model.C2SampleAnalysis
+	if pcap == "" {
+		analysis = emptyC2SampleAnalysis()
+		analysis.Notes = append(analysis.Notes, "当前未加载抓包，C2 骨架页仅显示空结构。")
+	} else {
+		if s.packetStore == nil {
+			return model.C2SampleAnalysis{}, errors.New("当前抓包尚未建立本地数据包索引")
+		}
+		packets, err := s.packetStore.All(nil)
+		if err != nil {
+			return model.C2SampleAnalysis{}, err
+		}
+		analysis, err = buildC2SampleAnalysisFromPackets(ctx, packets)
+		if err != nil {
+			return model.C2SampleAnalysis{}, err
+		}
+		analysis.Notes = append(analysis.Notes,
+			"当前版本已接入 CS / VShell 第一版可观测流量规则；结果仍按“候选证据”处理，静态端口/路径不会单独定性。",
+			"Silver Fox / 银狐相关字段已预埋为归因扩展口，后续独立 APT 页面可复用这里的技术证据。",
+		)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return model.C2SampleAnalysis{}, err
+	}
+
+	s.mu.Lock()
+	if s.c2Analysis == nil {
+		s.c2Analysis = &analysis
+	}
+	out := *s.c2Analysis
+	s.mu.Unlock()
+	return out, nil
+}
+
+func emptyC2SampleAnalysis() model.C2SampleAnalysis {
+	return model.C2SampleAnalysis{
+		TotalMatchedPackets: 0,
+		Families:            []model.TrafficBucket{},
+		Conversations:       []model.AnalysisConversation{},
+		CS: model.C2FamilyAnalysis{
+			CandidateCount:   0,
+			MatchedRuleCount: 0,
+			Channels:         []model.TrafficBucket{},
+			Indicators:       []model.TrafficBucket{},
+			Conversations:    []model.AnalysisConversation{},
+			BeaconPatterns:   []model.C2BeaconPattern{},
+			Candidates:       []model.C2IndicatorRecord{},
+			Notes:            []string{},
+			RelatedActors:    []model.TrafficBucket{},
+			DeliveryChains:   []model.TrafficBucket{},
+		},
+		VShell: model.C2FamilyAnalysis{
+			CandidateCount:   0,
+			MatchedRuleCount: 0,
+			Channels:         []model.TrafficBucket{},
+			Indicators:       []model.TrafficBucket{},
+			Conversations:    []model.AnalysisConversation{},
+			BeaconPatterns:   []model.C2BeaconPattern{},
+			Candidates:       []model.C2IndicatorRecord{},
+			Notes:            []string{},
+			RelatedActors:    []model.TrafficBucket{},
+			DeliveryChains:   []model.TrafficBucket{},
+		},
+		Notes: []string{},
+	}
 }
 
 func (s *Service) MediaArtifact(token string) (string, string, error) {
