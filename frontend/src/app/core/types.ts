@@ -675,6 +675,7 @@ export interface C2IndicatorRecord {
     lastTime?: string;
     avgInterval?: string;
     jitter?: string;
+    intervals?: number[];
     streams?: number[];
     packets?: number[];
     representativePacket?: number;
@@ -698,6 +699,7 @@ export interface C2IndicatorRecord {
     lastTime?: string;
     avgInterval?: string;
     jitter?: string;
+    intervals?: number[];
     packets?: number[];
     confidence?: number;
     summary: string;
@@ -714,6 +716,7 @@ export interface C2IndicatorRecord {
     transitions: number;
     heartbeatAvg?: string;
     heartbeatJitter?: string;
+    intervals?: number[];
     hasWebSocket: boolean;
     wsParams?: string;
     listenerHints?: TrafficBucket[];
@@ -749,6 +752,14 @@ export interface C2SampleAnalysis {
   notes: string[];
 }
 
+export interface APTScoreFactor {
+  name: string;
+  weight: number;
+  direction: "positive" | "negative" | "missing" | string;
+  sourceModule?: string;
+  summary?: string;
+}
+
 export interface APTEvidenceRecord {
   packetId: number;
   streamId?: number;
@@ -770,6 +781,7 @@ export interface APTEvidenceRecord {
   infrastructureHints?: string[];
   ttpTags?: string[];
   tags?: string[];
+  scoreFactors?: APTScoreFactor[];
   summary: string;
   evidence?: string;
 }
@@ -787,6 +799,7 @@ export interface APTActorProfile {
   infrastructureHints: TrafficBucket[];
   relatedC2Families: TrafficBucket[];
   ttpTags: TrafficBucket[];
+  scoreFactors?: APTScoreFactor[];
   notes: string[];
 }
 

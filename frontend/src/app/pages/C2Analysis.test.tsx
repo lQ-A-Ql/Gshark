@@ -118,6 +118,7 @@ describe("C2Analysis", () => {
             lastTime: "12:03:00.000000",
             avgInterval: "60.0s",
             jitter: "0%",
+            intervals: [60, 60, 60],
             streams: [7],
             packets: [42, 43, 44, 45],
             confidence: 76,
@@ -148,6 +149,7 @@ describe("C2Analysis", () => {
             lastTime: "12:05:00.000000",
             avgInterval: "60.0s",
             jitter: "10%",
+            intervals: [60, 60, 60, 60, 60],
             packets: [51, 52, 53, 54, 55, 56],
             confidence: 66,
             summary: "6 DNS 查询 · TXT=4 · avg=60.0s · jitter=10% · req=6",
@@ -195,6 +197,7 @@ describe("C2Analysis", () => {
             transitions: 2,
             heartbeatAvg: "10.0s",
             heartbeatJitter: "0%",
+            intervals: [10, 10, 10],
             hasWebSocket: false,
             listenerHints: [{ label: "vshell-listener-port", count: 1 }],
             packets: [81, 82, 83],
@@ -239,6 +242,7 @@ describe("C2Analysis", () => {
       expect(screen.getByText("GET:2")).toBeInTheDocument();
       expect(screen.getByText("POST:2")).toBeInTheDocument();
       expect(screen.getByText("Scoring Factors")).toBeInTheDocument();
+      expect(screen.getAllByText("Interval Sparkline").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("stable-interval").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("get-post-tasking-shape").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("non-browser-context").length).toBeGreaterThanOrEqual(1);
@@ -257,10 +261,10 @@ describe("C2Analysis", () => {
       expect(screen.getByText("CS DNS Beacon 聚合画像")).toBeInTheDocument();
       expect(screen.getByText("abcdefg.example.com")).toBeInTheDocument();
       expect(screen.getByText("6 DNS 查询 · TXT=4 · avg=60.0s · jitter=10% · req=6")).toBeInTheDocument();
-      expect(screen.getAllByText((content, element) => element?.textContent === "TXT 4").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText((content, element) => element?.textContent === "A 2").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText((content, element) => element?.textContent === "req 6").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText((content, element) => element?.textContent === "resp 0").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText((_content, element) => element?.textContent === "TXT 4").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText((_content, element) => element?.textContent === "A 2").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText((_content, element) => element?.textContent === "req 6").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText((_content, element) => element?.textContent === "resp 0").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -304,6 +308,7 @@ describe("C2Analysis", () => {
       expect(screen.getByText("DNS Aggregate Detail")).toBeInTheDocument();
       expect(screen.getByText("dns-beacon-review")).toBeInTheDocument();
       expect(screen.getByText("Packet 时间序列")).toBeInTheDocument();
+      expect(screen.getAllByText("Interval Sparkline").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("51, 52, 53, 54, 55, 56").length).toBeGreaterThanOrEqual(1);
     });
 

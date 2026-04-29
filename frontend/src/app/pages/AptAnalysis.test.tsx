@@ -63,6 +63,12 @@ function createAnalysis(overrides: Partial<APTAnalysis> = {}): APTAnalysis {
         infrastructureHints: [{ label: "fallback-c2", count: 1 }],
         relatedC2Families: [{ label: "cs", count: 1 }],
         ttpTags: [{ label: "encrypted-c2", count: 1 }],
+        scoreFactors: [
+          { name: "hfs-download-chain", weight: 8, direction: "positive", sourceModule: "c2-analysis", summary: "HFS 下载链" },
+          { name: "valleyrat-family-hint", weight: 7, direction: "positive", sourceModule: "c2-analysis", summary: "ValleyRAT 家族线索" },
+          { name: "https-c2", weight: 3, direction: "positive", sourceModule: "c2-analysis", summary: "HTTPS C2 弱传输线索" },
+          { name: "missing-object-evidence", weight: 0, direction: "missing", sourceModule: "profile", summary: "缺失 Object Export 证据" },
+        ],
         notes: ["端口、路径、单个 IOC 仅作为弱观察位。"],
       },
     ],
@@ -88,6 +94,10 @@ function createAnalysis(overrides: Partial<APTAnalysis> = {}): APTAnalysis {
         infrastructureHints: ["hfs-download-chain", "fallback-c2"],
         ttpTags: ["encrypted-c2"],
         tags: ["actor-hint"],
+        scoreFactors: [
+          { name: "hfs-download-chain", weight: 8, direction: "positive", sourceModule: "c2-analysis", summary: "HFS 下载链" },
+          { name: "valleyrat-family-hint", weight: 7, direction: "positive", sourceModule: "c2-analysis", summary: "ValleyRAT 家族线索" },
+        ],
         summary: "C2 技术证据关联 Silver Fox 候选",
       },
     ],
@@ -130,8 +140,11 @@ describe("AptAnalysis", () => {
       expect(screen.getAllByText("https-c2").length).toBeGreaterThan(0);
       expect(screen.getByText("C2 Evidence")).toBeInTheDocument();
       expect(screen.getByText("Delivery / Object")).toBeInTheDocument();
-      expect(screen.getByText(/c2-analysis · c2-indicator/)).toBeInTheDocument();
-      expect(screen.getByText("C2 技术证据关联 Silver Fox 候选")).toBeInTheDocument();
+      expect(screen.getAllByText(/c2-analysis · c2-indicator/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText("C2 技术证据关联 Silver Fox 候选").length).toBeGreaterThan(0);
+      expect(screen.getByText("Evidence Timeline")).toBeInTheDocument();
+      expect(screen.getAllByText("hfs-download-chain").length).toBeGreaterThan(0);
+      expect(screen.getByText(/缺失 Object Export 证据/)).toBeInTheDocument();
     });
     expect(mocks.getAPTAnalysis).toHaveBeenCalledTimes(1);
   });

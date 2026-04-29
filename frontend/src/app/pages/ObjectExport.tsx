@@ -108,7 +108,10 @@ export default function ObjectExport() {
   };
 
   return (
-    <PageShell innerClassName="max-w-6xl px-6 py-6">
+    <PageShell
+      className="bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.26),transparent_36%),linear-gradient(180deg,#fffaf0_0%,#fbfbff_44%,#f8fafc_100%)]"
+      innerClassName="max-w-6xl px-6 py-6"
+    >
       <AnalysisHero
         icon={<FileDown className="h-5 w-5" />}
         title="附件提取"
@@ -118,8 +121,8 @@ export default function ObjectExport() {
         tagsLabel="导出域"
         theme="amber"
       />
-      <div className="flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
-        <div className="z-10 flex shrink-0 items-center justify-between border-b border-border bg-card px-5 py-2.5 shadow-sm">
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-white/80 bg-white/88 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl">
+        <div className="z-10 flex shrink-0 items-center justify-between border-b border-slate-100 bg-white/82 px-5 py-3 shadow-sm backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -148,12 +151,12 @@ export default function ObjectExport() {
           <div className="shrink-0 text-xs text-muted-foreground">匹配 {objects.length} 个对象</div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-accent/20 p-5">
+        <div className="flex-1 overflow-auto bg-slate-50/45 p-5">
           <div className="mb-4 flex flex-wrap gap-2">
             {suffixGroups.map((group) => (
               <span
                 key={group.label}
-                className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+                className="rounded-full border border-amber-100 bg-white/82 px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm"
               >
                 {group.label} · {group.items.length}
               </span>
@@ -176,10 +179,10 @@ export default function ObjectExport() {
                         key={file.id}
                         onClick={() => toggleSelect(file.id)}
                         className={cn(
-                          "group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border bg-card p-5 transition-all",
+                          "group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border bg-white/86 p-5 shadow-sm transition-all",
                           isSelected
                             ? "border-blue-500 bg-blue-50/30 ring-1 ring-blue-500 shadow-md"
-                            : "border-border hover:border-ring hover:shadow-sm",
+                            : "border-slate-100 hover:border-amber-200 hover:shadow-md",
                         )}
                       >
                         <div className="absolute right-3 top-3">
@@ -197,7 +200,7 @@ export default function ObjectExport() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-border bg-accent/40 px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white/82 px-5 py-3.5 backdrop-blur-xl">
           <div className="text-xs font-medium text-muted-foreground">
             已选 {selectedObjects.length} 个文件 ({formatBytes(selectedBytes)})
           </div>

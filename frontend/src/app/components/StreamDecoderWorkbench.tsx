@@ -604,7 +604,7 @@ export function StreamDecoderWorkbench({
           )}
 
           {batchFailureDetails.length > 0 && (
-            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
               <div className="font-semibold">批量失败明细（最多显示 {MAX_BATCH_FAILURE_DETAILS} 条）</div>
               <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-auto pl-4">
                 {batchFailureDetails.map((item, idx) => (
@@ -1054,7 +1054,7 @@ function PayloadPane({
           <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-muted-foreground">{bytesHex}</pre>
         </div>
       )}
-      {footer && <div className="mt-2 text-[11px] text-blue-700 dark:text-blue-300">{footer}</div>}
+      {footer && <div className="mt-2 text-[11px] text-blue-700">{footer}</div>}
     </div>
   );
 }

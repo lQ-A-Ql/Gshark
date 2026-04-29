@@ -120,6 +120,41 @@ type BackgroundFadeState = {
   style: CSSProperties;
 };
 
+type BrowserDragEventLike = {
+  preventDefault: () => void;
+  stopPropagation: () => void;
+  target?: EventTarget | null;
+};
+
+function isExplicitDropZone(target: EventTarget | null | undefined) {
+  return target instanceof Element && Boolean(target.closest("[data-gshark-drop-zone='true']"));
+}
+
+export function preventBrowserPageDrag(event: BrowserDragEventLike) {
+  if (isExplicitDropZone(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+export function installBrowserPageDragGuard() {
+  window.addEventListener("dragstart", preventBrowserPageDrag, { capture: true });
+  window.addEventListener("dragover", preventBrowserPageDrag, { capture: true });
+  window.addEventListener("drop", preventBrowserPageDrag, { capture: true });
+  document.addEventListener("dragstart", preventBrowserPageDrag, { capture: true });
+  document.addEventListener("dragover", preventBrowserPageDrag, { capture: true });
+  document.addEventListener("drop", preventBrowserPageDrag, { capture: true });
+  return () => {
+    window.removeEventListener("dragstart", preventBrowserPageDrag, { capture: true });
+    window.removeEventListener("dragover", preventBrowserPageDrag, { capture: true });
+    window.removeEventListener("drop", preventBrowserPageDrag, { capture: true });
+    document.removeEventListener("dragstart", preventBrowserPageDrag, { capture: true });
+    document.removeEventListener("dragover", preventBrowserPageDrag, { capture: true });
+    document.removeEventListener("drop", preventBrowserPageDrag, { capture: true });
+  };
+}
+
 function themeForPath(pathname: string): (typeof PAGE_THEMES)[PageThemeName] {
   const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme
     ?? (pathname === "/" ? "blue" : pathname.includes("udp") ? "cyan" : pathname.includes("http") ? "cyan" : "blue");
@@ -217,8 +252,11 @@ export function MainLayout() {
   };
 
   useEffect(() => {
-    document.documentElement.classList.remove("dark");
     localStorage.setItem("gshark-theme", "light");
+  }, []);
+
+  useEffect(() => {
+    return installBrowserPageDragGuard();
   }, []);
 
   useEffect(() => {
@@ -297,6 +335,9 @@ export function MainLayout() {
       <div
         className="gshark-page-bg flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
         style={pageThemeStyle}
+        onDragStartCapture={preventBrowserPageDrag}
+        onDragOverCapture={preventBrowserPageDrag}
+        onDropCapture={preventBrowserPageDrag}
       >
         <header className="relative z-50 flex shrink-0 flex-col border-b border-slate-200 bg-white/92 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] backdrop-blur">
           <div className="flex h-12 items-center justify-between px-4">

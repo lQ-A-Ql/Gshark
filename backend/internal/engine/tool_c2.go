@@ -41,18 +41,18 @@ type c2AnalysisBuilder struct {
 }
 
 type c2HTTPObservation struct {
-	packet      model.Packet
-	method      string
-	path        string
-	host        string
-	channel     string
-	userAgent   string
-	statusCode  int
-	contentType string
+	packet       model.Packet
+	method       string
+	path         string
+	host         string
+	channel      string
+	userAgent    string
+	statusCode   int
+	contentType  string
 	responseSize int
-	evidence    string
-	confidence  int
-	tags        []string
+	evidence     string
+	confidence   int
+	tags         []string
 }
 
 type c2DNSObservation struct {
@@ -179,18 +179,18 @@ func (b *c2AnalysisBuilder) inspectHTTPPacket(packet model.Packet, payloadText s
 	if method != "" {
 		channel := httpChannel(packet)
 		obs := c2HTTPObservation{
-			packet:      packet,
-			method:      strings.ToUpper(method),
-			path:        path,
-			host:        host,
-			channel:     channel,
-			userAgent:   userAgent,
-			statusCode:  statusCode,
-			contentType: contentType,
+			packet:       packet,
+			method:       strings.ToUpper(method),
+			path:         path,
+			host:         host,
+			channel:      channel,
+			userAgent:    userAgent,
+			statusCode:   statusCode,
+			contentType:  contentType,
 			responseSize: responseSize,
-			evidence:    strings.Join(headerHints, "; "),
-			confidence:  30,
-			tags:        []string{"http", "malleable-profile-weak", "needs-correlation"},
+			evidence:     strings.Join(headerHints, "; "),
+			confidence:   30,
+			tags:         []string{"http", "malleable-profile-weak", "needs-correlation"},
 		}
 		if ok, confidence, tags := strongCSHTTPStaticSignal(obs); ok {
 			obs.confidence = confidence
@@ -940,20 +940,20 @@ func (b *c2AnalysisBuilder) finish() {
 }
 
 type c2EndpointAggregateWork struct {
-	host        string
-	uri         string
-	channel     string
-	total       int
-	methods     map[string]int
-	firstTime   string
-	lastTime    string
-	times       []float64
-	streams     []int64
-	packets     []int64
-	postPacket  int64
-	confidence  int
-	indicatorTy []string
-	signalTags  []string
+	host           string
+	uri            string
+	channel        string
+	total          int
+	methods        map[string]int
+	firstTime      string
+	lastTime       string
+	times          []float64
+	streams        []int64
+	packets        []int64
+	postPacket     int64
+	confidence     int
+	indicatorTy    []string
+	signalTags     []string
 	scoreFactorMap map[string]*c2ScoreFactorWork
 }
 
@@ -992,10 +992,10 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 		item := work[key]
 		if item == nil {
 			item = &c2EndpointAggregateWork{
-				host:    host,
-				uri:     uri,
-				channel: c2FirstNonEmpty(channel, "http"),
-				methods: map[string]int{},
+				host:           host,
+				uri:            uri,
+				channel:        c2FirstNonEmpty(channel, "http"),
+				methods:        map[string]int{},
 				scoreFactorMap: map[string]*c2ScoreFactorWork{},
 			}
 			work[key] = item
@@ -1104,6 +1104,7 @@ func buildCSHostURIAggregates(candidates []model.C2IndicatorRecord, limit int) [
 			LastTime:             item.lastTime,
 			AvgInterval:          avgInterval,
 			Jitter:               jitterText,
+			Intervals:            limitFloat64List(intervals, 64),
 			Streams:              limitInt64List(uniqueInt64s(item.streams), 12),
 			Packets:              limitInt64List(uniqueInt64s(item.packets), 24),
 			RepresentativePacket: representativePacket,
@@ -1262,6 +1263,7 @@ func buildCSDNSAggregates(observations []c2DNSObservation, limit int) []model.C2
 			LastTime:       item.lastTime,
 			AvgInterval:    avgInterval,
 			Jitter:         jitterText,
+			Intervals:      limitFloat64List(intervals, 64),
 			Packets:        limitInt64List(uniqueInt64s(item.packets), 24),
 			Confidence:     clampConfidence(confidence),
 			Summary:        strings.Join(summaryParts, " · "),
@@ -1309,6 +1311,14 @@ func buildVShellStreamAggregates(streamData map[int64]*c2VShellStreamWork, limit
 				}
 			}
 		}
+		sort.Float64s(times)
+		intervals := make([]float64, 0, len(times)-1)
+		for i := 1; i < len(times); i++ {
+			if delta := times[i] - times[i-1]; delta > 0 {
+				intervals = append(intervals, delta)
+			}
+		}
+
 		confidence := sw.confidence
 		if sw.lengthPrefix > 0 {
 			confidence += 6
@@ -1351,6 +1361,7 @@ func buildVShellStreamAggregates(streamData map[int64]*c2VShellStreamWork, limit
 			Transitions:     sw.transitions,
 			HeartbeatAvg:    sw.heartbeatAvg,
 			HeartbeatJitter: sw.heartbeatJit,
+			Intervals:       limitFloat64List(intervals, 64),
 			HasWebSocket:    sw.hasWebSocket,
 			WSParams:        sw.wsParams,
 			ListenerHints:   bucketsFromMap(sw.listenerHints, 4),
@@ -1628,6 +1639,13 @@ func limitInt64List(values []int64, limit int) []int64 {
 }
 
 func limitStringList(values []string, limit int) []string {
+	if limit > 0 && len(values) > limit {
+		return values[:limit]
+	}
+	return values
+}
+
+func limitFloat64List(values []float64, limit int) []float64 {
 	if limit > 0 && len(values) > limit {
 		return values[:limit]
 	}

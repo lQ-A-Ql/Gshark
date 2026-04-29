@@ -1,6 +1,7 @@
 import { Binary, ClipboardPaste, Eraser, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
+import { AnalysisBadge } from "../../components/analysis/AnalysisPrimitives";
 import { StreamDecoderWorkbench } from "../../components/StreamDecoderWorkbench";
 import type { MiscModuleRendererProps } from "../types";
 
@@ -27,13 +28,13 @@ export function PayloadWebShellDecoderModule({ module, surfaceVariant = "card" }
 
   return (
     <div className={embedded ? "space-y-4" : "space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"}>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+      <div className={embedded ? "overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/60" : "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"}>
+        <div className={embedded ? "border-b border-slate-100 bg-transparent px-4 py-3" : "border-b border-slate-100 bg-slate-50/80 px-4 py-3"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <Binary className="h-4 w-4 text-cyan-600" />
-                {module.title}
+                {embedded ? "手动 Payload 输入" : module.title}
               </div>
               <p className="mt-1 max-w-3xl text-[12px] leading-6 text-slate-500">
                 手动粘贴 HTTP 报文、body、form 参数、multipart、Base64、Hex 或单个可疑参数值。非 Base64 家族解码会显示置信度与失败阶段，结果仅用于分析，不写回抓包。
@@ -60,12 +61,12 @@ export function PayloadWebShellDecoderModule({ module, surfaceVariant = "card" }
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={"POST /shell.php HTTP/1.1\r\nHost: target\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\npass=..."}
-            className="min-h-[180px] w-full resize-y rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 font-mono text-xs leading-6 text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+            className="min-h-[180px] w-full resize-y rounded-xl border border-slate-200 bg-white/95 px-4 py-3 font-mono text-xs leading-6 text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
             spellCheck={false}
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
             <span>当前输入 {draft.length.toLocaleString()} 字符，已提交分析 {payload.length.toLocaleString()} 字符。</span>
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">实验性 webshell 解码，需人工复核</span>
+            <AnalysisBadge tone="amber" className="px-2.5 py-1">实验性 webshell 解码，需人工复核</AnalysisBadge>
           </div>
         </div>
       </div>

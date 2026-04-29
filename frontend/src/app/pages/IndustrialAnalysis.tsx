@@ -1,8 +1,18 @@
 import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { IndustrialAnalysis as IndustrialAnalysisData, TrafficBucket } from "../core/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { IndustrialAnalysis as IndustrialAnalysisData } from "../core/types";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import {
+  AnalysisBadge,
+  AnalysisBucketChart as BucketChart,
+  AnalysisCallout,
+  AnalysisDataTable as DataTable,
+  AnalysisList as ConversationList,
+  AnalysisPanel as Panel,
+  AnalysisStatCard as StatCard,
+  type AnalysisTone,
+} from "../components/analysis/AnalysisPrimitives";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
@@ -110,7 +120,7 @@ export default function IndustrialAnalysis() {
   }, [isPreloadingCapture, refreshAnalysis]);
 
   return (
-    <PageShell>
+    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.26),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]">
       <AnalysisHero
         icon={<Factory className="h-5 w-5" />}
         title="工控分析"
@@ -123,11 +133,11 @@ export default function IndustrialAnalysis() {
       />
 
       {loading && (
-        <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在调用 tshark 生成工控分析结果...</div>
+        <div className="mb-3 rounded-2xl border border-blue-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在调用 tshark 生成工控分析结果...</div>
       )}
 
       {!loading && error && (
-        <div className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">{error}</div>
+        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">{error}</div>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
@@ -139,7 +149,7 @@ export default function IndustrialAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="工控协议分布">
-          <BucketChart data={analysis.protocols} color="bg-blue-500" />
+          <BucketChart data={analysis.protocols} barClassName="bg-blue-500" />
         </Panel>
         <Panel title="工控会话">
           <ConversationList
@@ -160,28 +170,27 @@ export default function IndustrialAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="Modbus 功能码">
-          <BucketChart data={analysis.modbus.functionCodes} color="bg-indigo-500" />
+          <BucketChart data={analysis.modbus.functionCodes} barClassName="bg-indigo-500" />
         </Panel>
         <Panel title="Modbus Unit ID">
-          <BucketChart data={analysis.modbus.unitIds} color="bg-cyan-500" />
+          <BucketChart data={analysis.modbus.unitIds} barClassName="bg-cyan-500" />
         </Panel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="寄存器 / 线圈引用">
-          <BucketChart data={analysis.modbus.referenceHits} color="bg-emerald-500" />
+          <BucketChart data={analysis.modbus.referenceHits} barClassName="bg-emerald-500" />
         </Panel>
         <Panel title="异常码">
-          <BucketChart data={analysis.modbus.exceptionCodes} color="bg-rose-500" />
+          <BucketChart data={analysis.modbus.exceptionCodes} barClassName="bg-rose-500" />
         </Panel>
       </div>
 
       {(analysis.ruleHits?.length ?? 0) > 0 && (
         <Panel title={`规则检测 / Modbus 异常命中 (${analysis.ruleHits!.length})`} className="mt-4">
-          <div className="mb-2 flex items-start gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>基于主从角色、功能码、数量字段、位长度一致性和高频写入行为生成规则命中，可直接定位可疑包与目标地址。</span>
-          </div>
+          <AnalysisCallout className="mb-2" tone="blue" icon={<Shield className="h-4 w-4" />}>
+            基于主从角色、功能码、数量字段、位长度一致性和高频写入行为生成规则命中，可直接定位可疑包与目标地址。
+          </AnalysisCallout>
           <div className="max-h-[460px] overflow-auto">
             <table className="w-full table-fixed border-collapse text-left text-xs">
               <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
@@ -202,7 +211,7 @@ export default function IndustrialAnalysis() {
                 {analysis.ruleHits!.map((item, idx) => (
                   <tr key={`${item.rule}-${item.packetId}-${idx}`} className="border-b border-border/70 align-top">
                     <td className="px-3 py-2">
-                      <span className={ruleLevelBadge(item.level)}>{item.level || "info"}</span>
+                      <AnalysisBadge tone={toneForIndustrialRuleLevel(item.level)}>{item.level || "info"}</AnalysisBadge>
                     </td>
                     <td className="px-3 py-2 font-medium">{item.rule}</td>
                     <td className="px-3 py-2 font-mono text-muted-foreground">{item.packetId || "--"}</td>
@@ -234,10 +243,9 @@ export default function IndustrialAnalysis() {
             <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">当前抓包未识别到工控协议。</div>
           ) : (
             analysis.notes.map((note, index) => (
-              <div key={`${note}-${index}`} className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
-                <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <span>{note}</span>
-              </div>
+              <AnalysisCallout key={`${note}-${index}`} tone="blue" icon={<Workflow className="h-4 w-4" />}>
+                {note}
+              </AnalysisCallout>
             ))
           )}
         </div>
@@ -245,10 +253,9 @@ export default function IndustrialAnalysis() {
 
       {(analysis.suspiciousWrites?.length ?? 0) > 0 && (
         <Panel title={`Modbus 可疑写操作 (${analysis.suspiciousWrites!.length})`} className="mt-4">
-          <div className="mb-2 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>以下为按写入次数排序的 Modbus 写操作聚合，高频写入可能对应灯控、阀门切换或寄存器篡改。</span>
-          </div>
+          <AnalysisCallout className="mb-2" tone="amber" icon={<AlertTriangle className="h-4 w-4" />}>
+            以下为按写入次数排序的 Modbus 写操作聚合，高频写入可能对应灯控、阀门切换或寄存器篡改。
+          </AnalysisCallout>
           <div className="max-h-[420px] overflow-auto">
             <table className="w-full table-fixed border-collapse text-left text-xs">
               <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
@@ -295,10 +302,9 @@ export default function IndustrialAnalysis() {
 
       {(analysis.controlCommands?.length ?? 0) > 0 && (
         <Panel title={`控制指令 (${analysis.controlCommands!.length})`} className="mt-4">
-          <div className="mb-2 flex items-start gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-            <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>以下为从 IEC 104、DNP3、BACnet 等协议中提取的控制/操作类指令，可能涉及遥控、设点或设备重启。</span>
-          </div>
+          <AnalysisCallout className="mb-2" tone="rose" icon={<Shield className="h-4 w-4" />}>
+            以下为从 IEC 104、DNP3、BACnet 等协议中提取的控制/操作类指令，可能涉及遥控、设点或设备重启。
+          </AnalysisCallout>
           <div className="max-h-[520px] overflow-auto">
             <table className="w-full table-fixed border-collapse text-left text-xs">
               <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
@@ -321,7 +327,7 @@ export default function IndustrialAnalysis() {
                     <td className="px-3 py-2 font-mono text-muted-foreground">{cmd.packetId}</td>
                     <td className="px-3 py-2 font-mono">{cmd.time || "--"}</td>
                     <td className="px-3 py-2">
-                      <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-blue-700">{cmd.protocol}</span>
+                      <AnalysisBadge tone="blue">{cmd.protocol}</AnalysisBadge>
                     </td>
                     <td className="px-3 py-2">{cmd.source || "--"}</td>
                     <td className="px-3 py-2">{cmd.destination || "--"}</td>
@@ -373,7 +379,7 @@ export default function IndustrialAnalysis() {
                       <div className="text-muted-foreground">{item.functionName || "--"}</div>
                     </td>
                     <td className="px-3 py-2">
-                      <span className={kindBadge(item.kind)}>{item.kind}</span>
+                      <AnalysisBadge tone={toneForIndustrialTransactionKind(item.kind)}>{item.kind}</AnalysisBadge>
                     </td>
                     <td className="px-3 py-2 font-mono">{item.unitId || "--"}</td>
                     <td className="px-3 py-2 font-mono">{item.reference || "--"}</td>
@@ -406,13 +412,13 @@ export default function IndustrialAnalysis() {
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Panel title="操作分布">
-              <BucketChart data={detail.operations} color="bg-blue-500" />
+              <BucketChart data={detail.operations} barClassName="bg-blue-500" />
             </Panel>
             <Panel title="目标对象">
-              <BucketChart data={detail.targets} color="bg-emerald-500" />
+              <BucketChart data={detail.targets} barClassName="bg-emerald-500" />
             </Panel>
             <Panel title="结果 / 状态">
-              <BucketChart data={detail.results} color="bg-amber-500" />
+              <BucketChart data={detail.results} barClassName="bg-amber-500" />
             </Panel>
           </div>
           <div className="mt-4">
@@ -437,114 +443,27 @@ export default function IndustrialAnalysis() {
   );
 }
 
-function kindBadge(kind: string) {
-  switch (kind) {
-    case "request":
-      return "rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700";
-    case "response":
-      return "rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700";
-    default:
-      return "rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700";
-  }
-}
-
-function ruleLevelBadge(level: string) {
+function toneForIndustrialRuleLevel(level: string): AnalysisTone {
   switch (String(level ?? "").toLowerCase()) {
     case "critical":
     case "high":
-      return "rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700";
+      return "rose";
     case "warning":
-      return "rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700";
+      return "amber";
     default:
-      return "rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700";
+      return "blue";
   }
 }
 
-function StatCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-2 text-xs text-muted-foreground">{title}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className}`.trim()}>
-      <div className="mb-3 text-sm font-semibold">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function BucketChart({ data, color }: { data: TrafficBucket[]; color: string }) {
-  const max = Math.max(1, ...data.map((item) => item.count));
-  if (data.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
+function toneForIndustrialTransactionKind(kind: string): AnalysisTone {
+  switch (kind) {
+    case "request":
+      return "blue";
+    case "response":
+      return "emerald";
+    default:
+      return "rose";
   }
-  return (
-    <div className="max-h-[420px] overflow-auto pr-1">
-      <div className="space-y-2">
-        {data.map((row) => (
-          <div key={row.label} className="grid grid-cols-[220px_1fr_72px] items-center gap-2 text-xs">
-            <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
-            <div className="h-2 rounded bg-accent">
-              <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
-            </div>
-            <div className="text-right font-mono">{row.count}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ConversationList({ items }: { items: TrafficBucket[] }) {
-  if (items.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
-  }
-  return (
-    <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
-      {items.map((item) => (
-        <div key={`${item.label}-${item.count}`} className="flex items-center justify-between rounded border border-border bg-background px-3 py-2 text-xs">
-          <span className="truncate text-muted-foreground" title={item.label}>{item.label}</span>
-          <span className="ml-3 font-mono text-foreground">{item.count}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<string | number>> }) {
-  return (
-    <div className="max-h-[420px] overflow-auto">
-      <table className="w-full table-fixed border-collapse text-left text-xs">
-        <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2">{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={headers.length} className="px-3 py-6 text-center text-muted-foreground">暂无数据</td>
-            </tr>
-          ) : (
-            rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-border/70 align-top">
-                {row.map((value, cellIndex) => (
-                  <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">{String(value)}</td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 export function buildIndustrialAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {

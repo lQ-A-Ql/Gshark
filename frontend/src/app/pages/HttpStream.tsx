@@ -1,15 +1,12 @@
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
   ArrowLeftRight,
-  ChevronLeft,
-  ChevronRight,
   Download,
-  Search,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { ungzip } from "pako";
 import { cn } from "../components/ui/utils";
+import { StreamChunkCard, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/DesignSystem";
 import { useSentinel } from "../state/SentinelContext";
 import type { StreamLoadMeta } from "../core/types";
 
@@ -24,6 +21,7 @@ type HTTPChunk = {
 type HTTPViewMode = "formatted" | "raw" | "hex";
 
 const INITIAL_RENDER_LIMIT = 72;
+const MAX_HTTP_PREVIEW_CHARS = 6000;
 
 export default function HttpStream() {
   const navigate = useNavigate();
@@ -40,6 +38,7 @@ export default function HttpStream() {
   const [cursor, setCursor] = useState(0);
   const [streamInput, setStreamInput] = useState("");
   const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER_LIMIT);
+  const [expandedChunk, setExpandedChunk] = useState<HTTPChunk | null>(null);
   const consumedRouteStreamIdRef = useRef<number | null>(null);
   const deferredSearch = useDeferredValue(search);
   const currentIndex = streamIds.http.findIndex((id) => id === httpStream.id);
@@ -127,17 +126,18 @@ export default function HttpStream() {
   const selectedChunkRendered = useMemo(() => {
     if (!selectedChunk) return "";
     if (viewMode === "hex") {
-      return toHexDump(selectedChunk.body);
+      return renderHTTPChunk(selectedChunk.body, viewMode, false);
     }
     if (viewMode === "formatted") {
-      return formatHTTPForDisplay(selectedChunk.body);
+      return renderHTTPChunk(selectedChunk.body, viewMode, false);
     }
-    return selectedChunk.body;
+    return renderHTTPChunk(selectedChunk.body, viewMode, false);
   }, [selectedChunk, viewMode]);
 
   useEffect(() => {
     setRenderLimit(INITIAL_RENDER_LIMIT);
     setCursor(0);
+    setExpandedChunk(null);
   }, [httpStream.id]);
 
   useEffect(() => {
@@ -158,132 +158,73 @@ export default function HttpStream() {
   };
 
   return (
-    <div className="bg-background relative flex h-full flex-col overflow-hidden text-sm text-foreground">
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="rounded p-1 text-foreground transition-colors hover:bg-accent"
-            title="返回上一页"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="h-4 w-px bg-border" />
-          <h1 className="flex items-center gap-2 font-semibold text-foreground">
-            HTTP 会话追踪 (stream eq {httpStream.id})
-            <span className="ml-2 flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {httpStream.client} <ArrowLeftRight className="h-3 w-3" /> {httpStream.server}
-            </span>
-          </h1>
-        </div>
-
-        <div className="grid grid-cols-[260px_400px_220px] items-center gap-2">
-          <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.26),transparent_34%),linear-gradient(180deg,#fbfaff_0%,#f6f7ff_42%,#f8fafc_100%)] text-sm text-foreground">
+      <WorkbenchTitleBar
+        onBack={() => navigate(-1)}
+        title={`HTTP 会话追踪 (stream eq ${httpStream.id})`}
+        subtitle={(
+          <span className="flex min-w-0 items-center gap-1 font-mono">
+            <span className="truncate">{httpStream.client}</span>
+            <ArrowLeftRight className="h-3 w-3 shrink-0" />
+            <span className="truncate">{httpStream.server}</span>
+          </span>
+        )}
+        meta={(
+          <WorkbenchChip className="max-w-[300px] truncate">
             切流 last {streamSwitchMetrics.byProtocol.HTTP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.HTTP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.HTTP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.HTTP.cacheHitRate}%
-          </div>
-          <div className="grid h-full grid-cols-[28px_minmax(220px,1fr)_28px_72px] items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs">
-            <button
-              onClick={() => {
-                if (!hasPrev) return;
-                void setActiveStream("HTTP", streamIds.http[currentIndex - 1]);
-              }}
-              disabled={!hasPrev}
-              className="rounded border border-border p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-40"
-              title={`HTTP 流总数: ${streamIds.http.length}`}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="px-1 text-center font-mono" title={`HTTP 流总数: ${streamIds.http.length}`}>
-              第 {ordinalLabel} 条 / stream eq {httpStream.id}
-            </span>
-            <button
-              onClick={() => {
-                if (!hasNext) return;
-                void setActiveStream("HTTP", streamIds.http[currentIndex + 1]);
-              }}
-              disabled={!hasNext}
-              className="rounded border border-border p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-40"
-              title={`HTTP 流总数: ${streamIds.http.length}`}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-            <input
-              value={streamInput}
-              onChange={(event) => setStreamInput(event.target.value.replace(/[^0-9]/g, ""))}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
+          </WorkbenchChip>
+        )}
+        actions={(
+          <>
+            <StreamNavigator
+              protocolLabel="HTTP"
+              ordinalLabel={ordinalLabel}
+              streamId={httpStream.id}
+              streamTotal={streamIds.http.length}
+              streamInput={streamInput}
+              onStreamInputChange={setStreamInput}
+              onSubmitStream={() => {
                 const id = Number(streamInput);
-                if (id >= 0) {
-                  void setActiveStream("HTTP", id);
-                }
+                if (id >= 0) void setActiveStream("HTTP", id);
               }}
-              className="w-16 rounded border border-border bg-card px-1 py-0.5 text-center font-mono outline-none"
-              placeholder="stream"
-              title={`HTTP 流总数: ${streamIds.http.length}`}
+              onPrev={() => {
+                if (hasPrev) void setActiveStream("HTTP", streamIds.http[currentIndex - 1]);
+              }}
+              onNext={() => {
+                if (hasNext) void setActiveStream("HTTP", streamIds.http[currentIndex + 1]);
+              }}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
             />
-          </div>
-          <div className="flex justify-self-start rounded-md border border-border bg-accent p-0.5">
-            <button
-              onClick={() => setViewMode("formatted")}
-              className={cn(
-                "rounded-sm px-2 py-0.5 text-xs transition-colors",
-                viewMode === "formatted" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Formatted
-            </button>
-            <button
-              onClick={() => setViewMode("raw")}
-              className={cn(
-                "rounded-sm px-2 py-0.5 text-xs transition-colors",
-                viewMode === "raw" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Raw
-            </button>
-            <button
-              onClick={() => setViewMode("hex")}
-              className={cn(
-                "rounded-sm px-2 py-0.5 text-xs transition-colors",
-                viewMode === "hex" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Hex
-            </button>
-          </div>
-        </div>
-      </div>
+            <ViewModeToggle<HTTPViewMode>
+              label="视图"
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: "formatted", label: "Formatted" },
+                { value: "raw", label: "Raw" },
+                { value: "hex", label: "Hex" },
+              ]}
+              className="py-1"
+            />
+          </>
+        )}
+      />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-2 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="flex w-72 items-center overflow-hidden rounded-md border border-border bg-background shadow-sm transition-colors focus-within:border-blue-500">
-              <Search className="ml-2 h-4 w-4 text-muted-foreground" />
-              <input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setCursor(0);
-                }}
-                type="text"
-                className="flex-1 border-none bg-transparent px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
-                placeholder="搜索流内容..."
-              />
-            </div>
-            <button
-              className="rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
-              onClick={() => setCursor((prev) => Math.max(prev - 1, 0))}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              className="rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
-              onClick={() => setCursor((prev) => Math.min(prev + 1, Math.max(0, displayChunks.length - 1)))}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <span className="px-2 text-xs font-medium text-muted-foreground">{matchCount} 匹配</span>
-          </div>
+          <StreamSearchBar
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setCursor(0);
+            }}
+            onPrev={() => setCursor((prev) => Math.max(prev - 1, 0))}
+            onNext={() => setCursor((prev) => Math.min(prev + 1, Math.max(0, displayChunks.length - 1)))}
+            matchCount={matchCount}
+            resultCount={displayChunks.length}
+            currentIndex={selectedIndex}
+          />
 
           <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
             {formatLoadMeta(httpStream.loadMeta)}
@@ -306,12 +247,18 @@ export default function HttpStream() {
             <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.95fr)]">
               <div className="flex min-h-0 flex-col gap-4">
                 {deferredVisibleChunks.map((chunk, index) => (
-                  <HTTPChunkCard
+                  <StreamChunkCard
                     key={chunk.key}
-                    chunk={chunk}
-                    viewMode={viewMode}
+                    directionLabel={chunk.direction === "client" ? "Request ->" : "<- Response"}
+                    packetId={chunk.packetId}
+                    rendered={renderHTTPChunk(chunk.body, viewMode, false)}
+                    highlight={deferredSearch}
+                    tone={chunk.direction === "client" ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"}
                     selected={index === deferredSelectedIndex}
-                    onClick={() => setCursor(index)}
+                    onSelect={() => setCursor(index)}
+                    onOpen={() => setExpandedChunk(chunk)}
+                    truncated={isHTTPChunkTruncated(chunk.body, viewMode)}
+                    minHeight="min-h-0"
                   />
                 ))}
                 {renderLimit < displayChunks.length && (
@@ -324,45 +271,62 @@ export default function HttpStream() {
                 )}
               </div>
               <div className="space-y-4 xl:sticky xl:top-0">
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">当前片段</div>
-                      <div className="text-[11px] text-muted-foreground">按当前视图模式同步预览选中的 HTTP 请求/响应</div>
-                    </div>
-                    {selectedChunk && (
-                      <span className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                        selectedChunk.direction === "client"
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-700",
-                      )}>
-                        {selectedChunk.direction === "client" ? "请求" : "响应"}
-                      </span>
-                    )}
-                  </div>
-                  {selectedChunk ? (
-                    <>
-                      <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
-                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">packet #{selectedChunk.packetId}</span>
-                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">stream-index {selectedChunk.streamIndex}</span>
-                        <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">{estimateTextBytes(selectedChunk.body)} bytes</span>
-                      </div>
-                      <div className="max-h-[360px] overflow-auto rounded-lg border border-border bg-background/80 p-3">
-                        <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-5 text-foreground">{selectedChunkRendered || "(empty)"}</pre>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                      选择左侧片段后，可在这里固定查看详情。
-                    </div>
-                  )}
-                </div>
+                <StreamCurrentChunkPanel
+                  description="按当前视图模式同步预览选中的 HTTP 请求/响应"
+                  badge={selectedChunk ? (
+                    <span className={cn(
+                      "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+                      selectedChunk.direction === "client"
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    )}>
+                      {selectedChunk.direction === "client" ? "请求" : "响应"}
+                    </span>
+                  ) : undefined}
+                  chips={selectedChunk ? [
+                    `packet #${selectedChunk.packetId}`,
+                    `stream-index ${selectedChunk.streamIndex}`,
+                    `${estimateTextBytes(selectedChunk.body)} bytes`,
+                  ] : []}
+                  content={selectedChunk ? selectedChunkRendered || "(empty)" : null}
+                  highlight={deferredSearch}
+                  showOpenButton={selectedChunk ? isHTTPChunkTruncated(selectedChunk.body, viewMode) : false}
+                  onOpen={() => selectedChunk && setExpandedChunk(selectedChunk)}
+                />
               </div>
             </div>
           )}
         </div>
       </div>
+      {expandedChunk && (
+        <StreamPayloadDialog
+          title={`HTTP Payload 详情 #${expandedChunk.packetId}`}
+          subtitle={`${expandedChunk.direction === "client" ? "请求" : "响应"} · stream-index ${expandedChunk.streamIndex} · ${estimateTextBytes(expandedChunk.body)} bytes`}
+          meta={[
+            { label: "协议", value: "HTTP" },
+            { label: "Stream", value: httpStream.id },
+            { label: "Packet", value: `#${expandedChunk.packetId}` },
+            { label: "方向", value: expandedChunk.direction === "client" ? "请求" : "响应" },
+            { label: "Stream Index", value: expandedChunk.streamIndex },
+            { label: "视图", value: viewMode },
+            { label: "原始字节", value: `${estimateTextBytes(expandedChunk.body)} bytes` },
+            { label: "预览阈值", value: `${MAX_HTTP_PREVIEW_CHARS} chars` },
+          ]}
+          extraActions={(
+            <button
+              type="button"
+              onClick={() => navigate("/misc")}
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 shadow-sm transition-colors hover:bg-cyan-100"
+            >
+              打开 MISC 解码工作台
+            </button>
+          )}
+          content={renderHTTPChunk(expandedChunk.body, viewMode, true)}
+          highlight={deferredSearch}
+          filename={`http-stream-${httpStream.id}-packet-${expandedChunk.packetId}.txt`}
+          onClose={() => setExpandedChunk(null)}
+        />
+      )}
     </div>
   );
 }
@@ -376,45 +340,22 @@ function formatLoadMeta(meta?: StreamLoadMeta): string {
   return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}${overrides}`;
 }
 
-const HTTPChunkCard = memo(function HTTPChunkCard({
-  chunk,
-  viewMode,
-  selected,
-  onClick,
-}: {
-  chunk: HTTPChunk;
-  viewMode: HTTPViewMode;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const rendered = useMemo(() => {
-    if (viewMode === "hex") {
-      return toHexDump(chunk.body);
-    }
-    if (viewMode === "formatted") {
-      return formatHTTPForDisplay(chunk.body);
-    }
-    return chunk.body;
-  }, [chunk.body, viewMode]);
+function renderHTTPChunk(body: string, viewMode: HTTPViewMode, expanded = false): string {
+  let rendered = body;
+  if (viewMode === "hex") {
+    rendered = toHexDump(body);
+  } else if (viewMode === "formatted") {
+    rendered = formatHTTPForDisplay(body);
+  }
+  if (expanded || rendered.length <= MAX_HTTP_PREVIEW_CHARS) {
+    return rendered;
+  }
+  return `${rendered.slice(0, MAX_HTTP_PREVIEW_CHARS)}\n\n... 已截断，点击查看完整 payload`;
+}
 
-  const isClient = chunk.direction === "client";
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer rounded-md border px-3 py-2 font-mono text-xs leading-5",
-        isClient ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-        selected && "ring-2 ring-blue-300",
-      )}
-    >
-      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold opacity-80">
-        <span>{isClient ? "Request ->" : "<- Response"}</span>
-        <span>packet #{chunk.packetId}</span>
-      </div>
-      <pre className="whitespace-pre-wrap break-all">{rendered}</pre>
-    </div>
-  );
-});
+function isHTTPChunkTruncated(body: string, viewMode: HTTPViewMode): boolean {
+  return renderHTTPChunk(body, viewMode, true).length > MAX_HTTP_PREVIEW_CHARS;
+}
 
 function toHexDump(text: string): string {
   if (!text) return "(empty)";

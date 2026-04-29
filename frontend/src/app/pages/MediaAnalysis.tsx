@@ -1,7 +1,12 @@
 import { Clapperboard, Copy, Download, FileText, Headphones, Loader2, Play, Square, Video } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import {
+  AnalysisBucketChart as BucketChart,
+  AnalysisPanel as Panel,
+  AnalysisStatCard as StatCard,
+} from "../components/analysis/AnalysisPrimitives";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus, TrafficBucket } from "../core/types";
+import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 
@@ -481,7 +486,7 @@ export default function MediaAnalysis() {
   ), [playbackUrl]);
 
   return (
-    <PageShell>
+    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(251,113,133,0.26),transparent_36%),linear-gradient(180deg,#fff7f8_0%,#fbfbff_44%,#f8fafc_100%)]">
       <AnalysisHero
         icon={<Clapperboard className="h-5 w-5" />}
         title="媒体流还原"
@@ -634,10 +639,10 @@ export default function MediaAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="协议分布">
-          <BucketChart data={analysis.protocols} color="bg-blue-500" />
+          <BucketChart data={analysis.protocols} barClassName="bg-blue-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
         <Panel title="应用分布">
-          <BucketChart data={analysis.applications} color="bg-violet-500" />
+          <BucketChart data={analysis.applications} barClassName="bg-violet-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
       </div>
 
@@ -704,8 +709,8 @@ export default function MediaAnalysis() {
                   <tr key={session.id} className="border-b border-border/70 align-top">
                     <td className="px-3 py-2">
                       <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${(session.mediaType || "video") === "audio"
-                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-blue-100 text-blue-700"
                         }`}>
                         {(session.mediaType || "video") === "audio"
                           ? <><Headphones className="h-3 w-3" /> 音频</>
@@ -1012,45 +1017,5 @@ export default function MediaAnalysis() {
         </AlertDialogContent>
       </AlertDialog>
     </PageShell>
-  );
-}
-
-function StatCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-2 text-xs text-muted-foreground">{title}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className}`.trim()}>
-      <div className="mb-3 text-sm font-semibold">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function BucketChart({ data, color }: { data: TrafficBucket[]; color: string }) {
-  const max = Math.max(1, ...data.map((item) => item.count));
-  if (data.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
-  }
-  return (
-    <div className="max-h-[320px] overflow-auto pr-1">
-      <div className="space-y-2">
-        {data.map((row) => (
-          <div key={row.label} className="grid grid-cols-[220px_1fr_72px] items-center gap-2 text-xs">
-            <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
-            <div className="h-2 rounded bg-accent">
-              <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
-            </div>
-            <div className="text-right font-mono">{row.count}</div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

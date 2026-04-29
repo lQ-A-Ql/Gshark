@@ -693,6 +693,7 @@ type C2HTTPEndpointAggregate struct {
 	LastTime             string          `json:"last_time,omitempty"`
 	AvgInterval          string          `json:"avg_interval,omitempty"`
 	Jitter               string          `json:"jitter,omitempty"`
+	Intervals            []float64       `json:"intervals,omitempty"`
 	Streams              []int64         `json:"streams,omitempty"`
 	Packets              []int64         `json:"packets,omitempty"`
 	RepresentativePacket int64           `json:"representative_packet,omitempty"`
@@ -716,6 +717,7 @@ type C2DNSAggregate struct {
 	LastTime       string          `json:"last_time,omitempty"`
 	AvgInterval    string          `json:"avg_interval,omitempty"`
 	Jitter         string          `json:"jitter,omitempty"`
+	Intervals      []float64       `json:"intervals,omitempty"`
 	Packets        []int64         `json:"packets,omitempty"`
 	Confidence     int             `json:"confidence,omitempty"`
 	Summary        string          `json:"summary"`
@@ -732,6 +734,7 @@ type C2StreamAggregate struct {
 	Transitions     int             `json:"transitions"`
 	HeartbeatAvg    string          `json:"heartbeat_avg,omitempty"`
 	HeartbeatJitter string          `json:"heartbeat_jitter,omitempty"`
+	Intervals       []float64       `json:"intervals,omitempty"`
 	HasWebSocket    bool            `json:"has_websocket"`
 	WSParams        string          `json:"ws_params,omitempty"`
 	ListenerHints   []TrafficBucket `json:"listener_hints,omitempty"`
@@ -767,45 +770,55 @@ type C2SampleAnalysis struct {
 	Notes               []string               `json:"notes"`
 }
 
+type APTScoreFactor struct {
+	Name         string `json:"name"`
+	Weight       int    `json:"weight"`
+	Direction    string `json:"direction"`
+	SourceModule string `json:"source_module,omitempty"`
+	Summary      string `json:"summary,omitempty"`
+}
+
 type APTEvidenceRecord struct {
-	PacketID            int64    `json:"packet_id"`
-	StreamID            int64    `json:"stream_id,omitempty"`
-	Time                string   `json:"time,omitempty"`
-	ActorID             string   `json:"actor_id,omitempty"`
-	ActorName           string   `json:"actor_name,omitempty"`
-	SourceModule        string   `json:"source_module,omitempty"`
-	Family              string   `json:"family,omitempty"`
-	EvidenceType        string   `json:"evidence_type,omitempty"`
-	EvidenceValue       string   `json:"evidence_value,omitempty"`
-	Confidence          int      `json:"confidence,omitempty"`
-	Source              string   `json:"source,omitempty"`
-	Destination         string   `json:"destination,omitempty"`
-	Host                string   `json:"host,omitempty"`
-	URI                 string   `json:"uri,omitempty"`
-	SampleFamily        string   `json:"sample_family,omitempty"`
-	CampaignStage       string   `json:"campaign_stage,omitempty"`
-	TransportTraits     []string `json:"transport_traits,omitempty"`
-	InfrastructureHints []string `json:"infrastructure_hints,omitempty"`
-	TTPTags             []string `json:"ttp_tags,omitempty"`
-	Tags                []string `json:"tags,omitempty"`
-	Summary             string   `json:"summary"`
-	Evidence            string   `json:"evidence,omitempty"`
+	PacketID            int64            `json:"packet_id"`
+	StreamID            int64            `json:"stream_id,omitempty"`
+	Time                string           `json:"time,omitempty"`
+	ActorID             string           `json:"actor_id,omitempty"`
+	ActorName           string           `json:"actor_name,omitempty"`
+	SourceModule        string           `json:"source_module,omitempty"`
+	Family              string           `json:"family,omitempty"`
+	EvidenceType        string           `json:"evidence_type,omitempty"`
+	EvidenceValue       string           `json:"evidence_value,omitempty"`
+	Confidence          int              `json:"confidence,omitempty"`
+	Source              string           `json:"source,omitempty"`
+	Destination         string           `json:"destination,omitempty"`
+	Host                string           `json:"host,omitempty"`
+	URI                 string           `json:"uri,omitempty"`
+	SampleFamily        string           `json:"sample_family,omitempty"`
+	CampaignStage       string           `json:"campaign_stage,omitempty"`
+	TransportTraits     []string         `json:"transport_traits,omitempty"`
+	InfrastructureHints []string         `json:"infrastructure_hints,omitempty"`
+	TTPTags             []string         `json:"ttp_tags,omitempty"`
+	Tags                []string         `json:"tags,omitempty"`
+	ScoreFactors        []APTScoreFactor `json:"score_factors,omitempty"`
+	Summary             string           `json:"summary"`
+	Evidence            string           `json:"evidence,omitempty"`
 }
 
 type APTActorProfile struct {
-	ID                  string          `json:"id"`
-	Name                string          `json:"name"`
-	Aliases             []string        `json:"aliases,omitempty"`
-	Summary             string          `json:"summary"`
-	Confidence          int             `json:"confidence,omitempty"`
-	EvidenceCount       int             `json:"evidence_count"`
-	SampleFamilies      []TrafficBucket `json:"sample_families"`
-	CampaignStages      []TrafficBucket `json:"campaign_stages"`
-	TransportTraits     []TrafficBucket `json:"transport_traits"`
-	InfrastructureHints []TrafficBucket `json:"infrastructure_hints"`
-	RelatedC2Families   []TrafficBucket `json:"related_c2_families"`
-	TTPTags             []TrafficBucket `json:"ttp_tags"`
-	Notes               []string        `json:"notes"`
+	ID                  string           `json:"id"`
+	Name                string           `json:"name"`
+	Aliases             []string         `json:"aliases,omitempty"`
+	Summary             string           `json:"summary"`
+	Confidence          int              `json:"confidence,omitempty"`
+	EvidenceCount       int              `json:"evidence_count"`
+	SampleFamilies      []TrafficBucket  `json:"sample_families"`
+	CampaignStages      []TrafficBucket  `json:"campaign_stages"`
+	TransportTraits     []TrafficBucket  `json:"transport_traits"`
+	InfrastructureHints []TrafficBucket  `json:"infrastructure_hints"`
+	RelatedC2Families   []TrafficBucket  `json:"related_c2_families"`
+	TTPTags             []TrafficBucket  `json:"ttp_tags"`
+	ScoreFactors        []APTScoreFactor `json:"score_factors,omitempty"`
+	Notes               []string         `json:"notes"`
 }
 
 type APTAnalysis struct {

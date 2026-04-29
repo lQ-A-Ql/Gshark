@@ -2,10 +2,12 @@ import { Activity, Bug, ChevronDown, ChevronRight, Network, Radio, Server, Shiel
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
+import { DataTableShell, EmptyState, MetricCard, StatusHint, SurfacePanel } from "../components/DesignSystem";
+import { AnalysisBucketChart, AnalysisList } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { Sparkline } from "../components/Sparkline";
 import { cn } from "../components/ui/utils";
-import type { C2DNSAggregate, C2FamilyAnalysis, C2HTTPEndpointAggregate, C2IndicatorRecord, C2SampleAnalysis, C2StreamAggregate, TrafficBucket } from "../core/types";
+import type { C2DNSAggregate, C2FamilyAnalysis, C2HTTPEndpointAggregate, C2IndicatorRecord, C2SampleAnalysis, C2StreamAggregate } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { EvidenceActions } from "../misc/EvidenceActions";
 import { FilterActions } from "../misc/FilterActions";
@@ -179,30 +181,24 @@ export default function C2Analysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && (
-        <div className="mb-3 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-xs text-rose-700">
-          正在加载 C2 样本分析骨架...
-        </div>
-      )}
+      {loading && <StatusHint tone="rose" className="mb-3">正在加载 C2 样本分析骨架...</StatusHint>}
 
-      {!loading && error && (
-        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>
-      )}
+      {!loading && error && <StatusHint tone="amber" className="mb-3">{error}</StatusHint>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <StatCard title="命中包" value={analysis.totalMatchedPackets.toLocaleString()} icon={<Shield className="h-4 w-4" />} tone="rose" />
-        <StatCard title="CS 候选" value={analysis.cs.candidateCount.toLocaleString()} icon={<Radio className="h-4 w-4" />} tone="blue" />
-        <StatCard title="VShell 候选" value={analysis.vshell.candidateCount.toLocaleString()} icon={<Server className="h-4 w-4" />} tone="cyan" />
-        <StatCard title="归因预留" value={String((analysis.cs.relatedActors?.length ?? 0) + (analysis.vshell.relatedActors?.length ?? 0))} icon={<Workflow className="h-4 w-4" />} tone="amber" />
+        <MetricCard label="命中包" value={analysis.totalMatchedPackets.toLocaleString()} icon={<Shield className="h-4 w-4" />} tone="rose" />
+        <MetricCard label="CS 候选" value={analysis.cs.candidateCount.toLocaleString()} icon={<Radio className="h-4 w-4" />} tone="blue" />
+        <MetricCard label="VShell 候选" value={analysis.vshell.candidateCount.toLocaleString()} icon={<Server className="h-4 w-4" />} tone="cyan" />
+        <MetricCard label="归因预留" value={String((analysis.cs.relatedActors?.length ?? 0) + (analysis.vshell.relatedActors?.length ?? 0))} icon={<Workflow className="h-4 w-4" />} tone="amber" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="Family 分布">
-          <BucketList data={analysis.families} emptyText="当前骨架未填充 CS / VShell 命中，后续规则会在这里汇总家族分布。" color="bg-rose-500" />
-        </Panel>
-        <Panel title="会话概览">
-          <ConversationList items={analysis.conversations} />
-        </Panel>
+        <C2Panel title="Family 分布">
+          <AnalysisBucketChart data={analysis.families} emptyText="当前骨架未填充 CS / VShell 命中，后续规则会在这里汇总家族分布。" barClassName="bg-rose-500" labelWidthClassName="grid-cols-[minmax(0,1fr)_minmax(96px,1.2fr)_72px]" />
+        </C2Panel>
+        <C2Panel title="会话概览">
+          <AnalysisList items={analysis.conversations.map((item) => ({ label: item.protocol ? `${item.protocol} · ${item.label}` : item.label, count: item.count }))} emptyText="当前骨架未填充 C2 会话，后续会聚合同 Host / URI / Channel 的候选通信。" />
+        </C2Panel>
       </div>
 
       <div className="mt-4 rounded-[28px] border border-white/80 bg-white/90 p-2 shadow-[0_24px_80px_-54px_rgba(15,23,42,0.45)] backdrop-blur">
@@ -213,10 +209,10 @@ export default function C2Analysis() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <StatCard title={`${familyLabel} 候选`} value={family.candidateCount.toLocaleString()} />
-        <StatCard title="规则位" value={family.matchedRuleCount.toLocaleString()} />
-        <StatCard title="通道种类" value={String(family.channels.length)} />
-        <StatCard title="周期画像" value={String(family.beaconPatterns?.length ?? 0)} />
+        <MetricCard label={`${familyLabel} 候选`} value={family.candidateCount.toLocaleString()} />
+        <MetricCard label="规则位" value={family.matchedRuleCount.toLocaleString()} />
+        <MetricCard label="通道种类" value={String(family.channels.length)} />
+        <MetricCard label="周期画像" value={String(family.beaconPatterns?.length ?? 0)} />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -226,19 +222,19 @@ export default function C2Analysis() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title={`${familyLabel} Channel 分布`}>
-          <BucketList data={family.channels} emptyText="尚未接入真实 channel 规则。" color={activeTab === "cs" ? "bg-rose-500" : "bg-cyan-500"} />
-        </Panel>
-        <Panel title={`${familyLabel} 指标类型`}>
-          <BucketList data={family.indicators} emptyText="尚未接入 indicator 统计。" color="bg-indigo-500" />
-        </Panel>
+        <C2Panel title={`${familyLabel} Channel 分布`}>
+          <AnalysisBucketChart data={family.channels} emptyText="尚未接入真实 channel 规则。" barClassName={activeTab === "cs" ? "bg-rose-500" : "bg-cyan-500"} labelWidthClassName="grid-cols-[minmax(0,1fr)_minmax(96px,1.2fr)_72px]" />
+        </C2Panel>
+        <C2Panel title={`${familyLabel} 指标类型`}>
+          <AnalysisBucketChart data={family.indicators} emptyText="尚未接入 indicator 统计。" barClassName="bg-indigo-500" labelWidthClassName="grid-cols-[minmax(0,1fr)_minmax(96px,1.2fr)_72px]" />
+        </C2Panel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="Beacon / Heartbeat 模式">
+        <C2Panel title="Beacon / Heartbeat 模式">
           <BeaconPatternList family={activeTab} patterns={family.beaconPatterns ?? []} />
-        </Panel>
-        <Panel title="APT 兼容扩展口">
+        </C2Panel>
+        <C2Panel title="APT 兼容扩展口">
           <div className="space-y-2">
             {SILVER_FOX_BASELINE.map((note, index) => (
               <div key={`${note}-${index}`} className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-800">
@@ -247,73 +243,48 @@ export default function C2Analysis() {
               </div>
             ))}
           </div>
-        </Panel>
+        </C2Panel>
       </div>
 
       {activeTab === "cs" && (
-        <Panel title="CS Host / URI 聚合画像" className="mt-4">
+        <C2Panel title="CS Host / URI 聚合画像" className="mt-4">
           <CSHostURIAggregates items={analysis.cs.hostUriAggregates ?? []} />
-        </Panel>
+        </C2Panel>
       )}
 
       {activeTab === "cs" && (
-        <Panel title="CS DNS Beacon 聚合画像" className="mt-4">
+        <C2Panel title="CS DNS Beacon 聚合画像" className="mt-4">
           <CSDNSAggregates items={analysis.cs.dnsAggregates ?? []} />
-        </Panel>
+        </C2Panel>
       )}
 
       {activeTab === "vshell" && (
-        <Panel title="VShell Stream 聚合画像" className="mt-4">
+        <C2Panel title="VShell Stream 聚合画像" className="mt-4">
           <VShellStreamAggregates items={analysis.vshell.streamAggregates ?? []} />
-        </Panel>
+        </C2Panel>
       )}
 
-      <Panel title={`${familyLabel} 候选证据表`} className="mt-4">
+      <C2Panel title={`${familyLabel} 候选证据表`} className="mt-4">
         <CandidateTable candidates={family.candidates} />
-      </Panel>
+      </C2Panel>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title={`${familyLabel} Notes`}>
+        <C2Panel title={`${familyLabel} Notes`}>
           <NotesPanel notes={family.notes} emptyText="当前 family 仅完成骨架，下一轮规则接入后会输出强信号、中弱信号与样本特别说明。" />
-        </Panel>
-        <Panel title="全局 Notes">
+        </C2Panel>
+        <C2Panel title="全局 Notes">
           <NotesPanel notes={analysis.notes} emptyText="C2 分析骨架已就绪，当前抓包暂未生成全局说明。" />
-        </Panel>
+        </C2Panel>
       </div>
     </PageShell>
   );
 }
 
-function StatCard({ title, value, icon, tone = "slate" }: { title: string; value: string; icon?: ReactNode; tone?: "rose" | "blue" | "cyan" | "amber" | "slate" }) {
-  const toneClasses = {
-    rose: "text-rose-600 bg-rose-50 border-rose-100",
-    blue: "text-blue-600 bg-blue-50 border-blue-100",
-    cyan: "text-cyan-600 bg-cyan-50 border-cyan-100",
-    amber: "text-amber-600 bg-amber-50 border-amber-100",
-    slate: "text-slate-600 bg-slate-50 border-slate-100",
-  };
+function C2Panel({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-white/88 p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.5)]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{title}</div>
-        {icon ? <div className={cn("rounded-2xl border p-2", toneClasses[tone])}>{icon}</div> : null}
-      </div>
-      <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <section className={cn("rounded-[28px] border border-slate-200/80 bg-white/92 shadow-[0_24px_80px_-54px_rgba(15,23,42,0.42)]", className)}>
-      <div className="border-b border-slate-100 px-5 py-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-          <Network className="h-4 w-4 text-rose-600" />
-          {title}
-        </div>
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
+    <SurfacePanel title={title} icon={<Network className="h-4 w-4 text-rose-600" />} className={className}>
+      {children}
+    </SurfacePanel>
   );
 }
 
@@ -350,44 +321,6 @@ function FeatureCard({ title, text }: { title: string; text: string }) {
   );
 }
 
-function BucketList({ data, emptyText, color }: { data: TrafficBucket[]; emptyText: string; color: string }) {
-  if (data.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs leading-5 text-slate-500">{emptyText}</div>;
-  }
-  const max = Math.max(...data.map((item) => item.count), 1);
-  return (
-    <div className="space-y-3">
-      {data.map((item) => (
-        <div key={item.label} className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="truncate font-medium text-slate-700">{item.label}</span>
-            <span className="font-mono text-slate-500">{item.count.toLocaleString()}</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div className={cn("h-full rounded-full", color)} style={{ width: `${Math.max(6, Math.round((item.count / max) * 100))}%` }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ConversationList({ items }: { items: { label: string; protocol?: string; count: number }[] }) {
-  if (items.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs leading-5 text-slate-500">当前骨架未填充 C2 会话，后续会聚合同 Host / URI / Channel 的候选通信。</div>;
-  }
-  return (
-    <div className="space-y-2">
-      {items.map((item) => (
-        <div key={`${item.protocol}-${item.label}`} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs">
-          <span className="truncate font-medium text-slate-700">{item.protocol ? `${item.protocol} · ${item.label}` : item.label}</span>
-          <span className="font-mono text-slate-500">{item.count.toLocaleString()}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function BeaconPatternList({ family, patterns }: { family: C2Tab; patterns: NonNullable<C2FamilyAnalysis["beaconPatterns"]> }) {
   if (patterns.length === 0) {
     return (
@@ -416,9 +349,9 @@ function BeaconPatternList({ family, patterns }: { family: C2Tab; patterns: NonN
 function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[] }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-xs leading-6 text-slate-500">
+      <EmptyState className="text-left">
         尚未形成 CS Host / URI 聚合。该区域会按 Host + URI 汇总 GET/POST、时间范围、平均间隔、jitter、stream 与 packet 列表，用于从单包候选升级到 Beacon 会话画像。
-      </div>
+      </EmptyState>
     );
   }
   return (
@@ -449,6 +382,7 @@ function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[] }) {
               <td className="px-3 py-2 font-mono text-slate-600">
                 <div>{item.avgInterval || "--"}</div>
                 <div className="text-[10px] text-slate-400">{item.jitter ? `jitter ${item.jitter}` : "jitter --"}</div>
+                <IntervalSparkline values={item.intervals} color="stroke-rose-500" compact />
               </td>
               <td className="space-y-1 px-3 py-2 font-mono text-[11px] text-slate-500">
                 <div>{item.firstTime || "--"}</div>
@@ -529,9 +463,9 @@ function CSDNSAggregates({ items }: { items: C2DNSAggregate[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-xs leading-6 text-slate-500">
+      <EmptyState className="text-left">
         尚未形成 CS DNS 聚合。该区域会按 qname 汇总 DNS 查询类型、TXT/NULL/CNAME 分布、请求/响应比例、时间间隔与 packet 列表，用于 DNS Beacon 画像。
-      </div>
+      </EmptyState>
     );
   }
   return (
@@ -639,9 +573,9 @@ function VShellStreamAggregates({ items }: { items: C2StreamAggregate[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-xs leading-6 text-slate-500">
+      <EmptyState className="text-left">
         尚未形成 VShell Stream 聚合。该区域会按 stream 汇总架构标记、长度前缀、短长包交替、心跳间隔与 WebSocket 参数，用于 VShell stream-level 画像。
-      </div>
+      </EmptyState>
     );
   }
   return (
@@ -770,13 +704,13 @@ function CandidateTable({ candidates }: { candidates: C2IndicatorRecord[] }) {
 
   if (candidates.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs leading-6 text-slate-500">
+      <EmptyState className="py-8">
         当前仅完成候选证据表骨架。后续规则会填充 family、channel、indicator、confidence、actorHints 与 tags；命中后可直接定位包或打开关联流。
-      </div>
+      </EmptyState>
     );
   }
   return (
-    <div className="max-h-[440px] overflow-auto">
+    <DataTableShell maxHeight={440}>
       <table className="w-full table-fixed border-collapse text-left text-xs">
         <thead className="sticky top-0 bg-slate-50 text-slate-500 shadow-[0_1px_0_0_rgba(226,232,240,0.9)]">
           <tr>
@@ -844,7 +778,7 @@ function CandidateTable({ candidates }: { candidates: C2IndicatorRecord[] }) {
           })}
         </tbody>
       </table>
-    </div>
+    </DataTableShell>
   );
 }
 
@@ -856,6 +790,24 @@ function formatNumberList(values?: number[]) {
 function firstNumber(values?: number[]) {
   const value = values?.find((item) => Number.isFinite(item) && item > 0);
   return value ?? 0;
+}
+
+function IntervalSparkline({ values, color = "stroke-rose-500", compact = false }: { values?: number[]; color?: string; compact?: boolean }) {
+  const cleanValues = (values ?? []).filter((value) => Number.isFinite(value) && value > 0);
+  if (cleanValues.length < 2) return null;
+  const preview = cleanValues.slice(0, 6).map((value) => `${value.toFixed(value >= 10 ? 0 : 1)}s`).join(" / ");
+  return (
+    <div className={cn(
+      "rounded-2xl border border-slate-100 bg-white/80 px-3 py-2",
+      compact ? "mt-2 px-2 py-1" : "mt-3",
+    )}>
+      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        <span>Interval Sparkline</span>
+        <span className="font-mono normal-case tracking-normal text-slate-500">{preview}{cleanValues.length > 6 ? " ..." : ""}</span>
+      </div>
+      <Sparkline values={cleanValues} color={color} width={compact ? 96 : 180} height={compact ? 20 : 28} />
+    </div>
+  );
 }
 
 function AggregateExpandButton({ expanded, label, onClick }: { expanded: boolean; label: string; onClick: () => void }) {
@@ -904,6 +856,7 @@ function CSDNSAggregateDetailPanel({ item }: { item: C2DNSAggregate }) {
         <TagLine values={["dns-beacon-review", item.confidence ? `confidence:${item.confidence}` : ""].filter(Boolean)} />
       </div>
       <DetailMetricGrid rows={metrics} />
+      <IntervalSparkline values={item.intervals} color="stroke-rose-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">Query Type 分布</div>
@@ -942,6 +895,7 @@ function VShellStreamAggregateDetailPanel({ item }: { item: C2StreamAggregate })
         <TagLine values={["stream-level-review", item.hasWebSocket ? "websocket" : "", item.confidence ? `confidence:${item.confidence}` : ""].filter(Boolean)} />
       </div>
       <DetailMetricGrid rows={metrics} />
+      <IntervalSparkline values={item.intervals} color="stroke-cyan-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">架构标记 / Payload 形态</div>
@@ -1125,7 +1079,7 @@ function TagLine({ values }: { values: string[] }) {
 
 function NotesPanel({ notes, emptyText }: { notes: string[]; emptyText: string }) {
   if (notes.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-xs leading-5 text-slate-500">{emptyText}</div>;
+    return <EmptyState className="text-left">{emptyText}</EmptyState>;
   }
   return (
     <div className="space-y-2">

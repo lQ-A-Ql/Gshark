@@ -1,8 +1,16 @@
 import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
-import type { DBCProfile, TrafficBucket, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
+import {
+  AnalysisBucketChart as BucketChart,
+  AnalysisDataTable as DataTable,
+  AnalysisList as ConversationList,
+  AnalysisMiniStat as MiniStat,
+  AnalysisPanel as Panel,
+  AnalysisStatCard as StatCard,
+} from "../components/analysis/AnalysisPrimitives";
+import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
@@ -196,7 +204,7 @@ export default function VehicleAnalysis() {
   }, [isPreloadingCapture, refreshAnalysis, refreshDBCProfiles]);
 
   return (
-    <PageShell>
+    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.24),transparent_36%),linear-gradient(180deg,#f4fffb_0%,#f6f7ff_44%,#f8fafc_100%)]">
       <AnalysisHero
         icon={<Car className="h-5 w-5" />}
         title="车机流量分析"
@@ -209,11 +217,11 @@ export default function VehicleAnalysis() {
       />
 
       {loading && (
-        <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在调用 tshark 生成车机分析结果...</div>
+        <div className="mb-3 rounded-2xl border border-emerald-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在调用 tshark 生成车机分析结果...</div>
       )}
 
       {!loading && error && (
-        <div className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">{error}</div>
+        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">{error}</div>
       )}
 
       <Panel title="DBC 映射" className="mb-4">
@@ -275,7 +283,7 @@ export default function VehicleAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="车载协议分布">
-          <BucketChart data={analysis.protocols} color="bg-blue-500" />
+          <BucketChart data={analysis.protocols} barClassName="bg-blue-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
         <Panel title="网络 / 总线视图">
           <ConversationList
@@ -313,8 +321,8 @@ export default function VehicleAnalysis() {
             <MiniStat title="DBC 信号" value={analysis.can.decodedSignals.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.can.busIds} color="bg-cyan-500" />
-            <BucketChart data={analysis.can.messageIds} color="bg-indigo-500" />
+            <BucketChart data={analysis.can.busIds} barClassName="bg-cyan-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart data={analysis.can.messageIds} barClassName="bg-indigo-500" maxHeightClassName="max-h-[320px]" />
           </div>
         </Panel>
         <Panel title="J1939">
@@ -325,8 +333,8 @@ export default function VehicleAnalysis() {
             <MiniStat title="目标地址种类" value={analysis.j1939.targetAddrs.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.j1939.pgns} color="bg-emerald-500" />
-            <BucketChart data={analysis.j1939.sourceAddrs} color="bg-violet-500" />
+            <BucketChart data={analysis.j1939.pgns} barClassName="bg-emerald-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart data={analysis.j1939.sourceAddrs} barClassName="bg-violet-500" maxHeightClassName="max-h-[320px]" />
           </div>
         </Panel>
       </div>
@@ -340,8 +348,8 @@ export default function VehicleAnalysis() {
             <MiniStat title="逻辑地址" value={analysis.doip.endpoints.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.doip.messageTypes} color="bg-sky-500" />
-            <BucketChart data={analysis.doip.vins} color="bg-fuchsia-500" />
+            <BucketChart data={analysis.doip.messageTypes} barClassName="bg-sky-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart data={analysis.doip.vins} barClassName="bg-fuchsia-500" maxHeightClassName="max-h-[320px]" />
           </div>
         </Panel>
         <Panel title="UDS">
@@ -352,8 +360,8 @@ export default function VehicleAnalysis() {
             <MiniStat title="DTC 数" value={analysis.uds.dtcs.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.uds.serviceIDs} color="bg-orange-500" />
-            <BucketChart data={analysis.uds.negativeCodes} color="bg-rose-500" />
+            <BucketChart data={analysis.uds.serviceIDs} barClassName="bg-orange-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart data={analysis.uds.negativeCodes} barClassName="bg-rose-500" maxHeightClassName="max-h-[320px]" />
           </div>
         </Panel>
       </div>
@@ -390,7 +398,7 @@ export default function VehicleAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="CAN Payload 协议分布">
-          <BucketChart data={analysis.can.payloadProtocols} color="bg-amber-500" />
+          <BucketChart data={analysis.can.payloadProtocols} barClassName="bg-amber-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
         <Panel title={`CAN Payload 明细预览 (${analysis.can.payloadRecords.length})`}>
           <DataTable
@@ -418,10 +426,10 @@ export default function VehicleAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="DBC 报文分布">
-          <BucketChart data={analysis.can.decodedMessageDist} color="bg-emerald-500" />
+          <BucketChart data={analysis.can.decodedMessageDist} barClassName="bg-emerald-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
         <Panel title="DBC 信号分布">
-          <BucketChart data={analysis.can.decodedSignals} color="bg-violet-500" />
+          <BucketChart data={analysis.can.decodedSignals} barClassName="bg-violet-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
       </div>
 
@@ -513,102 +521,6 @@ export default function VehicleAnalysis() {
         />
       </Panel>
     </PageShell>
-  );
-}
-
-function StatCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-2 text-xs text-muted-foreground">{title}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function MiniStat({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="rounded border border-border bg-background px-3 py-2">
-      <div className="text-[11px] text-muted-foreground">{title}</div>
-      <div className="text-sm font-semibold">{value.toLocaleString()}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className}`.trim()}>
-      <div className="mb-3 text-sm font-semibold">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function BucketChart({ data, color }: { data: TrafficBucket[]; color: string }) {
-  const max = Math.max(1, ...data.map((item) => item.count));
-  if (data.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
-  }
-  return (
-    <div className="max-h-[320px] overflow-auto pr-1">
-      <div className="space-y-2">
-        {data.map((row) => (
-          <div key={row.label} className="grid grid-cols-[220px_1fr_72px] items-center gap-2 text-xs">
-            <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
-            <div className="h-2 rounded bg-accent">
-              <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
-            </div>
-            <div className="text-right font-mono">{row.count}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ConversationList({ items }: { items: TrafficBucket[] }) {
-  if (items.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
-  }
-  return (
-    <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-      {items.map((item) => (
-        <div key={`${item.label}-${item.count}`} className="flex items-center justify-between rounded border border-border bg-background px-3 py-2 text-xs">
-          <span className="truncate text-muted-foreground" title={item.label}>{item.label}</span>
-          <span className="ml-3 font-mono">{item.count}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<string | number>> }) {
-  return (
-    <div className="max-h-[420px] overflow-auto">
-      <table className="w-full table-fixed border-collapse text-left text-xs">
-        <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2">{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={headers.length} className="px-3 py-6 text-center text-muted-foreground">暂无数据</td>
-            </tr>
-          ) : (
-            rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-border/70 align-top">
-                {row.map((value, cellIndex) => (
-                  <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">{String(value)}</td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

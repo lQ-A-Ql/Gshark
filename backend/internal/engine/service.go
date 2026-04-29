@@ -1856,6 +1856,7 @@ func (s *Service) APTAnalysis(ctx context.Context) (model.APTAnalysis, error) {
 			"Silver Fox / 银狐作为首个预置 actor profile；ValleyRAT、Winos 4.0、Gh0st 系、HFS 下载链与 fallback C2 作为后续规则接入口。",
 		)
 	}
+	analysis = finalizeAPTAnalysis(analysis)
 
 	if err := ctx.Err(); err != nil {
 		return model.APTAnalysis{}, err
@@ -1995,7 +1996,7 @@ func buildAPTAnalysisFromC2(c2 model.C2SampleAnalysis) model.APTAnalysis {
 						ttpTags[value]++
 					}
 				}
-				analysis.Evidence = append(analysis.Evidence, model.APTEvidenceRecord{
+				record := model.APTEvidenceRecord{
 					PacketID:            item.PacketID,
 					StreamID:            item.StreamID,
 					Time:                item.Time,
@@ -2018,7 +2019,9 @@ func buildAPTAnalysisFromC2(c2 model.C2SampleAnalysis) model.APTAnalysis {
 					Tags:                item.Tags,
 					Summary:             item.Summary,
 					Evidence:            item.Evidence,
-				})
+				}
+				record.ScoreFactors = aptScoreFactorsForRecord(record)
+				analysis.Evidence = append(analysis.Evidence, record)
 			}
 		}
 	}

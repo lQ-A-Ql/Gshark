@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, BarChart3, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { AnalysisEmptyState, AnalysisPanel, AnalysisStatCard } from "../components/analysis/AnalysisPrimitives";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet, GlobalTrafficStats } from "../core/types";
@@ -133,7 +134,7 @@ export default function TrafficGraph() {
   }, [applyFilter, navigate, setDisplayFilter]);
 
   return (
-    <PageShell>
+    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.28),transparent_36%),linear-gradient(180deg,#fffaf0_0%,#fbfbff_44%,#f8fafc_100%)]">
       <AnalysisHero
         icon={<BarChart3 className="h-5 w-5" />}
         title="流量图分析"
@@ -146,56 +147,56 @@ export default function TrafficGraph() {
       />
 
       {loading && (
-        <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在加载全局流量统计...</div>
+        <div className="mb-3 rounded-2xl border border-amber-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在加载全局流量统计...</div>
       )}
 
       {!loading && error && (
-        <div className="mb-3 flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        <div className="mb-3 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">
           <span>{error}</span>
-          <button className="rounded border border-amber-300 bg-white px-2 py-0.5 hover:bg-amber-100" onClick={() => refreshStats(true)}>重试</button>
+          <button className="rounded-full border border-amber-200 bg-white/90 px-3 py-1 font-semibold shadow-sm transition-all hover:bg-amber-100" onClick={() => refreshStats(true)}>重试</button>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <StatCard title="总包数" value={stats.totalPackets.toLocaleString()} icon={<Activity className="h-4 w-4 text-emerald-600" />} />
-        <StatCard title="协议种类" value={String(stats.protocolKinds)} icon={<BarChart3 className="h-4 w-4 text-indigo-600" />} />
-        <StatCard title="时间窗口" value={timeline.length > 0 ? `${timeline[0].label} ~ ${timeline[timeline.length - 1].label}` : "--"} icon={<Clock3 className="h-4 w-4 text-amber-600" />} />
+        <AnalysisStatCard title="总包数" value={stats.totalPackets.toLocaleString()} icon={<Activity className="h-4 w-4 text-emerald-600" />} tone="amber" />
+        <AnalysisStatCard title="协议种类" value={String(stats.protocolKinds)} icon={<BarChart3 className="h-4 w-4 text-indigo-600" />} tone="amber" />
+        <AnalysisStatCard title="时间窗口" value={timeline.length > 0 ? `${timeline[0].label} ~ ${timeline[timeline.length - 1].label}` : "--"} icon={<Clock3 className="h-4 w-4 text-amber-600" />} tone="amber" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="每秒流量趋势">
+        <AnalysisPanel title="每秒流量趋势" tone="amber">
           <SimpleBarChart data={timeline} color="bg-blue-500" />
-        </Panel>
-        <Panel title="协议分布">
+        </AnalysisPanel>
+        <AnalysisPanel title="协议分布" tone="amber">
           <SimpleBarChart data={protocolDist} color="bg-emerald-500" onSelect={(row) => jumpWithFilter(filterForProtocolBucket(row.label))} />
-        </Panel>
+        </AnalysisPanel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="源 IP">
+        <AnalysisPanel title="源 IP" tone="amber">
           <SimpleBarChart data={topSrcIPs} color="bg-violet-500" onSelect={(row) => jumpWithFilter(filterForIpBucket(row.label, "src"))} />
-        </Panel>
-        <Panel title="目标 IP">
+        </AnalysisPanel>
+        <AnalysisPanel title="目标 IP" tone="amber">
           <SimpleBarChart data={topDstIPs} color="bg-sky-500" onSelect={(row) => jumpWithFilter(filterForIpBucket(row.label, "dst"))} />
-        </Panel>
+        </AnalysisPanel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="计算机名">
+        <AnalysisPanel title="计算机名" tone="amber">
           <SimpleBarChart data={topComputerNames} color="bg-fuchsia-500" />
-        </Panel>
-        <Panel title="域名">
+        </AnalysisPanel>
+        <AnalysisPanel title="域名" tone="amber">
           <SimpleBarChart data={topDomains} color="bg-rose-500" onSelect={(row) => jumpWithFilter(filterForDomainBucket(row.label))} />
-        </Panel>
+        </AnalysisPanel>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="目标端口">
+        <AnalysisPanel title="目标端口" tone="amber">
           <SimpleBarChart data={topDestPorts} color="bg-cyan-500" onSelect={(row) => jumpWithFilter(filterForPortBucket(row.label))} />
-        </Panel>
-        <Panel title="源端口">
+        </AnalysisPanel>
+        <AnalysisPanel title="源端口" tone="amber">
           <SimpleBarChart data={topSrcPorts} color="bg-orange-500" onSelect={(row) => jumpWithFilter(filterForPortBucket(row.label))} />
-        </Panel>
+        </AnalysisPanel>
       </div>
     </PageShell>
   );
@@ -349,27 +350,6 @@ function extractComputerName(packet: Packet): string {
   return "";
 }
 
-function StatCard({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{title}</span>
-        {icon}
-      </div>
-      <div className="text-lg font-semibold text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 text-sm font-semibold text-foreground">{title}</div>
-      {children}
-    </div>
-  );
-}
-
 function SimpleBarChart({
   data,
   color,
@@ -382,7 +362,7 @@ function SimpleBarChart({
   const max = Math.max(1, ...data.map((x) => x.count));
 
   if (data.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无数据</div>;
+    return <AnalysisEmptyState>暂无数据</AnalysisEmptyState>;
   }
 
   return (
@@ -393,13 +373,13 @@ function SimpleBarChart({
             key={row.label}
             type="button"
             onClick={() => onSelect?.(row)}
-            className={`grid w-full grid-cols-[180px_1fr_64px] items-center gap-2 rounded-lg px-1 py-1 text-left text-xs ${onSelect ? "transition-colors hover:bg-accent" : ""}`}
+            className={`grid w-full grid-cols-[180px_1fr_64px] items-center gap-3 rounded-2xl px-2 py-2 text-left text-xs ${onSelect ? "transition-all hover:bg-amber-50/70 hover:shadow-sm" : ""}`}
           >
-            <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
-            <div className="h-2 rounded bg-accent">
+            <div className="truncate font-medium text-slate-500" title={row.label}>{row.label}</div>
+            <div className="h-2 rounded-full bg-slate-100">
               <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
             </div>
-            <div className="text-right font-mono text-foreground">{row.count}</div>
+            <div className="text-right font-mono font-semibold text-slate-700">{row.count}</div>
           </button>
         ))}
       </div>

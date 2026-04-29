@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { PageShell } from "../components/PageShell";
+import { CollapsibleContent, EmptyState, StatusHint } from "../components/DesignSystem";
 import { Button } from "../components/ui/button";
 import { bridge } from "../integrations/wailsBridge";
 import type { MiscModuleManifest } from "../core/types";
@@ -179,9 +180,9 @@ export default function MiscTools() {
       {error && <ErrorBlock message={error} />}
 
       {loading ? (
-        <div className="rounded-[24px] border border-white/80 bg-white/86 px-4 py-12 text-center text-sm font-medium text-slate-500 shadow-[0_20px_55px_rgba(148,163,184,0.16)] backdrop-blur">
+        <StatusHint className="px-4 py-12 text-center text-sm font-medium shadow-[0_20px_55px_rgba(148,163,184,0.16)]" tone="violet">
           正在加载 MISC 模块...
-        </div>
+        </StatusHint>
       ) : (
         <div className="space-y-4">
           {filteredModules.map((module) => {
@@ -250,27 +251,21 @@ export default function MiscTools() {
                   </div>
                 </button>
 
-                <div
-                  aria-hidden={!expanded}
-                  className={cn(
-                    "grid transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    expanded ? "visible grid-rows-[1fr] opacity-100" : "pointer-events-none invisible grid-rows-[0fr] opacity-0",
-                  )}
-                >
-                  <div className="overflow-hidden px-6 pb-6 sm:px-7">
-                    <div className="pt-1">
+                <CollapsibleContent open={expanded}>
+                  <div className="px-6 pb-6 sm:px-7">
+                    <div className="border-t border-slate-100 pt-5">
                       <Renderer module={module} onModuleDeleted={handleModuleDeleted} surfaceVariant="embedded" />
                     </div>
                   </div>
-                </div>
+                </CollapsibleContent>
               </section>
             );
           })}
 
           {filteredModules.length === 0 && !error && (
-            <div className="rounded-[24px] border border-dashed border-white/80 bg-white/86 px-4 py-12 text-center text-sm text-slate-500 shadow-[0_18px_50px_rgba(148,163,184,0.12)]">
+            <EmptyState className="border-white/80 bg-white/86 px-4 py-12 text-sm shadow-[0_18px_50px_rgba(148,163,184,0.12)]">
               当前筛选下没有可展示的 MISC 模块。
-            </div>
+            </EmptyState>
           )}
         </div>
       )}

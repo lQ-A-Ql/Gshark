@@ -1,9 +1,13 @@
-import { ChevronLeft, ChevronRight, Database, Download, HardDrive, Keyboard, Pause, Play, Route, Upload, Usb, Workflow } from "lucide-react";
+import { ChevronLeft, ChevronRight, HardDrive, Keyboard, Pause, Play, Route, Usb, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import {
+  AnalysisBucketChart as BucketChart,
+  AnalysisPanel as Panel,
+  AnalysisStatCard as StatCard,
+} from "../components/analysis/AnalysisPrimitives";
 import type {
-  TrafficBucket,
   USBAnalysis as USBAnalysisData,
   USBKeyboardEvent,
   USBMassStorageOperation,
@@ -312,7 +316,7 @@ export default function UsbAnalysis() {
   }, [filteredKeyboardEvents, keyboardCursor]);
 
   return (
-    <PageShell>
+    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.26),transparent_36%),linear-gradient(180deg,#f0fdff_0%,#f6faff_44%,#f8fafc_100%)]">
       <AnalysisHero
         icon={<Usb className="h-5 w-5" />}
         title="USB 行为分析"
@@ -336,10 +340,10 @@ export default function UsbAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Panel title="协议分布">
-          <BucketChart data={analysis.protocols} color="bg-blue-500" />
+          <BucketChart data={analysis.protocols} barClassName="bg-blue-500" />
         </Panel>
         <Panel title="传输类型">
-          <BucketChart data={analysis.transferTypes} color="bg-emerald-500" />
+          <BucketChart data={analysis.transferTypes} barClassName="bg-emerald-500" />
         </Panel>
         <Panel title="分析提示">
           <NotesList notes={analysis.notes} emptyLabel="当前抓包未识别到可展示的 USB 行为。" />
@@ -485,10 +489,10 @@ export default function UsbAnalysis() {
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <Panel title="命令分布">
-                  <BucketChart data={analysis.massStorage.commands} color="bg-cyan-500" />
+                  <BucketChart data={analysis.massStorage.commands} barClassName="bg-cyan-500" />
                 </Panel>
                 <Panel title="设备分布">
-                  <BucketChart data={analysis.massStorage.devices} color="bg-violet-500" />
+                  <BucketChart data={analysis.massStorage.devices} barClassName="bg-violet-500" />
                 </Panel>
                 <Panel title="分析提示">
                   <NotesList notes={massStorageNotes} emptyLabel="暂无存储域提示" />
@@ -540,13 +544,13 @@ export default function UsbAnalysis() {
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <Panel title="设备分布">
-                  <BucketChart data={analysis.other.devices} color="bg-amber-500" />
+                  <BucketChart data={analysis.other.devices} barClassName="bg-amber-500" />
                 </Panel>
                 <Panel title="端点分布">
-                  <BucketChart data={analysis.other.endpoints} color="bg-slate-500" />
+                  <BucketChart data={analysis.other.endpoints} barClassName="bg-slate-500" />
                 </Panel>
                 <Panel title="Setup 请求分布">
-                  <BucketChart data={analysis.other.setupRequests} color="bg-rose-500" />
+                  <BucketChart data={analysis.other.setupRequests} barClassName="bg-rose-500" />
                 </Panel>
               </div>
 
@@ -1201,51 +1205,6 @@ function Banner({ children, tone }: { children: ReactNode; tone: "muted" | "warn
     ? "mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"
     : "mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground";
   return <div className={className}>{children}</div>;
-}
-
-function StatCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-2 text-xs text-muted-foreground">{title}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function Panel({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className}`.trim()}>
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        {title === "读请求" && <Download className="h-4 w-4 text-cyan-600" />}
-        {title === "写请求" && <Upload className="h-4 w-4 text-emerald-600" />}
-        {title === "概览" && <Database className="h-4 w-4 text-slate-600" />}
-        <span>{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function BucketChart({ data, color }: { data: TrafficBucket[]; color: string }) {
-  const max = Math.max(1, ...data.map((item) => item.count));
-  if (data.length === 0) {
-    return <EmptyState>暂无数据</EmptyState>;
-  }
-  return (
-    <div className="max-h-[420px] overflow-auto pr-1">
-      <div className="space-y-2">
-        {data.map((row) => (
-          <div key={row.label} className="grid grid-cols-[220px_1fr_72px] items-center gap-2 text-xs">
-            <div className="truncate text-muted-foreground" title={row.label}>{row.label}</div>
-            <div className="h-2 rounded bg-accent">
-              <div className={`h-2 rounded ${color}`} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
-            </div>
-            <div className="text-right font-mono">{row.count}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function buildUSBAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {

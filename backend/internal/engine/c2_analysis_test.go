@@ -122,6 +122,36 @@ func TestBuildC2SampleAnalysisDetectsVShellTCPShapes(t *testing.T) {
 	}
 }
 
+func TestBuildVShellStreamAggregatesReturnsIntervals(t *testing.T) {
+	streamData := map[int64]*c2VShellStreamWork{
+		7: {
+			streamID:      7,
+			protocol:      "TCP",
+			archMarkers:   map[string]int{"l64": 1},
+			lengthPrefix:  3,
+			shortPackets:  3,
+			longPackets:   1,
+			transitions:   2,
+			heartbeatAvg:  "10.0s",
+			listenerHints: map[string]int{"vshell-listener-port": 1},
+			confidence:    60,
+			packets: []model.Packet{
+				{ID: 1, Timestamp: "12:00:00.000000"},
+				{ID: 2, Timestamp: "12:00:10.000000"},
+				{ID: 3, Timestamp: "12:00:20.000000"},
+				{ID: 4, Timestamp: "12:00:30.000000"},
+			},
+		},
+	}
+	aggregates := buildVShellStreamAggregates(streamData, 16)
+	if len(aggregates) != 1 {
+		t.Fatalf("expected one aggregate, got %+v", aggregates)
+	}
+	if !floatSliceEqual(aggregates[0].Intervals, []float64{10, 10, 10}) {
+		t.Fatalf("expected stream intervals, got %+v", aggregates[0].Intervals)
+	}
+}
+
 func TestBuildC2SampleAnalysisDetectsCSHTTPAndDNS(t *testing.T) {
 	packets := []model.Packet{
 		{ID: 1, Timestamp: "12:00:00.000000", SourceIP: "10.0.0.5", SourcePort: 50100, DestIP: "10.0.0.9", DestPort: 80, Protocol: "HTTP", Info: "GET /submit.php?id=1 HTTP/1.1", Payload: "GET /submit.php?id=1 HTTP/1.1\r\nHost: cdn.demo\r\n\r\n", StreamID: 3},
@@ -235,6 +265,9 @@ func TestBuildC2SampleAnalysisBuildsCSHostURIAggregates(t *testing.T) {
 	if got.AvgInterval != "60.0s" || got.Jitter != "0%" {
 		t.Fatalf("unexpected timing profile: %+v", got)
 	}
+	if !floatSliceEqual(got.Intervals, []float64{60, 60, 60}) {
+		t.Fatalf("unexpected raw intervals: %+v", got.Intervals)
+	}
 	if !stringSliceContains(got.SignalTags, "stable-interval") || !stringSliceContains(got.SignalTags, "get-post-tasking-shape") {
 		t.Fatalf("expected scoring signal tags, got %+v", got.SignalTags)
 	}
@@ -272,6 +305,9 @@ func TestBuildC2SampleAnalysisBuildsCSDNSAggregates(t *testing.T) {
 	}
 	if got.RequestCount != 3 {
 		t.Fatalf("unexpected request count: %d", got.RequestCount)
+	}
+	if !floatSliceEqual(got.Intervals, []float64{60, 60}) {
+		t.Fatalf("unexpected DNS intervals: %+v", got.Intervals)
 	}
 }
 
@@ -311,6 +347,9 @@ func TestBuildC2SampleAnalysisAnnotatesSilverFoxCompatibleHTTP(t *testing.T) {
 	if apt.Evidence[0].SourceModule != "c2-analysis" {
 		t.Fatalf("expected c2-analysis source module, got %+v", apt.Evidence[0])
 	}
+	if !hasAPTScoreFactor(apt.Evidence[0].ScoreFactors, "hfs-download-chain") || !hasAPTScoreFactor(apt.Evidence[0].ScoreFactors, "winos-family-hint") {
+		t.Fatalf("expected structured APT score factors, got %+v", apt.Evidence[0].ScoreFactors)
+	}
 }
 
 func hasC2Indicator(items []model.C2IndicatorRecord, indicator string) bool {
@@ -325,6 +364,27 @@ func hasC2Indicator(items []model.C2IndicatorRecord, indicator string) bool {
 func stringSliceContains(items []string, value string) bool {
 	for _, item := range items {
 		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func floatSliceEqual(got, want []float64) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func hasAPTScoreFactor(items []model.APTScoreFactor, name string) bool {
+	for _, item := range items {
+		if item.Name == name {
 			return true
 		}
 	}

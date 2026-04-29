@@ -1477,6 +1477,7 @@ export const bridge: BackendBridge = {
       lastTime: String(item.last_time ?? "") || undefined,
       avgInterval: String(item.avg_interval ?? "") || undefined,
       jitter: String(item.jitter ?? "") || undefined,
+      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
       streams: Array.isArray(item.streams) ? item.streams.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
       packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
       representativePacket: Number(item.representative_packet ?? 0) || undefined,
@@ -1499,6 +1500,7 @@ export const bridge: BackendBridge = {
       lastTime: String(item.last_time ?? "") || undefined,
       avgInterval: String(item.avg_interval ?? "") || undefined,
       jitter: String(item.jitter ?? "") || undefined,
+      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
       packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
       confidence: Number(item.confidence ?? 0) || undefined,
       summary: String(item.summary ?? ""),
@@ -1514,6 +1516,7 @@ export const bridge: BackendBridge = {
       transitions: Number(item.transitions ?? 0),
       heartbeatAvg: String(item.heartbeat_avg ?? "") || undefined,
       heartbeatJitter: String(item.heartbeat_jitter ?? "") || undefined,
+      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
       hasWebSocket: Boolean(item.has_websocket),
       wsParams: String(item.ws_params ?? "") || undefined,
       listenerHints: Array.isArray(item.listener_hints) ? item.listener_hints.map(asBucket) : [],
@@ -1550,6 +1553,13 @@ export const bridge: BackendBridge = {
 
   async getAPTAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/apt-analysis", { signal });
+    const asAPTScoreFactor = (item: any) => ({
+      name: String(item.name ?? ""),
+      weight: Number(item.weight ?? 0),
+      direction: String(item.direction ?? ""),
+      sourceModule: String(item.source_module ?? "") || undefined,
+      summary: String(item.summary ?? "") || undefined,
+    });
     const asAPTRecord = (item: any) => ({
       packetId: Number(item.packet_id ?? 0),
       streamId: Number(item.stream_id ?? 0) || undefined,
@@ -1571,6 +1581,7 @@ export const bridge: BackendBridge = {
       infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map((value: unknown) => String(value ?? "")) : [],
       ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map((value: unknown) => String(value ?? "")) : [],
       tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
+      scoreFactors: Array.isArray(item.score_factors) ? item.score_factors.map(asAPTScoreFactor) : [],
       summary: String(item.summary ?? ""),
       evidence: String(item.evidence ?? "") || undefined,
     });
@@ -1587,6 +1598,7 @@ export const bridge: BackendBridge = {
       infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map(asBucket) : [],
       relatedC2Families: Array.isArray(item.related_c2_families) ? item.related_c2_families.map(asBucket) : [],
       ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map(asBucket) : [],
+      scoreFactors: Array.isArray(item.score_factors) ? item.score_factors.map(asAPTScoreFactor) : [],
       notes: Array.isArray(item.notes) ? item.notes.map((value: unknown) => String(value ?? "")) : [],
     });
     return {

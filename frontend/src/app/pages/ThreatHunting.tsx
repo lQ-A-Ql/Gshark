@@ -6,15 +6,9 @@ import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { AnalysisBadge, type AnalysisTone } from "../components/analysis/AnalysisPrimitives";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Progress } from "../components/ui/progress";
-
-function levelColor(level: string) {
-  if (level === "critical") return "text-rose-700 bg-rose-50 border-rose-200";
-  if (level === "high") return "text-orange-700 bg-orange-50 border-orange-200";
-  if (level === "medium") return "text-amber-700 bg-amber-50 border-amber-200";
-  return "text-foreground bg-accent border-border";
-}
 
 export default function ThreatHunting() {
   const navigate = useNavigate();
@@ -177,7 +171,10 @@ export default function ThreatHunting() {
   };
 
   return (
-    <PageShell innerClassName="max-w-7xl px-6 py-6">
+    <PageShell
+      className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.24),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]"
+      innerClassName="max-w-7xl px-6 py-6"
+    >
       <AnalysisHero
         icon={<ShieldAlert className="h-5 w-5" />}
         title="威胁狩猎中心"
@@ -204,9 +201,9 @@ export default function ThreatHunting() {
               <div className="mt-1 text-xs leading-5 text-slate-500">{threatProgress.detail}</div>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <span className="rounded-full border border-blue-200 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-blue-700">
+              <AnalysisBadge tone="blue" className="bg-white/90 px-2.5 py-1">
                 {threatProgress.phaseLabel}
-              </span>
+              </AnalysisBadge>
               <span className="text-[11px] font-medium text-slate-500">
                 {Math.round(threatProgress.value)}%
               </span>
@@ -252,9 +249,9 @@ export default function ThreatHunting() {
                   YARA 相关路径更推荐在右侧设置栏统一维护；这里保留的是当前狩猎任务的快速参数入口。
                 </div>
               </div>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+              <AnalysisBadge tone={backendConnected ? "blue" : "slate"} className="px-2.5 py-1">
                 {statusText || (backendConnected ? "可以直接重跑当前狩猎任务" : "后端未连接")}
-              </span>
+              </AnalysisBadge>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -371,7 +368,7 @@ export default function ThreatHunting() {
                         <td className="border-r border-slate-200/80 px-3 py-2">{hit.category}</td>
                         <td className="border-r border-slate-200/80 px-3 py-2 font-medium text-rose-600">{hit.rule}</td>
                         <td className="border-r border-slate-200/80 px-3 py-2">
-                          <span className={`rounded border px-2 py-0.5 ${levelColor(hit.level)}`}>{hit.level}</span>
+                          <AnalysisBadge tone={toneForThreatLevel(hit.level)}>{hit.level}</AnalysisBadge>
                         </td>
                         <td className="truncate px-3 py-2 font-mono text-slate-500">{hit.preview}</td>
                       </tr>
@@ -451,10 +448,22 @@ function CategoryCard({ title, count, icon, accent }: { title: string; count: nu
           {icon}
           {title}
         </div>
-        <span className="rounded-full border border-white/70 bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
+        <AnalysisBadge tone={accent} className="border-white/70 bg-white/80 px-2 text-xs text-slate-600 shadow-sm">
           {count}
-        </span>
+        </AnalysisBadge>
       </div>
     </div>
   );
+}
+
+function toneForThreatLevel(level: string): AnalysisTone {
+  switch (level) {
+    case "critical":
+    case "high":
+      return "rose";
+    case "medium":
+      return "amber";
+    default:
+      return "slate";
+  }
 }

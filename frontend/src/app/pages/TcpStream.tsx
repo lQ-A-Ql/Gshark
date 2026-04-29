@@ -1,14 +1,16 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Download, ChevronLeft, ChevronRight, ArrowLeft, X } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeftRight, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
+import { StreamChunkCard, StreamControlBar, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/DesignSystem";
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
 import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";
 
 type RawViewMode = "ascii" | "hex" | "raw";
 type RawChunk = { packetId: number; direction: string; body: string };
+type VisibleRawChunk = RawChunk & { key: string; streamIndex: number };
 
 const STREAM_PAGE_SIZE = 96;
 const MAX_PREVIEW_BYTES = 4096;
@@ -30,7 +32,8 @@ export default function TcpStream() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedChunkIndex, setSelectedChunkIndex] = useState(0);
-  const [expandedChunkIndex, setExpandedChunkIndex] = useState<number | null>(null);
+  const [expandedChunk, setExpandedChunk] = useState<VisibleRawChunk | null>(null);
+  const [search, setSearch] = useState("");
   const consumedRouteStreamIdRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
@@ -54,20 +57,13 @@ export default function TcpStream() {
   useEffect(() => {
     setStreamInput(tcpStream.id >= 0 ? String(tcpStream.id) : "");
     setLoadError("");
+    setSearch("");
     setSelectedChunkIndex(0);
-    setExpandedChunkIndex(null);
+    setExpandedChunk(null);
     if (viewportRef.current) {
       viewportRef.current.scrollTop = 0;
     }
   }, [tcpStream.id]);
-
-  useEffect(() => {
-    if (streamView.chunks.length === 0) {
-      setSelectedChunkIndex(0);
-      return;
-    }
-    setSelectedChunkIndex((prev) => Math.min(prev, streamView.chunks.length - 1));
-  }, [streamView.chunks]);
 
   useEffect(() => {
     const state = location.state as { streamId?: number } | null;
@@ -88,12 +84,38 @@ export default function TcpStream() {
   const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.tcp.length || 1}` : `-- / ${streamIds.tcp.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.tcp.length - 1;
-  const selectedChunk = streamView.chunks[selectedChunkIndex] ?? null;
-  const expandedChunk = expandedChunkIndex == null ? null : streamView.chunks[expandedChunkIndex] ?? null;
+  const deferredSearch = useDeferredValue(search);
+  const allChunks = useMemo<VisibleRawChunk[]>(
+    () => streamView.chunks.map((chunk, index) => ({
+      ...chunk,
+      key: `${chunk.packetId}-${chunk.direction}-${index}`,
+      streamIndex: index,
+    })),
+    [streamView.chunks],
+  );
+  const displayChunks = useMemo<VisibleRawChunk[]>(() => {
+    const query = deferredSearch.trim().toLowerCase();
+    if (!query) return allChunks;
+    return allChunks.filter((chunk) => chunk.body.toLowerCase().includes(query));
+  }, [allChunks, deferredSearch]);
+  const matchCount = useMemo(() => {
+    const query = deferredSearch.trim().toLowerCase();
+    if (!query) return 0;
+    return displayChunks.reduce((sum, chunk) => sum + countOccurrences(chunk.body, query), 0);
+  }, [deferredSearch, displayChunks]);
+  const selectedChunk = displayChunks[selectedChunkIndex] ?? null;
   const selectedChunkRendered = useMemo(
     () => renderStreamChunk(selectedChunk?.body ?? "", viewMode, false),
     [selectedChunk, viewMode],
   );
+
+  useEffect(() => {
+    if (displayChunks.length === 0) {
+      setSelectedChunkIndex(0);
+      return;
+    }
+    setSelectedChunkIndex((prev) => Math.min(prev, displayChunks.length - 1));
+  }, [displayChunks.length]);
 
   async function loadMore() {
     if (loadingMore || !streamView.hasMore) return;
@@ -135,34 +157,33 @@ export default function TcpStream() {
   }
 
   return (
-    <div className="bg-background relative flex h-full flex-col overflow-hidden text-sm text-foreground">
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/40 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="rounded p-1 text-foreground transition-colors hover:bg-accent" title="返回上一页">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="h-4 w-px bg-border" />
-          <h1 className="flex items-center gap-2 font-semibold text-foreground">
-            TCP 流追踪 (stream eq {streamView.id})
-            <span className="ml-2 flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {streamView.from} <ArrowLeftRight className="h-3 w-3" /> {streamView.to}
-            </span>
-          </h1>
-        </div>
-        <div className="flex max-w-[58%] flex-wrap items-center justify-end gap-2">
-          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.22),transparent_34%),linear-gradient(180deg,#fbfaff_0%,#f6f7ff_42%,#f8fafc_100%)] text-sm text-foreground">
+      <WorkbenchTitleBar
+        onBack={() => navigate(-1)}
+        title={`TCP 流追踪 (stream eq ${streamView.id})`}
+        subtitle={(
+          <span className="flex min-w-0 items-center gap-1 font-mono">
+            <span className="truncate">{streamView.from}</span>
+            <ArrowLeftRight className="h-3 w-3 shrink-0" />
+            <span className="truncate">{streamView.to}</span>
+          </span>
+        )}
+        meta={(
+          <>
+            <WorkbenchChip>
             已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-          </span>
-          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+            </WorkbenchChip>
+            <WorkbenchChip className="max-w-[520px] truncate">
             {formatLoadMeta(streamView.loadMeta)}
-          </span>
-        </div>
-      </div>
+            </WorkbenchChip>
+          </>
+        )}
+      />
 
       <div className="grid min-h-0 flex-1 gap-4 bg-transparent p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
         <div
           ref={viewportRef}
-          className="min-h-0 overflow-auto rounded-xl border border-border bg-background p-4 font-mono text-sm leading-relaxed shadow-sm"
+          className="min-h-0 overflow-auto rounded-[24px] border border-white/80 bg-white/88 p-4 font-mono text-sm leading-relaxed shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl"
           onScroll={(event) => {
             const nextScrollTop = event.currentTarget.scrollTop;
             const nearBottom = nextScrollTop + event.currentTarget.clientHeight >= event.currentTarget.scrollHeight - 480;
@@ -172,26 +193,28 @@ export default function TcpStream() {
           }}
         >
           {loadError && (
-            <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
               {loadError}
             </div>
           )}
           {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
-            <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+            <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700">
               正在解析 tcp.stream eq {streamView.id}，当前只先加载这一条流。
             </div>
           )}
           <div className="flex max-w-4xl flex-col gap-2">
-            {streamView.chunks.map((chunk, index) => (
-              <RawStreamChunkCard
-                key={`${chunk.packetId}-${chunk.direction}-${index}`}
-                chunk={chunk}
-                mode={viewMode}
-                clientTone="border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                serverTone="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400"
+            {displayChunks.map((chunk, index) => (
+              <StreamChunkCard
+                key={chunk.key}
+                directionLabel={chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
+                packetId={chunk.packetId}
+                rendered={renderStreamChunk(chunk.body, viewMode, false)}
+                highlight={deferredSearch}
+                tone={chunk.direction === "client" ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-blue-500/30 bg-blue-500/10 text-blue-700"}
                 selected={selectedChunkIndex === index}
                 onSelect={() => setSelectedChunkIndex(index)}
-                onOpen={() => setExpandedChunkIndex(index)}
+                onOpen={() => setExpandedChunk(chunk)}
+                truncated={isChunkTruncated(chunk.body, viewMode)}
               />
             ))}
             {(loadingMore || streamView.hasMore) && (
@@ -202,135 +225,116 @@ export default function TcpStream() {
           </div>
         </div>
         <div className="min-h-0 min-w-0 space-y-4 overflow-auto pb-4 pr-1">
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-foreground">当前片段</div>
-                <div className="text-[11px] text-muted-foreground">右侧固定查看当前 TCP payload，解码类实验工具已收敛到 MISC 工作台</div>
-              </div>
-              {selectedChunk && (
-                <span className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                  selectedChunk.direction === "client"
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-blue-200 bg-blue-50 text-blue-700",
-                )}>
-                  {selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
-                </span>
-              )}
-            </div>
-            {selectedChunk ? (
-              <>
-                <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
-                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">packet #{selectedChunk.packetId}</span>
-                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">{estimatePayloadBytes(selectedChunk.body)} bytes</span>
-                  <span className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground">chunk #{selectedChunkIndex + 1}</span>
-                </div>
-                <div className="max-h-[360px] overflow-auto rounded-lg border border-border bg-background/80 p-3">
-                  <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-5 text-foreground">{selectedChunkRendered || "(empty payload)"}</pre>
-                </div>
-                {isChunkTruncated(selectedChunk.body, viewMode) && (
-                  <button
-                    className="mt-3 rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    onClick={() => setExpandedChunkIndex(selectedChunkIndex)}
-                  >
-                    查看完整 payload
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                选择左侧片段后，可在这里固定查看完整上下文。
-              </div>
-            )}
-          </div>
+          <StreamCurrentChunkPanel
+            description="右侧固定查看当前 TCP payload，解码类实验工具已收敛到 MISC 工作台"
+            badge={selectedChunk ? (
+              <span className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+                selectedChunk.direction === "client"
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700",
+              )}>
+                {selectedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
+              </span>
+            ) : undefined}
+            chips={selectedChunk ? [
+              `packet #${selectedChunk.packetId}`,
+              `${estimatePayloadBytes(selectedChunk.body)} bytes`,
+              `chunk #${selectedChunk.streamIndex + 1}`,
+            ] : []}
+            content={selectedChunk ? selectedChunkRendered || "(empty payload)" : null}
+            highlight={deferredSearch}
+            emptyText="选择左侧片段后，可在这里固定查看完整上下文。"
+            showOpenButton={selectedChunk ? isChunkTruncated(selectedChunk.body, viewMode) : false}
+            onOpen={() => selectedChunk && setExpandedChunk(selectedChunk)}
+          />
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border bg-card px-4 py-3 shadow-sm">
+      <StreamControlBar>
         <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
           切流 last {streamSwitchMetrics.byProtocol.TCP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.TCP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.TCP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.TCP.cacheHitRate}%
         </div>
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
-          显示方式:
-          <label className="flex cursor-pointer items-center gap-1 hover:text-foreground">
-            <input type="radio" name="viewMode" checked={viewMode === "ascii"} onChange={() => setViewMode("ascii")} className="accent-blue-600" /> ASCII
-          </label>
-          <label className="flex cursor-pointer items-center gap-1 hover:text-foreground">
-            <input type="radio" name="viewMode" checked={viewMode === "hex"} onChange={() => setViewMode("hex")} className="accent-blue-600" /> Hex Dump
-          </label>
-          <label className="flex cursor-pointer items-center gap-1 hover:text-foreground">
-            <input type="radio" name="viewMode" checked={viewMode === "raw"} onChange={() => setViewMode("raw")} className="accent-blue-600" /> Raw
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-          <span className="text-xs text-muted-foreground">流切换</span>
-          <button
-            className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
-            onClick={() => {
-              if (!hasPrev) return;
-              void setActiveStream("TCP", streamIds.tcp[currentIndex - 1]);
-            }}
-            disabled={!hasPrev}
-            title={`TCP 流总数: ${streamIds.tcp.length}`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="px-2 text-center font-mono text-xs text-foreground" title={`TCP 流总数: ${streamIds.tcp.length}`}>
-            第 {ordinalLabel} 条 / stream eq {streamView.id}
-          </span>
-          <button
-            className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
-            onClick={() => {
-              if (!hasNext) return;
-              void setActiveStream("TCP", streamIds.tcp[currentIndex + 1]);
-            }}
-            disabled={!hasNext}
-            title={`TCP 流总数: ${streamIds.tcp.length}`}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <input
-            value={streamInput}
-            onChange={(event) => setStreamInput(event.target.value.replace(/[^0-9]/g, ""))}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              const id = Number(streamInput);
-              if (id >= 0) {
-                void setActiveStream("TCP", id);
-              }
-            }}
-            className="w-16 rounded border border-border bg-background px-1 py-0.5 text-center text-xs font-mono outline-none"
-            placeholder="stream"
-            title={`TCP 流总数: ${streamIds.tcp.length}`}
-          />
-          <span className="text-[11px] text-muted-foreground">
+        <ViewModeToggle<RawViewMode>
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: "ascii", label: "ASCII" },
+            { value: "hex", label: "Hex Dump" },
+            { value: "raw", label: "Raw" },
+          ]}
+        />
+        <StreamNavigator
+          protocolLabel="TCP"
+          ordinalLabel={ordinalLabel}
+          streamId={streamView.id}
+          streamTotal={streamIds.tcp.length}
+          streamInput={streamInput}
+          onStreamInputChange={setStreamInput}
+          onSubmitStream={() => {
+            const id = Number(streamInput);
+            if (id >= 0) void setActiveStream("TCP", id);
+          }}
+          onPrev={() => {
+            if (hasPrev) void setActiveStream("TCP", streamIds.tcp[currentIndex - 1]);
+          }}
+          onNext={() => {
+            if (hasNext) void setActiveStream("TCP", streamIds.tcp[currentIndex + 1]);
+          }}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+        />
+        <StreamSearchBar
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setSelectedChunkIndex(0);
+          }}
+          onPrev={() => setSelectedChunkIndex((prev) => Math.max(prev - 1, 0))}
+          onNext={() => setSelectedChunkIndex((prev) => Math.min(prev + 1, Math.max(0, displayChunks.length - 1)))}
+          matchCount={matchCount}
+          resultCount={displayChunks.length}
+          currentIndex={selectedChunkIndex}
+          placeholder="搜索 TCP payload..."
+        />
+        <WorkbenchChip>
             已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-          </span>
-        </div>
+        </WorkbenchChip>
         <div className="ml-auto">
           <button onClick={exportAll} className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent">
             <Download className="h-3.5 w-3.5" /> 导出为文件
           </button>
         </div>
-      </div>
+      </StreamControlBar>
 
       {expandedChunk && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 px-6 py-8">
-          <div className="flex h-full max-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div className="text-sm font-semibold text-foreground">
-                Payload 详情 #{expandedChunk.packetId} / {expandedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"}
-              </div>
-              <button className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => setExpandedChunkIndex(null)}>
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4 font-mono text-xs leading-5 text-foreground">
-              <pre className="whitespace-pre-wrap break-all">{renderStreamChunk(expandedChunk.body, viewMode, true)}</pre>
-            </div>
-          </div>
-        </div>
+        <StreamPayloadDialog
+          title={`Payload 详情 #${expandedChunk.packetId}`}
+          subtitle={`${expandedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端"} · chunk #${expandedChunk.streamIndex + 1} · ${estimatePayloadBytes(expandedChunk.body)} bytes`}
+          meta={[
+            { label: "协议", value: "TCP" },
+            { label: "Stream", value: streamView.id },
+            { label: "Packet", value: `#${expandedChunk.packetId}` },
+            { label: "方向", value: expandedChunk.direction === "client" ? "客户端 -> 服务端" : "服务端 -> 客户端" },
+            { label: "Chunk", value: `${expandedChunk.streamIndex + 1} / ${streamView.chunks.length}` },
+            { label: "视图", value: viewMode },
+            { label: "原始估算", value: `${estimatePayloadBytes(expandedChunk.body)} bytes` },
+            { label: "预览阈值", value: `${MAX_PREVIEW_BYTES} bytes` },
+          ]}
+          extraActions={(
+            <button
+              type="button"
+              onClick={() => navigate("/misc")}
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 shadow-sm transition-colors hover:bg-cyan-100"
+            >
+              打开 MISC 解码工作台
+            </button>
+          )}
+          content={renderStreamChunk(expandedChunk.body, viewMode, true)}
+          highlight={deferredSearch}
+          filename={`tcp-stream-${streamView.id}-packet-${expandedChunk.packetId}.txt`}
+          onClose={() => setExpandedChunk(null)}
+        />
       )}
     </div>
   );
@@ -344,54 +348,6 @@ function formatLoadMeta(meta?: StreamLoadMeta): string {
   const overrides = meta.overrideCount && meta.overrideCount > 0 ? ` / overrides ${meta.overrideCount}` : "";
   return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}${overrides}`;
 }
-
-const RawStreamChunkCard = memo(function RawStreamChunkCard({
-  chunk,
-  mode,
-  clientTone,
-  serverTone,
-  selected,
-  onSelect,
-  onOpen,
-}: {
-  chunk: RawChunk;
-  mode: RawViewMode;
-  clientTone: string;
-  serverTone: string;
-  selected: boolean;
-  onSelect: () => void;
-  onOpen: () => void;
-}) {
-  const rendered = useMemo(() => renderStreamChunk(chunk.body, mode, false), [chunk.body, mode]);
-  const tone = chunk.direction === "client" ? clientTone : serverTone;
-  const truncated = isChunkTruncated(chunk.body, mode);
-
-  return (
-    <div
-      className={cn("flex min-h-[164px] min-w-0 cursor-pointer flex-col rounded-md border px-3 py-2 transition-shadow", tone, selected && "ring-2 ring-blue-300 shadow-sm")}
-      onClick={onSelect}
-    >
-      <span className="mr-2 select-none text-xs font-semibold opacity-60">
-        {chunk.direction === "client" ? "[客户端 -> 服务端]" : "[服务端 -> 客户端]"}
-      </span>
-      <pre className="mt-1 max-h-40 min-w-0 flex-1 overflow-hidden whitespace-pre-wrap break-all text-xs leading-5">{rendered}</pre>
-      <div className="mt-2 flex items-center justify-between text-[11px] opacity-80">
-        <span>packet #{chunk.packetId}</span>
-        {truncated && (
-          <button
-            className="rounded border border-current/20 px-2 py-1 hover:opacity-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen();
-            }}
-          >
-            查看完整 payload
-          </button>
-        )}
-      </div>
-    </div>
-  );
-});
 
 function isHexPayload(body: string): boolean {
   return /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test((body ?? "").trim());
@@ -407,6 +363,21 @@ function isChunkTruncated(body: string, mode: RawViewMode): boolean {
     return raw.split(":").length > MAX_PREVIEW_BYTES;
   }
   return raw.length > MAX_PREVIEW_BYTES;
+}
+
+function countOccurrences(text: string, query: string): number {
+  if (!query) return 0;
+  let count = 0;
+  let index = 0;
+  const haystack = text.toLowerCase();
+  while (index >= 0) {
+    index = haystack.indexOf(query, index);
+    if (index >= 0) {
+      count += 1;
+      index += query.length;
+    }
+  }
+  return count;
 }
 
 function renderStreamChunk(body: string, mode: RawViewMode, expanded = false): string {
