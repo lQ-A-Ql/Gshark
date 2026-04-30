@@ -447,7 +447,7 @@ export function MainLayout() {
                     <div className={cn("absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full", activeTheme.bar)} />
                   )}
 
-                  <div className="invisible absolute left-full z-50 ml-3 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-md transition-all group-hover:visible group-hover:opacity-100">
+                  <div className="pointer-events-none invisible absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-xl border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-700 opacity-0 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur transition-all group-hover:visible group-hover:opacity-100">
                     {item.label}
                   </div>
                 </Link>
@@ -475,7 +475,7 @@ export function MainLayout() {
           <button
             type="button"
             aria-label="关闭设置侧栏"
-            className="fixed inset-0 z-40 bg-slate-900/12 backdrop-blur-[1px]"
+            className="fixed inset-0 z-40 bg-slate-100/65 backdrop-blur-[1px]"
             onClick={() => setSettingsOpen(false)}
           />
         ) : null}
@@ -516,10 +516,10 @@ export function MainLayout() {
 function MenuGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="group relative">
-      <button className="cursor-default rounded-md px-3 py-1.5 transition-colors hover:bg-accent hover:text-accent-foreground">
+      <button className="cursor-default rounded-lg px-3 py-1.5 transition-colors hover:bg-cyan-50 hover:text-cyan-700">
         {label}
       </button>
-      <div className="invisible absolute left-0 top-full z-50 min-w-[180px] rounded-md border border-border bg-card py-1 opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
+      <div className="invisible absolute left-0 top-full z-50 mt-1 max-h-[calc(100vh-5rem)] min-w-[190px] overflow-auto rounded-xl border border-slate-200 bg-white/95 py-1.5 opacity-0 shadow-[0_24px_64px_rgba(15,23,42,0.16)] backdrop-blur transition-all group-hover:visible group-hover:opacity-100">
         {children}
       </div>
     </div>
@@ -540,8 +540,8 @@ function MenuItem({
   return (
     <div
       className={cn(
-        "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-        danger ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-accent hover:text-accent-foreground",
+        "flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition-colors",
+        danger ? "hover:bg-rose-50 hover:text-rose-700" : "hover:bg-cyan-50 hover:text-cyan-700",
       )}
       onClick={onClick}
     >

@@ -49,7 +49,7 @@ export function PayloadWebShellDecoderModule({ module, surfaceVariant = "card" }
                 <Eraser className="h-3.5 w-3.5" />
                 清空
               </Button>
-              <Button type="button" onClick={analyzePayload} className="h-8 gap-2 bg-slate-900 text-xs text-white hover:bg-slate-800">
+              <Button type="button" onClick={analyzePayload} className="h-8 gap-2 bg-cyan-600 text-xs text-white shadow-sm hover:bg-cyan-700">
                 <Search className="h-3.5 w-3.5" />
                 识别候选
               </Button>

@@ -7,6 +7,7 @@ import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -217,7 +218,7 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
                       }`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[11px] font-semibold text-white">SMTP #{item.streamId}</span>
+                        <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 font-mono text-[11px] font-semibold text-sky-700">SMTP #{item.streamId}</span>
                         {item.authUsername || (item.authMechanisms?.length ?? 0) > 0 ? (
                           <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">认证</span>
                         ) : null}
@@ -300,7 +301,7 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
                   {(selectedSession.messages ?? []).map((message) => (
                     <div key={`${selectedSession.streamId}-${message.sequence}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white">邮件 #{message.sequence}</span>
+                        <span className="rounded-md border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold text-sky-700">邮件 #{message.sequence}</span>
                         {message.subject ? <span className="text-sm font-semibold text-slate-800">{message.subject}</span> : <span className="text-sm text-slate-500">(无主题)</span>}
                         {(message.attachmentNames?.length ?? 0) > 0 ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-700">
@@ -339,36 +340,50 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
                 <div className="text-sm font-semibold text-slate-800">命令轨迹</div>
                 <div className="text-[11px] text-slate-500">{selectedSession?.commands?.length ?? 0} 条</div>
               </div>
-              <div className="max-h-[320px] overflow-auto">
-                <table className="w-full table-fixed border-collapse text-left text-xs">
-                  <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-                    <tr>
-                      <th className="w-20 px-3 py-2">包号</th>
-                      <th className="w-20 px-3 py-2">方向</th>
-                      <th className="w-24 px-3 py-2">命令</th>
-                      <th className="w-20 px-3 py-2">状态码</th>
-                      <th className="px-3 py-2">摘要</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!selectedSession || (selectedSession.commands?.length ?? 0) === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">暂无命令轨迹</td>
-                      </tr>
-                    ) : (
-                      (selectedSession.commands ?? []).map((command) => (
-                        <tr key={`${selectedSession.streamId}-${command.packetId}-${command.summary || command.command || command.statusCode || "row"}`} className="border-b border-border/70 align-top">
-                          <td className="px-3 py-2 font-mono">{command.packetId}</td>
-                          <td className="px-3 py-2">{command.direction || "--"}</td>
-                          <td className="px-3 py-2 font-mono">{command.command || "--"}</td>
-                          <td className="px-3 py-2 font-mono">{command.statusCode || "--"}</td>
-                          <td className="px-3 py-2 break-all">{command.summary || command.argument || "--"}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                data={selectedSession?.commands ?? []}
+                rowKey={(command) => `${selectedSession?.streamId ?? "smtp"}-${command.packetId}-${command.summary || command.command || command.statusCode || "row"}`}
+                maxHeightClassName="max-h-[320px]"
+                wrapperClassName="border-slate-100 bg-white"
+                headerClassName="bg-slate-50/95 text-slate-500"
+                emptyText="暂无命令轨迹"
+                rowClassName="hover:bg-sky-50/40"
+                columns={[
+                  {
+                    key: "packet",
+                    header: "包号",
+                    widthClassName: "w-20",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (command) => command.packetId,
+                  },
+                  {
+                    key: "direction",
+                    header: "方向",
+                    widthClassName: "w-20",
+                    render: (command) => command.direction || "--",
+                  },
+                  {
+                    key: "command",
+                    header: "命令",
+                    widthClassName: "w-24",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (command) => command.command || "--",
+                  },
+                  {
+                    key: "status",
+                    header: "状态码",
+                    widthClassName: "w-20",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (command) => command.statusCode || "--",
+                  },
+                  {
+                    key: "summary",
+                    header: "摘要",
+                    cellClassName: "break-all text-slate-700",
+                    render: (command) => command.summary || command.argument || "--",
+                  },
+                ]}
+              />
             </div>
           </div>
         </div>

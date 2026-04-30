@@ -168,7 +168,7 @@ export default function MiscTools() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
-              className="h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(15,23,42,0.26)] hover:bg-slate-800"
+              className="h-11 rounded-full bg-cyan-600 px-5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(8,145,178,0.22)] hover:bg-cyan-700"
             >
               <Upload className="mr-2 h-4 w-4" />
               {importing ? "导入中..." : "导入模块 ZIP"}

@@ -21,20 +21,22 @@ export function HexAsciiPanel({
   const rows = useMemo(() => buildHexRows(frameBytes), [frameBytes]);
 
   return (
-    <Panel defaultSize={50} minSize={20} className="flex flex-col bg-card">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">
+    <Panel defaultSize={50} minSize={20} className="flex flex-col bg-white/95">
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-gradient-to-r from-amber-50 via-white to-slate-50 px-4 py-2 text-[13px] font-semibold text-slate-800">
         <FileText className="h-4 w-4 text-amber-600" /> 十六进制与 ASCII 视图
         {packet && (
-          <span className="ml-2 rounded bg-blue-50 px-2 py-0.5 text-[10px] text-blue-600">
+          <span className="ml-2 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
             Packet #{packet.id}
           </span>
         )}
       </div>
-      <div ref={panelRef} className="flex-1 overflow-auto p-3 font-mono text-xs leading-5">
+      <div ref={panelRef} className="flex-1 overflow-auto p-3 font-mono text-[12.5px] leading-5">
         {frameBytes.length === 0 ? (
-          <div className="text-muted-foreground">暂无 hex 数据</div>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+            暂无 hex 数据
+          </div>
         ) : (
-          <div className="space-y-0.5">
+          <div className="w-max min-w-full space-y-1">
             {rows.map((row) => (
               <HexAsciiRow
                 key={row.offset}
@@ -63,9 +65,9 @@ function HexAsciiRow({
   onSelectByte: (offset: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-[44px_1fr_136px] gap-1 text-foreground">
-      <span className="text-muted-foreground">{row.offset}</span>
-      <span>
+    <div className="grid grid-cols-[3.25rem_22.1rem_11.9rem] items-start gap-2 rounded-lg px-1.5 py-0.5 text-slate-800 hover:bg-slate-50">
+      <span className="pt-px text-[11px] font-semibold text-slate-400">{row.offset}</span>
+      <span className="flex gap-px whitespace-nowrap">
         {row.bytes.map((item) => (
           <HexByteButton
             key={item.index}
@@ -77,7 +79,7 @@ function HexAsciiRow({
           />
         ))}
       </span>
-      <span>
+      <span className="flex gap-px whitespace-nowrap border-l border-slate-200 pl-2">
         {row.bytes.map((item) => (
           <HexByteButton
             key={`ascii-${item.index}`}
@@ -109,17 +111,21 @@ function HexByteButton({
   const inRange = selectedByteRange && item.index >= selectedByteRange[0] && item.index <= selectedByteRange[1];
   const isCursor = selectedByteOffset === item.index;
   const textClass = isCursor
-    ? "bg-blue-700 text-white"
+    ? "bg-blue-700 text-white shadow-sm"
     : inRange
-      ? "bg-amber-100 text-amber-800"
+      ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
       : tone === "hex"
-        ? "text-foreground"
-        : "text-muted-foreground";
+        ? "text-slate-800 hover:bg-cyan-50 hover:text-cyan-700"
+        : "text-slate-500 hover:bg-slate-100 hover:text-slate-800";
+  const sizeClass = tone === "hex"
+    ? "w-[1.32rem] px-0"
+    : "w-[0.72rem] px-0";
 
   return (
     <button
+      type="button"
       data-byte={item.index}
-      className={`inline-block rounded px-[1px] text-[11px] leading-4 font-normal ${tone === "hex" ? "font-mono" : ""} ${textClass}`}
+      className={`inline-flex items-center justify-center rounded py-0.5 text-[12.5px] leading-5 font-normal transition-colors font-mono ${sizeClass} ${textClass}`}
       onClick={() => onSelectByte(item.index)}
     >
       {tone === "hex" ? item.hex : item.ascii}

@@ -494,7 +494,7 @@ export function StreamDecoderWorkbench({
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white">{candidate.kind}</span>
+                      <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">{candidate.kind}</span>
                       {typeof candidate.confidence === "number" && candidate.confidence > 0 && (
                         <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{candidate.confidence}%</span>
                       )}

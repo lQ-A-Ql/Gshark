@@ -7,6 +7,7 @@ import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -208,7 +209,7 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
                       }`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[11px] font-semibold text-white">MySQL #{item.streamId}</span>
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-mono text-[11px] font-semibold text-emerald-700">MySQL #{item.streamId}</span>
                         {item.username ? <span className="rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">登录</span> : null}
                         {item.errCount > 0 ? <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">错误 {item.errCount}</span> : null}
                         {item.resultsetCount > 0 ? <span className="rounded-md bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-700">结果集 {item.resultsetCount}</span> : null}
@@ -262,42 +263,57 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
                 <div className="text-sm font-semibold text-slate-800">查询轨迹</div>
                 <div className="text-[11px] text-slate-500">{selectedSession?.queries.length ?? 0} 条</div>
               </div>
-              <div className="max-h-[420px] overflow-auto">
-                <table className="w-full table-fixed border-collapse text-left text-xs">
-                  <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-                    <tr>
-                      <th className="w-20 px-3 py-2">请求包</th>
-                      <th className="w-24 px-3 py-2">命令</th>
-                      <th className="w-20 px-3 py-2">响应</th>
-                      <th className="w-20 px-3 py-2">代码</th>
-                      <th className="w-24 px-3 py-2">数据库</th>
-                      <th className="px-3 py-2">SQL / 摘要</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!selectedSession || selectedSession.queries.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">暂无查询轨迹</td>
-                      </tr>
-                    ) : (
-                      selectedSession.queries.map((row) => (
-                        <tr key={`${selectedSession.streamId}-${row.packetId}-${row.command || "row"}`} className="border-b border-border/70 align-top">
-                          <td className="px-3 py-2 font-mono">{row.packetId}</td>
-                          <td className="px-3 py-2 font-mono">{row.command || "--"}</td>
-                          <td className="px-3 py-2">
-                            {row.responseKind ? (
-                              <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${responseBadgeClass(row.responseKind)}`}>{row.responseKind}</span>
-                            ) : "--"}
-                          </td>
-                          <td className="px-3 py-2 font-mono">{row.responseCode || "--"}</td>
-                          <td className="px-3 py-2 font-mono break-all">{row.database || "--"}</td>
-                          <td className="px-3 py-2 break-all font-mono text-[11px] text-slate-700">{row.sql || row.responseSummary || "--"}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                data={selectedSession?.queries ?? []}
+                rowKey={(row) => `${selectedSession?.streamId ?? "mysql"}-${row.packetId}-${row.command || "row"}`}
+                maxHeightClassName="max-h-[420px]"
+                wrapperClassName="border-slate-100 bg-white"
+                headerClassName="bg-slate-50/95 text-slate-500"
+                emptyText="暂无查询轨迹"
+                rowClassName="hover:bg-emerald-50/40"
+                columns={[
+                  {
+                    key: "packet",
+                    header: "请求包",
+                    widthClassName: "w-20",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (row) => row.packetId,
+                  },
+                  {
+                    key: "command",
+                    header: "命令",
+                    widthClassName: "w-24",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (row) => row.command || "--",
+                  },
+                  {
+                    key: "response",
+                    header: "响应",
+                    widthClassName: "w-20",
+                    render: (row) => row.responseKind ? <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${responseBadgeClass(row.responseKind)}`}>{row.responseKind}</span> : "--",
+                  },
+                  {
+                    key: "code",
+                    header: "代码",
+                    widthClassName: "w-20",
+                    cellClassName: "font-mono text-slate-700",
+                    render: (row) => row.responseCode || "--",
+                  },
+                  {
+                    key: "database",
+                    header: "数据库",
+                    widthClassName: "w-24",
+                    cellClassName: "break-all font-mono text-slate-700",
+                    render: (row) => row.database || "--",
+                  },
+                  {
+                    key: "summary",
+                    header: "SQL / 摘要",
+                    cellClassName: "break-all font-mono text-[11px] text-slate-700",
+                    render: (row) => row.sql || row.responseSummary || "--",
+                  },
+                ]}
+              />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -312,7 +328,7 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
                   {selectedSession.serverEvents.map((event) => (
                     <div key={`${selectedSession.streamId}-${event.packetId}-${event.kind || "evt"}`} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white">帧 #{event.packetId}</span>
+                        <span className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700">帧 #{event.packetId}</span>
                         <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${eventBadgeClass(event.kind)}`}>{event.kind || "UNKNOWN"}</span>
                         {event.code ? <span className="font-mono text-[11px] text-slate-500">code {event.code}</span> : null}
                         {event.sequence !== undefined ? <span className="font-mono text-[11px] text-slate-500">seq {event.sequence}</span> : null}

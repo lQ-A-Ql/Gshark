@@ -4,6 +4,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
 import type { MiscModuleFormField, MiscModuleTableResult } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import type { MiscModuleRendererProps } from "../types";
@@ -136,7 +137,7 @@ function SchemaSelectField({
                 : "animate-[misc-select-stream-out_160ms_cubic-bezier(0.4,0,1,1)_both]"
             }`}
           />
-          <div className="max-h-64 overflow-auto pr-1">
+          <div className="max-h-[min(16rem,calc(100vh-12rem))] overflow-auto pr-1">
             {allOptions.map((option, index) => {
               const active = option.value === value;
               return (
@@ -386,30 +387,23 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
                 </Badge>
               </div>
               {resultTable && resultTable.columns.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <table className="min-w-full text-left text-xs text-slate-700">
-                    <thead className="bg-gradient-to-r from-slate-100 to-cyan-50 text-slate-800">
-                      <tr>
-                        {resultTable.columns.map((column) => (
-                          <th key={`${module.id}-${column.key}`} className="whitespace-nowrap border-b border-slate-200 px-3 py-2.5 font-semibold">
-                            {column.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {resultTable.rows.map((row, index) => (
-                        <tr key={`${module.id}-row-${index}`} className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-cyan-50/40">
-                          {resultTable.columns.map((column) => (
-                            <td key={`${module.id}-${index}-${column.key}`} className="whitespace-pre-wrap px-3 py-2.5 align-top">
-                              {row[column.key] ?? ""}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<Record<string, string>>
+                  data={resultTable.rows}
+                  rowKey={(_, index) => `${module.id}-row-${index}`}
+                  maxHeightClassName="max-h-72"
+                  tableClassName="min-w-full text-slate-700"
+                  wrapperClassName="border-slate-200 bg-white shadow-sm"
+                  headerClassName="bg-gradient-to-r from-slate-100 to-cyan-50 text-slate-800"
+                  emptyText="暂无表格结果"
+                  rowClassName="last:border-b-0 hover:bg-cyan-50/40"
+                  columns={resultTable.columns.map((column) => ({
+                    key: column.key,
+                    header: column.label,
+                    headerClassName: "whitespace-nowrap border-b border-slate-200 py-2.5 font-semibold",
+                    cellClassName: "whitespace-pre-wrap py-2.5 align-top",
+                    render: (row) => row[column.key] ?? "",
+                  }))}
+                />
               ) : null}
               {resultText ? (
                 <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-700 shadow-inner">
@@ -450,27 +444,27 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
   return (
     <Card className="group relative min-w-0 overflow-visible border-cyan-100/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)] ring-1 ring-cyan-50/80 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_26px_70px_rgba(8,145,178,0.14)]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-cyan-400 via-sky-500 to-indigo-500" />
-      <CardHeader className="relative gap-3 rounded-t-xl border-b border-cyan-100/70 bg-[radial-gradient(circle_at_12%_20%,rgba(34,211,238,0.22),transparent_34%),linear-gradient(135deg,#0f172a_0%,#164e63_58%,#1e3a8a_100%)] pb-5 text-white">
+      <CardHeader className="relative gap-3 rounded-t-xl border-b border-cyan-100/70 bg-[radial-gradient(circle_at_12%_20%,rgba(34,211,238,0.22),transparent_34%),linear-gradient(135deg,#f8fafc_0%,#ecfeff_52%,#eff6ff_100%)] pb-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-white/20 bg-white/12 text-white shadow-sm backdrop-blur">
+              <Badge variant="outline" className="border-cyan-200 bg-white/80 text-cyan-700 shadow-sm backdrop-blur">
                 {module.kind === "custom" ? "Custom" : "Builtin"}
               </Badge>
               {module.interfaceSchema?.runtime ? (
-                <Badge variant="outline" className="border-cyan-200/40 bg-cyan-300/15 text-cyan-50 shadow-sm backdrop-blur">
+                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 shadow-sm backdrop-blur">
                   {module.interfaceSchema.runtime}
                 </Badge>
               ) : null}
             </div>
-            <CardTitle className="break-words text-lg font-semibold tracking-tight text-white drop-shadow-sm">{module.title}</CardTitle>
+            <CardTitle className="break-words text-lg font-semibold tracking-tight text-slate-900">{module.title}</CardTitle>
           </div>
           {canDelete ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="border-white/20 bg-white/10 text-white shadow-sm backdrop-blur hover:border-rose-200/60 hover:bg-rose-500/20 hover:text-white"
+              className="border-rose-200 bg-white/80 text-rose-600 shadow-sm backdrop-blur hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
               onClick={() => void handleDelete()}
               disabled={deleting || running}
             >
@@ -479,7 +473,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
             </Button>
           ) : null}
         </div>
-        <CardDescription className="max-w-3xl text-[13px] leading-relaxed text-cyan-50/85">{module.summary}</CardDescription>
+        <CardDescription className="max-w-3xl text-[13px] leading-relaxed text-slate-600">{module.summary}</CardDescription>
       </CardHeader>
       <CardContent>{body}</CardContent>
     </Card>

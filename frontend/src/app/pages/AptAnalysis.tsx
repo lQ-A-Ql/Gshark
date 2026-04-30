@@ -2,8 +2,8 @@ import { Crosshair, Database, Network, ShieldAlert, Workflow } from "lucide-reac
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
-import { DataTableShell, EmptyState, MetricCard, StatusHint, SurfacePanel } from "../components/DesignSystem";
-import { AnalysisBucketChart, AnalysisMiniStat } from "../components/analysis/AnalysisPrimitives";
+import { EmptyState, MetricCard, StatusHint, SurfacePanel } from "../components/DesignSystem";
+import { AnalysisBucketChart, AnalysisDataTable, AnalysisMiniStat } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { cn } from "../components/ui/utils";
 import type { APTActorProfile, APTAnalysis, APTEvidenceRecord, APTScoreFactor } from "../core/types";
@@ -292,43 +292,64 @@ function EvidenceTable({ evidence }: { evidence: APTEvidenceRecord[] }) {
     );
   }
   return (
-    <DataTableShell maxHeight={460}>
-      <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
-        <thead className="bg-slate-50 text-slate-500">
-          <tr>
-            <th className="px-3 py-2">Actor / Type</th>
-            <th className="px-3 py-2">Evidence</th>
-            <th className="px-3 py-2">Network</th>
-            <th className="px-3 py-2">Traits</th>
-            <th className="px-3 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
-          {evidence.map((item, index) => (
-            <tr key={`${item.packetId}-${item.actorId}-${index}`} className="align-top hover:bg-indigo-50/20">
-              <td className="space-y-1 px-3 py-2">
-                <div className="font-semibold text-slate-800">{item.actorName || "--"}</div>
-                <div className="font-mono text-[11px] text-slate-500">{item.sourceModule || "--"} · {item.evidenceType || "--"} · confidence {item.confidence ?? 0}</div>
-              </td>
-              <td className="space-y-1 px-3 py-2">
-                <div className="text-slate-700">{item.summary}</div>
-                <div className="font-mono text-[11px] text-slate-500">{item.evidenceValue || item.evidence || "--"}</div>
-              </td>
-              <td className="space-y-1 px-3 py-2 font-mono text-[11px] text-slate-500">
-                <div>{item.source || "--"} → {item.destination || "--"}</div>
-                <div>{item.host || ""}{item.uri || ""}</div>
-              </td>
-              <td className="px-3 py-2">
-                <TagLine values={[item.sampleFamily ?? "", item.campaignStage ?? "", ...(item.transportTraits ?? []), ...(item.infrastructureHints ?? []), ...(item.ttpTags ?? []), ...(item.scoreFactors ?? []).map((factor) => `${factor.name}:${factor.weight}`)].filter(Boolean)} />
-              </td>
-              <td className="px-3 py-2">
-                <EvidenceActions packetId={item.packetId} preferredProtocol={protocolForEvidence(item.family)} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </DataTableShell>
+    <AnalysisDataTable
+      data={evidence}
+      rowKey={(item, index) => `${item.packetId}-${item.actorId}-${index}`}
+      maxHeightClassName="max-h-[460px]"
+      tableClassName="min-w-[980px]"
+      rowClassName="hover:bg-indigo-50/20"
+      columns={[
+        {
+          key: "actor",
+          header: "Actor / Type",
+          widthClassName: "w-[210px]",
+          cellClassName: "space-y-1",
+          render: (item) => (
+            <>
+              <div className="font-semibold text-slate-800">{item.actorName || "--"}</div>
+              <div className="font-mono text-[11px] text-slate-500">{item.sourceModule || "--"} · {item.evidenceType || "--"} · confidence {item.confidence ?? 0}</div>
+            </>
+          ),
+        },
+        {
+          key: "evidence",
+          header: "Evidence",
+          cellClassName: "space-y-1",
+          render: (item) => (
+            <>
+              <div className="text-slate-700">{item.summary}</div>
+              <div className="font-mono text-[11px] text-slate-500">{item.evidenceValue || item.evidence || "--"}</div>
+            </>
+          ),
+        },
+        {
+          key: "network",
+          header: "Network",
+          widthClassName: "w-[220px]",
+          cellClassName: "space-y-1 font-mono text-[11px] text-slate-500",
+          render: (item) => (
+            <>
+              <div>{item.source || "--"} → {item.destination || "--"}</div>
+              <div>{item.host || ""}{item.uri || ""}</div>
+            </>
+          ),
+        },
+        {
+          key: "traits",
+          header: "Traits",
+          widthClassName: "w-[260px]",
+          render: (item) => (
+            <TagLine values={[item.sampleFamily ?? "", item.campaignStage ?? "", ...(item.transportTraits ?? []), ...(item.infrastructureHints ?? []), ...(item.ttpTags ?? []), ...(item.scoreFactors ?? []).map((factor) => `${factor.name}:${factor.weight}`)].filter(Boolean)} />
+          ),
+        },
+        {
+          key: "actions",
+          header: "Actions",
+          widthClassName: "w-[140px]",
+          render: (item) => <EvidenceActions packetId={item.packetId} preferredProtocol={protocolForEvidence(item.family)} />,
+        },
+      ]}
+    />
   );
 }
 

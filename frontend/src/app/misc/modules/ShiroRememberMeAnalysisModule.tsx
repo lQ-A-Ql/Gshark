@@ -201,7 +201,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
                       }`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[11px] font-semibold text-white">#{item.packetId}</span>
+                        <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-700">#{item.packetId}</span>
                         {item.hitCount ? (
                           <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">Key 命中</span>
                         ) : null}

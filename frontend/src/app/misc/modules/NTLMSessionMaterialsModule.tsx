@@ -232,7 +232,7 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
                       }`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[11px] font-semibold text-white">{item.protocol}</span>
+                        <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 font-mono text-[11px] font-semibold text-violet-700">{item.protocol}</span>
                         <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${item.complete ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                           {item.complete ? "材料完整" : "待补字段"}
                         </span>

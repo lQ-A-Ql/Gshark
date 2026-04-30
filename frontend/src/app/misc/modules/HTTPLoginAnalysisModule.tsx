@@ -7,6 +7,7 @@ import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -210,7 +211,7 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-slate-900 px-2 py-1 font-mono text-[11px] font-semibold text-white">{item.method || "HTTP"}</span>
+                      <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 font-mono text-[11px] font-semibold text-cyan-700">{item.method || "HTTP"}</span>
                       {item.possibleBruteforce && (
                         <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">疑似爆破</span>
                       )}
@@ -272,58 +273,88 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                   {filteredAttempts.length} 条
                 </span>
               </div>
-              <div className="max-h-[460px] overflow-auto">
-                <table className="min-w-[1040px] w-full border-separate border-spacing-0 text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-100/95 text-[11px] uppercase tracking-[0.12em] text-slate-500 shadow-[0_1px_0_0_rgba(148,163,184,0.35)] backdrop-blur">
-                    <tr>
-                      <th className="w-[84px] whitespace-nowrap px-3 py-3 font-semibold">请求包</th>
-                      <th className="w-[84px] whitespace-nowrap px-3 py-3 font-semibold">响应包</th>
-                      <th className="w-[104px] whitespace-nowrap px-3 py-3 font-semibold">结果</th>
-                      <th className="w-[84px] whitespace-nowrap px-3 py-3 font-semibold">状态码</th>
-                      <th className="w-[140px] whitespace-nowrap px-3 py-3 font-semibold">用户名</th>
-                      <th className="w-[170px] whitespace-nowrap px-3 py-3 font-semibold">参数键</th>
-                      <th className="w-[190px] whitespace-nowrap px-3 py-3 font-semibold">原因</th>
-                      <th className="min-w-[300px] whitespace-nowrap px-3 py-3 font-semibold">请求 / 响应预览</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredAttempts.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-muted-foreground">暂无认证尝试</td>
-                      </tr>
-                    ) : (
-                      filteredAttempts.map((item) => (
-                        <tr
-                          key={`${item.packetId}-${item.responsePacketId || 0}`}
-                          className="align-top transition-colors odd:bg-white even:bg-slate-50/45 hover:bg-cyan-50/45"
-                        >
-                          <td className="whitespace-nowrap px-3 py-3 font-mono text-[12px] font-semibold text-slate-800">#{item.packetId}</td>
-                          <td className="whitespace-nowrap px-3 py-3 font-mono text-[12px] text-slate-600">{item.responsePacketId ? `#${item.responsePacketId}` : "--"}</td>
-                          <td className="whitespace-nowrap px-3 py-3">
-                            <span className={attemptBadge(item.result, item.possibleBruteforce)}>{renderAttemptLabel(item.result, item.possibleBruteforce)}</span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 font-mono text-[12px] text-slate-700">{item.statusCode || "--"}</td>
-                          <td className="px-3 py-3">
-                            <div className="max-w-[128px] truncate font-mono text-[11px] text-slate-700" title={item.username || "--"}>{item.username || "--"}</div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="max-w-[158px] truncate font-mono text-[11px] text-slate-600" title={(item.requestKeys ?? []).join(", ") || "--"}>
-                              {(item.requestKeys ?? []).join(", ") || "--"}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-[12px] leading-relaxed text-slate-700">{item.reason || "--"}</td>
-                          <td className="px-3 py-3">
-                            <div className="space-y-1.5">
-                              <PreviewLine label="REQ" value={item.requestPreview || "--"} tone="sky" />
-                              {item.responsePreview ? <PreviewLine label="RESP" value={item.responsePreview} tone="slate" /> : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                data={filteredAttempts}
+                rowKey={(item) => `${item.packetId}-${item.responsePacketId || 0}`}
+                maxHeightClassName="max-h-[460px]"
+                tableClassName="min-w-[1040px] border-separate border-spacing-0"
+                wrapperClassName="rounded-none border-0 bg-white"
+                headerClassName="z-10 bg-slate-100/95 text-[11px] uppercase tracking-[0.12em] shadow-[0_1px_0_0_rgba(148,163,184,0.35)] backdrop-blur"
+                headerCellClassName="py-3 font-semibold"
+                emptyText="暂无认证尝试"
+                rowClassName="odd:bg-white even:bg-slate-50/45 hover:bg-cyan-50/45"
+                cellClassName="py-3"
+                columns={[
+                  {
+                    key: "request",
+                    header: "请求包",
+                    widthClassName: "w-[84px]",
+                    headerClassName: "whitespace-nowrap",
+                    cellClassName: "whitespace-nowrap font-mono text-[12px] font-semibold text-slate-800",
+                    render: (item) => `#${item.packetId}`,
+                  },
+                  {
+                    key: "response",
+                    header: "响应包",
+                    widthClassName: "w-[84px]",
+                    headerClassName: "whitespace-nowrap",
+                    cellClassName: "whitespace-nowrap font-mono text-[12px] text-slate-600",
+                    render: (item) => item.responsePacketId ? `#${item.responsePacketId}` : "--",
+                  },
+                  {
+                    key: "result",
+                    header: "结果",
+                    widthClassName: "w-[104px]",
+                    headerClassName: "whitespace-nowrap",
+                    cellClassName: "whitespace-nowrap",
+                    render: (item) => <span className={attemptBadge(item.result, item.possibleBruteforce)}>{renderAttemptLabel(item.result, item.possibleBruteforce)}</span>,
+                  },
+                  {
+                    key: "status",
+                    header: "状态码",
+                    widthClassName: "w-[84px]",
+                    headerClassName: "whitespace-nowrap",
+                    cellClassName: "whitespace-nowrap font-mono text-[12px] text-slate-700",
+                    render: (item) => item.statusCode || "--",
+                  },
+                  {
+                    key: "username",
+                    header: "用户名",
+                    widthClassName: "w-[140px]",
+                    headerClassName: "whitespace-nowrap",
+                    render: (item) => <div className="max-w-[128px] truncate font-mono text-[11px] text-slate-700" title={item.username || "--"}>{item.username || "--"}</div>,
+                  },
+                  {
+                    key: "keys",
+                    header: "参数键",
+                    widthClassName: "w-[170px]",
+                    headerClassName: "whitespace-nowrap",
+                    render: (item) => {
+                      const keys = (item.requestKeys ?? []).join(", ") || "--";
+                      return <div className="max-w-[158px] truncate font-mono text-[11px] text-slate-600" title={keys}>{keys}</div>;
+                    },
+                  },
+                  {
+                    key: "reason",
+                    header: "原因",
+                    widthClassName: "w-[190px]",
+                    headerClassName: "whitespace-nowrap",
+                    cellClassName: "text-[12px] leading-relaxed text-slate-700",
+                    render: (item) => item.reason || "--",
+                  },
+                  {
+                    key: "preview",
+                    header: "请求 / 响应预览",
+                    headerClassName: "min-w-[300px] whitespace-nowrap",
+                    render: (item) => (
+                      <div className="space-y-1.5">
+                        <PreviewLine label="REQ" value={item.requestPreview || "--"} tone="sky" />
+                        {item.responsePreview ? <PreviewLine label="RESP" value={item.responsePreview} tone="slate" /> : null}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             </div>
 
             {analysis.bruteforceCount > 0 && (

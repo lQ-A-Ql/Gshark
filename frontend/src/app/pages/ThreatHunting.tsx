@@ -6,7 +6,8 @@ import { cn } from "../components/ui/utils";
 import { bridge } from "../integrations/wailsBridge";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
-import { AnalysisBadge, type AnalysisTone } from "../components/analysis/AnalysisPrimitives";
+import { AnalysisBadge, AnalysisDataTable, type AnalysisTone } from "../components/analysis/AnalysisPrimitives";
+import { MetricCard } from "../components/DesignSystem";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Progress } from "../components/ui/progress";
 
@@ -188,9 +189,27 @@ export default function ThreatHunting() {
       />
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <GlassStatCard title="总命中" value={hits.length} icon={<SearchCode className="h-4 w-4" />} tone="blue" />
-        <GlassStatCard title="高风险" value={hits.filter((item) => item.level === "critical" || item.level === "high").length} icon={<Shield className="h-4 w-4" />} tone="rose" />
-        <GlassStatCard title="CTF / 异常" value={`${stats.ctf} / ${stats.anomaly}`} icon={<Sparkles className="h-4 w-4" />} tone="amber" />
+        <MetricCard
+          label="总命中"
+          value={hits.length.toLocaleString()}
+          hint="当前规则集返回的全部命中"
+          icon={<SearchCode className="h-4 w-4 text-blue-600" />}
+          tone="blue"
+        />
+        <MetricCard
+          label="高风险"
+          value={hits.filter((item) => item.level === "critical" || item.level === "high").length.toLocaleString()}
+          hint="critical / high 级别命中"
+          icon={<Shield className="h-4 w-4 text-rose-600" />}
+          tone="rose"
+        />
+        <MetricCard
+          label="CTF / 异常"
+          value={`${stats.ctf.toLocaleString()} / ${stats.anomaly.toLocaleString()}`}
+          hint="Flag 前缀与异常特征命中"
+          icon={<Sparkles className="h-4 w-4 text-amber-600" />}
+          tone="amber"
+        />
       </div>
 
       {threatProgress && (
@@ -341,42 +360,61 @@ export default function ThreatHunting() {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
-            <ScrollArea className="min-h-0 flex-1">
-              <table className="w-full table-fixed cursor-default whitespace-nowrap border-collapse text-left text-xs">
-                <thead className="sticky top-0 z-10 bg-white/95 text-slate-500 shadow-[0_1px_0_0_var(--color-border)] backdrop-blur-sm">
-                  <tr>
-                    <th className="w-16 border-r border-slate-200 px-3 py-2 font-medium">No.</th>
-                    <th className="w-28 border-r border-slate-200 px-3 py-2 font-medium">分类</th>
-                    <th className="w-40 border-r border-slate-200 px-3 py-2 font-medium">规则</th>
-                    <th className="w-24 border-r border-slate-200 px-3 py-2 font-medium">等级</th>
-                    <th className="px-3 py-2 font-medium">预览</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {hits.map((hit) => {
-                    const isSelected = selectedHit === hit.id;
-                    return (
-                      <tr
-                        key={hit.id}
-                        onClick={() => setSelectedHit(hit.id)}
-                        className={cn(
-                          "border-b border-slate-200/80 transition-colors",
-                          isSelected ? "border-l-2 border-l-rose-500 bg-rose-50/80 text-rose-700" : "text-foreground hover:bg-slate-50",
-                        )}
-                      >
-                        <td className="border-r border-slate-200/80 px-3 py-2 text-slate-500">{hit.packetId}</td>
-                        <td className="border-r border-slate-200/80 px-3 py-2">{hit.category}</td>
-                        <td className="border-r border-slate-200/80 px-3 py-2 font-medium text-rose-600">{hit.rule}</td>
-                        <td className="border-r border-slate-200/80 px-3 py-2">
-                          <AnalysisBadge tone={toneForThreatLevel(hit.level)}>{hit.level}</AnalysisBadge>
-                        </td>
-                        <td className="truncate px-3 py-2 font-mono text-slate-500">{hit.preview}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </ScrollArea>
+            <AnalysisDataTable
+              columns={[
+                {
+                  key: "packet",
+                  header: "No.",
+                  widthClassName: "w-16",
+                  headerClassName: "border-r border-slate-200",
+                  cellClassName: "border-r border-slate-200/80 text-slate-500",
+                  render: (hit) => hit.packetId,
+                },
+                {
+                  key: "category",
+                  header: "分类",
+                  widthClassName: "w-28",
+                  headerClassName: "border-r border-slate-200",
+                  cellClassName: "border-r border-slate-200/80",
+                  render: (hit) => hit.category,
+                },
+                {
+                  key: "rule",
+                  header: "规则",
+                  widthClassName: "w-40",
+                  headerClassName: "border-r border-slate-200",
+                  cellClassName: "border-r border-slate-200/80 font-medium text-rose-600",
+                  render: (hit) => hit.rule,
+                },
+                {
+                  key: "level",
+                  header: "等级",
+                  widthClassName: "w-24",
+                  headerClassName: "border-r border-slate-200",
+                  cellClassName: "border-r border-slate-200/80",
+                  render: (hit) => <AnalysisBadge tone={toneForThreatLevel(hit.level)}>{hit.level}</AnalysisBadge>,
+                },
+                {
+                  key: "preview",
+                  header: "预览",
+                  cellClassName: "truncate font-mono text-slate-500",
+                  render: (hit) => hit.preview,
+                },
+              ]}
+              data={hits}
+              rowKey={(hit) => hit.id}
+              rowClassName={(hit) => (
+                selectedHit === hit.id
+                  ? "border-l-2 border-l-rose-500 bg-rose-50/80 text-rose-700 hover:bg-rose-50"
+                  : "text-foreground"
+              )}
+              onRowClick={(hit) => setSelectedHit(hit.id)}
+              emptyText="暂无威胁命中"
+              maxHeightClassName="max-h-none"
+              wrapperClassName="min-h-0 flex-1 rounded-none border-0 bg-transparent"
+              tableClassName="cursor-default whitespace-nowrap"
+              headerClassName="z-10 bg-white/95 backdrop-blur-sm"
+            />
 
             {selected && (
               <div className="flex h-56 min-h-0 shrink-0 flex-col border-t border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] shadow-[0_-10px_30px_-24px_rgba(15,23,42,0.35)]">
@@ -411,27 +449,6 @@ export default function ThreatHunting() {
         </div>
       </div>
     </PageShell>
-  );
-}
-
-function GlassStatCard({ title, value, icon, tone }: { title: string; value: string | number; icon: ReactNode; tone: "blue" | "rose" | "amber" }) {
-  const toneClass = tone === "blue"
-    ? "border-blue-200 bg-gradient-to-br from-white via-blue-50 to-cyan-50 text-blue-700"
-    : tone === "rose"
-      ? "border-rose-200 bg-gradient-to-br from-white via-rose-50 to-orange-50 text-rose-700"
-      : "border-amber-200 bg-gradient-to-br from-white via-amber-50 to-yellow-50 text-amber-700";
-  return (
-    <div className={cn("rounded-2xl border p-4 shadow-sm", toneClass)}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-medium text-slate-500">{title}</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
-        </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
-          {icon}
-        </div>
-      </div>
-    </div>
   );
 }
 

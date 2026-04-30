@@ -17,6 +17,7 @@ import { buildCaptureOverview, type CaptureRecommendation } from "../core/captur
 import type { GlobalTrafficStats, IndustrialAnalysis, MediaAnalysis, USBAnalysis, VehicleAnalysis } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
+import { MetricCard } from "./DesignSystem";
 
 interface OverviewBundle {
   stats: GlobalTrafficStats | null;
@@ -110,24 +111,28 @@ export function CaptureMissionControl() {
       value: totalPackets.toLocaleString(),
       detail: `当前文件 ${formatBytes(fileMeta.sizeBytes)}`,
       icon: <Activity className="h-4 w-4 text-emerald-600" />,
+      tone: "emerald" as const,
     },
     {
       label: "可疑命中",
       value: threatHits.length.toLocaleString(),
       detail: `${threatHits.filter((hit) => hit.level === "critical" || hit.level === "high").length} 条高危`,
       icon: <ShieldAlert className="h-4 w-4 text-rose-600" />,
+      tone: "rose" as const,
     },
     {
       label: "流数量",
       value: (streamIds.http.length + streamIds.tcp.length + streamIds.udp.length).toLocaleString(),
       detail: `HTTP ${streamIds.http.length} / TCP ${streamIds.tcp.length} / UDP ${streamIds.udp.length}`,
       icon: <Network className="h-4 w-4 text-blue-600" />,
+      tone: "blue" as const,
     },
     {
       label: "提取对象",
       value: extractedObjects.length.toLocaleString(),
       detail: extractedObjects.length > 0 ? "可直接跳转附件提取页" : "暂未发现可导出对象",
       icon: <FileWarning className="h-4 w-4 text-amber-600" />,
+      tone: "amber" as const,
     },
   ]), [extractedObjects.length, fileMeta.sizeBytes, streamIds.http.length, streamIds.tcp.length, streamIds.udp.length, threatHits, totalPackets]);
 
@@ -246,7 +251,7 @@ export function CaptureMissionControl() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {statCards.map((item) => (
-              <StatCard key={item.label} label={item.label} value={item.value} detail={item.detail} icon={item.icon} />
+              <MetricCard key={item.label} label={item.label} value={item.value} hint={item.detail} icon={item.icon} tone={item.tone} />
             ))}
           </div>
 
@@ -395,7 +400,7 @@ export function CaptureMissionControl() {
                   </div>
                   <button
                     onClick={() => navigate("/misc")}
-                    className="shrink-0 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                    className="shrink-0 rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50"
                   >
                     去 MISC
                   </button>
@@ -423,29 +428,6 @@ function iconForRecommendation(key: CaptureRecommendation["key"]) {
   if (key === "media") return <Clapperboard className="h-4 w-4 text-violet-600" />;
   if (key === "payload") return <Binary className="h-4 w-4 text-rose-600" />;
   return <Network className="h-4 w-4 text-sky-600" />;
-}
-
-function StatCard({
-  label,
-  value,
-  detail,
-  icon,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>{label}</span>
-        {icon}
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-1 text-xs leading-5 text-slate-500">{detail}</div>
-    </div>
-  );
 }
 
 function RecommendationCard({

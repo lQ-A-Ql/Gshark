@@ -191,49 +191,40 @@ export default function IndustrialAnalysis() {
           <AnalysisCallout className="mb-2" tone="blue" icon={<Shield className="h-4 w-4" />}>
             基于主从角色、功能码、数量字段、位长度一致性和高频写入行为生成规则命中，可直接定位可疑包与目标地址。
           </AnalysisCallout>
-          <div className="max-h-[460px] overflow-auto">
-            <table className="w-full table-fixed border-collapse text-left text-xs">
-              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-                <tr>
-                  <th className="w-20 px-3 py-2">等级</th>
-                  <th className="w-28 px-3 py-2">规则</th>
-                  <th className="w-20 px-3 py-2">包号</th>
-                  <th className="w-28 px-3 py-2">时间</th>
-                  <th className="w-32 px-3 py-2">源</th>
-                  <th className="w-32 px-3 py-2">目标</th>
-                  <th className="w-24 px-3 py-2">功能码</th>
-                  <th className="w-32 px-3 py-2">对象</th>
-                  <th className="w-40 px-3 py-2">证据</th>
-                  <th className="px-3 py-2">摘要</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.ruleHits!.map((item, idx) => (
-                  <tr key={`${item.rule}-${item.packetId}-${idx}`} className="border-b border-border/70 align-top">
-                    <td className="px-3 py-2">
-                      <AnalysisBadge tone={toneForIndustrialRuleLevel(item.level)}>{item.level || "info"}</AnalysisBadge>
-                    </td>
-                    <td className="px-3 py-2 font-medium">{item.rule}</td>
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{item.packetId || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{item.time || "--"}</td>
-                    <td className="px-3 py-2 break-all">{item.source || "--"}</td>
-                    <td className="px-3 py-2 break-all">{item.destination || "--"}</td>
-                    <td className="px-3 py-2">
-                      {item.functionCode ? (
-                        <div>
-                          <div className="font-mono">{String(item.functionCode).padStart(2, "0")}</div>
-                          {item.functionName && <div className="text-muted-foreground">{item.functionName}</div>}
-                        </div>
-                      ) : "--"}
-                    </td>
-                    <td className="px-3 py-2 font-mono break-all">{item.target || "--"}</td>
-                    <td className="px-3 py-2 break-all font-mono text-[11px] text-muted-foreground">{item.evidence || "--"}</td>
-                    <td className="px-3 py-2">{item.summary || "--"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={[
+              {
+                key: "level",
+                header: "等级",
+                widthClassName: "w-20",
+                render: (item) => <AnalysisBadge tone={toneForIndustrialRuleLevel(item.level)}>{item.level || "info"}</AnalysisBadge>,
+              },
+              { key: "rule", header: "规则", widthClassName: "w-28", cellClassName: "font-medium", render: (item) => item.rule },
+              { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: "font-mono text-slate-500", render: (item) => item.packetId || "--" },
+              { key: "time", header: "时间", widthClassName: "w-28", cellClassName: "font-mono", render: (item) => item.time || "--" },
+              { key: "source", header: "源", widthClassName: "w-32", cellClassName: "break-all", render: (item) => item.source || "--" },
+              { key: "destination", header: "目标", widthClassName: "w-32", cellClassName: "break-all", render: (item) => item.destination || "--" },
+              {
+                key: "function",
+                header: "功能码",
+                widthClassName: "w-24",
+                render: (item) => item.functionCode != null ? (
+                  <div>
+                    <div className="font-mono">{String(item.functionCode).padStart(2, "0")}</div>
+                    {item.functionName && <div className="text-slate-500">{item.functionName}</div>}
+                  </div>
+                ) : "--",
+              },
+              { key: "target", header: "对象", widthClassName: "w-32", cellClassName: "break-all font-mono", render: (item) => item.target || "--" },
+              { key: "evidence", header: "证据", widthClassName: "w-40", cellClassName: "break-all font-mono text-[11px] text-slate-500", render: (item) => item.evidence || "--" },
+              { key: "summary", header: "摘要", render: (item) => item.summary || "--" },
+            ]}
+            data={analysis.ruleHits ?? []}
+            rowKey={(item, idx) => `${item.rule}-${item.packetId}-${idx}`}
+            maxHeightClassName="max-h-[460px]"
+            tableClassName="min-w-[1120px]"
+            emptyText="暂无规则命中"
+          />
         </Panel>
       )}
 
@@ -256,47 +247,43 @@ export default function IndustrialAnalysis() {
           <AnalysisCallout className="mb-2" tone="amber" icon={<AlertTriangle className="h-4 w-4" />}>
             以下为按写入次数排序的 Modbus 写操作聚合，高频写入可能对应灯控、阀门切换或寄存器篡改。
           </AnalysisCallout>
-          <div className="max-h-[420px] overflow-auto">
-            <table className="w-full table-fixed border-collapse text-left text-xs">
-              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-                <tr>
-                  <th className="w-36 px-3 py-2">目标地址</th>
-                  <th className="w-20 px-3 py-2">Unit ID</th>
-                  <th className="w-28 px-3 py-2">功能码</th>
-                  <th className="w-20 px-3 py-2">写入次数</th>
-                  <th className="w-36 px-3 py-2">来源 IP</th>
-                  <th className="w-28 px-3 py-2">首次时间</th>
-                  <th className="w-28 px-3 py-2">末次时间</th>
-                  <th className="px-3 py-2">样本值</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.suspiciousWrites!.map((sw, idx) => (
-                  <tr key={`sw-${idx}`} className="border-b border-border/70 align-top">
-                    <td className="px-3 py-2 font-mono">{sw.target}</td>
-                    <td className="px-3 py-2 font-mono">{sw.unitId || "--"}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-mono">{String(sw.functionCode).padStart(2, "0")}</div>
-                      <div className="text-muted-foreground">{sw.functionName}</div>
-                    </td>
-                    <td className="px-3 py-2 font-mono font-semibold text-amber-700">{sw.writeCount}</td>
-                    <td className="px-3 py-2 font-mono">{sw.sources.join(", ") || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{sw.firstTime || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{sw.lastTime || "--"}</td>
-                    <td className="px-3 py-2">
-                      {sw.sampleValues.length > 0 ? (
-                        <div className="space-y-0.5">
-                          {sw.sampleValues.map((v, vi) => (
-                            <div key={vi} className="break-all font-mono text-[11px] text-muted-foreground">{v}</div>
-                          ))}
-                        </div>
-                      ) : "--"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={[
+              { key: "target", header: "目标地址", widthClassName: "w-36", cellClassName: "font-mono", render: (sw) => sw.target },
+              { key: "unit", header: "Unit ID", widthClassName: "w-20", cellClassName: "font-mono", render: (sw) => sw.unitId || "--" },
+              {
+                key: "function",
+                header: "功能码",
+                widthClassName: "w-28",
+                render: (sw) => (
+                  <div>
+                    <div className="font-mono">{String(sw.functionCode).padStart(2, "0")}</div>
+                    <div className="text-slate-500">{sw.functionName}</div>
+                  </div>
+                ),
+              },
+              { key: "count", header: "写入次数", widthClassName: "w-20", cellClassName: "font-mono font-semibold text-amber-700", render: (sw) => sw.writeCount },
+              { key: "sources", header: "来源 IP", widthClassName: "w-36", cellClassName: "font-mono", render: (sw) => sw.sources.join(", ") || "--" },
+              { key: "first", header: "首次时间", widthClassName: "w-28", cellClassName: "font-mono", render: (sw) => sw.firstTime || "--" },
+              { key: "last", header: "末次时间", widthClassName: "w-28", cellClassName: "font-mono", render: (sw) => sw.lastTime || "--" },
+              {
+                key: "samples",
+                header: "样本值",
+                render: (sw) => sw.sampleValues.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {sw.sampleValues.map((value, valueIndex) => (
+                      <div key={valueIndex} className="break-all font-mono text-[11px] text-slate-500">{value}</div>
+                    ))}
+                  </div>
+                ) : "--",
+              },
+            ]}
+            data={analysis.suspiciousWrites ?? []}
+            rowKey={(_sw, idx) => `sw-${idx}`}
+            maxHeightClassName="max-h-[420px]"
+            tableClassName="min-w-[920px]"
+            emptyText="暂无可疑写操作"
+          />
         </Panel>
       )}
 
@@ -305,101 +292,73 @@ export default function IndustrialAnalysis() {
           <AnalysisCallout className="mb-2" tone="rose" icon={<Shield className="h-4 w-4" />}>
             以下为从 IEC 104、DNP3、BACnet 等协议中提取的控制/操作类指令，可能涉及遥控、设点或设备重启。
           </AnalysisCallout>
-          <div className="max-h-[520px] overflow-auto">
-            <table className="w-full table-fixed border-collapse text-left text-xs">
-              <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-                <tr>
-                  <th className="w-20 px-3 py-2">包号</th>
-                  <th className="w-28 px-3 py-2">时间</th>
-                  <th className="w-20 px-3 py-2">协议</th>
-                  <th className="w-32 px-3 py-2">源</th>
-                  <th className="w-32 px-3 py-2">目标</th>
-                  <th className="w-36 px-3 py-2">操作</th>
-                  <th className="w-28 px-3 py-2">对象</th>
-                  <th className="w-24 px-3 py-2">值</th>
-                  <th className="w-24 px-3 py-2">结果</th>
-                  <th className="px-3 py-2">摘要</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.controlCommands!.map((cmd, idx) => (
-                  <tr key={`cmd-${idx}`} className="border-b border-border/70 align-top">
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{cmd.packetId}</td>
-                    <td className="px-3 py-2 font-mono">{cmd.time || "--"}</td>
-                    <td className="px-3 py-2">
-                      <AnalysisBadge tone="blue">{cmd.protocol}</AnalysisBadge>
-                    </td>
-                    <td className="px-3 py-2">{cmd.source || "--"}</td>
-                    <td className="px-3 py-2">{cmd.destination || "--"}</td>
-                    <td className="px-3 py-2 font-mono font-semibold text-rose-700">{cmd.operation || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{cmd.target || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{cmd.value || "--"}</td>
-                    <td className="px-3 py-2">{cmd.result || "--"}</td>
-                    <td className="px-3 py-2">{cmd.summary || "--"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={[
+              { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: "font-mono text-slate-500", render: (cmd) => cmd.packetId },
+              { key: "time", header: "时间", widthClassName: "w-28", cellClassName: "font-mono", render: (cmd) => cmd.time || "--" },
+              { key: "protocol", header: "协议", widthClassName: "w-20", render: (cmd) => <AnalysisBadge tone="blue">{cmd.protocol}</AnalysisBadge> },
+              { key: "source", header: "源", widthClassName: "w-32", render: (cmd) => cmd.source || "--" },
+              { key: "destination", header: "目标", widthClassName: "w-32", render: (cmd) => cmd.destination || "--" },
+              { key: "operation", header: "操作", widthClassName: "w-36", cellClassName: "font-mono font-semibold text-rose-700", render: (cmd) => cmd.operation || "--" },
+              { key: "target", header: "对象", widthClassName: "w-28", cellClassName: "font-mono", render: (cmd) => cmd.target || "--" },
+              { key: "value", header: "值", widthClassName: "w-24", cellClassName: "font-mono", render: (cmd) => cmd.value || "--" },
+              { key: "result", header: "结果", widthClassName: "w-24", render: (cmd) => cmd.result || "--" },
+              { key: "summary", header: "摘要", render: (cmd) => cmd.summary || "--" },
+            ]}
+            data={analysis.controlCommands ?? []}
+            rowKey={(_cmd, idx) => `cmd-${idx}`}
+            maxHeightClassName="max-h-[520px]"
+            tableClassName="min-w-[1120px]"
+            emptyText="暂无控制指令"
+          />
         </Panel>
       )}
 
       <Panel title={`Modbus 事务明细 (${analysis.modbus.transactions.length})`} className="mt-4">
-        <div className="max-h-[520px] overflow-auto">
-          <table className="w-full table-fixed border-collapse text-left text-xs">
-            <thead className="sticky top-0 bg-accent/90 text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-              <tr>
-                <th className="w-20 px-3 py-2">包号</th>
-                <th className="w-28 px-3 py-2">时间</th>
-                <th className="w-40 px-3 py-2">源</th>
-                <th className="w-40 px-3 py-2">目标</th>
-                <th className="w-28 px-3 py-2">功能码</th>
-                <th className="w-20 px-3 py-2">类型</th>
-                <th className="w-24 px-3 py-2">Unit</th>
-                <th className="w-28 px-3 py-2">引用</th>
-                <th className="w-20 px-3 py-2">数量</th>
-                <th className="w-20 px-3 py-2">耗时</th>
-                <th className="px-3 py-2">摘要</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analysis.modbus.transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">暂无 Modbus 事务</td>
-                </tr>
-              ) : (
-                analysis.modbus.transactions.map((item) => (
-                  <tr key={`${item.packetId}-${item.transactionId}-${item.kind}`} className="border-b border-border/70 align-top">
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{item.packetId}</td>
-                    <td className="px-3 py-2 font-mono">{item.time || "--"}</td>
-                    <td className="px-3 py-2">{item.source || "--"}</td>
-                    <td className="px-3 py-2">{item.destination || "--"}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-mono">{item.functionCode || "--"}</div>
-                      <div className="text-muted-foreground">{item.functionName || "--"}</div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <AnalysisBadge tone={toneForIndustrialTransactionKind(item.kind)}>{item.kind}</AnalysisBadge>
-                    </td>
-                    <td className="px-3 py-2 font-mono">{item.unitId || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{item.reference || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{item.quantity || "--"}</td>
-                    <td className="px-3 py-2 font-mono">{item.responseTime || "--"}</td>
-                    <td className="px-3 py-2">
-                      <div>{item.summary || "--"}</div>
-                      {item.bitRange?.preview && (
-                        <div className="mt-1 break-all font-mono text-[11px] text-blue-700">
-                          位值解析: {item.bitRange.preview}
-                        </div>
-                      )}
-                      {item.registerValues && <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">{item.registerValues}</div>}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={[
+            { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: "font-mono text-slate-500", render: (item) => item.packetId },
+            { key: "time", header: "时间", widthClassName: "w-28", cellClassName: "font-mono", render: (item) => item.time || "--" },
+            { key: "source", header: "源", widthClassName: "w-40", render: (item) => item.source || "--" },
+            { key: "destination", header: "目标", widthClassName: "w-40", render: (item) => item.destination || "--" },
+            {
+              key: "function",
+              header: "功能码",
+              widthClassName: "w-28",
+              render: (item) => (
+                <div>
+                  <div className="font-mono">{item.functionCode || "--"}</div>
+                  <div className="text-slate-500">{item.functionName || "--"}</div>
+                </div>
+              ),
+            },
+            { key: "kind", header: "类型", widthClassName: "w-20", render: (item) => <AnalysisBadge tone={toneForIndustrialTransactionKind(item.kind)}>{item.kind}</AnalysisBadge> },
+            { key: "unit", header: "Unit", widthClassName: "w-24", cellClassName: "font-mono", render: (item) => item.unitId || "--" },
+            { key: "reference", header: "引用", widthClassName: "w-28", cellClassName: "font-mono", render: (item) => item.reference || "--" },
+            { key: "quantity", header: "数量", widthClassName: "w-20", cellClassName: "font-mono", render: (item) => item.quantity || "--" },
+            { key: "latency", header: "耗时", widthClassName: "w-20", cellClassName: "font-mono", render: (item) => item.responseTime || "--" },
+            {
+              key: "summary",
+              header: "摘要",
+              render: (item) => (
+                <div>
+                  <div>{item.summary || "--"}</div>
+                  {item.bitRange?.preview && (
+                    <div className="mt-1 break-all font-mono text-[11px] text-blue-700">
+                      位值解析: {item.bitRange.preview}
+                    </div>
+                  )}
+                  {item.registerValues && <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{item.registerValues}</div>}
+                </div>
+              ),
+            },
+          ]}
+          data={analysis.modbus.transactions}
+          rowKey={(item) => `${item.packetId}-${item.transactionId}-${item.kind}`}
+          maxHeightClassName="max-h-[520px]"
+          tableClassName="min-w-[1200px]"
+          emptyText="暂无 Modbus 事务"
+        />
       </Panel>
 
       {analysis.details.map((detail) => (
