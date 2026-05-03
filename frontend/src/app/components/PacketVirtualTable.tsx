@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { createPortal } from "react-dom";
 import type { Packet } from "../core/types";
 import { getPacketColorStyle } from "../core/packetColoring";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Settings2 } from "lucide-react";
+import { FloatingSurface } from "./ui/FloatingSurface";
+import { useViewportSafePosition } from "../hooks/useViewportSafePosition";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -125,21 +126,7 @@ const BUFFER = 10;
 const CONTEXT_MENU_WIDTH = 192;
 const CONTEXT_MENU_HEIGHT = 118;
 const CONTEXT_MENU_MARGIN = 12;
-
-export function getContextMenuPosition(
-  clientX: number,
-  clientY: number,
-  viewportWidth = typeof window === "undefined" ? CONTEXT_MENU_WIDTH + CONTEXT_MENU_MARGIN * 2 : window.innerWidth,
-  viewportHeight = typeof window === "undefined" ? CONTEXT_MENU_HEIGHT + CONTEXT_MENU_MARGIN * 2 : window.innerHeight,
-) {
-  const maxX = Math.max(CONTEXT_MENU_MARGIN, viewportWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN);
-  const maxY = Math.max(CONTEXT_MENU_MARGIN, viewportHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_MARGIN);
-
-  return {
-    x: Math.min(Math.max(clientX, CONTEXT_MENU_MARGIN), maxX),
-    y: Math.min(Math.max(clientY, CONTEXT_MENU_MARGIN), maxY),
-  };
-}
+const CONTEXT_MENU_SIZE = { width: CONTEXT_MENU_WIDTH, height: CONTEXT_MENU_HEIGHT };
 
 export function PacketVirtualTable({
   packets,
@@ -152,9 +139,17 @@ export function PacketVirtualTable({
 }: PacketVirtualTableProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(360);
-  const [menu, setMenu] = useState<{ x: number; y: number; packet: Packet } | null>(null);
   const [showColumnPanel, setShowColumnPanel] = useState(false);
   const [columns, setColumns] = useState<ColumnSpec[]>(() => loadSavedColumns());
+  const {
+    position: menuPosition,
+    openAtEvent: openMenuAtEvent,
+    close: closeMenu,
+    isOpen: menuIsOpen,
+  } = useViewportSafePosition<Packet>({
+    floating: CONTEXT_MENU_SIZE,
+    margin: CONTEXT_MENU_MARGIN,
+  });
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const resizingRef = useRef<{ id: ColumnId; startX: number; startWidth: number } | null>(null);
@@ -216,32 +211,32 @@ export function PacketVirtualTable({
   }, [columns]);
 
   useEffect(() => {
-    if (!menu || typeof window === "undefined") return;
+    if (!menuIsOpen || typeof window === "undefined") return;
 
-    const closeMenu = () => setMenu(null);
+    const closeFloatingMenu = () => closeMenu();
     const handlePointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
-        setMenu(null);
+        closeMenu();
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setMenu(null);
+        closeMenu();
       }
     };
 
     // The menu is viewport-positioned; any scroll/resize invalidates the anchor point.
     window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("resize", closeFloatingMenu);
+    window.addEventListener("scroll", closeFloatingMenu, true);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown, true);
-      window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("resize", closeFloatingMenu);
+      window.removeEventListener("scroll", closeFloatingMenu, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [menu]);
+  }, [closeMenu, menuIsOpen]);
 
   const startResize = (id: ColumnId, event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -312,10 +307,10 @@ export function PacketVirtualTable({
   return (
     <div
       className="flex h-full flex-col overflow-hidden"
-      onClick={() => setMenu(null)}
+      onClick={closeMenu}
       onContextMenu={(event) => {
         event.preventDefault();
-        setMenu(null);
+        closeMenu();
       }}
     >
       <div className="sticky top-0 z-10 bg-accent text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
@@ -398,7 +393,7 @@ export function PacketVirtualTable({
                   event.preventDefault();
                   event.stopPropagation();
                   onSelect(packet.id);
-                  setMenu({ ...getContextMenuPosition(event.clientX, event.clientY), packet });
+                  openMenuAtEvent(event, packet);
                 }}
                 className={cn(
                   "grid border-b border-border/60 text-xs transition-colors",
@@ -444,12 +439,13 @@ export function PacketVirtualTable({
         </div>
       </div>
 
-      {menu && typeof document !== "undefined" ? createPortal((
-        <div
-          ref={menuRef}
+      {menuPosition ? (
+        <FloatingSurface
+          floatingRef={menuRef}
           role="menu"
-          className="fixed z-[1000] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white/95 py-1.5 text-xs shadow-[0_24px_64px_rgba(15,23,42,0.16)] backdrop-blur"
-          style={{ left: menu.x, top: menu.y }}
+          className="w-48 py-1.5"
+          x={menuPosition.x}
+          y={menuPosition.y}
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -462,8 +458,8 @@ export function PacketVirtualTable({
             role="menuitem"
             className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
             onClick={() => {
-              onFollowStream(menu.packet, "tcp");
-              setMenu(null);
+              onFollowStream(menuPosition.context, "tcp");
+              closeMenu();
             }}
           >
             追踪 TCP 流
@@ -473,8 +469,8 @@ export function PacketVirtualTable({
             role="menuitem"
             className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
             onClick={() => {
-              onFollowStream(menu.packet, "udp");
-              setMenu(null);
+              onFollowStream(menuPosition.context, "udp");
+              closeMenu();
             }}
           >
             追踪 UDP 流
@@ -484,14 +480,14 @@ export function PacketVirtualTable({
             role="menuitem"
             className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
             onClick={() => {
-              onFollowStream(menu.packet, "http");
-              setMenu(null);
+              onFollowStream(menuPosition.context, "http");
+              closeMenu();
             }}
           >
             追踪 HTTP 会话
           </button>
-        </div>
-      ), document.body) : null}
+        </FloatingSurface>
+      ) : null}
     </div>
   );
 }

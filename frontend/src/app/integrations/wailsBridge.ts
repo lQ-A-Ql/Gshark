@@ -1,5 +1,8 @@
 import type {
   AppUpdateStatus,
+  C2DecryptedRecord,
+  C2DecryptRequest,
+  C2DecryptResult,
   APTAnalysis,
   BinaryStream,
   C2SampleAnalysis,
@@ -26,6 +29,7 @@ import type {
   ToolRuntimeSnapshot,
   StreamDecodeResult,
   StreamPayloadInspection,
+  StreamPayloadSource,
   ThreatHit,
   NTLMSessionMaterial,
   USBAnalysis,
@@ -36,6 +40,7 @@ import type {
   SMB3RandomSessionKeyRequest,
   SMB3RandomSessionKeyResult,
 } from "../core/types";
+import { downloadBlob } from "../utils/browserFile";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -144,13 +149,14 @@ export interface BackendBridge {
   updateToolRuntimeConfig(config: ToolRuntimeConfig): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   openPcapFile(): Promise<OpenFileResult>;
-  startStreamingPackets(filePath: string, filter: string): Promise<void>;
+  startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal): Promise<void>;
   stopStreamingPackets(): Promise<void>;
+  prepareCaptureReplacement(): Promise<void>;
   closeCapture(): Promise<void>;
   listPackets(): Promise<Packet[]>;
   listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
-  locatePacketPage(packetId: number, limit: number, filter?: string): Promise<PacketLocateResult>;
-  getPacket(packetId: number): Promise<Packet>;
+  locatePacketPage(packetId: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketLocateResult>;
+  getPacket(packetId: number, signal?: AbortSignal): Promise<Packet>;
   listThreatHits(prefixes?: string[], signal?: AbortSignal): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
@@ -160,10 +166,11 @@ export interface BackendBridge {
   getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
   decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>, signal?: AbortSignal): Promise<StreamDecodeResult>;
   inspectStreamPayload(payload: string, signal?: AbortSignal): Promise<StreamPayloadInspection>;
+  listStreamPayloadSources(signal?: AbortSignal, limit?: number): Promise<StreamPayloadSource[]>;
   updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal): Promise<HttpStream | BinaryStream>;
-  listStreamIds(protocol: "HTTP" | "TCP" | "UDP"): Promise<number[]>;
-  getPacketRawHex(packetId: number): Promise<string>;
-  getPacketLayers(packetId: number): Promise<Record<string, unknown> | null>;
+  listStreamIds(protocol: "HTTP" | "TCP" | "UDP", signal?: AbortSignal): Promise<number[]>;
+  getPacketRawHex(packetId: number, signal?: AbortSignal): Promise<string>;
+  getPacketLayers(packetId: number, signal?: AbortSignal): Promise<Record<string, unknown> | null>;
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
@@ -175,6 +182,7 @@ export interface BackendBridge {
   exportMediaBatchTranscription(format: "txt" | "json"): Promise<void>;
   getUSBAnalysis(signal?: AbortSignal): Promise<USBAnalysis>;
   getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
+  decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal): Promise<C2DecryptResult>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   getMediaPlaybackBlob(token: string): Promise<Blob>;
@@ -351,6 +359,391 @@ function asBinaryStream(input: any, protocol: "TCP" | "UDP"): BinaryStream {
   };
 }
 
+function asC2DecryptedRecord(item: any): C2DecryptedRecord {
+  return {
+    packetId: Number(item.packet_id ?? 0) || undefined,
+    streamId: Number(item.stream_id ?? 0) || undefined,
+    time: String(item.time ?? "") || undefined,
+    direction: String(item.direction ?? "") || undefined,
+    algorithm: String(item.algorithm ?? "") || undefined,
+    keyStatus: String(item.key_status ?? "") || undefined,
+    confidence: Number(item.confidence ?? 0),
+    plaintextPreview: String(item.plaintext_preview ?? "") || undefined,
+    parsed: item.parsed && typeof item.parsed === "object" && !Array.isArray(item.parsed) ? item.parsed : undefined,
+    rawLength: Number(item.raw_length ?? 0) || undefined,
+    decryptedLength: Number(item.decrypted_length ?? 0) || undefined,
+    tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
+    error: String(item.error ?? "") || undefined,
+  };
+}
+
+const vshellLowInfoControlMaxBytes = 24;
+
+type C2PreviewNormalization = {
+  record: C2DecryptedRecord;
+  converted: boolean;
+  bestEffortConverted?: boolean;
+  truncatedHexPreview?: boolean;
+  ansiStripped?: boolean;
+  hiddenReason?: "utf8-invisible" | "timestamp-only";
+};
+
+type HexPreviewBytes = {
+  bytes: Uint8Array;
+  truncated: boolean;
+};
+
+export function normalizeC2DecryptResultForDisplay(result: C2DecryptResult): C2DecryptResult {
+  if (result.family !== "vshell" || result.records.length === 0) {
+    return result;
+  }
+
+  let convertedCount = 0;
+  let bestEffortConvertedCount = 0;
+  let truncatedHexPreviewCount = 0;
+  let ansiStrippedCount = 0;
+  let invisibleDecodedCount = 0;
+  let timestampOnlyCount = 0;
+  let shortBinaryControlCount = 0;
+  const normalizedRecords = result.records.map((record) => {
+    const normalized = normalizeC2DecryptedRecordPreview(record);
+    if (normalized.converted) {
+      convertedCount += 1;
+    }
+    if (normalized.bestEffortConverted) {
+      bestEffortConvertedCount += 1;
+    }
+    if (normalized.truncatedHexPreview) {
+      truncatedHexPreviewCount += 1;
+    }
+    if (normalized.ansiStripped) {
+      ansiStrippedCount += 1;
+    }
+    if (normalized.hiddenReason === "utf8-invisible") {
+      invisibleDecodedCount += 1;
+    }
+    if (normalized.hiddenReason === "timestamp-only") {
+      timestampOnlyCount += 1;
+    }
+    return normalized;
+  });
+  const visibleRecords: C2DecryptedRecord[] = [];
+  for (const item of normalizedRecords) {
+    if (item.hiddenReason) {
+      continue;
+    }
+    if (isLikelyVShellLowInfoControlRecord(item.record)) {
+      shortBinaryControlCount += 1;
+      continue;
+    }
+    visibleRecords.push(item.record);
+  }
+  const hiddenCount = result.records.length - visibleRecords.length;
+  if (hiddenCount <= 0 && convertedCount <= 0 && bestEffortConvertedCount <= 0 && truncatedHexPreviewCount <= 0 && ansiStrippedCount <= 0) {
+    return result;
+  }
+
+  const notes = [...result.notes];
+  if (convertedCount > 0) {
+    notes.push(`前端接口层已将 ${convertedCount} 条 VShell hex preview 转为 UTF-8 文本。`);
+  }
+  if (bestEffortConvertedCount > 0) {
+    notes.push(`前端接口层已从 ${bestEffortConvertedCount} 条 VShell hex preview 中提取可读文本。`);
+  }
+  if (truncatedHexPreviewCount > 0) {
+    notes.push(`前端接口层已从 ${truncatedHexPreviewCount} 条后端截断的 VShell hex preview 中提取可读文本。`);
+  }
+  if (ansiStrippedCount > 0) {
+    notes.push(`前端接口层已清理 ${ansiStrippedCount} 条 VShell 记录中的 ANSI/VT100 终端控制序列。`);
+  }
+  if (invisibleDecodedCount > 0) {
+    notes.push(`前端接口层已隐藏 ${invisibleDecodedCount} 条 UTF-8 解码后无可见字符的 VShell 记录。`);
+  }
+  if (timestampOnlyCount > 0) {
+    notes.push(`前端接口层已隐藏 ${timestampOnlyCount} 条仅包含时间戳的 VShell 记录。`);
+  }
+  if (shortBinaryControlCount > 0) {
+    notes.push(`前端接口层已隐藏 ${shortBinaryControlCount} 条 VShell 短二进制控制帧/心跳帧，避免短控制载荷淹没明文结果。`);
+  }
+
+  return {
+    ...result,
+    decryptedCount: Math.max(0, result.decryptedCount - hiddenCount),
+    records: visibleRecords,
+    notes,
+  };
+}
+
+function normalizeC2DecryptedRecordPreview(record: C2DecryptedRecord): C2PreviewNormalization {
+  if (record.error) {
+    return { record, converted: false };
+  }
+  const preview = record.plaintextPreview ?? "";
+  const hexPreview = parseHexPreviewBytes(preview, record.decryptedLength);
+  if (hexPreview) {
+    const decoded = hexPreview.truncated ? undefined : decodeBytesToUtf8(hexPreview.bytes);
+    if (decoded !== undefined) {
+      return normalizeDecodedC2Preview(record, decoded, {
+        converted: true,
+        tags: ["utf8-from-hex-preview"],
+      });
+    }
+    const extracted = extractBestEffortTextFromBytes(hexPreview.bytes);
+    if (extracted !== undefined) {
+      return normalizeDecodedC2Preview(record, extracted, {
+        converted: false,
+        bestEffortConverted: true,
+        truncatedHexPreview: hexPreview.truncated,
+        tags: [
+          "utf8-best-effort-from-hex-preview",
+          ...(hexPreview.truncated ? ["truncated-hex-preview"] : []),
+        ],
+      });
+    }
+  }
+
+  return normalizeDecodedC2Preview(record, preview, { converted: false });
+}
+
+function normalizeDecodedC2Preview(
+  record: C2DecryptedRecord,
+  value: string,
+  options: { converted: boolean; bestEffortConverted?: boolean; truncatedHexPreview?: boolean; tags?: string[] },
+): C2PreviewNormalization {
+  const normalized = normalizePreviewTextForDisplay(value);
+  const baseTags = record.tags ?? [];
+  const tags = [...new Set([...baseTags, ...(options.tags ?? []), ...(normalized.ansiStripped ? ["ansi-stripped"] : [])])];
+
+  if (!hasMeaningfulVisibleText(normalized.text)) {
+    return {
+      record: {
+        ...record,
+        plaintextPreview: normalized.text,
+        tags,
+      },
+      converted: options.converted,
+      bestEffortConverted: options.bestEffortConverted,
+      truncatedHexPreview: options.truncatedHexPreview,
+      ansiStripped: normalized.ansiStripped,
+      hiddenReason: "utf8-invisible",
+    };
+  }
+
+  if (isTimestampOnlyText(normalized.text)) {
+    return {
+      record: {
+        ...record,
+        plaintextPreview: normalized.text,
+        tags,
+      },
+      converted: options.converted,
+      bestEffortConverted: options.bestEffortConverted,
+      truncatedHexPreview: options.truncatedHexPreview,
+      ansiStripped: normalized.ansiStripped,
+      hiddenReason: "timestamp-only",
+    };
+  }
+
+  return {
+    record: {
+      ...record,
+      plaintextPreview: normalized.text,
+      tags,
+    },
+    converted: options.converted,
+    bestEffortConverted: options.bestEffortConverted,
+    truncatedHexPreview: options.truncatedHexPreview,
+    ansiStripped: normalized.ansiStripped,
+  };
+}
+
+function decodeBytesToUtf8(bytes: Uint8Array): string | undefined {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+}
+
+function extractBestEffortTextFromBytes(bytes: Uint8Array): string | undefined {
+  let out = "";
+  for (const byte of bytes) {
+    if ((byte >= 0x20 && byte <= 0x7e) || byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0x1b) {
+      out += String.fromCharCode(byte);
+    } else if (out && !out.endsWith(" ")) {
+      out += " ";
+    }
+  }
+  const normalized = normalizePreviewTextForDisplay(out).text;
+  if (!hasMeaningfulVisibleText(normalized)) {
+    return undefined;
+  }
+  if (!hasForensicTextSignal(normalized) && Array.from(normalized).filter((char) => /\S/.test(char)).length < 6) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function normalizePreviewTextForDisplay(value: string): { text: string; ansiStripped: boolean } {
+  const ansiStripped = stripAnsiControlSequences(value);
+  const controlCleaned = ansiStripped
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f]/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  return {
+    text: controlCleaned.trim(),
+    ansiStripped: ansiStripped !== value,
+  };
+}
+
+function stripAnsiControlSequences(value: string): string {
+  return value
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b[@-Z\\-_]/g, "");
+}
+
+function parseHexPreviewBytes(preview: string, decryptedLength?: number): HexPreviewBytes | undefined {
+  const normalized = preview.trim();
+  if (!normalized || normalized.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(normalized)) {
+    return undefined;
+  }
+  const byteLength = normalized.length / 2;
+  const expectedLength = decryptedLength && decryptedLength > 0 ? decryptedLength : undefined;
+  if (expectedLength !== undefined && byteLength > expectedLength) {
+    return undefined;
+  }
+  const bytes = new Uint8Array(byteLength);
+  for (let index = 0; index < normalized.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
+  }
+  return {
+    bytes,
+    truncated: expectedLength !== undefined && byteLength < expectedLength,
+  };
+}
+
+function hasMeaningfulVisibleText(value: string): boolean {
+  const normalized = stripAnsiControlSequences(value).replace(/[\u0000-\u001f\u007f]/g, "");
+  const visibleChars = Array.from(normalized).filter((char) => /\S/.test(char));
+  if (visibleChars.length < 2) {
+    return false;
+  }
+  if (hasForensicTextSignal(normalized)) {
+    return true;
+  }
+  const meaningfulChars = visibleChars.filter((char) => /[\p{L}\p{N}_{}\[\]:"'./\\=&()\-]/u.test(char));
+  if (meaningfulChars.length >= 3) {
+    return true;
+  }
+  return false;
+}
+
+function isTimestampOnlyText(value: string): boolean {
+  const normalized = stripAnsiControlSequences(value).trim();
+  if (!normalized) {
+    return false;
+  }
+  if (/^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?$/.test(normalized)) {
+    return true;
+  }
+  if (/^\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(normalized)) {
+    return true;
+  }
+  if (/^\d{10}$/.test(normalized)) {
+    const epochMs = Number(normalized) * 1000;
+    return epochMs >= Date.UTC(2000, 0, 1) && epochMs <= Date.UTC(2100, 0, 1);
+  }
+  if (/^\d{13}$/.test(normalized)) {
+    const epochMs = Number(normalized);
+    return epochMs >= Date.UTC(2000, 0, 1) && epochMs <= Date.UTC(2100, 0, 1);
+  }
+  return false;
+}
+
+function hasForensicTextSignal(value: string): boolean {
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+  if (/^\s*[\[{]/.test(value)) {
+    return true;
+  }
+  if (/\b(?:ok|id|ip|cmd|whoami|powershell|verifykey|hacked_by|fallsnow|paperplane)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/\b\d+(?:\.\d+){1,3}\b/.test(normalized)) {
+    return true;
+  }
+  if (/(?:[A-Za-z]:\\|\\\\|\/(?:bin|etc|home|tmp|usr|var)\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.test(normalized)) {
+    return true;
+  }
+  if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(normalized)) {
+    return true;
+  }
+  return /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\b/.test(normalized);
+}
+
+export function isLikelyVShellLowInfoControlRecord(record: C2DecryptedRecord): boolean {
+  if (record.error || (record.parsed && Object.keys(record.parsed).length > 0)) {
+    return false;
+  }
+
+  const decryptedLength = record.decryptedLength ?? 0;
+  if (decryptedLength <= 0 || decryptedLength > vshellLowInfoControlMaxBytes) {
+    return false;
+  }
+
+  const preview = String(record.plaintextPreview ?? "");
+  if (!preview) {
+    return decryptedLength <= 4;
+  }
+
+  const hexDecision = isLowInfoHexPreview(preview.trim(), decryptedLength);
+  if (hexDecision !== undefined) {
+    return hexDecision;
+  }
+
+  if (hasMeaningfulVisibleText(preview)) {
+    return false;
+  }
+
+  const visibleAsciiCount = Array.from(preview).filter((char) => char >= " " && char <= "~").length;
+  return visibleAsciiCount <= 1 || visibleAsciiCount / Math.max(1, Array.from(preview).length) < 0.35;
+}
+
+function isLowInfoHexPreview(preview: string, decryptedLength: number): boolean | undefined {
+  const parsed = parseHexPreviewBytes(preview, decryptedLength);
+  const bytes = parsed?.bytes;
+  if (!bytes || bytes.length === 0 || bytes.length > vshellLowInfoControlMaxBytes) {
+    return undefined;
+  }
+
+  const visibleAsciiBytes = Array.from(bytes).filter((byte) => byte >= 0x20 && byte <= 0x7e);
+  const visibleAsciiText = String.fromCharCode(...visibleAsciiBytes);
+  if (hasForensicTextSignal(visibleAsciiText)) {
+    return false;
+  }
+
+  const meaningfulVisibleBytes = visibleAsciiBytes.filter((byte) => (
+    (byte >= 0x30 && byte <= 0x39)
+    || (byte >= 0x41 && byte <= 0x5a)
+    || (byte >= 0x61 && byte <= 0x7a)
+    || byte === 0x2e
+    || byte === 0x2f
+    || byte === 0x5f
+    || byte === 0x2d
+    || byte === 0x3a
+    || byte === 0x7b
+    || byte === 0x7d
+  ));
+  if (meaningfulVisibleBytes.length >= 2 && visibleAsciiBytes.length / bytes.length >= 0.35) {
+    return false;
+  }
+
+  return true;
+}
+
 function asStreamLoadMeta(input: any): HttpStream["loadMeta"] {
   if (!input || typeof input !== "object") {
     return undefined;
@@ -407,15 +800,6 @@ async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
     throw new Error(detail || `backend request failed: ${res.status} ${res.statusText}`);
   }
   return await res.blob();
-}
-
-function downloadBlob(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function getDesktopAppBinding(): DesktopAppBinding | undefined {
@@ -653,15 +1037,20 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async startStreamingPackets(filePath: string, filter: string) {
+  async startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal) {
     await request("/api/capture/start", {
       method: "POST",
+      signal,
       body: JSON.stringify({ file_path: filePath, display_filter: filter, max_packets: 0, emit_packets: false, fast_list: true }),
     });
   },
 
   async stopStreamingPackets() {
     await request("/api/capture/stop", { method: "POST" });
+  },
+
+  async prepareCaptureReplacement() {
+    await request("/api/capture/prepare-replacement", { method: "POST" });
   },
 
   async closeCapture() {
@@ -708,7 +1097,7 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async locatePacketPage(packetId: number, limit: number, filter = "") {
+  async locatePacketPage(packetId: number, limit: number, filter = "", signal?: AbortSignal) {
     const query = new URLSearchParams({
       id: String(packetId),
       limit: String(limit),
@@ -716,7 +1105,7 @@ export const bridge: BackendBridge = {
     if (filter.trim()) {
       query.set("filter", filter);
     }
-    const payload = await request<any>(`/api/packets/locate?${query.toString()}`);
+    const payload = await request<any>(`/api/packets/locate?${query.toString()}`, { signal });
     return {
       packetId: Number(payload.packet_id ?? packetId),
       cursor: Number(payload.cursor ?? 0),
@@ -725,8 +1114,8 @@ export const bridge: BackendBridge = {
     };
   },
 
-  async getPacket(packetId: number) {
-    const payload = await request<any>(`/api/packet?id=${encodeURIComponent(String(packetId))}`);
+  async getPacket(packetId: number, signal?: AbortSignal) {
+    const payload = await request<any>(`/api/packet?id=${encodeURIComponent(String(packetId))}`, { signal });
     return asPacket(payload);
   },
 
@@ -838,6 +1227,9 @@ export const bridge: BackendBridge = {
             confidence: Number(item.confidence ?? 0) || undefined,
             decoderHints: Array.isArray(item.decoder_hints) ? item.decoder_hints.map((x: unknown) => String(x ?? "")) : [],
             fingerprints: Array.isArray(item.fingerprints) ? item.fingerprints.map((x: unknown) => String(x ?? "")) : [],
+            familyHint: String(item.family_hint ?? "") || undefined,
+            decoderOptionsHint: asPlainObject(item.decoder_options_hint),
+            sourceRole: String(item.source_role ?? "") || undefined,
           }))
         : [],
       suggestedCandidateId: String(result.suggested_candidate_id ?? "") || undefined,
@@ -846,6 +1238,39 @@ export const bridge: BackendBridge = {
       confidence: Number(result.confidence ?? 0) || undefined,
       reasons: Array.isArray(result.reasons) ? result.reasons.map((item: unknown) => String(item ?? "")) : [],
     } as StreamPayloadInspection;
+  },
+
+  async listStreamPayloadSources(signal?: AbortSignal, limit = 500) {
+    const query = new URLSearchParams();
+    query.set("limit", String(limit));
+    const payload = await request<any[]>(`/api/streams/payload-sources?${query.toString()}`, { signal });
+    return Array.isArray(payload)
+      ? payload.map((item: any) => ({
+          id: String(item.id ?? ""),
+          method: String(item.method ?? "") || undefined,
+          host: String(item.host ?? "") || undefined,
+          uri: String(item.uri ?? "") || undefined,
+          packetId: Number(item.packet_id ?? 0),
+          streamId: Number(item.stream_id ?? 0) || undefined,
+          sourceType: String(item.source_type ?? "") || undefined,
+          paramName: String(item.param_name ?? "") || undefined,
+          payload: String(item.payload ?? ""),
+          preview: String(item.preview ?? "") || undefined,
+          confidence: Number(item.confidence ?? 0) || undefined,
+          signals: Array.isArray(item.signals) ? item.signals.map((value: unknown) => String(value ?? "")) : [],
+          decoderHints: Array.isArray(item.decoder_hints) ? item.decoder_hints.map((value: unknown) => String(value ?? "")) : [],
+          familyHint: String(item.family_hint ?? "") || undefined,
+          decoderOptionsHint: asPlainObject(item.decoder_options_hint),
+          sourceRole: String(item.source_role ?? "") || undefined,
+          contentType: String(item.content_type ?? "") || undefined,
+          occurrenceCount: Number(item.occurrence_count ?? 0) || undefined,
+          firstTime: String(item.first_time ?? "") || undefined,
+          lastTime: String(item.last_time ?? "") || undefined,
+          repeatWindowSeconds: Number(item.repeat_window_seconds ?? 0) || undefined,
+          relatedPackets: Array.isArray(item.related_packets) ? item.related_packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
+          ruleReasons: Array.isArray(item.rule_reasons) ? item.rule_reasons.map((value: unknown) => String(value ?? "")) : [],
+        }))
+      : [];
   },
 
   async updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal) {
@@ -861,8 +1286,8 @@ export const bridge: BackendBridge = {
     return protocol === "HTTP" ? asHttpStream(payload) : asBinaryStream(payload, protocol);
   },
 
-  async listStreamIds(protocol: "HTTP" | "TCP" | "UDP") {
-    const payload = await request<any>(`/api/streams/index?protocol=${encodeURIComponent(protocol)}`);
+  async listStreamIds(protocol: "HTTP" | "TCP" | "UDP", signal?: AbortSignal) {
+    const payload = await request<any>(`/api/streams/index?protocol=${encodeURIComponent(protocol)}`, { signal });
     const ids = Array.isArray(payload.ids) ? payload.ids : [];
     return ids
       .map((id: unknown) => Number(id))
@@ -870,13 +1295,13 @@ export const bridge: BackendBridge = {
       .sort((a: number, b: number) => a - b);
   },
 
-  async getPacketRawHex(packetId: number) {
-    const payload = await request<any>(`/api/packet/raw?id=${encodeURIComponent(String(packetId))}`);
+  async getPacketRawHex(packetId: number, signal?: AbortSignal) {
+    const payload = await request<any>(`/api/packet/raw?id=${encodeURIComponent(String(packetId))}`, { signal });
     return String(payload.raw_hex ?? "");
   },
 
-  async getPacketLayers(packetId: number) {
-    const payload = await request<any>(`/api/packet/layers?id=${encodeURIComponent(String(packetId))}`);
+  async getPacketLayers(packetId: number, signal?: AbortSignal) {
+    const payload = await request<any>(`/api/packet/layers?id=${encodeURIComponent(String(packetId))}`, { signal });
     const layers = payload.layers;
     if (layers && typeof layers === "object" && !Array.isArray(layers)) {
       return layers as Record<string, unknown>;
@@ -1551,6 +1976,51 @@ export const bridge: BackendBridge = {
     } as C2SampleAnalysis;
   },
 
+  async decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal) {
+    const payload = await request<any>("/api/c2-analysis/decrypt", {
+      method: "POST",
+      signal,
+      body: JSON.stringify({
+        family: req.family,
+        scope: req.scope
+          ? {
+              packet_ids: req.scope.packetIds ?? [],
+              stream_ids: req.scope.streamIds ?? [],
+              use_candidates: Boolean(req.scope.useCandidates),
+              use_aggregates: Boolean(req.scope.useAggregates),
+            }
+          : undefined,
+        vshell: req.vshell
+          ? {
+              vkey: req.vshell.vkey,
+              salt: req.vshell.salt,
+              mode: req.vshell.mode,
+            }
+          : undefined,
+        cs: req.cs
+          ? {
+              key_mode: req.cs.keyMode,
+              aes_key: req.cs.aesKey,
+              hmac_key: req.cs.hmacKey,
+              aes_rand: req.cs.aesRand,
+              rsa_private_key: req.cs.rsaPrivateKey,
+              transform_mode: req.cs.transformMode,
+            }
+          : undefined,
+      }),
+    });
+    const result: C2DecryptResult = {
+      family: String(payload.family ?? req.family) === "vshell" ? "vshell" : "cs",
+      status: String(payload.status ?? "failed"),
+      totalCandidates: Number(payload.total_candidates ?? 0),
+      decryptedCount: Number(payload.decrypted_count ?? 0),
+      failedCount: Number(payload.failed_count ?? 0),
+      records: Array.isArray(payload.records) ? payload.records.map(asC2DecryptedRecord) : [],
+      notes: Array.isArray(payload.notes) ? payload.notes.map((value: unknown) => String(value ?? "")) : [],
+    };
+    return normalizeC2DecryptResultForDisplay(result);
+  },
+
   async getAPTAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/apt-analysis", { signal });
     const asAPTScoreFactor = (item: any) => ({
@@ -1856,13 +2326,7 @@ export const bridge: BackendBridge = {
       }
       throw new Error(message);
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(filename, await response.blob());
   },
 
   async listMiscModules() {
@@ -2429,6 +2893,13 @@ function asToolRuntimeSnapshot(input: any): ToolRuntimeSnapshot {
       timeoutMs: Number(input?.yara?.timeout_ms ?? 0) || 25000,
     },
   };
+}
+
+function asPlainObject(input: unknown): Record<string, unknown> | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+  return input as Record<string, unknown>;
 }
 
 function asConversation(input: any) {

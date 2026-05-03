@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -167,6 +168,229 @@ func TestClearCaptureResetsPacketStore(t *testing.T) {
 	if _, err := os.Stat(pathBefore); !os.IsNotExist(err) {
 		t.Fatalf("expected old packet db to be removed, stat err=%v", err)
 	}
+}
+
+func TestPrepareCaptureReplacementInvalidatesActiveRun(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	streamCtx, streamCancel := context.WithCancel(context.Background())
+	filterCtx, filterCancel := context.WithCancel(context.Background())
+	svc.mu.Lock()
+	svc.cancel = streamCancel
+	svc.displayFilterCache = map[string]*filteredPacketIndex{
+		"tcp": newFilteredPacketIndex(filterCancel),
+	}
+	svc.displayFilterCacheOrder = []string{"tcp"}
+	svc.mu.Unlock()
+	atomic.StoreInt64(&svc.runID, 41)
+
+	svc.PrepareCaptureReplacement()
+
+	if got := atomic.LoadInt64(&svc.runID); got != 42 {
+		t.Fatalf("expected replacement to invalidate previous runID, got %d", got)
+	}
+	select {
+	case <-streamCtx.Done():
+	default:
+		t.Fatal("expected active capture context to be cancelled")
+	}
+	select {
+	case <-filterCtx.Done():
+	default:
+		t.Fatal("expected display filter cache context to be cancelled")
+	}
+	if len(svc.displayFilterCache) != 0 {
+		t.Fatalf("expected display filter cache to be cleared, got %d entries", len(svc.displayFilterCache))
+	}
+}
+
+func TestClearCaptureCancelsActiveLoad(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldStream := streamPacketsFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFn = oldStream
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 0, nil
+	}
+	started := make(chan struct{})
+	streamPacketsFn = func(ctx context.Context, _ model.ParseOptions, _ func(model.Packet) error, _ func(int)) error {
+		close(started)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	capture := writeTempCaptureFile(t)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture})
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("expected load to start")
+	}
+
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected active load to be canceled, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected active load goroutine to exit after close")
+	}
+}
+
+func TestPendingLoadRunHonorsCloseBeforeGoroutineStarts(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+	})
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		t.Fatal("estimatePacketsFn should not be called for a closed pending run")
+		return 0, nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	capture := writeTempCaptureFile(t)
+
+	runID, runCtx := svc.BeginCaptureLoad(context.Background())
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+
+	err := svc.LoadPCAPWithRun(runCtx, model.ParseOptions{FilePath: capture}, runID)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected closed pending run to be canceled, got %v", err)
+	}
+	if got := svc.packetStore.Count(); got != 0 {
+		t.Fatalf("expected no packets to be written by canceled pending run, got %d", got)
+	}
+}
+
+func TestClearCaptureCancelsTrackedCaptureTasks(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "unit-test-task")
+	defer finishTask()
+	if got := svc.ActiveCaptureTaskCount(); got != 1 {
+		t.Fatalf("expected one active capture task, got %d", got)
+	}
+
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+
+	select {
+	case <-taskCtx.Done():
+	default:
+		t.Fatal("expected ClearCapture to cancel tracked capture task")
+	}
+	if got := svc.ActiveCaptureTaskCount(); got != 0 {
+		t.Fatalf("expected tracked capture tasks to be cleared, got %d", got)
+	}
+}
+
+func TestPrepareCaptureReplacementCancelsTrackedCaptureTasks(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "replacement-task")
+	defer finishTask()
+
+	svc.PrepareCaptureReplacement()
+
+	select {
+	case <-taskCtx.Done():
+	default:
+		t.Fatal("expected PrepareCaptureReplacement to cancel tracked capture task")
+	}
+	if got := svc.ActiveCaptureTaskCount(); got != 0 {
+		t.Fatalf("expected tracked capture tasks to be cleared, got %d", got)
+	}
+}
+
+func TestLoadPCAPReplacementCancelsPreviousLoad(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldStream := streamPacketsFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFn = oldStream
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 0, nil
+	}
+	startedFirst := make(chan struct{})
+	var calls atomic.Int32
+	streamPacketsFn = func(ctx context.Context, opts model.ParseOptions, onPacket func(model.Packet) error, _ func(int)) error {
+		call := calls.Add(1)
+		if call == 1 {
+			close(startedFirst)
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return onPacket(model.Packet{ID: 2, Protocol: "HTTP", Info: "GET /replacement", Payload: opts.FilePath})
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	first := writeTempCaptureFile(t)
+	second := writeTempCaptureFile(t)
+
+	firstDone := make(chan error, 1)
+	go func() {
+		firstDone <- svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: first})
+	}()
+	select {
+	case <-startedFirst:
+	case <-time.After(time.Second):
+		t.Fatal("expected first load to start")
+	}
+
+	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: second}); err != nil {
+		t.Fatalf("replacement LoadPCAP() error = %v", err)
+	}
+	select {
+	case err := <-firstDone:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected first load to be canceled, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected first load to exit after replacement")
+	}
+	if got := svc.packetStore.Count(); got != 1 {
+		t.Fatalf("expected replacement packet store to contain one packet, got %d", got)
+	}
+}
+
+func writeTempCaptureFile(t *testing.T) string {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "capture-*.pcap")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	if _, err := file.WriteString("placeholder"); err != nil {
+		_ = file.Close()
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	return file.Name()
 }
 
 func TestThreatHuntStreamsFromPacketStore(t *testing.T) {

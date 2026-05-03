@@ -1126,6 +1126,8 @@ func extractPayload(node map[string]any, layers map[string]any) string {
 	if s := pickFirstString(
 		findStringByPath(node, "layers.http.http_file_data"),
 		findStringByPath(node, "layers.data.data_data"),
+		findStringByPath(node, "layers.websocket.websocket.payload"),
+		findStringByPath(node, "layers.websocket.websocket_payload"),
 		findStringByPath(node, "layers.tcp.tcp_payload"),
 		findStringByPath(node, "layers.usb.usb_frame_data"),
 		findStringByPath(node, "layers.usb.usb_control_response"),
@@ -1135,6 +1137,7 @@ func extractPayload(node map[string]any, layers map[string]any) string {
 		findBySuffix(layers, "httpresponseline"),
 		findBySuffix(layers, "httpfiledata"),
 		findBySuffix(layers, "datadata"),
+		findBySuffix(layers, "websocketpayload"),
 		findBySuffix(layers, "tcppayload"),
 		findBySuffix(layers, "usbframedata"),
 		findBySuffix(layers, "usbcontrolresponse"),

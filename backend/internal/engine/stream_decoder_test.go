@@ -401,6 +401,68 @@ func TestDecodeStreamPayloadGodzillaAESCBC(t *testing.T) {
 	}
 }
 
+func TestDecodeStreamPayloadWebShellManualFailuresExplainStage(t *testing.T) {
+	cases := []struct {
+		name     string
+		decoder  string
+		payload  string
+		options  map[string]any
+		expected string
+	}{
+		{
+			name:     "behinder empty payload",
+			decoder:  "behinder",
+			payload:  "   ",
+			options:  map[string]any{"pass": "rebeyond", "deriveKeyFromPass": true},
+			expected: "未提取到冰蝎密文",
+		},
+		{
+			name:     "antsword empty payload",
+			decoder:  "antsword",
+			payload:  "   ",
+			options:  map[string]any{"pass": "pass", "extractParam": true},
+			expected: "未提取到蚁剑载荷",
+		},
+		{
+			name:     "godzilla empty payload",
+			decoder:  "godzilla",
+			payload:  "   ",
+			options:  map[string]any{"pass": "pass", "key": "key123", "extractParam": true},
+			expected: "未提取到哥斯拉载荷",
+		},
+		{
+			name:     "godzilla missing key",
+			decoder:  "godzilla",
+			payload:  base64.StdEncoding.EncodeToString([]byte("cipher-block-demo")),
+			options:  map[string]any{"pass": "pass", "cipher": "xor", "inputEncoding": "base64"},
+			expected: "哥斯拉解密需要 key",
+		},
+		{
+			name:     "godzilla unsupported cipher",
+			decoder:  "godzilla",
+			payload:  base64.StdEncoding.EncodeToString([]byte("cipher-block-demo")),
+			options:  map[string]any{"pass": "pass", "key": "key123", "cipher": "rc4", "inputEncoding": "base64"},
+			expected: "unsupported godzilla cipher",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := DecodeStreamPayload(StreamDecodeRequest{
+				Decoder: tc.decoder,
+				Payload: tc.payload,
+				Options: tc.options,
+			})
+			if err == nil {
+				t.Fatal("expected readable failure-stage error")
+			}
+			if !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("expected error to contain %q, got: %v", tc.expected, err)
+			}
+		})
+	}
+}
+
 func TestDecodeStreamPayloadAutoBase64(t *testing.T) {
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
 		Decoder: "auto",
@@ -411,6 +473,36 @@ func TestDecodeStreamPayloadAutoBase64(t *testing.T) {
 	}
 	if result.Text != "Hello Auto Detect" {
 		t.Fatalf("unexpected auto text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadAutoHintedGodzillaRequiresKey(t *testing.T) {
+	raw := "7f0e6f=" + url.QueryEscape(base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x13}, 16)))
+
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "auto",
+		Payload: raw,
+	})
+	if err == nil {
+		t.Fatal("expected Godzilla key error")
+	}
+	if !strings.Contains(err.Error(), "哥斯拉解密需要 key") {
+		t.Fatalf("expected Godzilla key error, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadAutoHintedAntSwordNumericParam(t *testing.T) {
+	raw := "1=" + url.QueryEscape(base64.StdEncoding.EncodeToString([]byte("assert($_POST['cmd']);")))
+
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "auto",
+		Payload: raw,
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(auto hinted AntSword) error = %v", err)
+	}
+	if !strings.Contains(result.Text, "assert($_POST['cmd']);") {
+		t.Fatalf("unexpected auto hinted AntSword text: %q", result.Text)
 	}
 }
 

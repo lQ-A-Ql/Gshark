@@ -54,7 +54,7 @@ function createAnalysis(overrides: Partial<APTAnalysis> = {}): APTAnalysis {
         id: "silver-fox",
         name: "Silver Fox / 银狐",
         aliases: ["Swimming Snake", "银狐"],
-        summary: "预置 APT 画像骨架",
+        summary: "Silver Fox 画像已接入 C2 证据链，仍需跨模块复核。",
         confidence: 65,
         evidenceCount: 1,
         sampleFamilies: [{ label: "ValleyRAT", count: 1 }],
@@ -101,7 +101,7 @@ function createAnalysis(overrides: Partial<APTAnalysis> = {}): APTAnalysis {
         summary: "C2 技术证据关联 Silver Fox 候选",
       },
     ],
-    notes: ["当前 APT 页仍处于骨架阶段。"],
+    notes: ["APT registry 已接入，未实现组织仅作为框架预置展示。"],
     ...overrides,
   };
 }
@@ -129,7 +129,7 @@ describe("AptAnalysis", () => {
     mocks.getAPTAnalysis.mockResolvedValue(createAnalysis());
   });
 
-  it("renders APT skeleton and Silver Fox actor profile", async () => {
+  it("renders APT registry and Silver Fox actor profile", async () => {
     render(<AptAnalysis />);
 
     await waitFor(() => {
@@ -138,6 +138,12 @@ describe("AptAnalysis", () => {
       expect(screen.getAllByText("样本家族").length).toBeGreaterThan(0);
       expect(screen.getAllByText("ValleyRAT").length).toBeGreaterThan(0);
       expect(screen.getAllByText("https-c2").length).toBeGreaterThan(0);
+      expect(screen.getByText("APT28 / Fancy Bear")).toBeInTheDocument();
+      expect(screen.getByText("Lazarus Group")).toBeInTheDocument();
+      expect(screen.getAllByText("已接入检测").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("框架预置").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("待样本验证").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("不参与本轮评分").length).toBeGreaterThan(0);
       expect(screen.getByText("C2 Evidence")).toBeInTheDocument();
       expect(screen.getByText("Delivery / Object")).toBeInTheDocument();
       expect(screen.getAllByText(/c2-analysis · c2-indicator/).length).toBeGreaterThan(0);

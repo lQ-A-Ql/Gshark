@@ -1,121 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Activity, BarChart3, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { StatusHint } from "../components/DesignSystem";
 import { AnalysisEmptyState, AnalysisPanel, AnalysisStatCard } from "../components/analysis/AnalysisPrimitives";
-import { bridge } from "../integrations/wailsBridge";
+import { buildTrafficStatsCacheKey, buildStatsFromPackets, useTrafficGraph } from "../features/traffic/useTrafficGraph";
 import { useSentinel } from "../state/SentinelContext";
-import type { Packet, GlobalTrafficStats } from "../core/types";
+
+export { buildTrafficStatsCacheKey, buildStatsFromPackets };
 
 interface Bucket {
   label: string;
   count: number;
 }
 
-const EMPTY_STATS: GlobalTrafficStats = {
-  totalPackets: 0,
-  protocolKinds: 0,
-  timeline: [],
-  protocolDist: [],
-  topTalkers: [],
-  topHostnames: [],
-  topDomains: [],
-  topSrcIPs: [],
-  topDstIPs: [],
-  topComputerNames: [],
-  topDestPorts: [],
-  topSrcPorts: [],
-};
-
-const trafficStatsCache = new Map<string, GlobalTrafficStats>();
-
 export default function TrafficGraph() {
   const navigate = useNavigate();
   const { totalPackets, backendConnected, isPreloadingCapture, fileMeta, setDisplayFilter, applyFilter, captureRevision } = useSentinel();
-  const captureCacheKey = useMemo(() => {
-    return buildTrafficStatsCacheKey(captureRevision, fileMeta.path, totalPackets);
-  }, [captureRevision, fileMeta.path, totalPackets]);
-  const [stats, setStats] = useState<GlobalTrafficStats>(EMPTY_STATS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const requestAbortRef = useRef<AbortController | null>(null);
-  const requestSeqRef = useRef(0);
-
-  const refreshStats = useCallback((force = false) => {
-    if (!backendConnected) {
-      setStats(EMPTY_STATS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    if (!force && captureCacheKey && trafficStatsCache.has(captureCacheKey)) {
-      setStats(trafficStatsCache.get(captureCacheKey) ?? EMPTY_STATS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    requestAbortRef.current?.abort();
-    const abortController = new AbortController();
-    requestAbortRef.current = abortController;
-    const requestSeq = ++requestSeqRef.current;
-    const isLatest = () => requestSeq === requestSeqRef.current;
-    void bridge
-      .getGlobalTrafficStats(abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (captureCacheKey) {
-          trafficStatsCache.set(captureCacheKey, payload);
-        }
-        setStats(payload);
-      })
-      .catch(async (e) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        // Backward compatibility for old backend without global stats endpoint.
-        try {
-          const packets = await bridge.listPackets();
-          if (!isLatest()) return;
-          const fallback = buildStatsFromPackets(packets);
-          if (captureCacheKey) {
-            trafficStatsCache.set(captureCacheKey, fallback);
-          }
-          setStats(fallback);
-          setError("");
-          return;
-        } catch {
-          const msg = e instanceof Error ? e.message : "全局流量统计加载失败";
-          setError(msg);
-          setStats(EMPTY_STATS);
-        }
-      })
-      .finally(() => {
-        if (requestAbortRef.current === abortController) {
-          requestAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      abortController.abort();
-      if (requestAbortRef.current === abortController) {
-        requestAbortRef.current = null;
-      }
-    };
-  }, [backendConnected, captureCacheKey]);
-
-  useEffect(() => () => {
-    requestAbortRef.current?.abort();
-  }, []);
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshStats();
-  }, [refreshStats, isPreloadingCapture]);
+  const { stats, loading, error, refreshStats } = useTrafficGraph({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+  });
 
   const timeline = useMemo(() => stats.timeline, [stats.timeline]);
   const protocolDist = useMemo(() => stats.protocolDist, [stats.protocolDist]);
@@ -146,15 +55,13 @@ export default function TrafficGraph() {
         onRefresh={() => refreshStats(true)}
       />
 
-      {loading && (
-        <div className="mb-3 rounded-2xl border border-amber-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在加载全局流量统计...</div>
-      )}
+      {loading && <StatusHint tone="slate" className="mb-3">正在加载全局流量统计...</StatusHint>}
 
       {!loading && error && (
-        <div className="mb-3 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">
+        <StatusHint tone="amber" className="mb-3 flex items-center justify-between">
           <span>{error}</span>
           <button className="rounded-full border border-amber-200 bg-white/90 px-3 py-1 font-semibold shadow-sm transition-all hover:bg-amber-100" onClick={() => refreshStats(true)}>重试</button>
-        </div>
+        </StatusHint>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -200,154 +107,6 @@ export default function TrafficGraph() {
       </div>
     </PageShell>
   );
-}
-
-export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
-  const timelineMap = new Map<string, number>();
-  const protocolMap = new Map<string, number>();
-  const talkerMap = new Map<string, number>();
-  const srcIPMap = new Map<string, number>();
-  const dstIPMap = new Map<string, number>();
-  const domainMap = new Map<string, number>();
-  const computerNameMap = new Map<string, number>();
-  const dstPortMap = new Map<string, number>();
-  const srcPortMap = new Map<string, number>();
-
-  for (const p of packets) {
-    const sec = (p.time || "").slice(0, 8) || "--:--:--";
-    timelineMap.set(sec, (timelineMap.get(sec) ?? 0) + 1);
-
-    const proto = String(p.displayProtocol || p.proto || "OTHER").toUpperCase();
-    protocolMap.set(proto, (protocolMap.get(proto) ?? 0) + 1);
-
-    const srcIP = String(p.src || "").trim();
-    const dstIP = String(p.dst || "").trim();
-    if (srcIP) {
-      srcIPMap.set(srcIP, (srcIPMap.get(srcIP) ?? 0) + 1);
-      talkerMap.set(srcIP, (talkerMap.get(srcIP) ?? 0) + 1);
-    }
-    if (dstIP) {
-      dstIPMap.set(dstIP, (dstIPMap.get(dstIP) ?? 0) + 1);
-      talkerMap.set(dstIP, (talkerMap.get(dstIP) ?? 0) + 1);
-    }
-    if (!srcIP && !dstIP) {
-      talkerMap.set("unknown", (talkerMap.get("unknown") ?? 0) + 1);
-    }
-
-    const domain = extractDomain(p);
-    if (domain) {
-      domainMap.set(domain, (domainMap.get(domain) ?? 0) + 1);
-    }
-
-    const computerName = extractComputerName(p);
-    if (computerName) {
-      computerNameMap.set(computerName, (computerNameMap.get(computerName) ?? 0) + 1);
-    }
-
-    if (p.dstPort > 0) {
-      const label = String(p.dstPort);
-      dstPortMap.set(label, (dstPortMap.get(label) ?? 0) + 1);
-    }
-    if (p.srcPort > 0) {
-      const label = String(p.srcPort);
-      srcPortMap.set(label, (srcPortMap.get(label) ?? 0) + 1);
-    }
-  }
-
-  const timeline = Array.from(timelineMap.entries())
-    .sort((a, b) => (a[0] > b[0] ? 1 : -1))
-    .map(([label, count]) => ({ label, count }));
-
-  const protocolDist = Array.from(protocolMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topTalkers = Array.from(talkerMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topSrcIPs = Array.from(srcIPMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topDstIPs = Array.from(dstIPMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topDomains = Array.from(domainMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topComputerNames = Array.from(computerNameMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topDestPorts = Array.from(dstPortMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const topSrcPorts = Array.from(srcPortMap.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  return {
-    totalPackets: packets.length,
-    protocolKinds: protocolMap.size,
-    timeline,
-    protocolDist,
-    topTalkers,
-    topHostnames: topDomains,
-    topDomains,
-    topSrcIPs,
-    topDstIPs,
-    topComputerNames,
-    topDestPorts,
-    topSrcPorts,
-  };
-}
-
-export function buildTrafficStatsCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
-  const normalizedPath = filePath.trim();
-  if (!normalizedPath) return "";
-  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
-}
-
-function extractDomain(packet: Packet): string {
-  const info = `${packet.info ?? ""}\n${packet.payload ?? ""}`;
-  const patterns = [
-    /(?:^|\n)Host:\s*([^\s\r\n]+)/i,
-    /\bServer Name:\s*([^\s\r\n]+)/i,
-    /\bSNI:\s*([^\s\r\n]+)/i,
-    /\b(?:A|AAAA|CNAME|Query|Request)\s+([a-z0-9.-]+\.[a-z]{2,})\b/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = info.match(pattern);
-    if (match?.[1]) {
-      return match[1].trim().toLowerCase();
-    }
-  }
-  return "";
-}
-
-function extractComputerName(packet: Packet): string {
-  const info = `${packet.info ?? ""}\n${packet.payload ?? ""}`;
-  const patterns = [
-    /\bNBNS\b.*?\b([A-Z0-9_-]{2,})(?:<[\dA-F]{2}>)?/i,
-    /\bComputer Name:\s*([^\s\r\n]+)/i,
-    /\bHostname:\s*([^\s\r\n]+)/i,
-    /\bServer Name:\s*([^\s\r\n]+)/i,
-    /\bNETBIOS(?: NAME)?\s*[:=]\s*([^\s\r\n]+)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = info.match(pattern);
-    if (!match?.[1]) continue;
-    const normalized = match[1].trim().replace(/<[\dA-F]{2}>$/i, "");
-    if (!normalized || normalized.includes(".")) continue;
-    return normalized.toUpperCase();
-  }
-  return "";
 }
 
 function SimpleBarChart({

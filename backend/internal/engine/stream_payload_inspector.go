@@ -12,18 +12,23 @@ import (
 )
 
 var (
-	antSwordChrPattern   = regexp.MustCompile(`(?i)(chr\(\d+\)\s*\.?){3,}`)
-	antSwordEvalPattern  = regexp.MustCompile(`(?i)(assert|eval)\s*\(|base64_decode\s*\(|system\s*\(|exec\s*\(`)
-	webshellParamPattern = regexp.MustCompile(`(?i)^(pass|password|pwd|cmd|assert|data|payload|rebeyond|ant|shell|key)$`)
+	antSwordChrPattern          = regexp.MustCompile(`(?i)(chr\(\d+\)\s*\.?){3,}`)
+	antSwordEvalPattern         = regexp.MustCompile(`(?i)(assert|eval)\s*\(|base64_decode\s*\(|system\s*\(|exec\s*\(`)
+	webshellParamPattern        = regexp.MustCompile(`(?i)^(pass|password|pwd|cmd|assert|data|payload|rebeyond|ant|shell|key)$`)
+	numericWebshellParamPattern = regexp.MustCompile(`^\d{1,3}$`)
+	randomHexParamPattern       = regexp.MustCompile(`(?i)^[a-f0-9]{5,16}$`)
 )
 
 type payloadFingerprint struct {
-	Family       string
-	Confidence   int
-	Suggested    string
-	Reasons      []string
-	Fingerprints []string
-	DecoderHints []string
+	Family             string
+	Confidence         int
+	Suggested          string
+	Reasons            []string
+	Fingerprints       []string
+	DecoderHints       []string
+	FamilyHint         string
+	DecoderOptionsHint map[string]any
+	SourceRole         string
 }
 
 func InspectStreamPayload(raw string) model.StreamPayloadInspection {
@@ -50,6 +55,9 @@ func InspectStreamPayload(raw string) model.StreamPayloadInspection {
 		inspection.Candidates[idx].Confidence = fp.Confidence
 		inspection.Candidates[idx].Fingerprints = append([]string(nil), fp.Fingerprints...)
 		inspection.Candidates[idx].DecoderHints = append([]string(nil), fp.DecoderHints...)
+		inspection.Candidates[idx].FamilyHint = fp.FamilyHint
+		inspection.Candidates[idx].DecoderOptionsHint = cloneDecoderOptionsHint(fp.DecoderOptionsHint)
+		inspection.Candidates[idx].SourceRole = fp.SourceRole
 		if fp.Confidence > bestScore {
 			bestScore = fp.Confidence
 			inspection.SuggestedCandidateID = inspection.Candidates[idx].ID
@@ -60,6 +68,11 @@ func InspectStreamPayload(raw string) model.StreamPayloadInspection {
 		}
 	}
 	return inspection
+}
+
+type inspectionTextVariant struct {
+	label string
+	text  string
 }
 
 func collectInspectionCandidates(raw, normalized string) []model.StreamPayloadCandidate {
@@ -91,37 +104,57 @@ func collectInspectionCandidates(raw, normalized string) []model.StreamPayloadCa
 		})
 	}
 
+	variants := collectInspectionTextVariants(raw, normalized)
 	if strings.TrimSpace(normalized) != "" {
 		add("当前 payload", "payload", "", normalized)
 	}
 
-	for _, item := range collectHTTPParamCandidates(raw) {
-		label := "参数"
-		if item.paramName != "" {
-			label = "参数 " + item.paramName
+	for _, variant := range variants {
+		for _, item := range collectHTTPParamCandidates(variant.text) {
+			label := "参数"
+			if item.paramName != "" {
+				label = "参数 " + item.paramName
+			}
+			if variant.label != "" && variant.label != "当前 payload" {
+				label += " (" + variant.label + ")"
+			}
+			add(label, item.kind, item.paramName, item.value)
 		}
-		add(label, item.kind, item.paramName, item.value)
-	}
-	for _, item := range collectMultipartCandidates(normalized) {
-		label := "分段字段"
-		if item.paramName != "" {
-			label = "分段字段 " + item.paramName
+		for _, item := range collectMultipartCandidates(variant.text) {
+			label := "分段字段"
+			if item.paramName != "" {
+				label = "分段字段 " + item.paramName
+			}
+			if variant.label != "" && variant.label != "当前 payload" {
+				label += " (" + variant.label + ")"
+			}
+			add(label, item.kind, item.paramName, item.value)
 		}
-		add(label, item.kind, item.paramName, item.value)
-	}
-	for _, item := range collectJSONCandidates(normalized) {
-		label := "JSON 字段"
-		if item.paramName != "" {
-			label = "JSON 字段 " + item.paramName
+		for _, item := range collectJSONCandidates(variant.text) {
+			label := "JSON 字段"
+			if item.paramName != "" {
+				label = "JSON 字段 " + item.paramName
+			}
+			if variant.label != "" && variant.label != "当前 payload" {
+				label += " (" + variant.label + ")"
+			}
+			add(label, item.kind, item.paramName, item.value)
 		}
-		add(label, item.kind, item.paramName, item.value)
-	}
 
-	if token := extractBestBase64Candidate(normalized); strings.TrimSpace(token) != "" && token != strings.TrimSpace(normalized) {
-		add("Base64 片段", "token", "", token)
-	}
-	if token := extractEmbeddedHexCandidate(normalized); token != "" && token != strings.TrimSpace(normalized) {
-		add("Hex 片段", "token", "", token)
+		if token := extractBestBase64Candidate(variant.text); strings.TrimSpace(token) != "" && token != strings.TrimSpace(variant.text) {
+			label := "Base64 片段"
+			if variant.label != "" && variant.label != "当前 payload" {
+				label += " (" + variant.label + ")"
+			}
+			add(label, "token", "", token)
+		}
+		if token := extractEmbeddedHexCandidate(variant.text); token != "" && token != strings.TrimSpace(variant.text) {
+			label := "Hex 片段"
+			if variant.label != "" && variant.label != "当前 payload" {
+				label += " (" + variant.label + ")"
+			}
+			add(label, "token", "", token)
+		}
 	}
 
 	result := make([]model.StreamPayloadCandidate, 0, len(out))
@@ -143,6 +176,59 @@ func collectInspectionCandidates(raw, normalized string) []model.StreamPayloadCa
 		return result[i].Label < result[j].Label
 	})
 	return result
+}
+
+func collectInspectionTextVariants(raw, normalized string) []inspectionTextVariant {
+	variants := make([]inspectionTextVariant, 0, 12)
+	seen := map[string]struct{}{}
+	add := func(label, text string) {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return
+		}
+		key := text
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		variants = append(variants, inspectionTextVariant{label: label, text: text})
+	}
+
+	add("当前 payload", normalized)
+	add("原始 payload", raw)
+	for _, item := range append([]inspectionTextVariant(nil), variants...) {
+		if looksLikeHTTPMessage(item.text) {
+			if body := strings.TrimSpace(extractHTTPMessageBody(item.text)); body != "" && body != item.text {
+				add(item.label+" body", body)
+			}
+		}
+	}
+
+	baseCount := len(variants)
+	for i := 0; i < baseCount; i++ {
+		current := variants[i].text
+		for round := 1; round <= 2; round++ {
+			decoded, err := url.QueryUnescape(current)
+			if err != nil || decoded == current {
+				break
+			}
+			current = decoded
+			add(fmt.Sprintf("%s URL 解码 %d 轮", variants[i].label, round), decoded)
+		}
+	}
+
+	baseCount = len(variants)
+	for i := 0; i < baseCount; i++ {
+		if decoded, ok := unwrapHexEncodedText(variants[i].text); ok {
+			add(variants[i].label+" Hex 解包", decoded)
+			if looksLikeHTTPMessage(decoded) {
+				if body := strings.TrimSpace(extractHTTPMessageBody(decoded)); body != "" && body != decoded {
+					add(variants[i].label+" Hex 解包 body", body)
+				}
+			}
+		}
+	}
+	return variants
 }
 
 type inspectionParamCandidate struct {
@@ -335,6 +421,7 @@ func previewPayload(raw string) string {
 
 func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payloadFingerprint {
 	text := strings.TrimSpace(candidate.Value)
+	paramName := strings.TrimSpace(candidate.ParamName)
 	fp := payloadFingerprint{
 		Family:       "plain",
 		Confidence:   15,
@@ -343,10 +430,15 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 		Fingerprints: []string{},
 	}
 
-	if candidate.ParamName != "" && webshellParamPattern.MatchString(candidate.ParamName) {
+	if paramName != "" && webshellParamPattern.MatchString(paramName) {
 		fp.Confidence += 20
 		fp.Reasons = append(fp.Reasons, "参数名命中常见 WebShell/命令执行字段。")
 		fp.Fingerprints = append(fp.Fingerprints, "suspicious-param")
+	}
+	if paramName != "" && numericWebshellParamPattern.MatchString(paramName) {
+		fp.Confidence += 18
+		fp.Reasons = append(fp.Reasons, "参数名是蚁剑常见数字密码字段。")
+		fp.Fingerprints = append(fp.Fingerprints, "numeric-webshell-param")
 	}
 
 	if antSwordChrPattern.MatchString(text) {
@@ -356,6 +448,25 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 		fp.Reasons = append(fp.Reasons, "存在连续 chr() 表达式，极像蚁剑 chr 编码载荷。")
 		fp.DecoderHints = append(fp.DecoderHints, "antsword")
 		fp.Fingerprints = append(fp.Fingerprints, "chr-chain")
+		fp.FamilyHint = "antsword_like"
+		fp.SourceRole = "script_or_command"
+		fp.DecoderOptionsHint = antswordDecoderOptionsHint(paramName)
+		return fp
+	}
+
+	if antSwordEvalPattern.MatchString(text) {
+		fp.Family = "antsword_like"
+		fp.Suggested = "antsword"
+		fp.Confidence = 86
+		if numericWebshellParamPattern.MatchString(paramName) {
+			fp.Confidence = 94
+		}
+		fp.Reasons = append(fp.Reasons, "候选值直接出现 assert/eval/system/exec 等脚本执行特征。")
+		fp.DecoderHints = append(fp.DecoderHints, "antsword", "auto")
+		fp.Fingerprints = append(fp.Fingerprints, "script-keyword")
+		fp.FamilyHint = "antsword_like"
+		fp.SourceRole = "script_or_command"
+		fp.DecoderOptionsHint = antswordDecoderOptionsHint(paramName)
 		return fp
 	}
 
@@ -365,9 +476,15 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 			fp.Family = "antsword_like"
 			fp.Suggested = "antsword"
 			fp.Confidence = 88
+			if numericWebshellParamPattern.MatchString(paramName) {
+				fp.Confidence = 96
+			}
 			fp.Reasons = append(fp.Reasons, "Base64 解码后出现 assert/eval/base64_decode 等脚本特征。")
 			fp.DecoderHints = append(fp.DecoderHints, "antsword", "base64")
 			fp.Fingerprints = append(fp.Fingerprints, "script-after-base64")
+			fp.FamilyHint = "antsword_like"
+			fp.SourceRole = "script_or_command"
+			fp.DecoderOptionsHint = antswordDecoderOptionsHint(paramName)
 			return fp
 		}
 		if len(decoded)%16 == 0 && !printable {
@@ -377,8 +494,29 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 			fp.Reasons = append(fp.Reasons, "候选值 Base64 解码后长度符合 AES 分组且可打印率低，疑似 Behinder/Godzilla 类密文。")
 			fp.DecoderHints = append(fp.DecoderHints, "behinder", "godzilla", "auto")
 			fp.Fingerprints = append(fp.Fingerprints, "base64-aes-block")
-			if candidate.ParamName != "" {
+			fp.SourceRole = "encrypted_blob"
+			fp.DecoderOptionsHint = map[string]any{
+				"extractParam":      paramName != "",
+				"urlDecodeRounds":   1,
+				"inputEncoding":     "base64",
+				"deriveKeyFromPass": true,
+			}
+			if paramName != "" {
 				fp.Confidence += 6
+				fp.DecoderOptionsHint["pass"] = paramName
+			}
+			if isLikelyGodzillaParam(paramName) {
+				fp.Family = "godzilla_like"
+				fp.Suggested = "godzilla"
+				fp.Confidence = 90
+				fp.Reasons = append(fp.Reasons, "参数名形态符合哥斯拉随机字段，候选值是 Base64 AES 分组密文。")
+				fp.DecoderHints = append([]string{"godzilla", "auto"}, removeDecodeHint(fp.DecoderHints, "godzilla")...)
+				fp.Fingerprints = append(fp.Fingerprints, "godzilla-random-param")
+				fp.FamilyHint = "godzilla_like"
+				fp.DecoderOptionsHint = godzillaDecoderOptionsHint(paramName)
+			} else {
+				fp.FamilyHint = "aes_webshell_like"
+				fp.DecoderOptionsHint["decoder"] = "behinder"
 			}
 			return fp
 		}
@@ -389,6 +527,13 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 			fp.Reasons = append(fp.Reasons, "候选值可直接做 Base64 明文还原。")
 			fp.DecoderHints = append(fp.DecoderHints, "base64", "auto")
 			fp.Fingerprints = append(fp.Fingerprints, "printable-base64")
+			if paramName != "" {
+				fp.DecoderOptionsHint = map[string]any{
+					"pass":          paramName,
+					"extractParam":  true,
+					"inputEncoding": "base64",
+				}
+			}
 			return fp
 		}
 	}
@@ -402,6 +547,27 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 			fp.Reasons = append(fp.Reasons, "候选值是纯十六进制且符合分组密文长度。")
 			fp.DecoderHints = append(fp.DecoderHints, "auto", "behinder", "godzilla")
 			fp.Fingerprints = append(fp.Fingerprints, "hex-block-cipher")
+			fp.SourceRole = "encrypted_blob"
+			if isLikelyGodzillaParam(paramName) {
+				fp.Family = "godzilla_like"
+				fp.Suggested = "godzilla"
+				fp.Confidence = 88
+				fp.DecoderHints = append([]string{"godzilla", "auto"}, removeDecodeHint(fp.DecoderHints, "godzilla")...)
+				fp.Fingerprints = append(fp.Fingerprints, "godzilla-random-param")
+				fp.FamilyHint = "godzilla_like"
+				fp.DecoderOptionsHint = godzillaDecoderOptionsHint(paramName)
+				fp.DecoderOptionsHint["inputEncoding"] = "hex"
+			} else {
+				fp.FamilyHint = "hex_cipher"
+				fp.DecoderOptionsHint = map[string]any{
+					"decoder":       "auto",
+					"extractParam":  paramName != "",
+					"inputEncoding": "hex",
+				}
+				if paramName != "" {
+					fp.DecoderOptionsHint["pass"] = paramName
+				}
+			}
 			return fp
 		}
 		fp.Family = "hex_payload"
@@ -422,6 +588,66 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 	}
 
 	return fp
+}
+
+func antswordDecoderOptionsHint(paramName string) map[string]any {
+	hint := map[string]any{
+		"decoder":         "antsword",
+		"extractParam":    strings.TrimSpace(paramName) != "",
+		"urlDecodeRounds": 2,
+	}
+	if strings.TrimSpace(paramName) != "" {
+		hint["pass"] = strings.TrimSpace(paramName)
+	}
+	return hint
+}
+
+func godzillaDecoderOptionsHint(paramName string) map[string]any {
+	hint := map[string]any{
+		"decoder":         "godzilla",
+		"extractParam":    strings.TrimSpace(paramName) != "",
+		"urlDecodeRounds": 1,
+		"inputEncoding":   "base64",
+		"cipher":          "aes_ecb",
+		"stripMarkers":    true,
+	}
+	if strings.TrimSpace(paramName) != "" {
+		hint["pass"] = strings.TrimSpace(paramName)
+	}
+	return hint
+}
+
+func cloneDecoderOptionsHint(raw map[string]any) map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(raw))
+	for key, value := range raw {
+		out[key] = value
+	}
+	return out
+}
+
+func isLikelyGodzillaParam(paramName string) bool {
+	paramName = strings.TrimSpace(paramName)
+	if paramName == "" || numericWebshellParamPattern.MatchString(paramName) {
+		return false
+	}
+	if webshellParamPattern.MatchString(paramName) {
+		return false
+	}
+	return randomHexParamPattern.MatchString(paramName)
+}
+
+func removeDecodeHint(items []string, target string) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item), target) {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func maxInt(left, right int) int {

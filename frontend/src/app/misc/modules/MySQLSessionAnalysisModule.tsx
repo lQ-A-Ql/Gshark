@@ -1,5 +1,5 @@
 import { Database, RefreshCw, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MySQLAnalysis, MySQLSession } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
+import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -33,56 +34,38 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
   const [query, setQuery] = useState("");
   const [selectedStreamId, setSelectedStreamId] = useState<number>(0);
   const embedded = surfaceVariant === "embedded";
+  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const loadAnalysis = useCallback((preserveSelection = false) => {
     if (!hasCapture) {
+      cancelAnalysisRequest();
       setAnalysis(EMPTY_ANALYSIS);
       setSelectedStreamId(0);
       setLoading(false);
       setError("");
-      return () => controller.abort();
+      return;
     }
     setLoading(true);
     setError("");
-    void bridge.getMySQLAnalysis(controller.signal)
-      .then((payload) => {
+    return runAnalysisRequest({
+      request: (signal) => bridge.getMySQLAnalysis(signal),
+      onSuccess: (payload) => {
         setAnalysis(payload);
-        setSelectedStreamId(payload.sessions[0]?.streamId ?? 0);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
+        setSelectedStreamId((current) => preserveSelection && current && payload.sessions.some((item) => item.streamId === current) ? current : payload.sessions[0]?.streamId ?? 0);
+      },
+      onError: (err) => {
         setAnalysis(EMPTY_ANALYSIS);
         setSelectedStreamId(0);
         setError(err instanceof Error ? err.message : "加载 MySQL 会话重建失败");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      });
-    return () => controller.abort();
-  }, [hasCapture, fileMeta.path]);
+      },
+      onSettled: () => setLoading(false),
+    });
+  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
 
-  async function refresh() {
-    if (!hasCapture) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    try {
-      const payload = await bridge.getMySQLAnalysis(controller.signal);
-      setAnalysis(payload);
-      setSelectedStreamId((current) => current && payload.sessions.some((item) => item.streamId === current) ? current : payload.sessions[0]?.streamId ?? 0);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedStreamId(0);
-      setError(err instanceof Error ? err.message : "加载 MySQL 会话重建失败");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
+  useEffect(() => loadAnalysis(false), [fileMeta.path, loadAnalysis]);
+
+  function refresh() {
+    loadAnalysis(true);
   }
 
   const filteredSessions = useMemo(() => {

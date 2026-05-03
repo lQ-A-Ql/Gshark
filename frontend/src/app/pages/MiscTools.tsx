@@ -9,7 +9,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { PageShell } from "../components/PageShell";
 import { CollapsibleContent, EmptyState, StatusHint } from "../components/DesignSystem";
 import { Button } from "../components/ui/button";
@@ -30,6 +30,7 @@ export default function MiscTools() {
   const [importing, setImporting] = useState(false);
   const [activeCategory, setActiveCategory] = useState<MiscCategory>("Misc");
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const [mountedModules, setMountedModules] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function loadModules(isCancelled: () => boolean = () => false) {
@@ -44,6 +45,15 @@ export default function MiscTools() {
         for (const module of rows) {
           if (next[module.id] === undefined) {
             next[module.id] = module.id === rows[0]?.id;
+          }
+        }
+        return next;
+      });
+      setMountedModules((current) => {
+        const next: Record<string, boolean> = {};
+        for (const module of rows) {
+          if (current[module.id] || module.id === rows[0]?.id) {
+            next[module.id] = true;
           }
         }
         return next;
@@ -91,6 +101,10 @@ export default function MiscTools() {
   }
 
   function toggleModule(moduleID: string) {
+    setMountedModules((current) => ({
+      ...current,
+      [moduleID]: true,
+    }));
     setExpandedModules((current) => ({
       ...current,
       [moduleID]: !current[moduleID],
@@ -107,15 +121,15 @@ export default function MiscTools() {
 
   return (
     <PageShell
-      className="bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.45),transparent_38%),linear-gradient(180deg,#efeafe_0%,#ece9ff_36%,#edefff_100%)]"
+      className="bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.42),transparent_38%),linear-gradient(180deg,#ecfeff_0%,#f0fdfa_36%,#f8fafc_100%)]"
       innerClassName="mx-auto flex w-full max-w-[1160px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8"
     >
-      <section className="rounded-[28px] border border-white/70 bg-white/72 px-6 py-6 shadow-[0_30px_80px_rgba(108,99,255,0.16)] backdrop-blur-xl sm:px-8 lg:px-10">
+      <section className="rounded-[28px] border border-white/70 bg-white/72 px-6 py-6 shadow-[0_30px_80px_rgba(8,145,178,0.16)] backdrop-blur-xl sm:px-8 lg:px-10">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 shadow-sm">
                   <Wrench className="h-4.5 w-4.5" />
                 </div>
                 <div className="min-w-0">
@@ -126,7 +140,7 @@ export default function MiscTools() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 rounded-full border border-violet-100/90 bg-violet-50/60 px-3 py-2 text-xs text-slate-500 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 rounded-full border border-cyan-100/90 bg-cyan-50/60 px-3 py-2 text-xs text-slate-500 shadow-sm">
                 <span className="font-semibold text-slate-600">模块层</span>
                 {categoryOptions.map((item) => {
                   const active = activeCategory === item;
@@ -138,8 +152,8 @@ export default function MiscTools() {
                       className={cn(
                         "rounded-full border px-3 py-1 font-medium transition-all",
                         active
-                          ? "border-violet-200 bg-violet-100 text-violet-700 shadow-sm"
-                          : "border-slate-200 bg-white/80 text-slate-500 hover:border-violet-200 hover:text-violet-600",
+                          ? "border-cyan-200 bg-cyan-100 text-cyan-700 shadow-sm"
+                          : "border-slate-200 bg-white/80 text-slate-500 hover:border-cyan-200 hover:text-cyan-700",
                       )}
                     >
                       {item}
@@ -152,7 +166,7 @@ export default function MiscTools() {
             <div className="grid gap-3 text-[13px] text-slate-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
               <p className="max-w-2xl leading-7 text-slate-500">{heroDescription}</p>
               <div className="flex flex-wrap gap-2 text-[11px]">
-                <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-violet-700 shadow-sm">支持中断</span>
+                <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-cyan-700 shadow-sm">支持中断</span>
                 <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-slate-600 shadow-sm">协议专题</span>
                 <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-slate-600 shadow-sm">结果可导出</span>
               </div>
@@ -161,7 +175,7 @@ export default function MiscTools() {
 
           <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
             <div className="max-w-[360px] text-sm leading-7 text-slate-500 lg:text-right">
-              将低频但高价值的协议辅助能力按模块编排，内置 WinRM 与 SMB3，同时为自定义模块预留稳定接入位。
+              将低频但高价值的协议辅助能力按模块编排，内置 WinRM 与 SMB3，同时为自定义模块提供稳定接入位。
             </div>
             <input ref={fileInputRef} type="file" accept=".zip" className="hidden" onChange={(event) => void handleImportModule(event)} />
             <Button
@@ -180,7 +194,7 @@ export default function MiscTools() {
       {error && <ErrorBlock message={error} />}
 
       {loading ? (
-        <StatusHint className="px-4 py-12 text-center text-sm font-medium shadow-[0_20px_55px_rgba(148,163,184,0.16)]" tone="violet">
+        <StatusHint className="px-4 py-12 text-center text-sm font-medium shadow-[0_20px_55px_rgba(148,163,184,0.16)]" tone="cyan">
           正在加载 MISC 模块...
         </StatusHint>
       ) : (
@@ -188,14 +202,15 @@ export default function MiscTools() {
           {filteredModules.map((module) => {
             const Renderer = resolveMiscModuleRenderer(module.id);
             const expanded = Boolean(expandedModules[module.id]);
+            const mounted = expanded || Boolean(mountedModules[module.id]);
             const meta = summarizeModule(module);
             const icon = resolveModuleIcon(module);
             return (
               <section
                 key={module.id}
                 className={cn(
-                  "overflow-hidden rounded-[24px] border bg-white/88 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl transition-all duration-300 hover:shadow-[0_28px_72px_rgba(99,102,241,0.16)]",
-                  expanded ? "border-violet-200/80 shadow-[0_28px_72px_rgba(99,102,241,0.18)]" : "border-white/80",
+                  "overflow-hidden rounded-[24px] border bg-white/88 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl transition-all duration-300 hover:shadow-[0_28px_72px_rgba(8,145,178,0.14)]",
+                  expanded ? "border-cyan-200/80 shadow-[0_28px_72px_rgba(8,145,178,0.16)]" : "border-white/80",
                 )}
               >
                 <button
@@ -213,7 +228,7 @@ export default function MiscTools() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="truncate text-[17px] font-semibold tracking-tight text-slate-900">{module.title}</h2>
                         {module.kind === "custom" ? (
-                          <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-[11px] font-semibold text-violet-700">Custom</span>
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Custom</span>
                         ) : null}
                         {module.cancellable ? (
                           <span
@@ -241,7 +256,7 @@ export default function MiscTools() {
                       className={cn(
                         "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold shadow-sm transition-all sm:text-xs",
                         expanded
-                          ? "border-violet-200 bg-violet-50 text-violet-700"
+                          ? "border-cyan-200 bg-cyan-50 text-cyan-700"
                           : "border-slate-200 bg-white text-slate-500",
                       )}
                     >
@@ -252,11 +267,15 @@ export default function MiscTools() {
                 </button>
 
                 <CollapsibleContent open={expanded}>
-                  <div className="px-6 pb-6 sm:px-7">
-                    <div className="border-t border-slate-100 pt-5">
-                      <Renderer module={module} onModuleDeleted={handleModuleDeleted} surfaceVariant="embedded" />
+                  {mounted ? (
+                    <div className="px-6 pb-6 sm:px-7">
+                      <div className="border-t border-slate-100 pt-5">
+                        <Suspense fallback={<ModuleLoadingState module={module} />}>
+                          <Renderer module={module} onModuleDeleted={handleModuleDeleted} surfaceVariant="embedded" />
+                        </Suspense>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </CollapsibleContent>
               </section>
             );
@@ -270,6 +289,14 @@ export default function MiscTools() {
         </div>
       )}
     </PageShell>
+  );
+}
+
+function ModuleLoadingState({ module }: { module: MiscModuleManifest }) {
+  return (
+    <StatusHint className="px-4 py-8 text-center text-sm font-medium" tone="cyan">
+      正在加载 {module.title} 工作台...
+    </StatusHint>
   );
 }
 
@@ -314,7 +341,7 @@ function resolveModuleIcon(module: MiscModuleManifest): { Icon: LucideIcon; surf
     return { Icon: Binary, surface: "border-cyan-200 bg-cyan-50", text: "text-cyan-700" };
   }
   if (haystack.includes("ntlm") || haystack.includes("smb3") || haystack.includes("winrm")) {
-    return { Icon: KeyRound, surface: "border-violet-200 bg-violet-50", text: "text-violet-700" };
+    return { Icon: KeyRound, surface: "border-sky-200 bg-sky-50", text: "text-sky-700" };
   }
   if (haystack.includes("http") || haystack.includes("auth")) {
     return { Icon: Shield, surface: "border-indigo-200 bg-indigo-50", text: "text-indigo-700" };

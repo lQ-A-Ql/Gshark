@@ -15,7 +15,7 @@ GShark-Sentinel 是一款面向安全分析师、CTF 选手、应急响应人员
 ## 技术栈
 
 - 桌面框架：Wails v2
-- 后端：Go 1.22+
+- 后端：Go 1.22+（桌面壳）/ Go 1.25（后端模块）
 - 前端：React 18、TypeScript、Vite、Tailwind CSS、Radix UI
 - 解析核心：tshark
 - 本地通信：Wails 绑定 + 本地 HTTP / SSE
@@ -131,7 +131,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 ## 环境要求
 
 - Windows 环境下开发体验最佳。
-- Go 1.22+。
+- Go 1.22+（桌面壳）/ Go 1.25（后端模块，go.work 统一管理）。
 - Node.js 20+。
 - pnpm 或 npm。
 - Wireshark / tshark。
@@ -227,6 +227,7 @@ python .\scripts\build_release_package.py v0.0.5 --skip-build
 
 ## 文档入口
 
+- [文档中心](./docs/README.md)
 - [MISC 模块接口文档](./docs/misc-module-interface.md)
 - [插件接口文档](./docs/plugin-interface.md)
 - [车机流量分析方案](./docs/automotive-analysis-plan.md)

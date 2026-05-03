@@ -7,7 +7,7 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
-func TestServiceC2SampleAnalysisReturnsSkeleton(t *testing.T) {
+func TestServiceC2SampleAnalysisReturnsInitializedEmptyState(t *testing.T) {
 	svc := NewService(nil, nil)
 	svc.pcap = "fixture.pcapng"
 
@@ -22,7 +22,7 @@ func TestServiceC2SampleAnalysisReturnsSkeleton(t *testing.T) {
 		t.Fatalf("expected initialized family slices, got %+v", analysis)
 	}
 	if len(analysis.Notes) == 0 {
-		t.Fatalf("expected explanatory notes for skeleton analysis")
+		t.Fatalf("expected explanatory notes for initialized empty-state analysis")
 	}
 }
 
@@ -36,7 +36,7 @@ func TestServiceC2SampleAnalysisHonorsContextCancel(t *testing.T) {
 	}
 }
 
-func TestServiceAPTAnalysisReturnsSkeleton(t *testing.T) {
+func TestServiceAPTAnalysisReturnsInitializedBaseline(t *testing.T) {
 	svc := NewService(nil, nil)
 
 	analysis, err := svc.APTAnalysis(context.Background())
@@ -47,13 +47,13 @@ func TestServiceAPTAnalysisReturnsSkeleton(t *testing.T) {
 		t.Fatalf("expected zero evidence, got %d", analysis.TotalEvidence)
 	}
 	if analysis.Evidence == nil || len(analysis.Profiles) == 0 {
-		t.Fatalf("expected initialized apt skeleton, got %+v", analysis)
+		t.Fatalf("expected initialized apt baseline, got %+v", analysis)
 	}
 	if analysis.Profiles[0].ID != "silver-fox" {
 		t.Fatalf("expected silver fox baseline profile, got %+v", analysis.Profiles)
 	}
 	if len(analysis.Notes) == 0 {
-		t.Fatalf("expected explanatory notes for apt skeleton")
+		t.Fatalf("expected explanatory notes for apt baseline")
 	}
 }
 

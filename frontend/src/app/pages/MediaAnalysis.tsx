@@ -1,5 +1,5 @@
 import { Clapperboard, Copy, Download, FileText, Headphones, Loader2, Play, Square, Video } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -18,34 +18,17 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import type { MediaAnalysis as MediaAnalysisData, MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../core/types";
+import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../core/types";
+import { buildMediaAnalysisCacheKey, EMPTY_BATCH_STATUS, useMediaAnalysis } from "../features/media/useMediaAnalysis";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
+import { copyTextToClipboard } from "../utils/browserFile";
+
+export { buildMediaAnalysisCacheKey };
 
 type MediaTab = "all" | "video" | "audio";
 
-const EMPTY_ANALYSIS: MediaAnalysisData = {
-  totalMediaPackets: 0,
-  protocols: [],
-  applications: [],
-  sessions: [],
-  notes: [],
-};
-
-const mediaAnalysisCache = new Map<string, MediaAnalysisData>();
 const MEDIA_PROTOCOL_TAGS = ["RTP", "RTSP", "Moonlight", "GameStream"];
-const EMPTY_BATCH_STATUS: SpeechBatchTaskStatus = {
-  taskId: "",
-  total: 0,
-  queued: 0,
-  running: 0,
-  completed: 0,
-  failed: 0,
-  skipped: 0,
-  done: false,
-  cancelled: false,
-  items: [],
-};
 
 function canPlayArtifact(session: MediaSession): boolean {
   if (!session.artifact) return false;
@@ -166,13 +149,15 @@ function collectBatchSummaryItems(batchStatus: SpeechBatchTaskStatus, transcript
 
 export default function MediaAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, mediaAnalysisProgress, captureRevision } = useSentinel();
-  const cacheKey = useMemo(() => {
-    if (!fileMeta.path) return "";
-    return `${captureRevision}::${fileMeta.path}::${totalPackets}`;
-  }, [captureRevision, fileMeta.path, totalPackets]);
-  const [analysis, setAnalysis] = useState<MediaAnalysisData>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { analysis, loading, error: analysisError, refreshAnalysis, batchStatus, setBatchStatus, transcriptions, setTranscriptions } = useMediaAnalysis({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+  });
+  const [pageError, setPageError] = useState("");
+  const error = analysisError || pageError;
   const [activeTab, setActiveTab] = useState<MediaTab>("all");
   const [playbackSession, setPlaybackSession] = useState<MediaSession | null>(null);
   const [playbackUrl, setPlaybackUrl] = useState("");
@@ -180,15 +165,11 @@ export default function MediaAnalysis() {
   const [ffmpegDialogMessage, setFfmpegDialogMessage] = useState("");
   const [speechDialogMessage, setSpeechDialogMessage] = useState("");
   const [speechStatus, setSpeechStatus] = useState<SpeechToTextStatus | null>(null);
-  const [transcriptions, setTranscriptions] = useState<Record<string, MediaTranscription>>({});
   const [transcriptionLoadingToken, setTranscriptionLoadingToken] = useState("");
   const [transcriptionStartedAt, setTranscriptionStartedAt] = useState<number | null>(null);
-  const [batchStatus, setBatchStatus] = useState<SpeechBatchTaskStatus>(EMPTY_BATCH_STATUS);
   const [batchStarting, setBatchStarting] = useState(false);
   const [batchTokenStartedAt, setBatchTokenStartedAt] = useState<number | null>(null);
   const [progressClock, setProgressClock] = useState(() => Date.now());
-  const analysisAbortRef = useRef<AbortController | null>(null);
-  const analysisSeqRef = useRef(0);
 
   const filteredSessions = useMemo(() => {
     if (activeTab === "all") return analysis.sessions;
@@ -205,59 +186,6 @@ export default function MediaAnalysis() {
     () => collectBatchSummaryItems(batchStatus, transcriptions),
     [batchStatus, transcriptions],
   );
-
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!backendConnected) {
-      setLoading(false);
-      setError("");
-      setAnalysis(EMPTY_ANALYSIS);
-      return;
-    }
-    if (!force && cacheKey && mediaAnalysisCache.has(cacheKey)) {
-      setAnalysis(mediaAnalysisCache.get(cacheKey) ?? EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    if (force && cacheKey) {
-      mediaAnalysisCache.delete(cacheKey);
-    }
-    analysisAbortRef.current?.abort();
-    const abortController = new AbortController();
-    analysisAbortRef.current = abortController;
-    const requestSeq = ++analysisSeqRef.current;
-    const isLatest = () => requestSeq === analysisSeqRef.current;
-    void bridge
-      .getMediaAnalysis(force, abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (cacheKey) {
-          mediaAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-      })
-      .catch((err) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "媒体分析加载失败");
-        setAnalysis(EMPTY_ANALYSIS);
-      })
-      .finally(() => {
-        if (analysisAbortRef.current === abortController) {
-          analysisAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      abortController.abort();
-      if (analysisAbortRef.current === abortController) {
-        analysisAbortRef.current = null;
-      }
-    };
-  }, [backendConnected, cacheKey]);
 
   const ensureSpeechReady = useCallback(async () => {
     const nextStatus = await bridge.checkSpeechToText();
@@ -307,7 +235,7 @@ export default function MediaAnalysis() {
     if (!session.artifact) return;
     setTranscriptionLoadingToken(session.artifact.token);
     setTranscriptionStartedAt(Date.now());
-    setError("");
+    setPageError("");
     try {
       await ensureSpeechReady();
       const result = await bridge.transcribeMediaArtifact(session.artifact.token, force);
@@ -318,7 +246,7 @@ export default function MediaAnalysis() {
       if (message.toLowerCase().includes("vosk") || message.toLowerCase().includes("python") || message.toLowerCase().includes("ffmpeg") || message.includes("模型")) {
         setSpeechDialogMessage(message);
       } else {
-        setError(message);
+        setPageError(message);
       }
     } finally {
       setTranscriptionLoadingToken("");
@@ -328,7 +256,7 @@ export default function MediaAnalysis() {
 
   const startBatchTranscription = useCallback(async (force = false) => {
     setBatchStarting(true);
-    setError("");
+    setPageError("");
     try {
       await ensureSpeechReady();
       const status = await bridge.startMediaBatchTranscription(force);
@@ -338,7 +266,7 @@ export default function MediaAnalysis() {
       if (message.toLowerCase().includes("vosk") || message.toLowerCase().includes("python") || message.toLowerCase().includes("ffmpeg") || message.includes("模型")) {
         setSpeechDialogMessage(message);
       } else {
-        setError(message);
+        setPageError(message);
       }
     } finally {
       setBatchStarting(false);
@@ -350,16 +278,15 @@ export default function MediaAnalysis() {
       const status = await bridge.cancelMediaBatchTranscription();
       setBatchStatus(status);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "取消批量转写失败");
+      setPageError(err instanceof Error ? err.message : "取消批量转写失败");
     }
   }, []);
 
   const copyText = useCallback(async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setError("");
-    } catch {
-      setError("复制文本失败");
+    if (await copyTextToClipboard(text)) {
+      setPageError("");
+    } else {
+      setPageError("复制文本失败");
     }
   }, []);
 
@@ -372,9 +299,9 @@ export default function MediaAnalysis() {
   const exportBatchTranscription = useCallback(async (format: "txt" | "json") => {
     try {
       await bridge.exportMediaBatchTranscription(format);
-      setError("");
+      setPageError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "批量转写导出失败");
+      setPageError(err instanceof Error ? err.message : "批量转写导出失败");
     }
   }, []);
 
@@ -382,9 +309,9 @@ export default function MediaAnalysis() {
     if (!session.artifact) return;
     try {
       await bridge.downloadMediaArtifact(session.artifact.token, session.artifact.name);
-      setError("");
+      setPageError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "媒体文件下载失败");
+      setPageError(err instanceof Error ? err.message : "媒体文件下载失败");
     }
   }, []);
 
@@ -401,7 +328,7 @@ export default function MediaAnalysis() {
   const openPlayback = useCallback(async (session: MediaSession) => {
     if (!session.artifact) return;
     setPlaybackLoadingToken(session.artifact.token);
-    setError("");
+    setPageError("");
     try {
       const ffmpeg = await bridge.checkFFmpeg();
       if (!ffmpeg.available) {
@@ -422,7 +349,7 @@ export default function MediaAnalysis() {
       if (message.toLowerCase().includes("ffmpeg")) {
         setFfmpegDialogMessage(message);
       } else {
-        setError(message);
+        setPageError(message);
       }
     } finally {
       setPlaybackLoadingToken("");
@@ -433,10 +360,6 @@ export default function MediaAnalysis() {
     if (isPreloadingCapture) return;
     return refreshAnalysis();
   }, [isPreloadingCapture, refreshAnalysis]);
-
-  useEffect(() => () => {
-    analysisAbortRef.current?.abort();
-  }, []);
 
   useEffect(() => {
     setTranscriptions({});
@@ -492,7 +415,7 @@ export default function MediaAnalysis() {
         icon={<Clapperboard className="h-5 w-5" />}
         title="媒体流还原"
         subtitle="MEDIA STREAM RECONSTRUCTION"
-        description="统一串起媒体流识别、播放、导出与语音转写，让 RTP、RTSP、Moonlight 和音频流分析保持同一套页面骨架。"
+        description="统一串起媒体流识别、播放、导出与语音转写，让 RTP、RTSP、Moonlight 和音频流分析保持同一套工作台结构。"
         tags={MEDIA_PROTOCOL_TAGS}
         tagsLabel="协议族"
         theme="rose"

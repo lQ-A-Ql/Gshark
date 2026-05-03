@@ -15,8 +15,18 @@ import (
 const maxStreamContentBytes = 1 << 20 // 1 MB
 
 func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTarget, func(), error) {
+	return s.buildYaraScanTargetsWithContext(context.Background(), objects)
+}
+
+func (s *Service) buildYaraScanTargetsWithContext(ctx context.Context, objects []model.ObjectFile) ([]yaraScanTarget, func(), error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	targets := make([]yaraScanTarget, 0, len(objects)+64)
 	for _, object := range objects {
+		if err := ctx.Err(); err != nil {
+			return targets, func() {}, err
+		}
 		if strings.TrimSpace(object.Path) == "" {
 			continue
 		}
@@ -31,6 +41,9 @@ func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTa
 	if s.packetStore == nil {
 		return targets, func() {}, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return targets, func() {}, err
+	}
 
 	tempDir, err := os.MkdirTemp("", "gshark-yara-streams-")
 	if err != nil {
@@ -38,10 +51,17 @@ func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTa
 	}
 	cleanup := func() { _ = os.RemoveAll(tempDir) }
 
-	ctx := context.Background()
 	for _, protocol := range []string{"HTTP", "TCP", "UDP"} {
+		if err := ctx.Err(); err != nil {
+			cleanup()
+			return nil, func() {}, err
+		}
 		ids := s.StreamIDs(protocol)
 		for _, streamID := range ids {
+			if err := ctx.Err(); err != nil {
+				cleanup()
+				return nil, func() {}, err
+			}
 			content, packetID := s.yaraStreamContent(ctx, protocol, streamID)
 			if strings.TrimSpace(content) == "" {
 				continue

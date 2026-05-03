@@ -1,8 +1,7 @@
 import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { IndustrialAnalysis as IndustrialAnalysisData } from "../core/types";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { StatusHint } from "../components/DesignSystem";
 import {
   AnalysisBadge,
   AnalysisBucketChart as BucketChart,
@@ -13,30 +12,10 @@ import {
   AnalysisStatCard as StatCard,
   type AnalysisTone,
 } from "../components/analysis/AnalysisPrimitives";
-import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
+import { buildIndustrialAnalysisCacheKey, useIndustrialAnalysis } from "../features/industrial/useIndustrialAnalysis";
 
-const EMPTY_ANALYSIS: IndustrialAnalysisData = {
-  totalIndustrialPackets: 0,
-  protocols: [],
-  conversations: [],
-  modbus: {
-    totalFrames: 0,
-    requests: 0,
-    responses: 0,
-    exceptions: 0,
-    functionCodes: [],
-    unitIds: [],
-    referenceHits: [],
-    exceptionCodes: [],
-    transactions: [],
-  },
-  ruleHits: [],
-  details: [],
-  notes: [],
-};
-
-const industrialAnalysisCache = new Map<string, IndustrialAnalysisData>();
+export { buildIndustrialAnalysisCacheKey };
 
 const INDUSTRIAL_PROTOCOL_TAGS = [
   "Modbus",
@@ -51,73 +30,13 @@ const INDUSTRIAL_PROTOCOL_TAGS = [
 
 export default function IndustrialAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
-  const cacheKey = useMemo(() => {
-    return buildIndustrialAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets);
-  }, [captureRevision, fileMeta.path, totalPackets]);
-  const [analysis, setAnalysis] = useState<IndustrialAnalysisData>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const requestAbortRef = useRef<AbortController | null>(null);
-  const requestSeqRef = useRef(0);
-
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!backendConnected) {
-      setLoading(false);
-      setError("");
-      setAnalysis(EMPTY_ANALYSIS);
-      return;
-    }
-    if (!force && cacheKey && industrialAnalysisCache.has(cacheKey)) {
-      setAnalysis(industrialAnalysisCache.get(cacheKey) ?? EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    requestAbortRef.current?.abort();
-    const abortController = new AbortController();
-    requestAbortRef.current = abortController;
-    const requestSeq = ++requestSeqRef.current;
-    const isLatest = () => requestSeq === requestSeqRef.current;
-    void bridge
-      .getIndustrialAnalysis(abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (cacheKey) {
-          industrialAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-      })
-      .catch((err) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "工控分析加载失败");
-        setAnalysis(EMPTY_ANALYSIS);
-      })
-      .finally(() => {
-        if (requestAbortRef.current === abortController) {
-          requestAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      abortController.abort();
-      if (requestAbortRef.current === abortController) {
-        requestAbortRef.current = null;
-      }
-    };
-  }, [backendConnected, cacheKey, captureRevision]);
-
-  useEffect(() => () => {
-    requestAbortRef.current?.abort();
-  }, []);
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
+  const { analysis, loading, error, refreshAnalysis } = useIndustrialAnalysis({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+  });
 
   return (
     <PageShell className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.26),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]">
@@ -132,13 +51,9 @@ export default function IndustrialAnalysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && (
-        <div className="mb-3 rounded-2xl border border-blue-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在调用 tshark 生成工控分析结果...</div>
-      )}
+      {loading && <StatusHint tone="slate" className="mb-3">正在调用 tshark 生成工控分析结果...</StatusHint>}
 
-      {!loading && error && (
-        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">{error}</div>
-      )}
+      {!loading && error && <StatusHint tone="amber" className="mb-3">{error}</StatusHint>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <StatCard title="工控相关包" value={analysis.totalIndustrialPackets.toLocaleString()} />
@@ -423,10 +338,4 @@ function toneForIndustrialTransactionKind(kind: string): AnalysisTone {
     default:
       return "rose";
   }
-}
-
-export function buildIndustrialAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
-  const normalizedPath = filePath.trim();
-  if (!normalizedPath) return "";
-  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
 }

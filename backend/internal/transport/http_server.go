@@ -101,6 +101,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/capture/start", s.handleCaptureStart)
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
+	mux.HandleFunc("/api/capture/prepare-replacement", s.handleCapturePrepareReplacement)
 	mux.HandleFunc("/api/capture/close", s.handleCaptureClose)
 	mux.HandleFunc("/api/capture/upload", s.handleCaptureUpload)
 	mux.HandleFunc("/api/packets", s.handlePackets)
@@ -116,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/streams/raw/page", s.handleRawStreamPage)
 	mux.HandleFunc("/api/streams/decode", s.handleStreamDecode)
 	mux.HandleFunc("/api/streams/inspect", s.handleStreamInspect)
+	mux.HandleFunc("/api/streams/payload-sources", s.handleStreamPayloadSources)
 	mux.HandleFunc("/api/streams/payloads", s.handleStreamPayloads)
 	mux.HandleFunc("/api/streams/index", s.handleStreamIndex)
 	mux.HandleFunc("/api/packet/raw", s.handlePacketRaw)
@@ -127,6 +129,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/media", s.handleMediaAnalysis)
 	mux.HandleFunc("/api/analysis/usb", s.handleUSBAnalysis)
 	mux.HandleFunc("/api/c2-analysis", s.handleC2Analysis)
+	mux.HandleFunc("/api/c2-analysis/decrypt", s.handleC2Decrypt)
 	mux.HandleFunc("/api/apt-analysis", s.handleAPTAnalysis)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/analysis/media/play", s.handleMediaArtifactPlayback)
@@ -324,10 +327,11 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		tsharkStatus.UsingCustomPath,
 	)
 	s.promoteUploadedFile(options.FilePath)
+	loadRunID, loadCtx := s.svc.BeginCaptureLoad(context.WithoutCancel(r.Context()))
 	go func() {
-		if err := s.svc.LoadPCAP(context.Background(), options); err != nil {
+		if err := s.svc.LoadPCAPWithRun(loadCtx, options, loadRunID); err != nil {
 			log.Printf("http: capture start failed file=%q err=%v", options.FilePath, err)
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				return
 			}
 			s.hub.EmitError(err.Error())
@@ -345,6 +349,15 @@ func (s *Server) handleCaptureStop(w http.ResponseWriter, r *http.Request) {
 	}
 	s.svc.StopStreaming()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
+}
+
+func (s *Server) handleCapturePrepareReplacement(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	s.svc.PrepareCaptureReplacement()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "prepared"})
 }
 
 func (s *Server) handleCaptureClose(w http.ResponseWriter, r *http.Request) {
@@ -638,6 +651,28 @@ func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, analysis)
 }
 
+func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var payload model.C2DecryptRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	result, err := s.svc.C2Decrypt(r.Context(), payload)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			writeError(w, http.StatusRequestTimeout, err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleAPTAnalysis(w http.ResponseWriter, r *http.Request) {
 	analysis, err := s.svc.APTAnalysis(r.Context())
 	if err != nil {
@@ -700,7 +735,7 @@ func (s *Server) handleMediaArtifactPlayback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	path, name, err := s.svc.MediaPlayback(token)
+	path, name, err := s.svc.MediaPlaybackWithContext(r.Context(), token)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -878,7 +913,7 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	allObjects := s.svc.Objects()
+	allObjects := s.svc.ObjectsWithContext(r.Context())
 	var toDownload []model.ObjectFile
 
 	if len(reqIds) == 0 {
@@ -905,6 +940,9 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 
 	zw := zip.NewWriter(w)
 	for _, obj := range toDownload {
+		if r.Context().Err() != nil {
+			break
+		}
 		f, err := os.Open(obj.Path)
 		if err != nil {
 			continue
@@ -1090,6 +1128,28 @@ func (s *Server) handleStreamInspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, engine.InspectStreamPayload(payload.Payload))
+}
+
+func (s *Server) handleStreamPayloadSources(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		limit = parsed
+	}
+	rows, err := s.svc.ListStreamPayloadSources(limit)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
 }
 
 func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
@@ -1502,6 +1562,10 @@ func classifyAuditAction(path, method string) string {
 		return "capture.start"
 	case "/api/capture/stop":
 		return "capture.stop"
+	case "/api/capture/prepare-replacement":
+		return "capture.prepare_replacement"
+	case "/api/capture/close":
+		return "capture.close"
 	case "/api/capture/upload":
 		return "capture.upload"
 	case "/api/tools/tshark":

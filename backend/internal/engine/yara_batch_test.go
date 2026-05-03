@@ -199,3 +199,27 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 		t.Fatalf("expected HTTP stream YARA hit, got %+v", hits)
 	}
 }
+
+func TestBuildYaraScanTargetsRespectsCanceledContext(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 41, Protocol: "HTTP", StreamID: 3, SourceIP: "10.0.0.1", SourcePort: 50123, DestIP: "10.0.0.2", DestPort: 80, Info: "GET /payload HTTP/1.1", Payload: "GET /payload HTTP/1.1\r\nHost: demo\r\n\r\n"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	targets, cleanup, err := svc.buildYaraScanTargetsWithContext(ctx, nil)
+	if cleanup != nil {
+		cleanup()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled context, got targets=%+v err=%v", targets, err)
+	}
+	if len(targets) != 0 {
+		t.Fatalf("expected no stream targets after cancel, got %+v", targets)
+	}
+}

@@ -594,15 +594,18 @@ type ReassembledStream struct {
 }
 
 type StreamPayloadCandidate struct {
-	ID           string   `json:"id"`
-	Label        string   `json:"label"`
-	Kind         string   `json:"kind"`
-	ParamName    string   `json:"param_name,omitempty"`
-	Value        string   `json:"value"`
-	Preview      string   `json:"preview,omitempty"`
-	Confidence   int      `json:"confidence,omitempty"`
-	DecoderHints []string `json:"decoder_hints,omitempty"`
-	Fingerprints []string `json:"fingerprints,omitempty"`
+	ID                 string         `json:"id"`
+	Label              string         `json:"label"`
+	Kind               string         `json:"kind"`
+	ParamName          string         `json:"param_name,omitempty"`
+	Value              string         `json:"value"`
+	Preview            string         `json:"preview,omitempty"`
+	Confidence         int            `json:"confidence,omitempty"`
+	DecoderHints       []string       `json:"decoder_hints,omitempty"`
+	Fingerprints       []string       `json:"fingerprints,omitempty"`
+	FamilyHint         string         `json:"family_hint,omitempty"`
+	DecoderOptionsHint map[string]any `json:"decoder_options_hint,omitempty"`
+	SourceRole         string         `json:"source_role,omitempty"`
 }
 
 type StreamPayloadInspection struct {
@@ -613,6 +616,32 @@ type StreamPayloadInspection struct {
 	SuggestedFamily      string                   `json:"suggested_family,omitempty"`
 	Confidence           int                      `json:"confidence,omitempty"`
 	Reasons              []string                 `json:"reasons,omitempty"`
+}
+
+type StreamPayloadSource struct {
+	ID                  string         `json:"id"`
+	Method              string         `json:"method,omitempty"`
+	Host                string         `json:"host,omitempty"`
+	URI                 string         `json:"uri,omitempty"`
+	PacketID            int64          `json:"packet_id"`
+	StreamID            int64          `json:"stream_id,omitempty"`
+	SourceType          string         `json:"source_type,omitempty"`
+	ParamName           string         `json:"param_name,omitempty"`
+	Payload             string         `json:"payload"`
+	Preview             string         `json:"preview,omitempty"`
+	Confidence          int            `json:"confidence,omitempty"`
+	Signals             []string       `json:"signals,omitempty"`
+	DecoderHints        []string       `json:"decoder_hints,omitempty"`
+	FamilyHint          string         `json:"family_hint,omitempty"`
+	DecoderOptionsHint  map[string]any `json:"decoder_options_hint,omitempty"`
+	SourceRole          string         `json:"source_role,omitempty"`
+	ContentType         string         `json:"content_type,omitempty"`
+	OccurrenceCount     int            `json:"occurrence_count,omitempty"`
+	FirstTime           string         `json:"first_time,omitempty"`
+	LastTime            string         `json:"last_time,omitempty"`
+	RepeatWindowSeconds int            `json:"repeat_window_seconds,omitempty"`
+	RelatedPackets      []int64        `json:"related_packets,omitempty"`
+	RuleReasons         []string       `json:"rule_reasons,omitempty"`
 }
 
 type TrafficBucket struct {
@@ -768,6 +797,61 @@ type C2SampleAnalysis struct {
 	CS                  C2FamilyAnalysis       `json:"cs"`
 	VShell              C2FamilyAnalysis       `json:"vshell"`
 	Notes               []string               `json:"notes"`
+}
+
+type C2DecryptScope struct {
+	PacketIDs     []int64 `json:"packet_ids,omitempty"`
+	StreamIDs     []int64 `json:"stream_ids,omitempty"`
+	UseCandidates bool    `json:"use_candidates,omitempty"`
+	UseAggregates bool    `json:"use_aggregates,omitempty"`
+}
+
+type C2VShellDecryptOptions struct {
+	VKey string `json:"vkey"`
+	Salt string `json:"salt"`
+	Mode string `json:"mode,omitempty"`
+}
+
+type C2CSDecryptOptions struct {
+	KeyMode       string `json:"key_mode"`
+	AESKey        string `json:"aes_key,omitempty"`
+	HMACKey       string `json:"hmac_key,omitempty"`
+	AESRand       string `json:"aes_rand,omitempty"`
+	RSAPrivateKey string `json:"rsa_private_key,omitempty"`
+	TransformMode string `json:"transform_mode,omitempty"`
+}
+
+type C2DecryptRequest struct {
+	Family string                 `json:"family"`
+	Scope  C2DecryptScope         `json:"scope,omitempty"`
+	VShell C2VShellDecryptOptions `json:"vshell,omitempty"`
+	CS     C2CSDecryptOptions     `json:"cs,omitempty"`
+}
+
+type C2DecryptedRecord struct {
+	PacketID         int64          `json:"packet_id,omitempty"`
+	StreamID         int64          `json:"stream_id,omitempty"`
+	Time             string         `json:"time,omitempty"`
+	Direction        string         `json:"direction,omitempty"`
+	Algorithm        string         `json:"algorithm,omitempty"`
+	KeyStatus        string         `json:"key_status,omitempty"`
+	Confidence       int            `json:"confidence"`
+	PlaintextPreview string         `json:"plaintext_preview,omitempty"`
+	Parsed           map[string]any `json:"parsed,omitempty"`
+	RawLength        int            `json:"raw_length,omitempty"`
+	DecryptedLength  int            `json:"decrypted_length,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
+	Error            string         `json:"error,omitempty"`
+}
+
+type C2DecryptResult struct {
+	Family          string              `json:"family"`
+	Status          string              `json:"status"`
+	TotalCandidates int                 `json:"total_candidates"`
+	DecryptedCount  int                 `json:"decrypted_count"`
+	FailedCount     int                 `json:"failed_count"`
+	Records         []C2DecryptedRecord `json:"records"`
+	Notes           []string            `json:"notes"`
 }
 
 type APTScoreFactor struct {

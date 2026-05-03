@@ -1,128 +1,43 @@
 import { Crosshair, Database, Network, ShieldAlert, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
-import { EmptyState, MetricCard, StatusHint, SurfacePanel } from "../components/DesignSystem";
+import { EmptyState, MetricCard, StatusHint } from "../components/DesignSystem";
 import { AnalysisBucketChart, AnalysisDataTable, AnalysisMiniStat } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { cn } from "../components/ui/utils";
-import type { APTActorProfile, APTAnalysis, APTEvidenceRecord, APTScoreFactor } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import type { APTEvidenceRecord, APTScoreFactor } from "../core/types";
+import { ActorEvidenceNeeds, ActorTab, AptPanel, RegistryTagSection, StatusBadge } from "../features/apt/APTDisplayComponents";
+import { buildAPTDisplayProfiles, type APTDisplayProfile } from "../features/apt/actorRegistry";
+import { buildAPTAnalysisCacheKey, useAPTAnalysis } from "../features/apt/useAPTAnalysis";
+import { confidenceLabelText, fromAPTEvidence } from "../features/evidence/evidenceSchema";
 import { EvidenceActions } from "../misc/EvidenceActions";
 import { useSentinel } from "../state/SentinelContext";
-import { LRUCache } from "../utils/lruCache";
 
 type EvidenceSourceTab = "all" | "c2" | "delivery" | "hunting" | "credential";
 
-const EMPTY_ANALYSIS: APTAnalysis = {
-  totalEvidence: 0,
-  actors: [],
-  sampleFamilies: [],
-  campaignStages: [],
-  transportTraits: [],
-  infrastructureHints: [],
-  relatedC2Families: [],
-  profiles: [],
-  evidence: [],
-  notes: [],
-};
-
-const aptAnalysisCache = new LRUCache<string, APTAnalysis>(10);
-
-const SILVER_FOX_BASELINE = [
-  {
-    title: "样本家族",
-    text: "预留 ValleyRAT、Winos 4.0、Gh0st 系及其变种证据位；样本家族不直接等同组织归因。",
-  },
-  {
-    title: "投递链",
-    text: "预留多阶段投递、下载器、HFS / HTTP File Server 下载链与后续 RAT/C2 串联字段。",
-  },
-  {
-    title: "网络画像",
-    text: "预留 HTTPS/TCP C2、fallback C2、长连接、周期回连、自定义高位端口等弱到中等信号。",
-  },
-];
-
 export default function AptAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
-  const [analysis, setAnalysis] = useState<APTAnalysis>(EMPTY_ANALYSIS);
   const [activeActorId, setActiveActorId] = useState("silver-fox");
   const [activeEvidenceTab, setActiveEvidenceTab] = useState<EvidenceSourceTab>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const requestAbortRef = useRef<AbortController | null>(null);
-  const requestSeqRef = useRef(0);
+  const handleActiveActorChange = useCallback((actorId: string) => setActiveActorId(actorId), []);
+  const { analysis, loading, error, refreshAnalysis } = useAPTAnalysis({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+    activeActorId,
+    onActiveActorChange: handleActiveActorChange,
+  });
 
-  const cacheKey = useMemo(() => buildAPTAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets), [captureRevision, fileMeta.path, totalPackets]);
-
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!fileMeta.path || !backendConnected) {
-      setAnalysis(EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    if (!force && cacheKey && aptAnalysisCache.has(cacheKey)) {
-      setAnalysis(aptAnalysisCache.get(cacheKey) ?? EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    requestAbortRef.current?.abort();
-    const abortController = new AbortController();
-    requestAbortRef.current = abortController;
-    const requestSeq = ++requestSeqRef.current;
-    const isLatest = () => requestSeq === requestSeqRef.current;
-
-    void bridge
-      .getAPTAnalysis(abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (cacheKey) {
-          aptAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-        if (payload.profiles.length > 0 && !payload.profiles.some((profile) => profile.id === activeActorId)) {
-          setActiveActorId(payload.profiles[0].id);
-        }
-      })
-      .catch((err) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "APT 组织画像加载失败");
-        setAnalysis(EMPTY_ANALYSIS);
-      })
-      .finally(() => {
-        if (requestAbortRef.current === abortController) {
-          requestAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      abortController.abort();
-      if (requestAbortRef.current === abortController) {
-        requestAbortRef.current = null;
-      }
-    };
-  }, [activeActorId, backendConnected, cacheKey, fileMeta.path]);
-
-  useEffect(() => () => {
-    requestAbortRef.current?.abort();
-  }, []);
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
-
-  const activeProfile = analysis.profiles.find((profile) => profile.id === activeActorId) ?? analysis.profiles[0];
-  const actorEvidence = activeProfile ? analysis.evidence.filter((item) => item.actorId === activeProfile.id) : analysis.evidence;
+  const displayProfiles = useMemo(() => buildAPTDisplayProfiles(analysis.profiles), [analysis.profiles]);
+  const activeProfile = useMemo(() => displayProfiles.find((profile) => profile.id === activeActorId) ?? displayProfiles[0], [activeActorId, displayProfiles]);
+  const actorEvidence = useMemo(() => {
+    if (!activeProfile) return analysis.evidence;
+    if (activeProfile.frameworkOnly) return [];
+    return analysis.evidence.filter((item) => item.actorId === activeProfile.id);
+  }, [activeProfile, analysis.evidence]);
   const activeEvidence = useMemo(() => actorEvidence.filter((item) => evidenceMatchesTab(item, activeEvidenceTab)), [actorEvidence, activeEvidenceTab]);
   const sourceTabs = useMemo(() => buildEvidenceSourceTabs(actorEvidence), [actorEvidence]);
 
@@ -136,27 +51,27 @@ export default function AptAnalysis() {
         icon={<Crosshair className="h-5 w-5" />}
         title="APT 组织画像"
         subtitle="APT ACTOR PROFILING"
-        description="独立承载组织/活动簇画像，优先消费 C2 样本分析页输出的 actorHints、样本家族、投递阶段、传输特征与基础设施线索；当前先预置 Silver Fox / 银狐骨架。"
-        tags={["Silver Fox", "Actor Profile", "TTP", "Infrastructure"]}
+        description="独立承载组织/活动簇画像，优先消费 C2 样本分析页输出的 actorHints、样本家族、投递阶段、传输特征与基础设施线索；Silver Fox 已接入检测，其它经典组织先作为可复核画像框架展示。"
+        tags={["Silver Fox", "Actor Registry", "TTP", "Evidence Caveat"]}
         tagsLabel="画像域"
         theme="indigo"
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && <StatusHint tone="indigo">正在加载 APT 组织画像骨架...</StatusHint>}
+      {loading && <StatusHint tone="indigo">正在加载 APT 组织画像...</StatusHint>}
 
       {!loading && error && <StatusHint tone="amber">{error}</StatusHint>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <MetricCard label="组织证据" value={analysis.totalEvidence.toLocaleString()} icon={<ShieldAlert className="h-4 w-4" />} tone="indigo" />
-        <MetricCard label="候选组织" value={String(analysis.profiles.length)} icon={<Crosshair className="h-4 w-4" />} tone="rose" />
+        <MetricCard label="候选组织" value={String(displayProfiles.length)} icon={<Crosshair className="h-4 w-4" />} tone="rose" />
         <MetricCard label="样本家族" value={String(analysis.sampleFamilies.length)} icon={<Database className="h-4 w-4" />} tone="cyan" />
         <MetricCard label="C2 关联" value={String(analysis.relatedC2Families.length)} icon={<Network className="h-4 w-4" />} tone="amber" />
       </div>
 
       <div className="rounded-[28px] border border-white/80 bg-white/90 p-2 shadow-[0_24px_80px_-54px_rgba(15,23,42,0.45)] backdrop-blur">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {analysis.profiles.map((profile) => (
+          {displayProfiles.map((profile) => (
             <ActorTab key={profile.id} profile={profile} active={activeActorId === profile.id} onClick={() => setActiveActorId(profile.id)} />
           ))}
         </div>
@@ -170,25 +85,24 @@ export default function AptAnalysis() {
                 <div className="text-lg font-semibold text-slate-950">{activeProfile.name}</div>
                 <div className="mt-1 text-xs text-slate-500">{activeProfile.aliases?.join(" / ") || "暂无别名"}</div>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge label={activeProfile.registry.statusLabel} tone={activeProfile.registry.statusTone} />
+                {activeProfile.frameworkOnly && <StatusBadge label="不参与本轮评分" tone="rose" />}
+                {!activeProfile.frameworkOnly && activeProfile.evidenceCount === 0 && <StatusBadge label="当前抓包未命中" tone="slate" />}
+              </div>
               <p className="text-sm leading-6 text-slate-600">{activeProfile.summary}</p>
               <div className="grid gap-3 sm:grid-cols-3">
                 <AnalysisMiniStat title="Evidence" value={activeProfile.evidenceCount.toLocaleString()} />
-                <AnalysisMiniStat title="Confidence" value={activeProfile.confidence ? `${activeProfile.confidence}%` : "待计算"} />
+                <AnalysisMiniStat title="Confidence" value={activeProfile.frameworkOnly ? "不评分" : activeProfile.confidence ? `${activeProfile.confidence}%` : "待计算"} />
                 <AnalysisMiniStat title="C2 Families" value={String(activeProfile.relatedC2Families.length)} />
               </div>
+              <RegistryTagSection profile={activeProfile} />
               <NotesPanel notes={activeProfile.notes} emptyText="该组织画像暂无补充说明。" />
             </div>
           </AptPanel>
 
-          <AptPanel title="Silver Fox 基线预留" icon={<Workflow className="h-4 w-4 text-amber-600" />}>
-            <div className="space-y-3">
-              {SILVER_FOX_BASELINE.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-                  <div className="text-sm font-semibold text-amber-900">{item.title}</div>
-                  <p className="mt-1 text-xs leading-5 text-amber-800">{item.text}</p>
-                </div>
-              ))}
-            </div>
+          <AptPanel title="画像状态与证据需求" icon={<Workflow className="h-4 w-4 text-amber-600" />}>
+            <ActorEvidenceNeeds profile={activeProfile} />
           </AptPanel>
         </div>
       ) : null}
@@ -221,11 +135,11 @@ export default function AptAnalysis() {
 
       <AptPanel title={`${activeProfile?.name ?? "APT"} 证据表`}>
         <EvidenceSourceTabs tabs={sourceTabs} active={activeEvidenceTab} onChange={setActiveEvidenceTab} />
-        <EvidenceTable evidence={activeEvidence} />
+        <EvidenceTable profile={activeProfile} evidence={activeEvidence} />
       </AptPanel>
 
       <AptPanel title="全局 Notes">
-        <NotesPanel notes={analysis.notes} emptyText="APT 组织画像骨架已就绪，当前抓包暂未生成全局说明。" />
+        <NotesPanel notes={analysis.notes} emptyText="当前抓包暂未生成 APT 全局说明；页面会继续展示 registry 画像和缺失证据需求，供后续样本接入复核。" />
       </AptPanel>
     </PageShell>
   );
@@ -254,40 +168,13 @@ function EvidenceSourceTabs({ tabs, active, onChange }: { tabs: Array<{ id: Evid
   );
 }
 
-function ActorTab({ profile, active, onClick }: { profile: APTActorProfile; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-[22px] border px-4 py-3 text-left transition-all",
-        active
-          ? "border-indigo-200 bg-indigo-50 text-indigo-900 shadow-[0_18px_50px_-34px_rgba(79,70,229,0.55)]"
-          : "border-slate-200 bg-white text-slate-700 hover:border-indigo-100 hover:bg-indigo-50/40",
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-semibold">{profile.name}</div>
-        <span className="rounded-full border border-white/80 bg-white px-2 py-0.5 text-[11px] text-slate-500">{profile.evidenceCount}</span>
-      </div>
-      <div className="mt-1 truncate text-xs text-slate-500">{profile.aliases?.join(" / ") || "actor profile"}</div>
-    </button>
-  );
-}
-
-function AptPanel({ title, children, icon, className }: { title: string; children: ReactNode; icon?: ReactNode; className?: string }) {
-  return (
-    <SurfacePanel title={title} icon={icon ?? <ShieldAlert className="h-4 w-4 text-indigo-600" />} className={className}>
-      {children}
-    </SurfacePanel>
-  );
-}
-
-function EvidenceTable({ evidence }: { evidence: APTEvidenceRecord[] }) {
+function EvidenceTable({ profile, evidence }: { profile?: APTDisplayProfile; evidence: APTEvidenceRecord[] }) {
   if (!evidence.length) {
     return (
       <EmptyState className="py-8">
-        暂无 APT 归因证据。当前页面只预置组织画像骨架；后续由 C2 样本分析、对象提取、威胁狩猎和样本解析模块共同填充。
+        {profile?.frameworkOnly
+          ? `${profile.name} 当前为${profile.registry.statusLabel}画像，不参与本轮评分；请补充样本、投递链、C2 和对象证据后再进入归因复核。`
+          : "暂无 APT 归因证据。当前抓包未形成该组织候选；后续由 C2 样本分析、对象提取、威胁狩猎和样本解析模块共同填充。"}
       </EmptyState>
     );
   }
@@ -304,12 +191,21 @@ function EvidenceTable({ evidence }: { evidence: APTEvidenceRecord[] }) {
           header: "Actor / Type",
           widthClassName: "w-[210px]",
           cellClassName: "space-y-1",
-          render: (item) => (
-            <>
-              <div className="font-semibold text-slate-800">{item.actorName || "--"}</div>
-              <div className="font-mono text-[11px] text-slate-500">{item.sourceModule || "--"} · {item.evidenceType || "--"} · confidence {item.confidence ?? 0}</div>
-            </>
-          ),
+          render: (item, index) => {
+            const normalized = fromAPTEvidence(item, index);
+            return (
+              <>
+                <div className="font-semibold text-slate-800">{item.actorName || "--"}</div>
+                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-slate-500">
+                  <span>{normalized.sourceModule || "--"} · {normalized.sourceType || "--"}</span>
+                  <span className={cn("rounded-full border px-2 py-0.5 font-sans text-[10px] font-semibold", confidenceToneClass(normalized.confidenceLabel))}>
+                    {confidenceLabelText(normalized.confidenceLabel)}
+                    {normalized.confidence !== undefined ? ` ${normalized.confidence}` : ""}
+                  </span>
+                </div>
+              </>
+            );
+          },
         },
         {
           key: "evidence",
@@ -338,9 +234,15 @@ function EvidenceTable({ evidence }: { evidence: APTEvidenceRecord[] }) {
           key: "traits",
           header: "Traits",
           widthClassName: "w-[260px]",
-          render: (item) => (
-            <TagLine values={[item.sampleFamily ?? "", item.campaignStage ?? "", ...(item.transportTraits ?? []), ...(item.infrastructureHints ?? []), ...(item.ttpTags ?? []), ...(item.scoreFactors ?? []).map((factor) => `${factor.name}:${factor.weight}`)].filter(Boolean)} />
-          ),
+          render: (item, index) => {
+            const normalized = fromAPTEvidence(item, index);
+            return (
+              <div className="space-y-2">
+                <TagLine values={normalized.tags.length > 0 ? normalized.tags : [item.sampleFamily ?? "", item.campaignStage ?? ""].filter(Boolean)} />
+                {normalized.caveats.length > 0 ? <CaveatLine values={normalized.caveats} /> : null}
+              </div>
+            );
+          },
         },
         {
           key: "actions",
@@ -353,6 +255,15 @@ function EvidenceTable({ evidence }: { evidence: APTEvidenceRecord[] }) {
   );
 }
 
+function confidenceToneClass(label: ReturnType<typeof fromAPTEvidence>["confidenceLabel"]) {
+  return {
+    high: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    medium: "border-amber-200 bg-amber-50 text-amber-700",
+    low: "border-rose-200 bg-rose-50 text-rose-700",
+    unknown: "border-slate-200 bg-slate-50 text-slate-600",
+  }[label];
+}
+
 function TagLine({ values }: { values: string[] }) {
   if (!values.length) return <span className="text-[11px] text-slate-400">--</span>;
   return (
@@ -361,6 +272,18 @@ function TagLine({ values }: { values: string[] }) {
         <span key={value} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
           {value}
         </span>
+      ))}
+    </div>
+  );
+}
+
+function CaveatLine({ values }: { values: string[] }) {
+  return (
+    <div className="space-y-1">
+      {values.slice(0, 2).map((value) => (
+        <div key={value} className="rounded-xl border border-amber-100 bg-amber-50/50 px-2 py-1 text-[10px] leading-4 text-amber-700">
+          {value}
+        </div>
       ))}
     </div>
   );
@@ -420,13 +343,9 @@ function evidenceMatchesTab(item: APTEvidenceRecord, tab: EvidenceSourceTab) {
   return true;
 }
 
-export function buildAPTAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
-  const normalizedPath = filePath.trim();
-  if (!normalizedPath) return "";
-  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
-}
+export { buildAPTAnalysisCacheKey };
 
-function AttributionExplainer({ profile, evidence }: { profile?: APTActorProfile; evidence: APTEvidenceRecord[] }) {
+function AttributionExplainer({ profile, evidence }: { profile?: APTDisplayProfile; evidence: APTEvidenceRecord[] }) {
   if (!profile) {
     return (
       <EmptyState>
@@ -435,7 +354,7 @@ function AttributionExplainer({ profile, evidence }: { profile?: APTActorProfile
     );
   }
 
-  const profileFactors = profile.scoreFactors ?? [];
+  const profileFactors = profile.frameworkOnly ? [] : (profile.scoreFactors ?? []);
   const hasStructuredFactors = profileFactors.length > 0;
   const supportingFactors = profileFactors.filter((factor) => factor.direction === "positive" && factor.weight >= 5);
   const weakFactors = profileFactors.filter((factor) => factor.direction === "positive" && factor.weight < 5);
@@ -443,7 +362,12 @@ function AttributionExplainer({ profile, evidence }: { profile?: APTActorProfile
   const missingFactors = profileFactors.filter((factor) => factor.direction === "missing");
   const supporting = hasStructuredFactors ? supportingFactors : evidence.filter((e) => (e.confidence ?? 0) >= 60);
   const weak = hasStructuredFactors ? weakFactors : evidence.filter((e) => (e.confidence ?? 0) >= 30 && (e.confidence ?? 0) < 60);
-  const missing = hasStructuredFactors ? missingFactors.map(formatAPTScoreFactor) : buildMissingEvidence(profile, evidence).map((summary) => ({ name: summary, summary }));
+  const missing = profile.frameworkOnly
+    ? profile.registry.evidenceNeeds.map((summary) => ({ name: summary, summary }))
+    : hasStructuredFactors
+      ? missingFactors.map(formatAPTScoreFactor)
+      : buildMissingEvidence(profile, evidence).map((summary) => ({ name: summary, summary }));
+  const caveatCount = profile.frameworkOnly ? profile.registry.caveats.length : negativeFactors.length;
 
   return (
     <div className="space-y-4">
@@ -465,15 +389,19 @@ function AttributionExplainer({ profile, evidence }: { profile?: APTActorProfile
         </div>
         <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">Suppression / Caveat</div>
-          <div className="mt-1 text-lg font-semibold text-rose-900">{negativeFactors.length}</div>
-          <div className="mt-1 text-[11px] text-rose-700">负向抑制或归因注意事项</div>
+          <div className="mt-1 text-lg font-semibold text-rose-900">{caveatCount}</div>
+          <div className="mt-1 text-[11px] text-rose-700">{profile.frameworkOnly ? "registry caveat 与人工复核提示" : "负向抑制或归因注意事项"}</div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-indigo-100 bg-indigo-50/30 px-4 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">Confidence Rationale</div>
         <div className="mt-2 text-xs leading-5 text-indigo-800">
-          {profile.confidence && profile.confidence > 0 ? (
+          {profile.frameworkOnly ? (
+            <span>
+              {profile.name} 当前为 <strong>{profile.registry.statusLabel}</strong>，只展示画像、证据需求和 caveat，不参与本轮强归因评分；需要补充样本、投递链、C2 与对象证据后再进入评分链路。
+            </span>
+          ) : profile.confidence && profile.confidence > 0 ? (
             <span>当前置信度 <strong>{profile.confidence}%</strong>，基于 {supporting.length} 个正向因子、{weak.length} 个弱观察、{negativeFactors.length} 个 caveat 与 {missing.length} 个缺失项。</span>
           ) : (
             <span>当前置信度待计算：需要更多 C2 / Threat Hunting / Object 证据流入。</span>
@@ -497,6 +425,20 @@ function AttributionExplainer({ profile, evidence }: { profile?: APTActorProfile
               <div key={item.name} className="flex items-start gap-2 text-[11px] text-slate-600">
                 <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-slate-400" />
                 <span>{item.summary || item.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {profile.frameworkOnly && profile.registry.caveats.length > 0 && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-4 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">Framework Caveat</div>
+          <div className="mt-2 space-y-1">
+            {profile.registry.caveats.map((item) => (
+              <div key={item} className="flex items-start gap-2 text-[11px] leading-5 text-rose-700">
+                <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                <span>{item}</span>
               </div>
             ))}
           </div>
@@ -566,7 +508,7 @@ function EvidenceTimeline({ evidence }: { evidence: APTEvidenceRecord[] }) {
   );
 }
 
-function buildMissingEvidence(profile: APTActorProfile, evidence: APTEvidenceRecord[]): string[] {
+function buildMissingEvidence(profile: APTDisplayProfile, evidence: APTEvidenceRecord[]): string[] {
   const missing: string[] = [];
   const joinedEvidence = evidence.map((item) => [
     item.sourceModule,

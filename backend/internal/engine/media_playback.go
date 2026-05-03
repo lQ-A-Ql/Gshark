@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -47,6 +48,18 @@ func (s *Service) FFmpegStatus() FFmpegStatus {
 }
 
 func (s *Service) MediaPlayback(token string) (string, string, error) {
+	return s.MediaPlaybackWithContext(context.Background(), token)
+}
+
+func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (string, string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, finishTask := s.TrackCaptureTask(ctx, "media-playback")
+	defer finishTask()
+	if err := ctx.Err(); err != nil {
+		return "", "", err
+	}
 	status := s.FFmpegStatus()
 	if !status.Available {
 		return "", "", errors.New(status.Message)
@@ -73,7 +86,7 @@ func (s *Service) MediaPlayback(token string) (string, string, error) {
 	}
 
 	outputPath := filepath.Join(filepath.Dir(inputPath), outputName)
-	if err := generatePlaybackAsset(status.Path, inputPath, outputPath, profile); err != nil {
+	if err := generatePlaybackAsset(ctx, status.Path, inputPath, outputPath, profile); err != nil {
 		return "", "", err
 	}
 
@@ -102,7 +115,10 @@ func buildPlaybackName(inputName, ext string) string {
 	return base + ext
 }
 
-func generatePlaybackAsset(ffmpegPath, inputPath, outputPath string, profile playbackProfile) error {
+func generatePlaybackAsset(ctx context.Context, ffmpegPath, inputPath, outputPath string, profile playbackProfile) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := os.RemoveAll(outputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("cleanup existing playback asset: %w", err)
 	}
@@ -120,9 +136,12 @@ func generatePlaybackAsset(ffmpegPath, inputPath, outputPath string, profile pla
 	args = append(args, "-i", inputPath)
 	args = append(args, profile.outputArgs...)
 	args = append(args, outputPath)
-	cmd := exec.Command(ffmpegPath, args...)
+	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return ctx.Err()
+		}
 		detail := strings.TrimSpace(string(output))
 		if detail == "" {
 			return fmt.Errorf("ffmpeg convert failed: %w", err)

@@ -7,6 +7,7 @@ import { StreamChunkCard, StreamControlBar, StreamCurrentChunkPanel, StreamNavig
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
 import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";
+import { downloadText } from "../utils/browserFile";
 
 type RawViewMode = "ascii" | "hex" | "raw";
 type RawChunk = { packetId: number; direction: string; body: string };
@@ -142,13 +143,7 @@ export default function UdpStream() {
     const content = streamView.chunks
       .map((chunk) => `--- ${chunk.direction === "client" ? "CLIENT -> SERVER" : "SERVER -> CLIENT"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
       .join("\n\n");
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `udp-stream-${streamView.id}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(`udp-stream-${streamView.id}.txt`, content);
   }
 
   return (

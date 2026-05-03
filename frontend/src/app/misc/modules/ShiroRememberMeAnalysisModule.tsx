@@ -1,11 +1,12 @@
 import { KeyRound, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ShiroRememberMeAnalysis, ShiroRememberMeCandidate } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { EvidenceActions } from "../EvidenceActions";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
@@ -29,68 +30,40 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
   const [customKeys, setCustomKeys] = useState("");
   const [selectedPacketId, setSelectedPacketId] = useState<number>(0);
   const embedded = surfaceVariant === "embedded";
+  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
   const keyLines = useMemo(
     () => customKeys.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     [customKeys],
   );
 
-  async function loadAnalysis(keys = keyLines) {
+  const loadAnalysis = useCallback((keys: string[], preserveSelection = true) => {
     if (!hasCapture) {
+      cancelAnalysisRequest();
       setAnalysis(EMPTY_ANALYSIS);
       setSelectedPacketId(0);
       setError("");
       setLoading(false);
       return;
     }
-    const controller = new AbortController();
     setLoading(true);
     setError("");
-    try {
-      const payload = await bridge.getShiroRememberMeAnalysis(keys, controller.signal);
-      setAnalysis(payload);
-      setSelectedPacketId((current) => current && payload.candidates.some((item) => item.packetId === current) ? current : payload.candidates[0]?.packetId ?? 0);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedPacketId(0);
-      setError(err instanceof Error ? err.message : "加载 Shiro rememberMe 分析失败");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }
-
-  useEffect(() => {
-    const controller = new AbortController();
-    if (!hasCapture) {
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedPacketId(0);
-      setError("");
-      setLoading(false);
-      return () => controller.abort();
-    }
-    setLoading(true);
-    setError("");
-    void bridge.getShiroRememberMeAnalysis([], controller.signal)
-      .then((payload) => {
+    return runAnalysisRequest({
+      request: (signal) => bridge.getShiroRememberMeAnalysis(keys, signal),
+      onSuccess: (payload) => {
         setAnalysis(payload);
-        setSelectedPacketId(payload.candidates[0]?.packetId ?? 0);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
+        setSelectedPacketId((current) => preserveSelection && current && payload.candidates.some((item) => item.packetId === current) ? current : payload.candidates[0]?.packetId ?? 0);
+      },
+      onError: (err) => {
         setAnalysis(EMPTY_ANALYSIS);
         setSelectedPacketId(0);
         setError(err instanceof Error ? err.message : "加载 Shiro rememberMe 分析失败");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      });
-    return () => controller.abort();
-  }, [hasCapture, fileMeta.path]);
+      },
+      onSettled: () => setLoading(false),
+    });
+  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
+
+  useEffect(() => loadAnalysis([], false), [fileMeta.path, loadAnalysis]);
 
   const filteredCandidates = useMemo(() => {
     return analysis.candidates.filter((item) => {
@@ -161,7 +134,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void loadAnalysis()} disabled={!hasCapture || loading} className="gap-2 bg-white text-amber-700">
+            <Button type="button" variant="outline" onClick={() => void loadAnalysis(keyLines, true)} disabled={!hasCapture || loading} className="gap-2 bg-white text-amber-700">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新 / 测试 Key"}
             </Button>

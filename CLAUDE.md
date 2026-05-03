@@ -18,6 +18,8 @@ GShark-Sentinel is a desktop-first offline traffic analysis tool for PCAP/PCAPNG
 - Required tools: Go, Node.js 20+, `pnpm`, `tshark`, Wails CLI.
 - Root module targets Go 1.22; backend/workspace targets Go 1.25.
 - Development is desktop-only: start via Wails scripts, not separate frontend/backend web workflows.
+- No ESLint/Prettier configured for frontend; only `gofmt` for Go.
+- Frontend uses `@` path alias (`@` → `./src`) configured in `vite.config.ts`.
 
 ## Common Commands
 
@@ -130,14 +132,16 @@ Desktop responsibilities:
 - Starts backend process on app startup, stops it on shutdown.
 - Provides Wails file-dialog bindings to frontend.
 - Injects/reads backend auth token (`GSHARK_BACKEND_TOKEN`).
+- Self-update system (`desktop_update.go`) checks GitHub releases when built with `-tags production`; disabled with `-tags dev`.
 
 ### Backend structure (`backend/`)
 
 - `cmd/sentinel/main.go`: entry point with `serve` and `parse` modes.
-- `internal/transport`: HTTP router + SSE hub + auth/audit middleware; exposes API endpoints used by UI.
+- `internal/transport`: HTTP router (stdlib `net/http.ServeMux`, not a framework) + SSE hub + auth/audit middleware; all routes registered in `Server.Handler()`.
 - `internal/engine/service.go`: orchestration core (capture lifecycle, caches, stream state, threat hunting, tool runtime config).
 - `internal/tshark`: tshark invocations, packet streaming/parsing helpers, industrial/vehicle/media protocol extraction.
-- `internal/plugin`: plugin manager and JS/Python runtime handling.
+- `internal/plugin`: plugin manager and JS (goja) / Python runtime handling.
+- `internal/miscpkg`: MISC zip package management (import/invoke/delete).
 - `internal/model`: backend API/shared data contracts.
 
 Important backend behavior:
@@ -145,14 +149,18 @@ Important backend behavior:
 - Stream reassembly is cached and can fall back to file/index reconstruction.
 - Threat hunting combines prefix matching, plugins, and YARA.
 - Runtime tool config includes tshark/ffmpeg/python/speech/yara settings via API.
+- YARA rules under `backend/rules/yara/` are embedded via Go embed and copied into build artifacts.
 
 ### Frontend structure (`frontend/src/app`)
 
-- `routes.tsx`: lazy-loaded feature routes.
-- `state/SentinelContext.tsx`: central app state (packet pagination, selected packet, stream state, threat/media progress, plugin state).
-- `integrations/wailsBridge.ts`: typed backend bridge for HTTP/SSE + desktop bindings.
+- `routes.tsx`: React Router v7 with lazy-loaded feature routes.
+- `state/SentinelContext.tsx`: central app state (packet pagination, selected packet, stream state, threat/media progress, plugin state). This is a large monolithic context (~73KB).
+- `integrations/wailsBridge.ts`: typed backend bridge for HTTP/SSE + desktop bindings (~120KB).
 - `core/types.ts`: frontend contract types mirroring backend responses.
 - `pages/*`: feature views (workspace, stream views, threat hunting, protocol analyses, media/USB/tools pages).
+- `components/ui/`: Radix UI primitives (button, dialog, card, tooltip, etc.).
+- `misc/`: MISC module system — registry, built-in module components, and custom zip module support.
+- `features/`: feature-specific code organized by domain (apt, c2, evidence).
 
 Frontend data flow:
 - SSE events (`packet/status/error`) update context state incrementally.
@@ -163,8 +171,23 @@ Frontend data flow:
 
 - Plugin directory: `backend/plugins/rules/`.
 - Plugin manager loads JSON metadata + logic entry (`.js`/`.py`) and validates IDs/capabilities.
+- Allowed plugin capabilities: `packet.read`, `threat.emit`, `logging`, `finish.hook`, `metadata.read`.
 - Threat hunting invokes enabled plugins during analysis runs.
 - YARA rules/assets live under `backend/rules/yara/` and are copied into build artifacts for runtime use.
+
+### MISC module system
+
+- Built-in modules (frontend): HTTPLoginAnalysis, SMTPSession, MySQLSession, ShiroRememberMe, NTLMSessionMaterials, WinRMDecrypt, SMB3SessionKey, PayloadWebShellDecoder.
+- Custom zip modules: `manifest.json + api.json + form.json + backend.js/.py`, managed via `internal/miscpkg/manager.go`.
+- Scaffold new modules: `./scripts/new-misc-module.ps1`.
+- Spec: `docs/misc-module-interface.md`.
+
+## CI
+
+- GitHub Actions (`.github/workflows/ci.yml`): triggers on push (any branch) and PRs.
+- Backend job: `gofmt -l .` check + `go test ./...` on ubuntu-latest.
+- Frontend job: `npm ci` + `npm run build` on ubuntu-latest (tests are NOT run in CI).
+- Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend tests/build).
 
 ## Operational knobs that affect behavior
 

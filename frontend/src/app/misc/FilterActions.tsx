@@ -1,6 +1,7 @@
 import { Copy, Filter } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../components/ui/button";
+import { copyTextToClipboard } from "../utils/browserFile";
 
 type CopyTarget = "" | "host" | "uri" | "qname" | "stream" | "filter";
 type FilterProtocol = "http" | "dns" | "tcp";
@@ -61,7 +62,7 @@ export function FilterActions({
     if (actionDisabled) return;
     setPending(target);
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToClipboard(text);
       setCopied(target);
       setTimeout(() => setCopied(""), 1500);
     } finally {

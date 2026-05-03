@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { getContextMenuPosition, PacketVirtualTable } from "./PacketVirtualTable";
+import { PacketVirtualTable } from "./PacketVirtualTable";
 import type { Packet } from "../core/types";
+import { getPointerFloatingPosition } from "../utils/viewportPosition";
 
 describe("PacketVirtualTable", () => {
   const packet: Packet = {
@@ -55,13 +56,40 @@ describe("PacketVirtualTable", () => {
     expect(menu.parentElement).toBe(document.body);
   });
 
+  it("positions the rendered context menu inside the viewport", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+
+    render(
+      <div style={{ height: 480 }}>
+        <PacketVirtualTable
+          packets={[packet]}
+          selectedPacketId={null}
+          onSelect={vi.fn()}
+          onDoubleClickHttp={vi.fn()}
+          onFollowStream={vi.fn()}
+        />
+      </div>,
+    );
+
+    fireEvent.contextMenu(screen.getByText("Client Hello"), { clientX: 790, clientY: 590 });
+
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveStyle({ left: "596px", top: "470px" });
+  });
+
   it("keeps context menus inside the viewport", () => {
-    expect(getContextMenuPosition(120, 160, 800, 600)).toEqual({ x: 120, y: 160 });
-    expect(getContextMenuPosition(790, 590, 800, 600)).toEqual({ x: 596, y: 470 });
-    expect(getContextMenuPosition(-20, -10, 800, 600)).toEqual({ x: 12, y: 12 });
+    const floating = { width: 192, height: 118 };
+    const viewport = { width: 800, height: 600 };
+
+    expect(getPointerFloatingPosition(120, 160, floating, { viewport })).toEqual({ x: 120, y: 160 });
+    expect(getPointerFloatingPosition(790, 590, floating, { viewport })).toEqual({ x: 596, y: 470 });
+    expect(getPointerFloatingPosition(-20, -10, floating, { viewport })).toEqual({ x: 12, y: 12 });
   });
 
   it("keeps context menu coordinates usable in very small viewports", () => {
-    expect(getContextMenuPosition(120, 160, 160, 100)).toEqual({ x: 12, y: 12 });
+    expect(
+      getPointerFloatingPosition(120, 160, { width: 192, height: 118 }, { viewport: { width: 160, height: 100 } }),
+    ).toEqual({ x: 12, y: 12 });
   });
 });

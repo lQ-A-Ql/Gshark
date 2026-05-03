@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip } from "../ui";
+import { copyTextToClipboard } from "../../utils/browserFile";
 
 type ProtocolFilter = "ALL" | "HTTP" | "WinRM" | "SMB3" | "NTLM";
 
@@ -116,14 +117,12 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
   async function copySelectedMaterial() {
     if (!selected) return;
     const text = renderMaterialText(selected);
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyTextToClipboard(text)) {
       setCopyNotice(`已复制帧 #${selected.frameNumber} 的 NTLM 材料`);
-      window.setTimeout(() => setCopyNotice(""), 1800);
-    } catch {
+    } else {
       setCopyNotice("复制失败");
-      window.setTimeout(() => setCopyNotice(""), 1800);
     }
+    window.setTimeout(() => setCopyNotice(""), 1800);
   }
 
   function exportMaterials(format: MiscExportFormat) {

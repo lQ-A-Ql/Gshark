@@ -2,6 +2,7 @@
 .vscode/
 .idea/
 .claude/
+.claude-design/
 .github/
 __pycache__/
 .DS_Store

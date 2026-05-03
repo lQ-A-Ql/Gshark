@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ErrorBlock, Field } from "../ui";
+import { copyTextToClipboard } from "../../utils/browserFile";
 
 export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -116,11 +117,7 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
 
   async function copySMBResult() {
     if (!smbResult?.randomSessionKey) return;
-    try {
-      await navigator.clipboard.writeText(smbResult.randomSessionKey);
-    } catch {
-      // ignore
-    }
+    await copyTextToClipboard(smbResult.randomSessionKey);
   }
 
   async function refreshSMB3Candidates() {

@@ -1,5 +1,5 @@
 import { Mail, Paperclip, RefreshCw, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SMTPAnalysis, SMTPSession } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
+import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -32,63 +33,35 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
   const [query, setQuery] = useState("");
   const [selectedStreamId, setSelectedStreamId] = useState<number>(0);
   const embedded = surfaceVariant === "embedded";
+  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  async function loadAnalysis() {
+  const loadAnalysis = useCallback((preserveSelection = false) => {
     if (!hasCapture) {
+      cancelAnalysisRequest();
       setAnalysis(EMPTY_ANALYSIS);
       setSelectedStreamId(0);
       setError("");
       setLoading(false);
       return;
     }
-    const controller = new AbortController();
     setLoading(true);
     setError("");
-    try {
-      const payload = await bridge.getSMTPAnalysis(controller.signal);
-      setAnalysis(payload);
-      setSelectedStreamId((current) => current && payload.sessions.some((item) => item.streamId === current) ? current : payload.sessions[0]?.streamId ?? 0);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedStreamId(0);
-      setError(err instanceof Error ? err.message : "加载 SMTP 会话重建失败");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }
-
-  useEffect(() => {
-    const controller = new AbortController();
-    if (!hasCapture) {
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedStreamId(0);
-      setError("");
-      setLoading(false);
-      return () => controller.abort();
-    }
-    setLoading(true);
-    setError("");
-    void bridge.getSMTPAnalysis(controller.signal)
-      .then((payload) => {
+    return runAnalysisRequest({
+      request: (signal) => bridge.getSMTPAnalysis(signal),
+      onSuccess: (payload) => {
         setAnalysis(payload);
-        setSelectedStreamId(payload.sessions[0]?.streamId ?? 0);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
+        setSelectedStreamId((current) => preserveSelection && current && payload.sessions.some((item) => item.streamId === current) ? current : payload.sessions[0]?.streamId ?? 0);
+      },
+      onError: (err) => {
         setAnalysis(EMPTY_ANALYSIS);
         setSelectedStreamId(0);
         setError(err instanceof Error ? err.message : "加载 SMTP 会话重建失败");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      });
-    return () => controller.abort();
-  }, [hasCapture, fileMeta.path]);
+      },
+      onSettled: () => setLoading(false),
+    });
+  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
+
+  useEffect(() => loadAnalysis(false), [fileMeta.path, loadAnalysis]);
 
   const filteredSessions = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -178,7 +151,7 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void loadAnalysis()} disabled={!hasCapture || loading} className="gap-2 bg-white text-sky-700">
+            <Button type="button" variant="outline" onClick={() => void loadAnalysis(true)} disabled={!hasCapture || loading} className="gap-2 bg-white text-sky-700">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新"}
             </Button>

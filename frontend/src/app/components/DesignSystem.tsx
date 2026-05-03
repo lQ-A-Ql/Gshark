@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Copy, Download, Search, X } from "lucide-react";
 import { cn } from "./ui/utils";
+import { copyTextToClipboard, downloadText } from "../utils/browserFile";
 
 type Tone = "slate" | "blue" | "cyan" | "emerald" | "amber" | "rose" | "indigo" | "violet";
 type SurfaceVariant = "page" | "section" | "flat" | "subtle";
@@ -557,19 +558,11 @@ export function StreamPayloadDialog({
   const visibleMeta = (meta ?? []).filter((item) => item.value !== null && item.value !== undefined && item.value !== "");
 
   const copyContent = () => {
-    if (typeof navigator === "undefined" || !navigator.clipboard) return;
-    void navigator.clipboard.writeText(safeContent);
+    void copyTextToClipboard(safeContent);
   };
 
   const exportContent = () => {
-    if (typeof document === "undefined" || typeof URL === "undefined") return;
-    const blob = new Blob([safeContent], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(filename, safeContent);
   };
 
   return (

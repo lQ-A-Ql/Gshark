@@ -1,6 +1,10 @@
 package engine
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
 
 func TestDetectPlaybackProfile(t *testing.T) {
 	t.Parallel()
@@ -36,3 +40,15 @@ func TestDetectPlaybackProfile(t *testing.T) {
 	}
 }
 
+func TestMediaPlaybackWithContextHonorsCanceledContext(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := svc.MediaPlaybackWithContext(ctx, "any-token")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled context, got %v", err)
+	}
+}

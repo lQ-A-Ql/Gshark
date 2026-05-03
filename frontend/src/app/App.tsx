@@ -4,7 +4,14 @@ import { SentinelProvider, useSentinel } from './state/SentinelContext';
 import { useEffect, useState } from 'react';
 
 function StartupGate() {
-  const { backendConnected, backendStatus, tsharkStatus, isTSharkChecking, setTSharkPath } = useSentinel();
+  const {
+    backendConnected,
+    backendStatus,
+    tsharkStatus,
+    isTSharkChecking,
+    toolRuntimeCheckDegraded,
+    setTSharkPath,
+  } = useSentinel();
   const [enterMain, setEnterMain] = useState(false);
   const [pathInput, setPathInput] = useState('');
   const [savingPath, setSavingPath] = useState(false);
@@ -21,7 +28,7 @@ function StartupGate() {
       return;
     }
 
-    if (isTSharkChecking || !tsharkStatus.available) {
+    if (isTSharkChecking || (!tsharkStatus.available && !toolRuntimeCheckDegraded)) {
       setEnterMain(false);
       return;
     }
@@ -32,7 +39,7 @@ function StartupGate() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [backendConnected, isTSharkChecking, tsharkStatus.available]);
+  }, [backendConnected, isTSharkChecking, toolRuntimeCheckDegraded, tsharkStatus.available]);
 
   const handleSavePath = async (nextPath = pathInput) => {
     setSavingPath(true);
@@ -63,17 +70,24 @@ function StartupGate() {
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className={`inline-block h-2.5 w-2.5 rounded-full ${!backendConnected || isTSharkChecking ? 'bg-slate-400 animate-pulse' : (tsharkStatus.available ? 'bg-emerald-500' : 'bg-rose-500')}`} />
-              <span>tshark：{!backendConnected || isTSharkChecking ? '检测中' : (tsharkStatus.available ? '可用' : '不可用')}</span>
+              <span>
+                tshark：
+                {!backendConnected || isTSharkChecking
+                  ? '检测中'
+                  : (tsharkStatus.available ? '可用' : (toolRuntimeCheckDegraded ? '稍后重试' : '不可用'))}
+              </span>
             </div>
             <div className="text-xs text-slate-500 break-all">{backendStatus || '等待状态...'}</div>
             {backendConnected && !isTSharkChecking && (
               <div className={`text-xs break-all ${tsharkStatus.available ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {tsharkStatus.available ? `已检测到: ${tsharkStatus.path || 'tshark'}` : (tsharkStatus.message || '未检测到 tshark')}
+                {tsharkStatus.available
+                  ? `已检测到: ${tsharkStatus.path || 'tshark'}`
+                  : (tsharkStatus.message || (toolRuntimeCheckDegraded ? '检测暂时未完成，可进入主界面后刷新状态' : '未检测到 tshark'))}
               </div>
             )}
           </div>
 
-          {backendConnected && !isTSharkChecking && !tsharkStatus.available && (
+          {backendConnected && !isTSharkChecking && !tsharkStatus.available && !toolRuntimeCheckDegraded && (
             <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
               <div className="text-sm font-medium text-rose-700">请先配置 tshark 路径</div>
               <p className="mt-1 text-xs text-rose-600">
@@ -111,7 +125,7 @@ function StartupGate() {
           )}
 
           <div className="mt-5 h-1.5 w-full overflow-hidden rounded bg-slate-200">
-            <div className={`h-full rounded bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected && tsharkStatus.available ? 'w-full' : backendConnected ? 'w-5/6' : 'w-2/3 animate-pulse'}`} />
+            <div className={`h-full rounded bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected && (tsharkStatus.available || toolRuntimeCheckDegraded) ? 'w-full' : backendConnected ? 'w-5/6' : 'w-2/3 animate-pulse'}`} />
           </div>
         </div>
       </div>

@@ -272,4 +272,3 @@ func joinStreamChunkBodies(left, right string) string {
 func isColonHexPayload(raw string) bool {
 	return colonHexPayloadPattern.MatchString(strings.TrimSpace(raw))
 }
-

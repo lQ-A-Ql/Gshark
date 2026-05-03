@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Binary, Bug, Cog, KeyRound, LoaderCircle, Search, ShieldAlert, Wand2 } from "lucide-react";
-import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } from "../core/types";
+import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection, StreamPayloadSource } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
+import { copyTextToClipboard, downloadText } from "../utils/browserFile";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 type DecoderSettings = {
   behinder: {
@@ -50,6 +52,9 @@ type DecoderApplyMode = "preview" | "derived" | "overwrite";
 const MAX_BATCH_FAILURE_DETAILS = 20;
 
 const SETTINGS_STORAGE_KEY = "gshark.stream-decoders.v1";
+const EMPTY_SELECT_VALUE = "__empty__";
+
+type DecoderHintSource = Pick<StreamPayloadSource, "familyHint" | "decoderOptionsHint" | "sourceRole" | "decoderHints" | "paramName">;
 
 const DEFAULT_SETTINGS: DecoderSettings = {
   behinder: {
@@ -81,20 +86,24 @@ const DEFAULT_SETTINGS: DecoderSettings = {
 
 export function StreamDecoderWorkbench({
   payload,
+  inspectRevision,
   chunkLabel,
   tone = "blue",
   onApplyDecoded,
   batchItems,
   selectedBatchIndex,
   onApplyDecodedBatch,
+  sourceHint,
 }: {
   payload: string;
+  inspectRevision?: number | string;
   chunkLabel: string;
   tone?: "blue" | "amber" | "emerald";
   onApplyDecoded?: (payload: string) => void | Promise<void>;
   batchItems?: BatchItem[];
   selectedBatchIndex?: number;
   onApplyDecodedBatch?: (patches: Array<{ index: number; body: string }>) => void | Promise<void>;
+  sourceHint?: DecoderHintSource;
 }) {
   const [settings, setSettings] = useState<DecoderSettings>(() => readDecoderSettings());
   const [activeSettings, setActiveSettings] = useState<Exclude<StreamDecoderKind, "base64"> | null>(null);
@@ -159,6 +168,10 @@ export function StreamDecoderWorkbench({
     () => inspection?.candidates.find((item) => item.id === selectedCandidateId) ?? inspection?.candidates[0] ?? null,
     [inspection, selectedCandidateId],
   );
+  const activeHintSource = useMemo<DecoderHintSource | undefined>(
+    () => mergeDecoderHintSources(selectedCandidate, sourceHint),
+    [selectedCandidate, sourceHint],
+  );
   const effectivePayload = useMemo(() => {
     const candidateValue = selectedCandidate?.value?.trim();
     if (candidateValue) {
@@ -217,18 +230,18 @@ export function StreamDecoderWorkbench({
       cancelled = true;
       controller.abort();
     };
-  }, [payload, preparedPayload]);
+  }, [payload, preparedPayload, inspectRevision]);
+
+  useEffect(() => {
+    setSettings((prev) => mergeHintIntoSettings(prev, activeHintSource));
+  }, [activeHintSource]);
 
   async function decodeOne(decoder: StreamDecoderKind, rawPayload: string, signal?: AbortSignal) {
     const normalized = normalizeTransportPayload(rawPayload);
     if (!normalized.trim()) {
       throw new Error("当前 payload 为空，无法解码");
     }
-    const options =
-      decoder === "behinder" ? settings.behinder :
-        decoder === "antsword" ? settings.antsword :
-          decoder === "godzilla" ? settings.godzilla :
-            {};
+    const options = buildDecoderOptions(decoder, settings, activeHintSource);
     return bridge.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options, signal);
   }
 
@@ -248,6 +261,7 @@ export function StreamDecoderWorkbench({
     activeDecodeAbortRef.current?.abort();
     const controller = new AbortController();
     activeDecodeAbortRef.current = controller;
+    setSettings((prev) => mergeHintIntoSettings(prev, activeHintSource));
     setRunningDecoder(decoder);
     setDecodeError("");
     setApplyMessage("");
@@ -411,7 +425,7 @@ export function StreamDecoderWorkbench({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {inspection?.suggestedFamily && (
-              <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700">
+              <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
                 家族：{inspection.suggestedFamily}
               </span>
             )}
@@ -501,6 +515,17 @@ export function StreamDecoderWorkbench({
                       {candidate.paramName && (
                         <span className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">{candidate.paramName}</span>
                       )}
+                      {candidate.familyHint && (
+                        <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">{candidate.familyHint}</span>
+                      )}
+                      {candidate.sourceRole && (
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{candidate.sourceRole}</span>
+                      )}
+                      {candidateHintBadges(candidate).map((badge) => (
+                        <span key={`${candidate.id}-${badge}`} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-700">
+                          {badge}
+                        </span>
+                      ))}
                     </div>
                     <div className="mt-2 text-xs font-semibold text-foreground">{candidate.label}</div>
                     <div className="mt-1 line-clamp-3 break-all font-mono text-[11px] text-muted-foreground">{candidate.preview || candidate.value || "(empty)"}</div>
@@ -820,6 +845,152 @@ function asKnownDecoder(value: unknown): StreamDecoderKind | null {
   }
 }
 
+function mergeDecoderHintSources(candidate?: DecoderHintSource | null, source?: DecoderHintSource): DecoderHintSource | undefined {
+  if (!candidate) return source;
+  if (!source) return candidate;
+  return {
+    ...candidate,
+    familyHint: source.familyHint || candidate.familyHint,
+    sourceRole: source.sourceRole || candidate.sourceRole,
+    paramName: source.paramName || candidate.paramName,
+    decoderHints: uniqueStrings([...(source.decoderHints ?? []), ...(candidate.decoderHints ?? [])]),
+    decoderOptionsHint: {
+      ...(candidate.decoderOptionsHint ?? {}),
+      ...(source.decoderOptionsHint ?? {}),
+    },
+  };
+}
+
+function uniqueStrings(items: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const key = String(item ?? "").trim();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+function decoderFromHintSource(source?: DecoderHintSource): StreamDecoderKind | null {
+  const optionsDecoder = asKnownDecoder(source?.decoderOptionsHint?.decoder);
+  if (optionsDecoder && optionsDecoder !== "base64" && optionsDecoder !== "auto") {
+    return optionsDecoder;
+  }
+  for (const hint of source?.decoderHints ?? []) {
+    const decoder = asKnownDecoder(hint);
+    if (decoder && decoder !== "base64" && decoder !== "auto") {
+      return decoder;
+    }
+  }
+  switch (source?.familyHint) {
+    case "antsword_like":
+      return "antsword";
+    case "godzilla_like":
+      return "godzilla";
+    case "aes_webshell_like":
+      return "behinder";
+    default:
+      return null;
+  }
+}
+
+function buildDecoderOptions(decoder: StreamDecoderKind, settings: DecoderSettings, source?: DecoderHintSource): Record<string, unknown> {
+  if (decoder === "base64") {
+    return {};
+  }
+  const hintedDecoder = decoderFromHintSource(source);
+  const effectiveDecoder = decoder === "auto" ? hintedDecoder : decoder;
+  if (effectiveDecoder === "behinder") {
+    return mergeHintOptionsForDecoder("behinder", settings.behinder, source);
+  }
+  if (effectiveDecoder === "antsword") {
+    return mergeHintOptionsForDecoder("antsword", settings.antsword, source);
+  }
+  if (effectiveDecoder === "godzilla") {
+    return mergeHintOptionsForDecoder("godzilla", settings.godzilla, source);
+  }
+  return {};
+}
+
+function mergeHintIntoSettings(settings: DecoderSettings, source?: DecoderHintSource): DecoderSettings {
+  const decoder = decoderFromHintSource(source);
+  if (decoder === "behinder") {
+    return {
+      ...settings,
+      behinder: mergeHintOptionsForDecoder("behinder", settings.behinder, source) as DecoderSettings["behinder"],
+    };
+  }
+  if (decoder === "antsword") {
+    return {
+      ...settings,
+      antsword: mergeHintOptionsForDecoder("antsword", settings.antsword, source) as DecoderSettings["antsword"],
+    };
+  }
+  if (decoder === "godzilla") {
+    return {
+      ...settings,
+      godzilla: mergeHintOptionsForDecoder("godzilla", settings.godzilla, source) as DecoderSettings["godzilla"],
+    };
+  }
+  return settings;
+}
+
+function mergeHintOptionsForDecoder(
+  decoder: Exclude<StreamDecoderKind, "auto" | "base64">,
+  current: Record<string, unknown>,
+  source?: DecoderHintSource,
+): Record<string, unknown> {
+  const rawHint = source?.decoderOptionsHint ?? {};
+  const hintedDecoder = asKnownDecoder(rawHint.decoder) ?? decoderFromHintSource(source);
+  if (hintedDecoder && hintedDecoder !== decoder) {
+    return current;
+  }
+  const allowed = allowedHintKeysForDecoder(decoder);
+  const merged: Record<string, unknown> = { ...current };
+  for (const key of allowed) {
+    const value = rawHint[key];
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    if ((decoder === "godzilla" && key === "key") || (decoder === "behinder" && (key === "key" || key === "iv"))) {
+      if (String(current[key] ?? "").trim()) {
+        continue;
+      }
+    }
+    merged[key] = value;
+  }
+  if (source?.paramName && !String(merged.pass ?? "").trim()) {
+    merged.pass = source.paramName;
+  }
+  return merged;
+}
+
+function allowedHintKeysForDecoder(decoder: Exclude<StreamDecoderKind, "auto" | "base64">): string[] {
+  if (decoder === "antsword") {
+    return ["pass", "extractParam", "urlDecodeRounds", "encoder"];
+  }
+  if (decoder === "godzilla") {
+    return ["pass", "extractParam", "urlDecodeRounds", "inputEncoding", "cipher", "stripMarkers"];
+  }
+  return ["pass", "extractParam", "urlDecodeRounds", "inputEncoding", "cipherMode", "deriveKeyFromPass"];
+}
+
+function candidateHintBadges(source: DecoderHintSource): string[] {
+  const options = source.decoderOptionsHint ?? {};
+  const badges: string[] = [];
+  for (const key of ["decoder", "pass", "inputEncoding", "cipher", "cipherMode"] as const) {
+    const value = options[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      badges.push(`${key}:${String(value)}`);
+    }
+  }
+  return badges;
+}
+
 function prepareDecoderInput(decoder: StreamDecoderKind, payload: string): string {
   if (decoder === "base64") {
     return extractBestBase64Candidate(payload);
@@ -945,19 +1116,26 @@ function LabeledSelect({
   options: Array<[string, string]>;
   onChange: (value: string) => void;
 }) {
+  const selectedValue = value === "" ? EMPTY_SELECT_VALUE : value;
   return (
-    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
       <span>{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus:border-blue-500"
+      <Select
+        value={selectedValue}
+        onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
       >
-        {options.map(([optionValue, optionLabel]) => (
-          <option key={optionValue} value={optionValue}>{optionLabel}</option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger className="h-9 rounded-md border-border bg-background text-xs text-foreground focus:border-blue-500 focus:ring-blue-100">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue || EMPTY_SELECT_VALUE} value={optionValue || EMPTY_SELECT_VALUE}>
+              {optionLabel}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -1005,7 +1183,7 @@ function PayloadPane({
 
   function copyContent() {
     if (!downloadable) return;
-    void navigator.clipboard?.writeText(content);
+    void copyTextToClipboard(content);
   }
 
   function exportContent() {
@@ -1076,16 +1254,6 @@ function TagList({ title, items, tone }: { title: string; items: string[]; tone:
       </div>
     </div>
   );
-}
-
-function downloadText(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function isAbortError(error: unknown) {

@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { ErrorBlock, Field, MetaChip } from "../ui";
+import { copyTextToClipboard } from "../../utils/browserFile";
 
 type WinRMPreviewMode = "full" | "extract" | "command" | "stdout" | "stderr";
 
@@ -125,7 +126,9 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
     try {
       const text = await loadWinRMFullText();
       if (!text) return;
-      await navigator.clipboard.writeText(text);
+      if (!(await copyTextToClipboard(text))) {
+        throw new Error("复制失败");
+      }
     } catch (error) {
       setWinrmError(error instanceof Error ? error.message : "复制失败");
     }

@@ -58,6 +58,14 @@ func (s *Service) TranscribeMediaArtifact(token string, force bool) (model.Media
 }
 
 func (s *Service) transcribeMediaArtifactWithContext(ctx context.Context, token string, force bool) (model.MediaTranscription, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, finishTask := s.TrackCaptureTask(ctx, "media-transcription")
+	defer finishTask()
+	if err := ctx.Err(); err != nil {
+		return model.MediaTranscription{}, err
+	}
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return model.MediaTranscription{}, errors.New("missing media artifact token")
@@ -161,6 +169,7 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 	}
 	s.cancelSpeechBatchLocked()
 	ctx, cancel := context.WithCancel(context.Background())
+	ctx, finishCaptureTask := s.TrackCaptureTask(ctx, "speech-batch")
 	taskSeed := sha1.Sum([]byte(fmt.Sprintf("%d-%d", time.Now().UnixNano(), len(items))))
 	task := &model.SpeechBatchTaskStatus{
 		TaskID: fmt.Sprintf("speech-batch-%x", taskSeed[:6]),
@@ -172,7 +181,10 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 	out := cloneSpeechBatchTask(task)
 	s.mu.Unlock()
 
-	go s.runSpeechBatchTask(ctx, task.TaskID, force)
+	go func() {
+		defer finishCaptureTask()
+		s.runSpeechBatchTask(ctx, task.TaskID, force)
+	}()
 	return out, nil
 }
 

@@ -7,9 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 const aesBlockSize = aes.BlockSize
+
+type decodeAttempt struct {
+	name    string
+	decoder string
+	fn      func() (StreamDecodeResult, error)
+}
 
 // decryptAESCBC decrypts AES-CBC ciphertext. If iv is nil or empty, uses zero IV.
 // Supports lenient PKCS7 unpadding — returns raw data on padding failure instead of error.
@@ -167,14 +175,16 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 	if normalized == "" {
 		return StreamDecodeResult{}, errors.New("payload 为空")
 	}
-
-	type attempt struct {
-		name    string
-		decoder string
-		fn      func() (StreamDecodeResult, error)
+	inspection := InspectStreamPayload(raw)
+	hintedDecoder := hintedDecoderFromInspection(inspection)
+	hintedOptions := safeDecoderOptionsHint(bestDecoderOptionsHintFromInspection(inspection))
+	mergedOptions := mergeDecodeOptions(options, hintedOptions)
+	encryptedHint := inspectionHasWebshellEncryptedHint(inspection)
+	if hintedDecoder == "godzilla" && optionsString(mergedOptions, "key") == "" {
+		return StreamDecodeResult{}, errors.New("哥斯拉解密需要 key")
 	}
 
-	attempts := []attempt{
+	attempts := []decodeAttempt{
 		{
 			name:    "Base64",
 			decoder: "base64",
@@ -183,23 +193,26 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 		{
 			name:    "Behinder (ECB)",
 			decoder: "behinder",
-			fn:      func() (StreamDecodeResult, error) { return decodeBehinderPayload(raw, options) },
+			fn:      func() (StreamDecodeResult, error) { return decodeBehinderPayload(raw, mergedOptions) },
 		},
 		{
 			name:    "Behinder (CBC)",
 			decoder: "behinder",
-			fn:      func() (StreamDecodeResult, error) { return decodeBehinderPayloadCBC(raw, options) },
+			fn:      func() (StreamDecodeResult, error) { return decodeBehinderPayloadCBC(raw, mergedOptions) },
 		},
 		{
 			name:    "AntSword",
 			decoder: "antsword",
-			fn:      func() (StreamDecodeResult, error) { return decodeAntSwordPayload(raw, options) },
+			fn:      func() (StreamDecodeResult, error) { return decodeAntSwordPayload(raw, mergedOptions) },
 		},
 		{
 			name:    "Godzilla",
 			decoder: "godzilla",
-			fn:      func() (StreamDecodeResult, error) { return decodeGodzillaPayload(raw, options) },
+			fn:      func() (StreamDecodeResult, error) { return decodeGodzillaPayload(raw, mergedOptions) },
 		},
+	}
+	if hintedDecoder != "" {
+		attempts = prioritizeDecodeAttempts(attempts, hintedDecoder)
 	}
 
 	var bestResult StreamDecodeResult
@@ -216,6 +229,12 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 		if score < 0 {
 			attemptErrors = append(attemptErrors, fmt.Sprintf("%s: 结果不可读或为空", a.name))
 			continue
+		}
+		if encryptedHint && a.decoder == "base64" && !isStrongPlainScriptResult(result.Text) {
+			score -= 55
+		}
+		if hintedDecoder != "" && a.decoder == hintedDecoder {
+			score += 25
 		}
 		if score > bestScore {
 			bestScore = score
@@ -235,6 +254,140 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 	bestResult.AttemptErrors = attemptErrors
 	bestResult.Signals = dedupeDecodeStrings(append(bestResult.Signals, fmt.Sprintf("auto-score:%d", bestScore)))
 	return bestResult, nil
+}
+
+func mergeDecodeOptions(base, hinted map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range hinted {
+		out[key] = value
+	}
+	for key, value := range base {
+		if value == nil {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func hintedDecoderFromInspection(inspection model.StreamPayloadInspection) string {
+	if strings.TrimSpace(inspection.SuggestedDecoder) != "" && inspection.SuggestedDecoder != "auto" {
+		return webshellDecoderHint(strings.ToLower(strings.TrimSpace(inspection.SuggestedDecoder)))
+	}
+	for _, candidate := range inspection.Candidates {
+		if candidate.DecoderOptionsHint == nil {
+			continue
+		}
+		if decoder := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", candidate.DecoderOptionsHint["decoder"]))); decoder != "" && decoder != "auto" {
+			return webshellDecoderHint(decoder)
+		}
+	}
+	return ""
+}
+
+func webshellDecoderHint(decoder string) string {
+	switch decoder {
+	case "behinder", "antsword", "godzilla":
+		return decoder
+	default:
+		return ""
+	}
+}
+
+func bestDecoderOptionsHintFromInspection(inspection model.StreamPayloadInspection) map[string]any {
+	if inspection.SuggestedCandidateID != "" {
+		for _, candidate := range inspection.Candidates {
+			if candidate.ID == inspection.SuggestedCandidateID && len(candidate.DecoderOptionsHint) > 0 {
+				return candidate.DecoderOptionsHint
+			}
+		}
+	}
+	bestScore := -1
+	var best map[string]any
+	for _, candidate := range inspection.Candidates {
+		if len(candidate.DecoderOptionsHint) == 0 {
+			continue
+		}
+		if candidate.Confidence > bestScore {
+			bestScore = candidate.Confidence
+			best = candidate.DecoderOptionsHint
+		}
+	}
+	return best
+}
+
+func safeDecoderOptionsHint(raw map[string]any) map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+	allowed := map[string]bool{
+		"decoder":           true,
+		"pass":              true,
+		"extractParam":      true,
+		"urlDecodeRounds":   true,
+		"inputEncoding":     true,
+		"cipher":            true,
+		"cipherMode":        true,
+		"deriveKeyFromPass": true,
+		"stripMarkers":      true,
+	}
+	out := make(map[string]any, len(raw))
+	for key, value := range raw {
+		if allowed[key] {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func inspectionHasWebshellEncryptedHint(inspection model.StreamPayloadInspection) bool {
+	for _, candidate := range inspection.Candidates {
+		if candidate.SourceRole == "encrypted_blob" {
+			return true
+		}
+		switch candidate.FamilyHint {
+		case "godzilla_like", "aes_webshell_like", "hex_cipher":
+			return true
+		}
+		for _, fp := range candidate.Fingerprints {
+			switch fp {
+			case "base64-aes-block", "hex-block-cipher", "godzilla-random-param":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func prioritizeDecodeAttempts(attempts []decodeAttempt, decoder string) []decodeAttempt {
+	if decoder == "" {
+		return attempts
+	}
+	out := make([]decodeAttempt, 0, len(attempts))
+	for _, item := range attempts {
+		if item.decoder == decoder {
+			out = append(out, item)
+		}
+	}
+	for _, item := range attempts {
+		if item.decoder != decoder {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func isStrongPlainScriptResult(text string) bool {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	if lower == "" {
+		return false
+	}
+	for _, keyword := range []string{"<?php", "eval(", "assert", "system(", "exec(", "base64_decode", "function", "class ", "cmd", "whoami", "powershell", "shell_exec"} {
+		if strings.Contains(lower, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func scoreDecodeAttempt(attemptName string, result StreamDecodeResult) int {

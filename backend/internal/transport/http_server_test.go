@@ -157,7 +157,7 @@ func TestHandleAuditLogsReturnsRecordedEntries(t *testing.T) {
 	}
 }
 
-func TestHandleC2AnalysisReturnsSkeleton(t *testing.T) {
+func TestHandleC2AnalysisReturnsInitializedPayload(t *testing.T) {
 	server := NewServer(engine.NewService(nil, nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/c2-analysis", nil)
 	rec := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestHandleC2AnalysisReturnsSkeleton(t *testing.T) {
 	}
 }
 
-func TestHandleAPTAnalysisReturnsSkeleton(t *testing.T) {
+func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
 	server := NewServer(engine.NewService(nil, nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/apt-analysis", nil)
 	rec := httptest.NewRecorder()
@@ -196,7 +196,26 @@ func TestHandleAPTAnalysisReturnsSkeleton(t *testing.T) {
 		t.Fatalf("expected initialized apt payload, got %+v", payload)
 	}
 	if payload.Profiles[0].ID != "silver-fox" {
-		t.Fatalf("expected silver fox profile placeholder, got %+v", payload.Profiles)
+		t.Fatalf("expected silver fox baseline profile, got %+v", payload.Profiles)
+	}
+}
+
+func TestHandleStreamPayloadSourcesReturnsInitializedPayload(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	req := httptest.NewRequest(http.MethodGet, "/api/streams/payload-sources?limit=10", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleStreamPayloadSources(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected payload sources endpoint to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload []model.StreamPayloadSource
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode payload sources: %v", err)
+	}
+	if payload == nil {
+		t.Fatalf("expected initialized payload source slice, got nil")
 	}
 }
 
@@ -402,6 +421,33 @@ func TestUploadedFileLifecycleCleansInactiveFiles(t *testing.T) {
 	server.cleanupUploadedFiles()
 	if _, err := os.Stat(third); !os.IsNotExist(err) {
 		t.Fatalf("expected cleanup to remove current upload, stat error = %v", err)
+	}
+}
+
+func TestHandleCapturePrepareReplacement(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/capture/prepare-replacement", nil)
+	rec := httptest.NewRecorder()
+	server.handleCapturePrepareReplacement(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected prepare replacement endpoint to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode prepare replacement payload: %v", err)
+	}
+	if payload["status"] != "prepared" {
+		t.Fatalf("unexpected prepare replacement payload: %+v", payload)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/capture/prepare-replacement", nil)
+	getRec := httptest.NewRecorder()
+	server.handleCapturePrepareReplacement(getRec, getReq)
+	if getRec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected non-POST prepare replacement request to fail, got %d", getRec.Code)
 	}
 }
 

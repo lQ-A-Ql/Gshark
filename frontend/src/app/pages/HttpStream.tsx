@@ -9,6 +9,7 @@ import { cn } from "../components/ui/utils";
 import { StreamChunkCard, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/DesignSystem";
 import { useSentinel } from "../state/SentinelContext";
 import type { StreamLoadMeta } from "../core/types";
+import { downloadText } from "../utils/browserFile";
 
 type HTTPChunk = {
   key: string;
@@ -148,13 +149,7 @@ export default function HttpStream() {
     const content = allChunks
       .map((chunk) => `--- ${chunk.direction === "client" ? "REQUEST" : "RESPONSE"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
       .join("\n\n");
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `http-stream-${httpStream.id}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(`http-stream-${httpStream.id}.txt`, content);
   };
 
   return (

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getShiroRememberMeAnalysis: vi.fn(),
   decodeStreamPayload: vi.fn(),
   inspectStreamPayload: vi.fn(),
+  listStreamPayloadSources: vi.fn(),
   listNTLMSessionMaterials: vi.fn(),
   listSMB3SessionCandidates: vi.fn(),
   generateSMB3RandomSessionKey: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("../integrations/wailsBridge", () => ({
     getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
     decodeStreamPayload: mocks.decodeStreamPayload,
     inspectStreamPayload: mocks.inspectStreamPayload,
+    listStreamPayloadSources: mocks.listStreamPayloadSources,
     listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
     listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
     generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
@@ -73,6 +75,7 @@ async function expandModule(moduleID: string) {
 
 describe("MiscTools SMB3 session candidates", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     mocks.sentinelState.fileMeta.path = "C:/captures/capture.pcapng";
     mocks.sentinelState.fileMeta.name = "capture.pcapng";
     mocks.sentinelState.locatePacketById.mockReset();
@@ -91,6 +94,7 @@ describe("MiscTools SMB3 session candidates", () => {
     mocks.getShiroRememberMeAnalysis.mockReset();
     mocks.decodeStreamPayload.mockReset();
     mocks.inspectStreamPayload.mockReset();
+    mocks.listStreamPayloadSources.mockReset();
     mocks.listNTLMSessionMaterials.mockReset();
     mocks.listSMB3SessionCandidates.mockReset();
     mocks.generateSMB3RandomSessionKey.mockReset();
@@ -278,6 +282,14 @@ describe("MiscTools SMB3 session candidates", () => {
           confidence: 88,
           decoderHints: ["antsword", "base64"],
           fingerprints: ["script-after-base64"],
+          familyHint: "antsword_like",
+          sourceRole: "script_or_command",
+          decoderOptionsHint: {
+            decoder: "antsword",
+            pass: "pass",
+            extractParam: true,
+            urlDecodeRounds: 1,
+          },
         },
       ],
       suggestedCandidateId: "form-0",
@@ -297,6 +309,7 @@ describe("MiscTools SMB3 session candidates", () => {
       signals: ["keyword:assert"],
       attemptErrors: ["Behinder (ECB): AES-ECB 密文长度非法"],
     });
+    mocks.listStreamPayloadSources.mockResolvedValue([]);
     mocks.listNTLMSessionMaterials.mockResolvedValue([
       {
         protocol: "HTTP",
@@ -486,14 +499,18 @@ describe("MiscTools SMB3 session candidates", () => {
 
     await expandModule("payload-webshell-decoder");
 
-    fireEvent.click(screen.getByRole("button", { name: "示例" }));
-    fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
+    fireEvent.click(await screen.findByRole("button", { name: "示例" }, { timeout: 5000 }));
+    fireEvent.click(await screen.findByRole("button", { name: "识别候选" }, { timeout: 5000 }));
 
     await waitFor(() => {
       expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==", expect.any(AbortSignal));
     });
     expect(await screen.findByText("参数 pass")).toBeInTheDocument();
-    expect(screen.getByText("实验性 webshell 解码，需人工复核")).toBeInTheDocument();
+    expect(screen.getByText("无需抓包")).toBeInTheDocument();
+    expect(screen.getByText("可取消")).toBeInTheDocument();
+    expect(screen.getAllByText("支持导出").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("实验性")).toBeInTheDocument();
+    expect(screen.getByText("候选可疑与低置信结果需要人工确认")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Base64" }));
 
@@ -509,6 +526,165 @@ describe("MiscTools SMB3 session candidates", () => {
     expect(screen.getByText("置信度 96%")).toBeInTheDocument();
     expect(screen.getByText("keyword:assert")).toBeInTheDocument();
     expect(screen.getByText("Behinder (ECB): AES-ECB 密文长度非法")).toBeInTheDocument();
+  }, 10000);
+
+  it("loads suspicious URI sources and fills the payload textarea from a selected source", async () => {
+    mocks.listStreamPayloadSources.mockResolvedValueOnce([
+      {
+        id: "pkt-81-form-pass",
+        method: "POST",
+        host: "web.test",
+        uri: "/shell.php",
+        packetId: 81,
+        streamId: 9,
+        sourceType: "form",
+        paramName: "pass",
+        payload: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        preview: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        confidence: 92,
+        signals: ["suspicious-uri", "suspicious-param", "script-after-base64"],
+        decoderHints: ["antsword", "base64"],
+        familyHint: "antsword_like",
+        sourceRole: "script_or_command",
+        decoderOptionsHint: {
+          decoder: "antsword",
+          pass: "pass",
+          extractParam: true,
+          urlDecodeRounds: 1,
+        },
+      },
+    ]);
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    expect(await screen.findByText("可疑 URI / 参数来源")).toBeInTheDocument();
+    const sourceText = await screen.findByText(/web\.test\/shell\.php/);
+    const sourceButton = sourceText.closest("button");
+    expect(sourceButton).toBeTruthy();
+    fireEvent.click(sourceButton!);
+
+    await waitFor(() => {
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==", expect.any(AbortSignal));
+    });
+    expect(screen.getByDisplayValue("YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==")).toBeInTheDocument();
+    expect(screen.getByText(/当前输入来自 packet #81/)).toBeInTheDocument();
+    expect((await screen.findAllByText("antsword_like")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("script_or_command").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("antsword").length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "AntSword" }));
+    await waitFor(() => {
+      expect(mocks.decodeStreamPayload).toHaveBeenCalledWith(
+        "antsword",
+        "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        expect.objectContaining({
+          pass: "pass",
+          extractParam: true,
+          urlDecodeRounds: 1,
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
+  it("keeps Godzilla source hints when payload re-inspection is weaker", async () => {
+    mocks.listStreamPayloadSources.mockResolvedValueOnce([
+      {
+        id: "pkt-82-form-7f0e6f",
+        method: "POST",
+        host: "web.test",
+        uri: "/index.jsp",
+        packetId: 82,
+        streamId: 10,
+        sourceType: "form",
+        paramName: "7f0e6f",
+        payload: "AAECAwQFBgcICQoLDA0ODw==",
+        preview: "AAECAwQFBgcICQoLDA0ODw==",
+        confidence: 96,
+        signals: ["godzilla_like", "encrypted_blob", "godzilla-random-param"],
+        decoderHints: ["godzilla", "auto"],
+        familyHint: "godzilla_like",
+        sourceRole: "encrypted_blob",
+        decoderOptionsHint: {
+          decoder: "godzilla",
+          pass: "7f0e6f",
+          extractParam: true,
+          urlDecodeRounds: 1,
+          inputEncoding: "base64",
+          cipher: "aes_ecb",
+          stripMarkers: true,
+        },
+      },
+    ]);
+    mocks.inspectStreamPayload.mockResolvedValueOnce({
+      normalizedPayload: "AAECAwQFBgcICQoLDA0ODw==",
+      candidates: [
+        {
+          id: "payload-0",
+          label: "当前 payload",
+          kind: "payload",
+          value: "AAECAwQFBgcICQoLDA0ODw==",
+          preview: "AAECAwQFBgcICQoLDA0ODw==",
+          confidence: 78,
+          decoderHints: ["behinder", "godzilla", "auto"],
+          fingerprints: ["base64-aes-block"],
+          familyHint: "aes_webshell_like",
+          sourceRole: "encrypted_blob",
+          decoderOptionsHint: {
+            decoder: "behinder",
+            extractParam: false,
+            urlDecodeRounds: 1,
+            inputEncoding: "base64",
+            deriveKeyFromPass: true,
+          },
+        },
+      ],
+      suggestedCandidateId: "payload-0",
+      suggestedDecoder: "behinder",
+      suggestedFamily: "aes_webshell_like",
+      confidence: 78,
+      reasons: ["候选值 Base64 解码后长度符合 AES 分组且可打印率低。"],
+    });
+
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    const sourceText = await screen.findByText(/web\.test\/index\.jsp/);
+    const sourceButton = sourceText.closest("button");
+    expect(sourceButton).toBeTruthy();
+    fireEvent.click(sourceButton!);
+
+    await waitFor(() => {
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("AAECAwQFBgcICQoLDA0ODw==", expect.any(AbortSignal));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Godzilla" }));
+
+    await waitFor(() => {
+      expect(mocks.decodeStreamPayload).toHaveBeenCalled();
+    });
+    const [, , options] = mocks.decodeStreamPayload.mock.calls.at(-1)!;
+    expect(options).toMatchObject({
+      pass: "7f0e6f",
+      extractParam: true,
+      urlDecodeRounds: 1,
+      inputEncoding: "base64",
+      cipher: "aes_ecb",
+      stripMarkers: true,
+    });
+    expect((options as Record<string, unknown>).key ?? "").toBe("");
+  });
+
+  it("keeps manual payload workflow available when no capture is loaded", async () => {
+    mocks.sentinelState.fileMeta.path = "";
+    mocks.sentinelState.fileMeta.name = "";
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    expect(await screen.findByText(/可先手动粘贴 payload/)).toBeInTheDocument();
+    expect(mocks.listStreamPayloadSources).not.toHaveBeenCalled();
   });
 
   it("keeps low-confidence auto detection as an explicit review state", async () => {
@@ -537,7 +713,7 @@ describe("MiscTools SMB3 session candidates", () => {
 
     await expandModule("payload-webshell-decoder");
 
-    fireEvent.change(screen.getByPlaceholderText(/POST \/shell\.php/), { target: { value: "just-random-text" } });
+    fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), { target: { value: "just-random-text" } });
     fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
 
     expect(await screen.findByText("当前 payload")).toBeInTheDocument();
@@ -546,23 +722,76 @@ describe("MiscTools SMB3 session candidates", () => {
     expect(await screen.findByText("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空")).toBeInTheDocument();
   });
 
+  it("re-runs payload inspection when the same input is submitted again", async () => {
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), {
+      target: { value: "pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
+
+    await waitFor(() => {
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
+
+    await waitFor(() => {
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("shows an immediate hint and skips inspect for empty payload input", async () => {
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder");
+
+    fireEvent.click(await screen.findByRole("button", { name: "识别候选" }));
+
+    expect(await screen.findByText("请输入 payload 后再识别候选。")).toBeInTheDocument();
+    expect(mocks.inspectStreamPayload).not.toHaveBeenCalled();
+  });
+
   it("loads candidates and renders detailed selector options", async () => {
     render(<MiscTools />);
 
     await waitFor(() => {
       expect(mocks.listMiscModules).toHaveBeenCalledTimes(1);
       expect(mocks.getHTTPLoginAnalysis).toHaveBeenCalledTimes(1);
-      expect(mocks.getMySQLAnalysis).toHaveBeenCalledTimes(1);
-      expect(mocks.getSMTPAnalysis).toHaveBeenCalledTimes(1);
-      expect(mocks.getShiroRememberMeAnalysis).toHaveBeenCalledTimes(1);
-      expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
     });
+    expect(mocks.getMySQLAnalysis).not.toHaveBeenCalled();
+    expect(mocks.getSMTPAnalysis).not.toHaveBeenCalled();
+    expect(mocks.getShiroRememberMeAnalysis).not.toHaveBeenCalled();
+    expect(mocks.listNTLMSessionMaterials).not.toHaveBeenCalled();
+    expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
 
     await expandModule("ntlm-session-materials");
+    await waitFor(() => {
+      expect(mocks.listNTLMSessionMaterials).toHaveBeenCalledTimes(1);
+    });
+
     await expandModule("mysql-session-analysis");
+    await waitFor(() => {
+      expect(mocks.getMySQLAnalysis).toHaveBeenCalledTimes(1);
+    });
+
     await expandModule("smtp-session-analysis");
+    await waitFor(() => {
+      expect(mocks.getSMTPAnalysis).toHaveBeenCalledTimes(1);
+    });
+
     await expandModule("shiro-rememberme-analysis");
+    await waitFor(() => {
+      expect(mocks.getShiroRememberMeAnalysis).toHaveBeenCalledTimes(1);
+    });
+
     await expandModule("smb3-session-key");
+    await waitFor(() => {
+      expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
+    });
 
     expect(await screen.findByText("已发现 2 条候选，其中 1 条材料完整")).toBeInTheDocument();
     expect(screen.getByTestId("smb-session-candidate-101")).toBeInTheDocument();
@@ -601,10 +830,13 @@ describe("MiscTools SMB3 session candidates", () => {
 
     await waitFor(() => {
       expect(mocks.listMiscModules).toHaveBeenCalled();
-      expect(mocks.listSMB3SessionCandidates).toHaveBeenCalled();
     });
+    expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
 
     await expandModule("smb3-session-key");
+    await waitFor(() => {
+      expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
+    });
 
     const hashInput = screen.getByLabelText("NTLM Hash (十六进制)") as HTMLInputElement;
     fireEvent.change(hashInput, { target: { value: "31d6cfe0d16ae931b73c59d7e0c089c0" } });

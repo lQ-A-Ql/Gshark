@@ -36,6 +36,7 @@ import {
 } from "../components/ui/sidebar";
 import { RuntimeSettingsSidebar } from "../components/RuntimeSettingsSidebar";
 import { TLSDecryptionDialog } from "../components/TLSDecryptionDialog";
+import { copyTextToClipboard, downloadText } from "../utils/browserFile";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -183,16 +184,6 @@ export function MainLayout() {
     applyFilter,
   } = useSentinel();
 
-  const downloadText = (filename: string, content: string, mime = "text/plain;charset=utf-8") => {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const exportPacketsJson = () => {
     downloadText(
       `packets-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`,
@@ -209,11 +200,7 @@ export function MainLayout() {
       `${selectedPacket.proto} len=${selectedPacket.length}`,
       selectedPacket.info,
     ].join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // ignore clipboard failures
-    }
+    await copyTextToClipboard(text);
   };
 
   const followSelectedStream = () => {
@@ -458,14 +445,14 @@ export function MainLayout() {
           <main className="gshark-page-bg gshark-theme-main relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {backgroundFade ? (
               <div
-                key={backgroundFade.key}
+                key={`fade-${backgroundFade.key}`}
                 aria-hidden="true"
                 className="gshark-page-bg gshark-theme-fade"
                 style={backgroundFade.style}
                 onAnimationEnd={() => setBackgroundFade(null)}
               />
             ) : null}
-            <div key={location.pathname} className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div key={`route-${location.pathname}`} className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden">
               <Outlet />
             </div>
           </main>

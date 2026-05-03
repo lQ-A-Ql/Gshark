@@ -36,11 +36,7 @@ func ConfiguredBinaryPath() string {
 }
 
 func Command(args ...string) (*exec.Cmd, error) {
-	binary, err := ResolveBinary()
-	if err != nil {
-		return nil, err
-	}
-	return exec.Command(binary, args...), nil
+	return CommandContext(context.Background(), args...)
 }
 
 func CommandContext(ctx context.Context, args ...string) (*exec.Cmd, error) {

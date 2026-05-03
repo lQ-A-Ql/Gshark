@@ -1,7 +1,8 @@
 import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { StatusHint } from "../components/DesignSystem";
 import {
   AnalysisBucketChart as BucketChart,
   AnalysisDataTable as DataTable,
@@ -11,56 +12,11 @@ import {
   AnalysisStatCard as StatCard,
 } from "../components/analysis/AnalysisPrimitives";
 import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
+import { buildVehicleAnalysisCacheKey, useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
-const EMPTY_ANALYSIS: VehicleAnalysisData = {
-  totalVehiclePackets: 0,
-  protocols: [],
-  conversations: [],
-  can: {
-    totalFrames: 0,
-    extendedFrames: 0,
-    rtrFrames: 0,
-    errorFrames: 0,
-    busIds: [],
-    messageIds: [],
-    payloadProtocols: [],
-    payloadRecords: [],
-    dbcProfiles: [],
-    decodedMessageDist: [],
-    decodedSignals: [],
-    decodedMessages: [],
-    signalTimelines: [],
-    frames: [],
-  },
-  j1939: {
-    totalMessages: 0,
-    pgns: [],
-    sourceAddrs: [],
-    targetAddrs: [],
-    messages: [],
-  },
-  doip: {
-    totalMessages: 0,
-    messageTypes: [],
-    vins: [],
-    endpoints: [],
-    messages: [],
-  },
-  uds: {
-    totalMessages: 0,
-    serviceIDs: [],
-    negativeCodes: [],
-    dtcs: [],
-    vins: [],
-    messages: [],
-    transactions: [],
-  },
-  recommendations: [],
-};
-
-const vehicleAnalysisCache = new Map<string, VehicleAnalysisData>();
+export { buildVehicleAnalysisCacheKey };
 const MAX_CAN_DATA_LINES_PER_ID = 12;
 const VEHICLE_PROTOCOL_TAGS = ["CAN", "J1939", "DoIP", "UDS"];
 
@@ -84,69 +40,17 @@ export default function VehicleAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
   const [dbcProfiles, setDBCProfiles] = useState<DBCProfile[]>([]);
   const [dbcPathInput, setDBCPathInput] = useState("");
-  const cacheKey = useMemo(() => {
-    return buildVehicleAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets, dbcProfiles);
-  }, [captureRevision, dbcProfiles, fileMeta.path, totalPackets]);
-  const [analysis, setAnalysis] = useState<VehicleAnalysisData>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { analysis, loading, error: analysisError, refreshAnalysis } = useVehicleAnalysis({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+    dbcProfiles,
+  });
+  const [pageError, setPageError] = useState("");
+  const error = analysisError || pageError;
   const canIdDataGroups = useMemo(() => buildCanIdDataGroups(analysis), [analysis]);
-  const requestAbortRef = useRef<AbortController | null>(null);
-  const requestSeqRef = useRef(0);
-
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!backendConnected) {
-      setLoading(false);
-      setError("");
-      setAnalysis(EMPTY_ANALYSIS);
-      return;
-    }
-    if (!force && cacheKey && vehicleAnalysisCache.has(cacheKey)) {
-      setAnalysis(vehicleAnalysisCache.get(cacheKey) ?? EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    requestAbortRef.current?.abort();
-    const abortController = new AbortController();
-    requestAbortRef.current = abortController;
-    const requestSeq = ++requestSeqRef.current;
-    const isLatest = () => requestSeq === requestSeqRef.current;
-    void bridge
-      .getVehicleAnalysis(abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (cacheKey) {
-          vehicleAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-      })
-      .catch((err) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "车机流量分析加载失败");
-        setAnalysis(EMPTY_ANALYSIS);
-      })
-      .finally(() => {
-        if (requestAbortRef.current === abortController) {
-          requestAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      abortController.abort();
-      if (requestAbortRef.current === abortController) {
-        requestAbortRef.current = null;
-      }
-    };
-  }, [backendConnected, cacheKey]);
-
-  useEffect(() => () => {
-    requestAbortRef.current?.abort();
-  }, []);
 
   const refreshDBCProfiles = useCallback(() => {
     if (!backendConnected) {
@@ -164,25 +68,23 @@ export default function VehicleAnalysis() {
     if (!normalized) return;
     try {
       const profiles = await bridge.addVehicleDBC(normalized);
-      vehicleAnalysisCache.clear();
       setDBCProfiles(profiles);
       setDBCPathInput("");
-      setError("");
+      setPageError("");
       refreshAnalysis(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "DBC 导入失败");
+      setPageError(err instanceof Error ? err.message : "DBC 导入失败");
     }
   }, [refreshAnalysis]);
 
   const removeDBC = useCallback(async (path: string) => {
     try {
       const profiles = await bridge.removeVehicleDBC(path);
-      vehicleAnalysisCache.clear();
       setDBCProfiles(profiles);
-      setError("");
+      setPageError("");
       refreshAnalysis(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "DBC 移除失败");
+      setPageError(err instanceof Error ? err.message : "DBC 移除失败");
     }
   }, [refreshAnalysis]);
 
@@ -192,7 +94,7 @@ export default function VehicleAnalysis() {
       .then((file) => addDBC(file.filePath))
       .catch((err) => {
         if (err instanceof Error && err.message !== "未选择 DBC 文件") {
-          setError(err.message);
+          setPageError(err.message);
         }
       });
   }, [addDBC]);
@@ -216,13 +118,9 @@ export default function VehicleAnalysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && (
-        <div className="mb-3 rounded-2xl border border-emerald-100 bg-white/88 px-4 py-3 text-xs font-medium text-slate-500 shadow-[0_18px_48px_rgba(148,163,184,0.14)] backdrop-blur-xl">正在调用 tshark 生成车机分析结果...</div>
-      )}
+      {loading && <StatusHint tone="slate" className="mb-3">正在调用 tshark 生成车机分析结果...</StatusHint>}
 
-      {!loading && error && (
-        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/88 px-4 py-3 text-xs text-amber-700 shadow-[0_18px_48px_rgba(245,158,11,0.12)] backdrop-blur-xl">{error}</div>
-      )}
+      {!loading && error && <StatusHint tone="amber" className="mb-3">{error}</StatusHint>}
 
       <Panel title="DBC 映射" className="mb-4">
         <div className="flex flex-col gap-3">
@@ -627,9 +525,3 @@ export function buildCanIdDataGroups(analysis: VehicleAnalysisData): CanIdDataGr
   });
 }
 
-export function buildVehicleAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number, dbcProfiles: DBCProfile[]) {
-  const normalizedPath = filePath.trim();
-  if (!normalizedPath) return "";
-  const dbcKey = dbcProfiles.map((item) => item.path).sort().join("|");
-  return `${captureRevision}::${normalizedPath}::${totalPackets}::${dbcKey}`;
-}

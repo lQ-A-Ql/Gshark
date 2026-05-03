@@ -27,6 +27,12 @@ type Service struct {
 
 	mu                      sync.RWMutex
 	loadMu                  sync.Mutex
+	activeLoadMu            sync.Mutex
+	activeLoadID            int64
+	activeLoadCancel        context.CancelFunc
+	captureTaskMu           sync.Mutex
+	captureTaskSeq          int64
+	captureTasks            map[int64]captureTaskCancel
 	packetStore             *packetStore
 	tlsConf                 model.TLSConfig
 	runID                   int64
@@ -82,6 +88,11 @@ type filteredPacketIndex struct {
 	cancel    context.CancelFunc
 }
 
+type captureTaskCancel struct {
+	name   string
+	cancel context.CancelFunc
+}
+
 type DisplayFilterError struct {
 	Filter string
 	Err    error
@@ -129,6 +140,7 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 		emitter:            emitter,
 		pluginManger:       pm,
 		packetStore:        store,
+		captureTasks:       map[int64]captureTaskCancel{},
 		displayFilterCache: map[string]*filteredPacketIndex{},
 		streamCache:        map[string]model.ReassembledStream{},
 		rawStreamIndex:     map[string]model.ReassembledStream{},
@@ -159,20 +171,31 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 		return errors.New("empty file path")
 	}
 
-	requestRunID := atomic.AddInt64(&s.runID, 1)
-	s.StopStreaming()
-	s.loadMu.Lock()
+	currentRunID, runCtx := s.BeginCaptureLoad(ctx)
+	return s.LoadPCAPWithRun(runCtx, opts, currentRunID)
+}
+
+func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
+	if opts.FilePath == "" {
+		s.finishActiveCaptureLoad(currentRunID)
+		return errors.New("empty file path")
+	}
+	defer s.finishActiveCaptureLoad(currentRunID)
+
+	if err := s.lockLoad(runCtx); err != nil {
+		log.Printf("engine: capture parse canceled before acquiring load lock file=%q err=%v", opts.FilePath, err)
+		s.emitStatus("解析被取消")
+		return err
+	}
 	defer s.loadMu.Unlock()
-	if atomic.LoadInt64(&s.runID) != requestRunID {
+	if atomic.LoadInt64(&s.runID) != currentRunID {
 		return context.Canceled
 	}
 
-	currentRunID := requestRunID
-	runCtx, cancel := context.WithCancel(ctx)
-	s.mu.Lock()
-	s.cancel = cancel
-	s.mu.Unlock()
+	return s.loadPCAPLocked(runCtx, opts, currentRunID)
+}
 
+func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
 	s.mu.RLock()
 	oldPCAP := s.pcap
 	s.mu.RUnlock()
@@ -391,6 +414,9 @@ func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
 	if total > 0 {
 		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", processed, total))
 	}
+	if err == nil && atomic.LoadInt64(&s.runID) != currentRunID {
+		err = context.Canceled
+	}
 
 	dropped := processed - accepted
 	if dropped < 0 {
@@ -457,25 +483,169 @@ func (s *Service) cancelSpeechBatchLocked() {
 	}
 }
 
-func (s *Service) StopStreaming() {
+func (s *Service) lockLoad(ctx context.Context) error {
+	for {
+		if s.loadMu.TryLock() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
+}
+
+func (s *Service) registerActiveCaptureLoad(runID int64, cancel context.CancelFunc) {
+	s.activeLoadMu.Lock()
+	previous := s.activeLoadCancel
+	s.activeLoadID = runID
+	s.activeLoadCancel = cancel
+	s.activeLoadMu.Unlock()
+	if previous != nil {
+		previous()
+	}
+}
+
+func (s *Service) TrackCaptureTask(ctx context.Context, name string) (context.Context, func()) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	taskCtx, cancel := context.WithCancel(ctx)
+	s.captureTaskMu.Lock()
+	if s.captureTasks == nil {
+		s.captureTasks = map[int64]captureTaskCancel{}
+	}
+	s.captureTaskSeq++
+	id := s.captureTaskSeq
+	s.captureTasks[id] = captureTaskCancel{name: strings.TrimSpace(name), cancel: cancel}
+	s.captureTaskMu.Unlock()
+
+	var done atomic.Bool
+	finish := func() {
+		if !done.CompareAndSwap(false, true) {
+			return
+		}
+		s.captureTaskMu.Lock()
+		delete(s.captureTasks, id)
+		s.captureTaskMu.Unlock()
+		cancel()
+	}
+	return taskCtx, finish
+}
+
+func (s *Service) CancelCaptureTasks() int {
+	s.captureTaskMu.Lock()
+	tasks := make([]captureTaskCancel, 0, len(s.captureTasks))
+	for id, task := range s.captureTasks {
+		tasks = append(tasks, task)
+		delete(s.captureTasks, id)
+	}
+	s.captureTaskMu.Unlock()
+	for _, task := range tasks {
+		if task.cancel != nil {
+			task.cancel()
+		}
+	}
+	return len(tasks)
+}
+
+func (s *Service) ActiveCaptureTaskCount() int {
+	s.captureTaskMu.Lock()
+	defer s.captureTaskMu.Unlock()
+	return len(s.captureTasks)
+}
+
+func (s *Service) BeginCaptureLoad(ctx context.Context) (int64, context.Context) {
+	currentRunID := atomic.AddInt64(&s.runID, 1)
+	s.CancelActiveCaptureLoad()
+	s.cancelLegacyStreaming()
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.mu.Unlock()
+
+	runCtx, cancel := context.WithCancel(ctx)
+	s.registerActiveCaptureLoad(currentRunID, cancel)
+	return currentRunID, runCtx
+}
+
+func (s *Service) finishActiveCaptureLoad(runID int64) {
+	s.activeLoadMu.Lock()
+	if s.activeLoadID == runID {
+		s.activeLoadID = 0
+		s.activeLoadCancel = nil
+	}
+	s.activeLoadMu.Unlock()
+}
+
+func (s *Service) CancelActiveCaptureLoad() bool {
+	s.activeLoadMu.Lock()
+	cancel := s.activeLoadCancel
+	s.activeLoadCancel = nil
+	s.activeLoadID = 0
+	s.activeLoadMu.Unlock()
+	if cancel != nil {
+		cancel()
+		return true
+	}
+	return false
+}
+
+func (s *Service) cancelLegacyStreaming() bool {
 	s.mu.Lock()
 	cancel := s.cancel
 	s.cancel = nil
 	s.mu.Unlock()
 	if cancel != nil {
 		cancel()
+		return true
 	}
+	return false
+}
+
+func (s *Service) StopStreaming() bool {
+	activeCanceled := s.CancelActiveCaptureLoad()
+	legacyCanceled := s.cancelLegacyStreaming()
+	return activeCanceled || legacyCanceled
+}
+
+func (s *Service) PrepareCaptureReplacement() {
+	atomic.AddInt64(&s.runID, 1)
+	if s.StopStreaming() {
+		s.emitStatus("正在终止旧抓包解析")
+	}
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.mu.Unlock()
 }
 
 func (s *Service) ClearCapture() error {
 	atomic.AddInt64(&s.runID, 1)
-	s.StopStreaming()
+	if s.StopStreaming() {
+		s.emitStatus("正在终止当前抓包解析")
+	}
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
 
 	s.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
 	s.mu.Unlock()
 
-	s.loadMu.Lock()
+	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.lockLoad(waitCtx); err != nil {
+		s.emitStatus("正在终止旧解析，请稍后重试关闭抓包。")
+		return err
+	}
 	defer s.loadMu.Unlock()
 
 	if s.packetStore != nil {
@@ -647,6 +817,8 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, finishTask := s.TrackCaptureTask(ctx, "threat-hunting")
+	defer finishTask()
 	if len(prefixes) == 0 {
 		prefixes = s.getHuntingPrefixes()
 	}
@@ -807,6 +979,11 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, finishTask := s.TrackCaptureTask(ctx, "yara-scan")
+	defer finishTask()
+	if ctx.Err() != nil {
+		return nil
+	}
 	s.yaraMu.Lock()
 	defer s.yaraMu.Unlock()
 
@@ -820,11 +997,14 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	yc := s.yaraConf
 	s.huntMu.RUnlock()
 
-	targets, cleanup, err := s.buildYaraScanTargets(objects)
+	targets, cleanup, err := s.buildYaraScanTargetsWithContext(ctx, objects)
 	if cleanup != nil {
 		defer cleanup()
 	}
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
 		log.Printf("engine: build yara scan targets failed: %v", err)
 		s.emitStatus("YARA 扫描目标构建失败: " + err.Error())
 		hits := []model.ThreatHit{newYaraWarningHit("YARA 扫描目标构建失败: " + err.Error())}
@@ -866,6 +1046,8 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, finishTask := s.TrackCaptureTask(ctx, "object-export")
+	defer finishTask()
 	s.objMu.Lock()
 	if s.objectsLoaded {
 		objects := s.objects
@@ -1001,6 +1183,9 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if ctx.Err() != nil {
+		return model.ReassembledStream{StreamID: streamID, Protocol: "HTTP"}
+	}
 	key := streamCacheKey("HTTP", streamID)
 	log.Printf("engine: http stream request stream=%d", streamID)
 	s.mu.RLock()
@@ -1057,6 +1242,9 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		ctx = context.Background()
 	}
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
+	if ctx.Err() != nil {
+		return model.ReassembledStream{StreamID: streamID, Protocol: normalized}
+	}
 	key := streamCacheKey(normalized, streamID)
 	log.Printf("engine: raw stream request protocol=%s stream=%d", normalized, streamID)
 
@@ -1755,7 +1943,7 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 	var analysis model.C2SampleAnalysis
 	if pcap == "" {
 		analysis = emptyC2SampleAnalysis()
-		analysis.Notes = append(analysis.Notes, "当前未加载抓包，C2 骨架页仅显示空结构。")
+		analysis.Notes = append(analysis.Notes, "当前未加载抓包，C2 分析暂未形成候选证据。")
 	} else {
 		if s.packetStore == nil {
 			return model.C2SampleAnalysis{}, errors.New("当前抓包尚未建立本地数据包索引")
@@ -1836,7 +2024,7 @@ func (s *Service) APTAnalysis(ctx context.Context) (model.APTAnalysis, error) {
 
 	analysis := emptyAPTAnalysis()
 	if pcap == "" {
-		analysis.Notes = append(analysis.Notes, "当前未加载抓包，APT 组织画像页仅显示独立骨架与 Silver Fox 预留模型。")
+		analysis.Notes = append(analysis.Notes, "当前未加载抓包，APT 组织画像暂未形成可评分证据，仅展示框架画像与待验证证据需求。")
 	} else {
 		c2, err := s.C2SampleAnalysis(ctx)
 		if err != nil {
@@ -1893,7 +2081,7 @@ func emptySilverFoxProfile() model.APTActorProfile {
 		ID:            "silver-fox",
 		Name:          "Silver Fox / 银狐",
 		Aliases:       []string{"Swimming Snake", "银狐", "Silver Fox"},
-		Summary:       "预置 APT 画像骨架：用于承载 ValleyRAT / Winos 4.0 / Gh0st 系、HFS 下载链、HTTPS/TCP C2、fallback C2 与周期回连等后续证据。",
+		Summary:       "预置 APT 框架画像：用于承载 ValleyRAT / Winos 4.0 / Gh0st 系、HFS 下载链、HTTPS/TCP C2、fallback C2 与周期回连等后续证据。",
 		Confidence:    0,
 		EvidenceCount: 0,
 		SampleFamilies: []model.TrafficBucket{

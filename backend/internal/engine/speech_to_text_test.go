@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -143,6 +144,97 @@ func TestStartMediaBatchTranscriptionRunsSequentially(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("timed out waiting for batch transcription to complete")
+}
+
+func TestPrepareCaptureReplacementCancelsSpeechBatchTask(t *testing.T) {
+	oldStatus := speechToTextStatusFn
+	oldTranscribe := transcribeAudioArtifactFn
+	t.Cleanup(func() {
+		speechToTextStatusFn = oldStatus
+		transcribeAudioArtifactFn = oldTranscribe
+	})
+
+	speechToTextStatusFn = func() model.SpeechToTextStatus {
+		return model.SpeechToTextStatus{
+			Available:       true,
+			FFmpegAvailable: true,
+			PythonAvailable: true,
+			VoskAvailable:   true,
+			ModelAvailable:  true,
+			Engine:          speechEngineName,
+			Language:        speechLanguageCode,
+			Message:         "ok",
+		}
+	}
+
+	started := make(chan struct{})
+	var calls atomic.Int32
+	transcribeAudioArtifactFn = func(ctx context.Context, _ model.SpeechToTextStatus, _ string) (rawTranscriptionPayload, error) {
+		if calls.Add(1) == 1 {
+			close(started)
+		}
+		<-ctx.Done()
+		return rawTranscriptionPayload{}, ctx.Err()
+	}
+
+	audioDir := t.TempDir()
+	audioFile1 := filepath.Join(audioDir, "first.ulaw")
+	audioFile2 := filepath.Join(audioDir, "second.ulaw")
+	_ = os.WriteFile(audioFile1, []byte("a"), 0o644)
+	_ = os.WriteFile(audioFile2, []byte("b"), 0o644)
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	svc.mediaAnalysis = &model.MediaAnalysis{
+		Sessions: []model.MediaSession{
+			{
+				ID: "audio-1", MediaType: "audio", Application: "RTP",
+				Source: "10.0.0.1", SourcePort: 4000, Destination: "10.0.0.2", DestinationPort: 5000,
+				Artifact: &model.MediaArtifact{Token: "tok-1", Name: filepath.Base(audioFile1), Format: "ulaw"},
+			},
+			{
+				ID: "audio-2", MediaType: "audio", Application: "RTP",
+				Source: "10.0.0.3", SourcePort: 4001, Destination: "10.0.0.4", DestinationPort: 5001,
+				Artifact: &model.MediaArtifact{Token: "tok-2", Name: filepath.Base(audioFile2), Format: "ulaw"},
+			},
+		},
+	}
+	svc.mediaArtifacts["tok-1"] = audioFile1
+	svc.mediaArtifacts["tok-2"] = audioFile2
+
+	if _, err := svc.StartMediaBatchTranscription(true); err != nil {
+		t.Fatalf("StartMediaBatchTranscription() error = %v", err)
+	}
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for speech batch item to start")
+	}
+	if got := svc.ActiveCaptureTaskCount(); got == 0 {
+		t.Fatal("expected speech batch to be registered as capture task")
+	}
+
+	svc.PrepareCaptureReplacement()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		status := svc.MediaBatchTranscriptionStatus()
+		if status.Done {
+			if !status.Cancelled {
+				t.Fatalf("expected speech batch to be marked cancelled, got %+v", status)
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("expected replacement to stop before second item, got %d transcription calls", calls.Load())
+			}
+			if got := svc.ActiveCaptureTaskCount(); got != 0 {
+				t.Fatalf("expected capture tasks to be cleared, got %d", got)
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for speech batch cancellation")
 }
 
 func TestBuildSpeechModuleHintMissingVosk(t *testing.T) {

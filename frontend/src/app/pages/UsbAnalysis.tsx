@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, HardDrive, Keyboard, Pause, Play, Route, Usb, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -15,63 +15,16 @@ import type {
   USBMouseEvent,
   USBPacketRecord,
 } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { buildUSBAnalysisCacheKey, useUsbAnalysis } from "../features/usb/useUsbAnalysis";
 import { useSentinel } from "../state/SentinelContext";
+
+export { buildUSBAnalysisCacheKey };
 
 type UsbPrimaryTab = "hid" | "mass-storage" | "other";
 type HidSubTab = "keyboard" | "mouse";
 type MassStorageSubTab = "overview" | "read" | "write";
 type OtherSubTab = "overview" | "control" | "raw";
 
-const EMPTY_ANALYSIS: USBAnalysisData = {
-  totalUSBPackets: 0,
-  keyboardPackets: 0,
-  mousePackets: 0,
-  otherUSBPackets: 0,
-  hidPackets: 0,
-  massStoragePackets: 0,
-  protocols: [],
-  transferTypes: [],
-  directions: [],
-  devices: [],
-  endpoints: [],
-  setupRequests: [],
-  records: [],
-  keyboardEvents: [],
-  mouseEvents: [],
-  otherRecords: [],
-  hid: {
-    keyboardEvents: [],
-    mouseEvents: [],
-    devices: [],
-    notes: [],
-  },
-  massStorage: {
-    totalPackets: 0,
-    readPackets: 0,
-    writePackets: 0,
-    controlPackets: 0,
-    devices: [],
-    luns: [],
-    commands: [],
-    readOperations: [],
-    writeOperations: [],
-    notes: [],
-  },
-  other: {
-    totalPackets: 0,
-    controlPackets: 0,
-    devices: [],
-    endpoints: [],
-    setupRequests: [],
-    controlRecords: [],
-    records: [],
-    notes: [],
-  },
-  notes: [],
-};
-
-const usbAnalysisCache = new Map<string, USBAnalysisData>();
 const USB_PROTOCOL_TAGS = ["HID", "Mass Storage", "其他"];
 const USB_TABLE_WRAPPER_CLASS = "border-slate-200 bg-white shadow-sm";
 const USB_TABLE_HEADER_CLASS = "bg-gradient-to-r from-slate-100 to-blue-50 text-slate-700";
@@ -80,13 +33,14 @@ const USB_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export default function UsbAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
-  const cacheKey = useMemo(() => {
-    return buildUSBAnalysisCacheKey(captureRevision, fileMeta.path, totalPackets);
-  }, [captureRevision, fileMeta.path, totalPackets]);
+  const { analysis, loading, error, refreshAnalysis } = useUsbAnalysis({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+  });
 
-  const [analysis, setAnalysis] = useState<USBAnalysisData>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [activePrimaryTab, setActivePrimaryTab] = useState<UsbPrimaryTab>("hid");
   const [activeHidSubTab, setActiveHidSubTab] = useState<HidSubTab>("keyboard");
   const [activeMassStorageSubTab, setActiveMassStorageSubTab] = useState<MassStorageSubTab>("overview");
@@ -97,68 +51,6 @@ export default function UsbAnalysis() {
   const [activeMouseDevice, setActiveMouseDevice] = useState("");
   const [activeMassStorageDevice, setActiveMassStorageDevice] = useState("all");
   const [activeMassStorageLUN, setActiveMassStorageLUN] = useState("all");
-  const requestAbortRef = useRef<AbortController | null>(null);
-  const requestSeqRef = useRef(0);
-
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!backendConnected) {
-      setLoading(false);
-      setError("");
-      setAnalysis(EMPTY_ANALYSIS);
-      return;
-    }
-    if (!force && cacheKey && usbAnalysisCache.has(cacheKey)) {
-      setAnalysis(usbAnalysisCache.get(cacheKey) ?? EMPTY_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    requestAbortRef.current?.abort();
-    const abortController = new AbortController();
-    requestAbortRef.current = abortController;
-    const requestSeq = ++requestSeqRef.current;
-    const isLatest = () => requestSeq === requestSeqRef.current;
-    void bridge
-      .getUSBAnalysis(abortController.signal)
-      .then((payload) => {
-        if (!isLatest()) return;
-        if (cacheKey) {
-          usbAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-      })
-      .catch((err) => {
-        if (!isLatest() || abortController.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "USB 分析加载失败");
-        setAnalysis(EMPTY_ANALYSIS);
-      })
-      .finally(() => {
-        if (requestAbortRef.current === abortController) {
-          requestAbortRef.current = null;
-        }
-        if (isLatest()) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      abortController.abort();
-      if (requestAbortRef.current === abortController) {
-        requestAbortRef.current = null;
-      }
-    };
-  }, [backendConnected, cacheKey]);
-
-  useEffect(() => () => {
-    requestAbortRef.current?.abort();
-  }, []);
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
 
   const hidKeyboardEvents = useMemo(
     () => (analysis.hid.keyboardEvents.length > 0 ? analysis.hid.keyboardEvents : analysis.keyboardEvents),
@@ -585,11 +477,34 @@ export default function UsbAnalysis() {
 function domainHasData(analysis: USBAnalysisData, tab: UsbPrimaryTab) {
   switch (tab) {
     case "hid":
-      return analysis.hidPackets > 0 || analysis.keyboardPackets > 0 || analysis.mousePackets > 0;
+      return (
+        analysis.hidPackets > 0 ||
+        analysis.keyboardPackets > 0 ||
+        analysis.mousePackets > 0 ||
+        analysis.keyboardEvents.length > 0 ||
+        analysis.mouseEvents.length > 0 ||
+        analysis.hid.keyboardEvents.length > 0 ||
+        analysis.hid.mouseEvents.length > 0 ||
+        analysis.hid.devices.length > 0
+      );
     case "mass-storage":
-      return analysis.massStoragePackets > 0 || analysis.massStorage.totalPackets > 0;
+      return (
+        analysis.massStoragePackets > 0 ||
+        analysis.massStorage.totalPackets > 0 ||
+        analysis.massStorage.readOperations.length > 0 ||
+        analysis.massStorage.writeOperations.length > 0 ||
+        analysis.massStorage.devices.length > 0 ||
+        analysis.massStorage.commands.length > 0
+      );
     case "other":
-      return analysis.otherUSBPackets > 0 || analysis.other.totalPackets > 0;
+      return (
+        analysis.otherUSBPackets > 0 ||
+        analysis.other.totalPackets > 0 ||
+        analysis.otherRecords.length > 0 ||
+        analysis.other.records.length > 0 ||
+        analysis.other.controlRecords.length > 0 ||
+        analysis.other.setupRequests.length > 0
+      );
     default:
       return false;
   }
@@ -1135,8 +1050,4 @@ function Banner({ children, tone }: { children: ReactNode; tone: "muted" | "warn
   return <div className={className}>{children}</div>;
 }
 
-export function buildUSBAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
-  const normalizedPath = filePath.trim();
-  if (!normalizedPath) return "";
-  return `${captureRevision}::${normalizedPath}::${totalPackets}`;
-}
+
