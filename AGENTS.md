@@ -20,18 +20,20 @@ cd backend && go test ./...
 
 When running backend commands, `cd backend` first. The root module has almost no logic.
 
-## CI vs local tooling mismatch
+## Frontend package manager and CI
 
-CI (`.github/workflows/ci.yml`) uses `npm ci` with `package-lock.json`. Local dev uses `pnpm`. Both lockfiles exist in `frontend/`. CI does NOT run frontend tests — only `npm run build`.
+Frontend uses `pnpm` as the only package manager. `frontend/pnpm-lock.yaml` is the maintained lockfile; do not reintroduce `package-lock.json`.
+
+CI (`.github/workflows/ci.yml`) enables Corepack, runs `pnpm install --frozen-lockfile`, then `pnpm run ci` (`typecheck` + ESLint + Vitest + Vite build).
 
 ## Frontend build quirks
 
 - `pnpm run build:wails` = `vite build` + copies backend binary into `frontend/dist/` (via `scripts/build-backend-binary.ps1`). This is the command Wails uses.
-- `pnpm run build` = plain Vite build only (what CI runs).
+- `pnpm run build` = plain Vite build; CI runs it through `pnpm run ci` after typecheck, ESLint, and Vitest.
 - Vite config enforces: never add `.css`, `.tsx`, `.ts` to `assetsInclude`.
 - `@` alias → `./src` (configured in `vite.config.ts`).
 - Test environment: jsdom, setup file at `src/test/setup.ts`.
-- No ESLint or Prettier configured.
+- ESLint is part of frontend CI. Prettier is configured as a scoped baseline check for touched/split frontend files; use `pnpm run format:check` before handing off frontend refactors.
 
 ## Backend: no framework, stdlib router
 
@@ -57,7 +59,7 @@ Backend: `17891`. Wails dev server: `34115`. `scripts/start-wails-dev.ps1` kills
 ./scripts/check-all.ps1
 ```
 
-Runs: root Go tests (no build tag — desktop-only tests are skipped) → backend gofmt check → backend tests → frontend tests → frontend build.
+Runs: root Go tests (no build tag — desktop-only tests are skipped) → backend gofmt check → backend tests → frontend tests → frontend typecheck → frontend lint → frontend scoped format check → frontend build.
 
 ## MISC module scaffolding
 
@@ -116,6 +118,8 @@ Legacy `context.Background()` wrappers exist for desktop synchronous calls only.
 ## Test baseline
 
 - Backend: `cd backend && go test ./...` — 6 packages (engine, miscpkg, plugin, transport, tshark, yara)
-- Frontend: `cd frontend && pnpm run test` — 18 test files, 85 tests
-- TypeScript strict: `cd frontend && npx tsc --noEmit --noUnusedLocals --noUnusedParameters`
+- Frontend: `cd frontend && pnpm run test:run`
+- TypeScript strict: `cd frontend && pnpm run typecheck`
+- Frontend CI bundle: `cd frontend && pnpm run ci`
+- Frontend lint: `cd frontend && pnpm run lint`
 - Full check: `./scripts/check-all.ps1`

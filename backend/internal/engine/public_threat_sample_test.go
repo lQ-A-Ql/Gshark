@@ -14,35 +14,35 @@ import (
 )
 
 type publicThreatSampleManifest struct {
-	SchemaVersion int                          `json:"schemaVersion"`
-	UpdatedAt     string                       `json:"updatedAt"`
-	Policy        publicThreatSamplePolicy     `json:"policy"`
+	SchemaVersion int                              `json:"schemaVersion"`
+	UpdatedAt     string                           `json:"updatedAt"`
+	Policy        publicThreatSamplePolicy         `json:"policy"`
 	Samples       []publicThreatSampleManifestItem `json:"samples"`
 }
 
 type publicThreatSamplePolicy struct {
-	Purpose          string   `json:"purpose"`
-	MaxBytes         int64    `json:"maxBytes"`
+	Purpose           string   `json:"purpose"`
+	MaxBytes          int64    `json:"maxBytes"`
 	AllowedExtensions []string `json:"allowedExtensions"`
-	ArchivePolicy    string   `json:"archivePolicy"`
+	ArchivePolicy     string   `json:"archivePolicy"`
 	ExecutionPolicy   string   `json:"executionPolicy"`
 }
 
 type publicThreatSampleManifestItem struct {
-	ID            string                 `json:"id"`
-	Family        string                 `json:"family"`
-	SourceName    string                 `json:"sourceName"`
-	SourceURL     string                 `json:"sourceUrl"`
-	LocalPath     string                 `json:"localPath"`
-	SHA256        string                 `json:"sha256"`
-	Bytes         int64                  `json:"bytes"`
-	Status        string                 `json:"status"`
-	SkippedReason string                 `json:"skippedReason"`
-	LicenseNote   string                 `json:"licenseNote"`
-	ArchivePassword string               `json:"archivePassword"`
-	KnownKeys     map[string]string      `json:"knownKeys"`
-	Expected      map[string]any         `json:"expected"`
-	DownloadedAt  string                 `json:"downloadedAt"`
+	ID              string            `json:"id"`
+	Family          string            `json:"family"`
+	SourceName      string            `json:"sourceName"`
+	SourceURL       string            `json:"sourceUrl"`
+	LocalPath       string            `json:"localPath"`
+	SHA256          string            `json:"sha256"`
+	Bytes           int64             `json:"bytes"`
+	Status          string            `json:"status"`
+	SkippedReason   string            `json:"skippedReason"`
+	LicenseNote     string            `json:"licenseNote"`
+	ArchivePassword string            `json:"archivePassword"`
+	KnownKeys       map[string]string `json:"knownKeys"`
+	Expected        map[string]any    `json:"expected"`
+	DownloadedAt    string            `json:"downloadedAt"`
 }
 
 func TestThreatSampleManifestAndCSDetection(t *testing.T) {

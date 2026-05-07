@@ -20,6 +20,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/.vite/
+frontend/package-lock.json
 
 # Go / binaries
 *.exe

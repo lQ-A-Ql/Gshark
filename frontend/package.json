@@ -3,12 +3,18 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "packageManager": "pnpm@10.31.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1",
+    "ci": "pnpm run typecheck && pnpm run lint && pnpm run test:run && pnpm run build",
+    "format:check": "prettier --check \"eslint.config.js\" \"src/app/integrations/mappers/**/*.{ts,tsx}\" \"src/app/state/captureConstants.ts\" \"src/app/state/progressHelpers.ts\" \"src/app/state/recentCaptures.ts\" \"src/app/state/streamState*.ts\" \"src/app/state/packetPagination*.ts\" \"src/app/state/selectedPacketState*.ts\" \"src/app/misc/FilterActions.tsx\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:run": "vitest run",
+    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "1.1.6",
@@ -34,6 +40,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
+    "@eslint/js": "^9.39.1",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@types/node": "24.3.0",
@@ -41,9 +48,13 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.7.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^26.1.0",
+    "prettier": "^3.7.4",
     "tailwindcss": "4.1.12",
     "typescript": "5.9.2",
+    "typescript-eslint": "^8.46.4",
     "vite": "6.3.5",
     "vitest": "^3.2.4"
   },

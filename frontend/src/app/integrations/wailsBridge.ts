@@ -42,6 +42,16 @@ import type {
 } from "../core/types";
 import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
 import { downloadBlob } from "../utils/browserFile";
+import { asAPTAnalysis } from "./mappers/aptMapper";
+import { asC2SampleAnalysis } from "./mappers/c2SampleMapper";
+import { parseEvidenceRecords } from "./mappers/evidenceMapper";
+import { asIndustrialAnalysis } from "./mappers/industrialMapper";
+import { asMediaAnalysis } from "./mappers/mediaMapper";
+import { asObjectList } from "./mappers/objectMapper";
+import { asDBCProfiles, asPluginItem, asPluginItems } from "./mappers/pluginMapper";
+import { asGlobalTrafficStats } from "./mappers/trafficMapper";
+import { asUSBAnalysis } from "./mappers/usbMapper";
+import { asVehicleAnalysis } from "./mappers/vehicleMapper";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -295,19 +305,6 @@ function asThreatHit(input: any): ThreatHit {
     level: threatLevel(String(input.level ?? "low")),
     preview: String(input.preview ?? ""),
     match: String(input.match ?? ""),
-  };
-}
-
-function asObject(input: any): ExtractedObject {
-  const source = String(input.source ?? "HTTP");
-  return {
-    id: Number(input.id ?? 0),
-    packetId: Number(input.packet_id ?? 0),
-    name: String(input.name ?? "object.bin"),
-    sizeBytes: Number(input.size_bytes ?? 0),
-    mime: String(input.mime ?? "application/octet-stream"),
-    magic: String(input.magic ?? ""),
-    source: source === "FTP" ? "FTP" : "HTTP",
   };
 }
 
@@ -1169,7 +1166,7 @@ export const bridge: BackendBridge = {
 
   async listObjects(signal?: AbortSignal) {
     const rows = await request<any[]>("/api/objects", { signal });
-    return rows.map(asObject);
+    return asObjectList(rows);
   },
 
   async downloadObjectsZip(ids: number[]) {
@@ -1326,395 +1323,22 @@ export const bridge: BackendBridge = {
 
   async getGlobalTrafficStats(signal?: AbortSignal) {
     const payload = await request<any>("/api/stats/traffic/global", { signal });
-    return {
-      totalPackets: Number(payload.total_packets ?? 0),
-      protocolKinds: Number(payload.protocol_kinds ?? 0),
-      timeline: Array.isArray(payload.timeline)
-        ? payload.timeline.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      protocolDist: Array.isArray(payload.protocol_dist)
-        ? payload.protocol_dist.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topTalkers: Array.isArray(payload.top_talkers)
-        ? payload.top_talkers.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topHostnames: Array.isArray(payload.top_hostnames)
-        ? payload.top_hostnames.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topDomains: Array.isArray(payload.top_domains)
-        ? payload.top_domains.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topSrcIPs: Array.isArray(payload.top_src_ips)
-        ? payload.top_src_ips.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topDstIPs: Array.isArray(payload.top_dst_ips)
-        ? payload.top_dst_ips.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topComputerNames: Array.isArray(payload.top_computer_names)
-        ? payload.top_computer_names.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topDestPorts: Array.isArray(payload.top_dest_ports)
-        ? payload.top_dest_ports.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-      topSrcPorts: Array.isArray(payload.top_src_ports)
-        ? payload.top_src_ports.map((x: any) => ({ label: String(x.label ?? ""), count: Number(x.count ?? 0) }))
-        : [],
-    };
+    return asGlobalTrafficStats(payload);
   },
 
   async getIndustrialAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/analysis/industrial", { signal });
-    return {
-      totalIndustrialPackets: Number(payload.total_industrial_packets ?? 0),
-      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
-      conversations: Array.isArray(payload.conversations) ? payload.conversations.map(asConversation) : [],
-      modbus: {
-        totalFrames: Number(payload.modbus?.total_frames ?? 0),
-        requests: Number(payload.modbus?.requests ?? 0),
-        responses: Number(payload.modbus?.responses ?? 0),
-        exceptions: Number(payload.modbus?.exceptions ?? 0),
-        functionCodes: Array.isArray(payload.modbus?.function_codes) ? payload.modbus.function_codes.map(asBucket) : [],
-        unitIds: Array.isArray(payload.modbus?.unit_ids) ? payload.modbus.unit_ids.map(asBucket) : [],
-        referenceHits: Array.isArray(payload.modbus?.reference_hits) ? payload.modbus.reference_hits.map(asBucket) : [],
-        exceptionCodes: Array.isArray(payload.modbus?.exception_codes) ? payload.modbus.exception_codes.map(asBucket) : [],
-        decodedInputs: Array.isArray(payload.modbus?.decoded_inputs)
-          ? payload.modbus.decoded_inputs.map((item: any) => ({
-              startPacketId: Number(item.start_packet_id ?? 0),
-              endPacketId: Number(item.end_packet_id ?? 0),
-              source: String(item.source ?? "") || undefined,
-              destination: String(item.destination ?? "") || undefined,
-              unitId: Number(item.unit_id ?? 0) || undefined,
-              functionCode: Number(item.function_code ?? 0) || undefined,
-              functionName: String(item.function_name ?? "") || undefined,
-              reference: String(item.reference ?? "") || undefined,
-              encoding: String(item.encoding ?? ""),
-              text: String(item.text ?? ""),
-              rawText: String(item.raw_text ?? "") || undefined,
-              summary: String(item.summary ?? "") || undefined,
-            }))
-          : [],
-        transactions: Array.isArray(payload.modbus?.transactions)
-          ? payload.modbus.transactions.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              source: String(item.source ?? ""),
-              destination: String(item.destination ?? ""),
-              transactionId: Number(item.transaction_id ?? 0),
-              unitId: Number(item.unit_id ?? 0),
-              functionCode: Number(item.function_code ?? 0),
-              functionName: String(item.function_name ?? ""),
-              kind: String(item.kind ?? ""),
-              reference: String(item.reference ?? ""),
-              quantity: String(item.quantity ?? ""),
-              exceptionCode: Number(item.exception_code ?? 0),
-              responseTime: String(item.response_time ?? ""),
-              registerValues: String(item.register_values ?? "") || undefined,
-              inputText: String(item.input_text ?? "") || undefined,
-              bitRange: item.bit_range && typeof item.bit_range === "object"
-                ? {
-                    type: String(item.bit_range.type ?? "") || undefined,
-                    start: Number(item.bit_range.start ?? 0) || undefined,
-                    count: Number(item.bit_range.count ?? 0) || undefined,
-                    values: Array.isArray(item.bit_range.values) ? item.bit_range.values.map((value: unknown) => Boolean(value)) : undefined,
-                    preview: String(item.bit_range.preview ?? "") || undefined,
-                  }
-                : undefined,
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-      },
-      suspiciousWrites: Array.isArray(payload.suspicious_writes)
-        ? payload.suspicious_writes.map((item: any) => ({
-            target: String(item.target ?? ""),
-            unitId: Number(item.unit_id ?? 0),
-            functionCode: Number(item.function_code ?? 0),
-            functionName: String(item.function_name ?? ""),
-            writeCount: Number(item.write_count ?? 0),
-            sources: Array.isArray(item.sources) ? item.sources.map((value: unknown) => String(value ?? "")) : [],
-            firstTime: String(item.first_time ?? ""),
-            lastTime: String(item.last_time ?? ""),
-            sampleValues: Array.isArray(item.sample_values) ? item.sample_values.map((value: unknown) => String(value ?? "")) : [],
-            samplePacketId: Number(item.sample_packet_id ?? 0),
-          }))
-        : [],
-      controlCommands: Array.isArray(payload.control_commands)
-        ? payload.control_commands.map((item: any) => ({
-            packetId: Number(item.packet_id ?? 0),
-            time: String(item.time ?? ""),
-            protocol: String(item.protocol ?? ""),
-            source: String(item.source ?? ""),
-            destination: String(item.destination ?? ""),
-            operation: String(item.operation ?? ""),
-            target: String(item.target ?? ""),
-            value: String(item.value ?? ""),
-            result: String(item.result ?? ""),
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
-      ruleHits: Array.isArray(payload.rule_hits)
-        ? payload.rule_hits.map((item: any) => ({
-            rule: String(item.rule ?? ""),
-            level: threatLevel(String(item.level ?? "low")),
-            packetId: Number(item.packet_id ?? 0) || undefined,
-            time: String(item.time ?? "") || undefined,
-            source: String(item.source ?? "") || undefined,
-            destination: String(item.destination ?? "") || undefined,
-            functionCode: Number(item.function_code ?? 0) || undefined,
-            functionName: String(item.function_name ?? "") || undefined,
-            target: String(item.target ?? "") || undefined,
-            evidence: String(item.evidence ?? "") || undefined,
-            summary: String(item.summary ?? ""),
-          }))
-        : [],
-      details: Array.isArray(payload.details)
-        ? payload.details.map((detail: any) => ({
-            name: String(detail.name ?? ""),
-            totalFrames: Number(detail.total_frames ?? 0),
-            operations: Array.isArray(detail.operations) ? detail.operations.map(asBucket) : [],
-            targets: Array.isArray(detail.targets) ? detail.targets.map(asBucket) : [],
-            results: Array.isArray(detail.results) ? detail.results.map(asBucket) : [],
-            records: Array.isArray(detail.records)
-              ? detail.records.map((item: any) => ({
-                  packetId: Number(item.packet_id ?? 0),
-                  time: String(item.time ?? ""),
-                  source: String(item.source ?? ""),
-                  destination: String(item.destination ?? ""),
-                  operation: String(item.operation ?? ""),
-                  target: String(item.target ?? "") || undefined,
-                  result: String(item.result ?? "") || undefined,
-                  value: String(item.value ?? "") || undefined,
-                  summary: String(item.summary ?? ""),
-                }))
-              : [],
-          }))
-        : [],
-      notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
-    };
+    return asIndustrialAnalysis(payload);
   },
 
   async getVehicleAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/analysis/vehicle", { signal });
-    return {
-      totalVehiclePackets: Number(payload.total_vehicle_packets ?? 0),
-      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
-      conversations: Array.isArray(payload.conversations) ? payload.conversations.map(asConversation) : [],
-      can: {
-        totalFrames: Number(payload.can?.total_frames ?? 0),
-        extendedFrames: Number(payload.can?.extended_frames ?? 0),
-        rtrFrames: Number(payload.can?.rtr_frames ?? 0),
-        errorFrames: Number(payload.can?.error_frames ?? 0),
-        busIds: Array.isArray(payload.can?.bus_ids) ? payload.can.bus_ids.map(asBucket) : [],
-        messageIds: Array.isArray(payload.can?.message_ids) ? payload.can.message_ids.map(asBucket) : [],
-        payloadProtocols: Array.isArray(payload.can?.payload_protocols) ? payload.can.payload_protocols.map(asBucket) : [],
-        payloadRecords: Array.isArray(payload.can?.payload_records)
-          ? payload.can.payload_records.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              busId: String(item.bus_id ?? ""),
-              identifier: String(item.identifier ?? ""),
-              protocol: String(item.protocol ?? ""),
-              frameType: String(item.frame_type ?? "") || undefined,
-              sourceAddress: String(item.source_address ?? "") || undefined,
-              targetAddress: String(item.target_address ?? "") || undefined,
-              service: String(item.service ?? "") || undefined,
-              detail: String(item.detail ?? "") || undefined,
-              length: Number(item.length ?? 0),
-              rawData: String(item.raw_data ?? "") || undefined,
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-        dbcProfiles: Array.isArray(payload.can?.dbc_profiles)
-          ? payload.can.dbc_profiles.map((item: any) => ({
-              path: String(item.path ?? ""),
-              name: String(item.name ?? ""),
-              messageCount: Number(item.message_count ?? 0),
-              signalCount: Number(item.signal_count ?? 0),
-            }))
-          : [],
-        decodedMessageDist: Array.isArray(payload.can?.decoded_message_dist) ? payload.can.decoded_message_dist.map(asBucket) : [],
-        decodedSignals: Array.isArray(payload.can?.decoded_signals) ? payload.can.decoded_signals.map(asBucket) : [],
-        decodedMessages: Array.isArray(payload.can?.decoded_messages)
-          ? payload.can.decoded_messages.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              busId: String(item.bus_id ?? ""),
-              identifier: String(item.identifier ?? ""),
-              database: String(item.database ?? ""),
-              messageName: String(item.message_name ?? ""),
-              sender: String(item.sender ?? "") || undefined,
-              signals: Array.isArray(item.signals)
-                ? item.signals.map((signal: any) => ({
-                    name: String(signal.name ?? ""),
-                    value: String(signal.value ?? ""),
-                    unit: String(signal.unit ?? "") || undefined,
-                  }))
-                : [],
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-        signalTimelines: Array.isArray(payload.can?.signal_timelines)
-          ? payload.can.signal_timelines.map((item: any) => ({
-              name: String(item.name ?? ""),
-              samples: Array.isArray(item.samples)
-                ? item.samples.map((sample: any) => ({
-                    packetId: Number(sample.packet_id ?? 0),
-                    time: String(sample.time ?? ""),
-                    value: Number(sample.value ?? 0),
-                    unit: String(sample.unit ?? "") || undefined,
-                    messageName: String(sample.message_name ?? "") || undefined,
-                  }))
-                : [],
-            }))
-          : [],
-          frames: Array.isArray(payload.can?.frames)
-            ? payload.can.frames.map((item: any) => ({
-                packetId: Number(item.packet_id ?? 0),
-                time: String(item.time ?? ""),
-                identifier: String(item.identifier ?? ""),
-                busId: String(item.bus_id ?? ""),
-                length: Number(item.length ?? 0),
-                rawData: String(item.raw_data ?? "") || undefined,
-                isExtended: Boolean(item.is_extended),
-                isRTR: Boolean(item.is_rtr),
-                isError: Boolean(item.is_error),
-                errorFlags: String(item.error_flags ?? "") || undefined,
-                summary: String(item.summary ?? ""),
-            }))
-          : [],
-      },
-      j1939: {
-        totalMessages: Number(payload.j1939?.total_messages ?? 0),
-        pgns: Array.isArray(payload.j1939?.pgns) ? payload.j1939.pgns.map(asBucket) : [],
-        sourceAddrs: Array.isArray(payload.j1939?.source_addrs) ? payload.j1939.source_addrs.map(asBucket) : [],
-        targetAddrs: Array.isArray(payload.j1939?.target_addrs) ? payload.j1939.target_addrs.map(asBucket) : [],
-        messages: Array.isArray(payload.j1939?.messages)
-          ? payload.j1939.messages.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              canId: String(item.can_id ?? ""),
-              pgn: String(item.pgn ?? ""),
-              priority: Number(item.priority ?? 0),
-              sourceAddr: String(item.source_addr ?? ""),
-              targetAddr: String(item.target_addr ?? ""),
-              dataPreview: String(item.data_preview ?? "") || undefined,
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-      },
-      doip: {
-        totalMessages: Number(payload.doip?.total_messages ?? 0),
-        messageTypes: Array.isArray(payload.doip?.message_types) ? payload.doip.message_types.map(asBucket) : [],
-        vins: Array.isArray(payload.doip?.vins) ? payload.doip.vins.map(asBucket) : [],
-        endpoints: Array.isArray(payload.doip?.endpoints) ? payload.doip.endpoints.map(asBucket) : [],
-        messages: Array.isArray(payload.doip?.messages)
-          ? payload.doip.messages.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              source: String(item.source ?? ""),
-              destination: String(item.destination ?? ""),
-              type: String(item.type ?? ""),
-              vin: String(item.vin ?? "") || undefined,
-              logicalAddress: String(item.logical_address ?? "") || undefined,
-              sourceAddress: String(item.source_address ?? "") || undefined,
-              targetAddress: String(item.target_address ?? "") || undefined,
-              testerAddress: String(item.tester_address ?? "") || undefined,
-              responseCode: String(item.response_code ?? "") || undefined,
-              diagnosticState: String(item.diagnostic_state ?? "") || undefined,
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-      },
-      uds: {
-        totalMessages: Number(payload.uds?.total_messages ?? 0),
-        serviceIDs: Array.isArray(payload.uds?.service_ids) ? payload.uds.service_ids.map(asBucket) : [],
-        negativeCodes: Array.isArray(payload.uds?.negative_codes) ? payload.uds.negative_codes.map(asBucket) : [],
-        dtcs: Array.isArray(payload.uds?.dtcs) ? payload.uds.dtcs.map(asBucket) : [],
-        vins: Array.isArray(payload.uds?.vins) ? payload.uds.vins.map(asBucket) : [],
-        messages: Array.isArray(payload.uds?.messages)
-          ? payload.uds.messages.map((item: any) => ({
-              packetId: Number(item.packet_id ?? 0),
-              time: String(item.time ?? ""),
-              serviceId: String(item.service_id ?? ""),
-              serviceName: String(item.service_name ?? ""),
-              isReply: Boolean(item.is_reply),
-              subFunction: String(item.sub_function ?? "") || undefined,
-              sourceAddress: String(item.source_address ?? "") || undefined,
-              targetAddress: String(item.target_address ?? "") || undefined,
-              dataIdentifier: String(item.data_identifier ?? "") || undefined,
-              diagnosticVIN: String(item.diagnostic_vin ?? "") || undefined,
-              dtc: String(item.dtc ?? "") || undefined,
-              negativeCode: String(item.negative_code ?? "") || undefined,
-              summary: String(item.summary ?? ""),
-            }))
-          : [],
-        transactions: Array.isArray(payload.uds?.transactions)
-          ? payload.uds.transactions.map((item: any) => ({
-              requestPacketId: Number(item.request_packet_id ?? 0),
-              responsePacketId: Number(item.response_packet_id ?? 0) || undefined,
-              requestTime: String(item.request_time ?? ""),
-              responseTime: String(item.response_time ?? "") || undefined,
-              sourceAddress: String(item.source_address ?? "") || undefined,
-              targetAddress: String(item.target_address ?? "") || undefined,
-              serviceId: String(item.service_id ?? ""),
-              serviceName: String(item.service_name ?? ""),
-              subFunction: String(item.sub_function ?? "") || undefined,
-              dataIdentifier: String(item.data_identifier ?? "") || undefined,
-              dtc: String(item.dtc ?? "") || undefined,
-              status: String(item.status ?? ""),
-              negativeCode: String(item.negative_code ?? "") || undefined,
-              latencyMs: Number(item.latency_ms ?? 0) || undefined,
-              requestSummary: String(item.request_summary ?? "") || undefined,
-              responseSummary: String(item.response_summary ?? "") || undefined,
-            }))
-          : [],
-      },
-      recommendations: Array.isArray(payload.recommendations)
-        ? payload.recommendations.map((item: unknown) => String(item ?? ""))
-        : [],
-    };
+    return asVehicleAnalysis(payload);
   },
 
   async getMediaAnalysis(forceRefresh = false, signal?: AbortSignal) {
     const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media", { signal });
-    return {
-      totalMediaPackets: Number(payload.total_media_packets ?? 0),
-      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
-      applications: Array.isArray(payload.applications) ? payload.applications.map(asBucket) : [],
-      sessions: Array.isArray(payload.sessions)
-        ? payload.sessions.map((item: any) => ({
-            id: String(item.id ?? ""),
-            mediaType: String(item.media_type ?? ""),
-            family: String(item.family ?? ""),
-            application: String(item.application ?? ""),
-            source: String(item.source ?? ""),
-            sourcePort: Number(item.source_port ?? 0),
-            destination: String(item.destination ?? ""),
-            destinationPort: Number(item.destination_port ?? 0),
-            transport: String(item.transport ?? ""),
-            ssrc: String(item.ssrc ?? "") || undefined,
-            payloadType: String(item.payload_type ?? "") || undefined,
-            codec: String(item.codec ?? "") || undefined,
-            clockRate: Number(item.clock_rate ?? 0) || undefined,
-            startTime: String(item.start_time ?? "") || undefined,
-            endTime: String(item.end_time ?? "") || undefined,
-            packetCount: Number(item.packet_count ?? 0),
-            gapCount: Number(item.gap_count ?? 0),
-            controlSummary: String(item.control_summary ?? "") || undefined,
-            tags: Array.isArray(item.tags) ? item.tags.map((tag: unknown) => String(tag ?? "")) : [],
-            notes: Array.isArray(item.notes) ? item.notes.map((note: unknown) => String(note ?? "")) : [],
-            artifact: item.artifact
-              ? {
-                  token: String(item.artifact.token ?? ""),
-                  name: String(item.artifact.name ?? ""),
-                  codec: String(item.artifact.codec ?? "") || undefined,
-                  format: String(item.artifact.format ?? "") || undefined,
-                  sizeBytes: Number(item.artifact.size_bytes ?? 0),
-                }
-              : undefined,
-          }))
-        : [],
-      notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
-    };
+    return asMediaAnalysis(payload);
   },
 
   async transcribeMediaArtifact(token: string, force = false) {
@@ -1771,241 +1395,12 @@ export const bridge: BackendBridge = {
 
   async getUSBAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/analysis/usb", { signal });
-    const asUSBPacketRecord = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      time: String(item.time ?? ""),
-      protocol: String(item.protocol ?? ""),
-      busId: String(item.bus_id ?? ""),
-      deviceAddress: String(item.device_address ?? ""),
-      endpoint: String(item.endpoint ?? ""),
-      direction: String(item.direction ?? ""),
-      transferType: String(item.transfer_type ?? ""),
-      urbType: String(item.urb_type ?? ""),
-      status: String(item.status ?? ""),
-      dataLength: Number(item.data_length ?? 0),
-      setupRequest: String(item.setup_request ?? "") || undefined,
-      payloadPreview: String(item.payload_preview ?? "") || undefined,
-      summary: String(item.summary ?? ""),
-    });
-    const asUSBKeyboardEvent = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      time: String(item.time ?? ""),
-      device: String(item.device ?? ""),
-      endpoint: String(item.endpoint ?? ""),
-      modifiers: Array.isArray(item.modifiers) ? item.modifiers.map((value: unknown) => String(value ?? "")) : [],
-      keys: Array.isArray(item.keys) ? item.keys.map((value: unknown) => String(value ?? "")) : [],
-      pressedModifiers: Array.isArray(item.pressed_modifiers) ? item.pressed_modifiers.map((value: unknown) => String(value ?? "")) : [],
-      releasedModifiers: Array.isArray(item.released_modifiers) ? item.released_modifiers.map((value: unknown) => String(value ?? "")) : [],
-      pressedKeys: Array.isArray(item.pressed_keys) ? item.pressed_keys.map((value: unknown) => String(value ?? "")) : [],
-      releasedKeys: Array.isArray(item.released_keys) ? item.released_keys.map((value: unknown) => String(value ?? "")) : [],
-      text: String(item.text ?? "") || undefined,
-      summary: String(item.summary ?? ""),
-    });
-    const asUSBMouseEvent = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      time: String(item.time ?? ""),
-      device: String(item.device ?? ""),
-      endpoint: String(item.endpoint ?? ""),
-      buttons: Array.isArray(item.buttons) ? item.buttons.map((value: unknown) => String(value ?? "")) : [],
-      pressedButtons: Array.isArray(item.pressed_buttons) ? item.pressed_buttons.map((value: unknown) => String(value ?? "")) : [],
-      releasedButtons: Array.isArray(item.released_buttons) ? item.released_buttons.map((value: unknown) => String(value ?? "")) : [],
-      xDelta: Number(item.x_delta ?? 0),
-      yDelta: Number(item.y_delta ?? 0),
-      wheelVertical: Number(item.wheel_vertical ?? 0),
-      wheelHorizontal: Number(item.wheel_horizontal ?? 0),
-      positionX: Number(item.position_x ?? 0),
-      positionY: Number(item.position_y ?? 0),
-      summary: String(item.summary ?? ""),
-    });
-    const asUSBMassStorageOperation = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      time: String(item.time ?? ""),
-      device: String(item.device ?? ""),
-      endpoint: String(item.endpoint ?? ""),
-      lun: String(item.lun ?? ""),
-      command: String(item.command ?? ""),
-      operation: String(item.operation ?? "other"),
-      transferLength: Number(item.transfer_length ?? 0),
-      direction: String(item.direction ?? ""),
-      status: String(item.status ?? ""),
-      requestFrame: item.request_frame == null ? undefined : Number(item.request_frame),
-      responseFrame: item.response_frame == null ? undefined : Number(item.response_frame),
-      latencyMs: item.latency_ms == null ? undefined : Number(item.latency_ms),
-      dataResidue: item.data_residue == null ? undefined : Number(item.data_residue),
-      summary: String(item.summary ?? ""),
-    });
-    return {
-      totalUSBPackets: Number(payload.total_usb_packets ?? 0),
-      keyboardPackets: Number(payload.keyboard_packets ?? 0),
-      mousePackets: Number(payload.mouse_packets ?? 0),
-      otherUSBPackets: Number(payload.other_usb_packets ?? 0),
-      hidPackets: Number(payload.hid_packets ?? 0),
-      massStoragePackets: Number(payload.mass_storage_packets ?? 0),
-      protocols: Array.isArray(payload.protocols) ? payload.protocols.map(asBucket) : [],
-      transferTypes: Array.isArray(payload.transfer_types) ? payload.transfer_types.map(asBucket) : [],
-      directions: Array.isArray(payload.directions) ? payload.directions.map(asBucket) : [],
-      devices: Array.isArray(payload.devices) ? payload.devices.map(asBucket) : [],
-      endpoints: Array.isArray(payload.endpoints) ? payload.endpoints.map(asBucket) : [],
-      setupRequests: Array.isArray(payload.setup_requests) ? payload.setup_requests.map(asBucket) : [],
-      records: Array.isArray(payload.records) ? payload.records.map(asUSBPacketRecord) : [],
-      keyboardEvents: Array.isArray(payload.keyboard_events) ? payload.keyboard_events.map(asUSBKeyboardEvent) : [],
-      mouseEvents: Array.isArray(payload.mouse_events) ? payload.mouse_events.map(asUSBMouseEvent) : [],
-      otherRecords: Array.isArray(payload.other_records) ? payload.other_records.map(asUSBPacketRecord) : [],
-      hid: {
-        keyboardEvents: Array.isArray(payload.hid?.keyboard_events) ? payload.hid.keyboard_events.map(asUSBKeyboardEvent) : [],
-        mouseEvents: Array.isArray(payload.hid?.mouse_events) ? payload.hid.mouse_events.map(asUSBMouseEvent) : [],
-        devices: Array.isArray(payload.hid?.devices) ? payload.hid.devices.map(asBucket) : [],
-        notes: Array.isArray(payload.hid?.notes) ? payload.hid.notes.map((item: unknown) => String(item ?? "")) : [],
-      },
-      massStorage: {
-        totalPackets: Number(payload.mass_storage?.total_packets ?? 0),
-        readPackets: Number(payload.mass_storage?.read_packets ?? 0),
-        writePackets: Number(payload.mass_storage?.write_packets ?? 0),
-        controlPackets: Number(payload.mass_storage?.control_packets ?? 0),
-        devices: Array.isArray(payload.mass_storage?.devices) ? payload.mass_storage.devices.map(asBucket) : [],
-        luns: Array.isArray(payload.mass_storage?.luns) ? payload.mass_storage.luns.map(asBucket) : [],
-        commands: Array.isArray(payload.mass_storage?.commands) ? payload.mass_storage.commands.map(asBucket) : [],
-        readOperations: Array.isArray(payload.mass_storage?.read_operations) ? payload.mass_storage.read_operations.map(asUSBMassStorageOperation) : [],
-        writeOperations: Array.isArray(payload.mass_storage?.write_operations) ? payload.mass_storage.write_operations.map(asUSBMassStorageOperation) : [],
-        notes: Array.isArray(payload.mass_storage?.notes) ? payload.mass_storage.notes.map((item: unknown) => String(item ?? "")) : [],
-      },
-      other: {
-        totalPackets: Number(payload.other?.total_packets ?? 0),
-        controlPackets: Number(payload.other?.control_packets ?? 0),
-        devices: Array.isArray(payload.other?.devices) ? payload.other.devices.map(asBucket) : [],
-        endpoints: Array.isArray(payload.other?.endpoints) ? payload.other.endpoints.map(asBucket) : [],
-        setupRequests: Array.isArray(payload.other?.setup_requests) ? payload.other.setup_requests.map(asBucket) : [],
-        controlRecords: Array.isArray(payload.other?.control_records) ? payload.other.control_records.map(asUSBPacketRecord) : [],
-        records: Array.isArray(payload.other?.records) ? payload.other.records.map(asUSBPacketRecord) : [],
-        notes: Array.isArray(payload.other?.notes) ? payload.other.notes.map((item: unknown) => String(item ?? "")) : [],
-      },
-      notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
-    };
+    return asUSBAnalysis(payload);
   },
 
   async getC2SampleAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/c2-analysis", { signal });
-    const asC2Record = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      streamId: Number(item.stream_id ?? 0) || undefined,
-      time: String(item.time ?? "") || undefined,
-      family: String(item.family ?? "cs") === "vshell" ? "vshell" : "cs",
-      channel: String(item.channel ?? "") || undefined,
-      source: String(item.source ?? "") || undefined,
-      destination: String(item.destination ?? "") || undefined,
-      host: String(item.host ?? "") || undefined,
-      uri: String(item.uri ?? "") || undefined,
-      method: String(item.method ?? "") || undefined,
-      indicatorType: String(item.indicator_type ?? "") || undefined,
-      indicatorValue: String(item.indicator_value ?? "") || undefined,
-      confidence: Number(item.confidence ?? 0) || undefined,
-      summary: String(item.summary ?? ""),
-      evidence: String(item.evidence ?? "") || undefined,
-      tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
-      actorHints: Array.isArray(item.actor_hints) ? item.actor_hints.map((value: unknown) => String(value ?? "")) : [],
-      sampleFamily: String(item.sample_family ?? "") || undefined,
-      campaignStage: String(item.campaign_stage ?? "") || undefined,
-      transportTraits: Array.isArray(item.transport_traits) ? item.transport_traits.map((value: unknown) => String(value ?? "")) : [],
-      infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map((value: unknown) => String(value ?? "")) : [],
-      ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map((value: unknown) => String(value ?? "")) : [],
-      attributionConfidence: Number(item.attribution_confidence ?? 0) || undefined,
-    });
-    const asC2BeaconPattern = (item: any) => ({
-      name: String(item.name ?? ""),
-      value: String(item.value ?? ""),
-      confidence: Number(item.confidence ?? 0) || undefined,
-      summary: String(item.summary ?? ""),
-    });
-    const asC2ScoreFactor = (item: any) => ({
-      name: String(item.name ?? ""),
-      weight: Number(item.weight ?? 0),
-      direction: String(item.direction ?? ""),
-      summary: String(item.summary ?? "") || undefined,
-    });
-    const asC2HTTPEndpointAggregate = (item: any) => ({
-      host: String(item.host ?? ""),
-      uri: String(item.uri ?? ""),
-      channel: String(item.channel ?? "") || undefined,
-      total: Number(item.total ?? 0),
-      getCount: Number(item.get_count ?? 0),
-      postCount: Number(item.post_count ?? 0),
-      methods: Array.isArray(item.methods) ? item.methods.map(asBucket) : [],
-      firstTime: String(item.first_time ?? "") || undefined,
-      lastTime: String(item.last_time ?? "") || undefined,
-      avgInterval: String(item.avg_interval ?? "") || undefined,
-      jitter: String(item.jitter ?? "") || undefined,
-      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
-      streams: Array.isArray(item.streams) ? item.streams.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
-      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
-      representativePacket: Number(item.representative_packet ?? 0) || undefined,
-      confidence: Number(item.confidence ?? 0) || undefined,
-      signalTags: Array.isArray(item.signal_tags) ? item.signal_tags.map((value: unknown) => String(value ?? "")) : [],
-      scoreFactors: Array.isArray(item.score_factors) ? item.score_factors.map(asC2ScoreFactor) : [],
-      summary: String(item.summary ?? ""),
-    });
-    const asC2DNSAggregate = (item: any) => ({
-      qname: String(item.qname ?? ""),
-      total: Number(item.total ?? 0),
-      maxLabelLength: Number(item.max_label_length ?? 0),
-      queryTypes: Array.isArray(item.query_types) ? item.query_types.map(asBucket) : [],
-      txtCount: Number(item.txt_count ?? 0),
-      nullCount: Number(item.null_count ?? 0),
-      cnameCount: Number(item.cname_count ?? 0),
-      requestCount: Number(item.request_count ?? 0),
-      responseCount: Number(item.response_count ?? 0),
-      firstTime: String(item.first_time ?? "") || undefined,
-      lastTime: String(item.last_time ?? "") || undefined,
-      avgInterval: String(item.avg_interval ?? "") || undefined,
-      jitter: String(item.jitter ?? "") || undefined,
-      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
-      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
-      confidence: Number(item.confidence ?? 0) || undefined,
-      summary: String(item.summary ?? ""),
-    });
-    const asC2StreamAggregate = (item: any) => ({
-      streamId: Number(item.stream_id ?? 0),
-      protocol: String(item.protocol ?? "") || undefined,
-      totalPackets: Number(item.total_packets ?? 0),
-      archMarkers: Array.isArray(item.arch_markers) ? item.arch_markers.map(asBucket) : [],
-      lengthPrefixCount: Number(item.length_prefix_count ?? 0),
-      shortPackets: Number(item.short_packets ?? 0),
-      longPackets: Number(item.long_packets ?? 0),
-      transitions: Number(item.transitions ?? 0),
-      heartbeatAvg: String(item.heartbeat_avg ?? "") || undefined,
-      heartbeatJitter: String(item.heartbeat_jitter ?? "") || undefined,
-      intervals: Array.isArray(item.intervals) ? item.intervals.map((value: unknown) => Number(value ?? 0)).filter((value: number) => Number.isFinite(value) && value > 0) : [],
-      hasWebSocket: Boolean(item.has_websocket),
-      wsParams: String(item.ws_params ?? "") || undefined,
-      listenerHints: Array.isArray(item.listener_hints) ? item.listener_hints.map(asBucket) : [],
-      firstTime: String(item.first_time ?? "") || undefined,
-      lastTime: String(item.last_time ?? "") || undefined,
-      packets: Array.isArray(item.packets) ? item.packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean) : [],
-      confidence: Number(item.confidence ?? 0) || undefined,
-      summary: String(item.summary ?? ""),
-    });
-    const asC2Family = (item: any) => ({
-      candidateCount: Number(item.candidate_count ?? 0),
-      matchedRuleCount: Number(item.matched_rule_count ?? 0),
-      channels: Array.isArray(item.channels) ? item.channels.map(asBucket) : [],
-      indicators: Array.isArray(item.indicators) ? item.indicators.map(asBucket) : [],
-      conversations: Array.isArray(item.conversations) ? item.conversations.map(asConversation) : [],
-      beaconPatterns: Array.isArray(item.beacon_patterns) ? item.beacon_patterns.map(asC2BeaconPattern) : [],
-      hostUriAggregates: Array.isArray(item.host_uri_aggregates) ? item.host_uri_aggregates.map(asC2HTTPEndpointAggregate) : [],
-      dnsAggregates: Array.isArray(item.dns_aggregates) ? item.dns_aggregates.map(asC2DNSAggregate) : [],
-      streamAggregates: Array.isArray(item.stream_aggregates) ? item.stream_aggregates.map(asC2StreamAggregate) : [],
-      candidates: Array.isArray(item.candidates) ? item.candidates.map(asC2Record) : [],
-      notes: Array.isArray(item.notes) ? item.notes.map((value: unknown) => String(value ?? "")) : [],
-      relatedActors: Array.isArray(item.related_actors) ? item.related_actors.map(asBucket) : [],
-      deliveryChains: Array.isArray(item.delivery_chains) ? item.delivery_chains.map(asBucket) : [],
-    });
-    return {
-      totalMatchedPackets: Number(payload.total_matched_packets ?? 0),
-      families: Array.isArray(payload.families) ? payload.families.map(asBucket) : [],
-      conversations: Array.isArray(payload.conversations) ? payload.conversations.map(asConversation) : [],
-      cs: asC2Family(payload.cs ?? {}),
-      vshell: asC2Family(payload.vshell ?? {}),
-      notes: Array.isArray(payload.notes) ? payload.notes.map((value: unknown) => String(value ?? "")) : [],
-    } as C2SampleAnalysis;
+    return asC2SampleAnalysis(payload);
   },
 
   async decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal) {
@@ -2055,66 +1450,7 @@ export const bridge: BackendBridge = {
 
   async getAPTAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/apt-analysis", { signal });
-    const asAPTScoreFactor = (item: any) => ({
-      name: String(item.name ?? ""),
-      weight: Number(item.weight ?? 0),
-      direction: String(item.direction ?? ""),
-      sourceModule: String(item.source_module ?? "") || undefined,
-      summary: String(item.summary ?? "") || undefined,
-    });
-    const asAPTRecord = (item: any) => ({
-      packetId: Number(item.packet_id ?? 0),
-      streamId: Number(item.stream_id ?? 0) || undefined,
-      time: String(item.time ?? "") || undefined,
-      actorId: String(item.actor_id ?? "") || undefined,
-      actorName: String(item.actor_name ?? "") || undefined,
-      sourceModule: String(item.source_module ?? "") || undefined,
-      family: String(item.family ?? "") || undefined,
-      evidenceType: String(item.evidence_type ?? "") || undefined,
-      evidenceValue: String(item.evidence_value ?? "") || undefined,
-      confidence: Number(item.confidence ?? 0) || undefined,
-      source: String(item.source ?? "") || undefined,
-      destination: String(item.destination ?? "") || undefined,
-      host: String(item.host ?? "") || undefined,
-      uri: String(item.uri ?? "") || undefined,
-      sampleFamily: String(item.sample_family ?? "") || undefined,
-      campaignStage: String(item.campaign_stage ?? "") || undefined,
-      transportTraits: Array.isArray(item.transport_traits) ? item.transport_traits.map((value: unknown) => String(value ?? "")) : [],
-      infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map((value: unknown) => String(value ?? "")) : [],
-      ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map((value: unknown) => String(value ?? "")) : [],
-      tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
-      scoreFactors: Array.isArray(item.score_factors) ? item.score_factors.map(asAPTScoreFactor) : [],
-      summary: String(item.summary ?? ""),
-      evidence: String(item.evidence ?? "") || undefined,
-    });
-    const asAPTProfile = (item: any) => ({
-      id: String(item.id ?? ""),
-      name: String(item.name ?? ""),
-      aliases: Array.isArray(item.aliases) ? item.aliases.map((value: unknown) => String(value ?? "")) : [],
-      summary: String(item.summary ?? ""),
-      confidence: Number(item.confidence ?? 0) || undefined,
-      evidenceCount: Number(item.evidence_count ?? 0),
-      sampleFamilies: Array.isArray(item.sample_families) ? item.sample_families.map(asBucket) : [],
-      campaignStages: Array.isArray(item.campaign_stages) ? item.campaign_stages.map(asBucket) : [],
-      transportTraits: Array.isArray(item.transport_traits) ? item.transport_traits.map(asBucket) : [],
-      infrastructureHints: Array.isArray(item.infrastructure_hints) ? item.infrastructure_hints.map(asBucket) : [],
-      relatedC2Families: Array.isArray(item.related_c2_families) ? item.related_c2_families.map(asBucket) : [],
-      ttpTags: Array.isArray(item.ttp_tags) ? item.ttp_tags.map(asBucket) : [],
-      scoreFactors: Array.isArray(item.score_factors) ? item.score_factors.map(asAPTScoreFactor) : [],
-      notes: Array.isArray(item.notes) ? item.notes.map((value: unknown) => String(value ?? "")) : [],
-    });
-    return {
-      totalEvidence: Number(payload.total_evidence ?? 0),
-      actors: Array.isArray(payload.actors) ? payload.actors.map(asBucket) : [],
-      sampleFamilies: Array.isArray(payload.sample_families) ? payload.sample_families.map(asBucket) : [],
-      campaignStages: Array.isArray(payload.campaign_stages) ? payload.campaign_stages.map(asBucket) : [],
-      transportTraits: Array.isArray(payload.transport_traits) ? payload.transport_traits.map(asBucket) : [],
-      infrastructureHints: Array.isArray(payload.infrastructure_hints) ? payload.infrastructure_hints.map(asBucket) : [],
-      relatedC2Families: Array.isArray(payload.related_c2_families) ? payload.related_c2_families.map(asBucket) : [],
-      profiles: Array.isArray(payload.profiles) ? payload.profiles.map(asAPTProfile) : [],
-      evidence: Array.isArray(payload.evidence) ? payload.evidence.map(asAPTRecord) : [],
-      notes: Array.isArray(payload.notes) ? payload.notes.map((value: unknown) => String(value ?? "")) : [],
-    } as APTAnalysis;
+    return asAPTAnalysis(payload);
   },
 
   async getEvidence(signal?: AbortSignal) {
@@ -2144,12 +1480,7 @@ export const bridge: BackendBridge = {
 
   async listVehicleDBCProfiles() {
     const rows = await request<any[]>("/api/analysis/vehicle/dbc");
-    return rows.map((item) => ({
-      path: String(item.path ?? ""),
-      name: String(item.name ?? ""),
-      messageCount: Number(item.message_count ?? 0),
-      signalCount: Number(item.signal_count ?? 0),
-    }));
+    return asDBCProfiles(rows);
   },
 
   async addVehicleDBC(path: string) {
@@ -2157,39 +1488,19 @@ export const bridge: BackendBridge = {
       method: "POST",
       body: JSON.stringify({ path }),
     });
-    return rows.map((item) => ({
-      path: String(item.path ?? ""),
-      name: String(item.name ?? ""),
-      messageCount: Number(item.message_count ?? 0),
-      signalCount: Number(item.signal_count ?? 0),
-    }));
+    return asDBCProfiles(rows);
   },
 
   async removeVehicleDBC(path: string) {
     const rows = await request<any[]>(`/api/analysis/vehicle/dbc?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
     });
-    return rows.map((item) => ({
-      path: String(item.path ?? ""),
-      name: String(item.name ?? ""),
-      messageCount: Number(item.message_count ?? 0),
-      signalCount: Number(item.signal_count ?? 0),
-    }));
+    return asDBCProfiles(rows);
   },
 
   async listPlugins() {
     const rows = await request<any[]>("/api/plugins");
-    return rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      version: item.version,
-      tag: item.tag,
-      author: item.author,
-      enabled: item.enabled,
-      entry: item.entry || "",
-      runtime: item.runtime || "",
-      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
-    }));
+    return asPluginItems(rows);
   },
 
   async getPluginSource(id: string) {
@@ -2240,17 +1551,7 @@ export const bridge: BackendBridge = {
         capabilities: Array.isArray(plugin.capabilities) ? plugin.capabilities : [],
       }),
     });
-    return {
-      id: item.id,
-      name: item.name,
-      version: item.version,
-      tag: item.tag,
-      author: item.author,
-      enabled: item.enabled,
-      entry: item.entry || "",
-      runtime: item.runtime || "",
-      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
-    };
+    return asPluginItem(item);
   },
 
   async deletePlugin(id: string) {
@@ -2259,17 +1560,7 @@ export const bridge: BackendBridge = {
 
   async togglePlugin(id: string) {
     const item = await request<any>(`/api/plugins/toggle?id=${encodeURIComponent(id)}`, { method: "POST" });
-    return {
-      id: item.id,
-      name: item.name,
-      version: item.version,
-      tag: item.tag,
-      author: item.author,
-      enabled: item.enabled,
-      entry: item.entry || "",
-      runtime: item.runtime || "",
-      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
-    };
+    return asPluginItem(item);
   },
 
   async setPluginsEnabled(ids: string[], enabled: boolean) {
@@ -2277,17 +1568,7 @@ export const bridge: BackendBridge = {
       method: "POST",
       body: JSON.stringify({ ids, enabled }),
     });
-    return rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      version: item.version,
-      tag: item.tag,
-      author: item.author,
-      enabled: item.enabled,
-      entry: item.entry || "",
-      runtime: item.runtime || "",
-      capabilities: Array.isArray(item.capabilities) ? item.capabilities.map((value: unknown) => String(value ?? "")) : [],
-    }));
+    return asPluginItems(rows);
   },
 
   async getTLSConfig() {
@@ -2861,54 +2142,6 @@ function asBucket(input: any) {
   };
 }
 
-function parseEvidenceRecords(payload: any): UnifiedEvidenceRecord[] {
-  const records = Array.isArray(payload?.records) ? payload.records : [];
-  return records.map((item: any): UnifiedEvidenceRecord => ({
-    id: String(item.id ?? ""),
-    module: normalizeEvidenceModule(String(item.module ?? "unknown")),
-    sourceModule: String(item.source_module ?? "") || undefined,
-    packetId: Number(item.packet_id ?? 0) || undefined,
-    streamId: Number(item.stream_id ?? 0) || undefined,
-    family: String(item.family ?? "") || undefined,
-    actorId: String(item.actor_id ?? "") || undefined,
-    actorName: String(item.actor_name ?? "") || undefined,
-    sourceType: String(item.source_type ?? ""),
-    summary: String(item.summary ?? ""),
-    value: String(item.value ?? "") || undefined,
-    confidence: typeof item.confidence === "number" ? item.confidence : undefined,
-    confidenceLabel: evidenceConfidenceLabel(item.confidence),
-    severity: String(item.severity ?? "info") as UnifiedEvidenceRecord["severity"],
-    source: String(item.source ?? "") || undefined,
-    destination: String(item.destination ?? "") || undefined,
-    host: String(item.host ?? "") || undefined,
-    uri: String(item.uri ?? "") || undefined,
-    tags: Array.isArray(item.tags) ? item.tags.map((t: unknown) => String(t)) : [],
-    caveats: Array.isArray(item.caveats) ? item.caveats.map((c: unknown) => String(c)) : [],
-  }));
-}
-
-function normalizeEvidenceModule(raw: string): UnifiedEvidenceRecord["module"] {
-  const lower = raw.toLowerCase();
-  if (lower.includes("c2")) return "c2";
-  if (lower.includes("apt")) return "apt";
-  if (lower.includes("hunting") || lower.includes("yara") || lower.includes("threat")) return "hunting";
-  if (lower.includes("industrial")) return "industrial";
-  if (lower.includes("vehicle")) return "vehicle";
-  if (lower.includes("usb")) return "usb";
-  if (lower.includes("object")) return "object";
-  if (lower.includes("misc") || lower.includes("webshell") || lower.includes("decoder")) return "misc";
-  if (lower.includes("stream")) return "stream";
-  return "unknown";
-}
-
-function evidenceConfidenceLabel(confidence?: number): UnifiedEvidenceRecord["confidenceLabel"] {
-  if (confidence === undefined || Number.isNaN(confidence)) return "unknown";
-  if (confidence >= 75) return "high";
-  if (confidence >= 45) return "medium";
-  if (confidence > 0) return "low";
-  return "unknown";
-}
-
 function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {
   return {
     taskId: String(input.task_id ?? ""),
@@ -2996,14 +2229,6 @@ function asPlainObject(input: unknown): Record<string, unknown> | undefined {
     return undefined;
   }
   return input as Record<string, unknown>;
-}
-
-function asConversation(input: any) {
-  return {
-    label: String(input.label ?? ""),
-    protocol: String(input.protocol ?? "") || undefined,
-    count: Number(input.count ?? 0),
-  };
 }
 
 async function selectLocalFile(): Promise<File> {

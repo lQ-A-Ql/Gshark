@@ -1,5 +1,5 @@
 import { Copy, Filter } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { copyTextToClipboard } from "../utils/browserFile";
 
@@ -46,6 +46,19 @@ export function FilterActions({
 }: FilterActionsProps) {
   const [pending, setPending] = useState<CopyTarget>("");
   const [copied, setCopied] = useState<CopyTarget>("");
+  const mountedRef = useRef(true);
+  const resetCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      if (resetCopiedTimerRef.current) {
+        clearTimeout(resetCopiedTimerRef.current);
+        resetCopiedTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   const hasHost = !!host?.trim();
   const hasUri = !!uri?.trim();
@@ -63,10 +76,21 @@ export function FilterActions({
     setPending(target);
     try {
       await copyTextToClipboard(text);
+      if (!mountedRef.current) return;
       setCopied(target);
-      setTimeout(() => setCopied(""), 1500);
+      if (resetCopiedTimerRef.current) {
+        clearTimeout(resetCopiedTimerRef.current);
+      }
+      resetCopiedTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          setCopied("");
+        }
+        resetCopiedTimerRef.current = null;
+      }, 1500);
     } finally {
-      setPending("");
+      if (mountedRef.current) {
+        setPending("");
+      }
     }
   }
 

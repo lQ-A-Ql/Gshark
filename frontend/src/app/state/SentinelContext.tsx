@@ -23,44 +23,74 @@ import type {
   RecentCapture,
   ToolRuntimeConfig,
   ToolRuntimeSnapshot,
-  StreamLoadMeta,
   StreamProtocol,
   StreamSwitchMetrics,
-  StreamSwitchStat,
   ThreatHit,
 } from "../core/types";
 import { bridge, type TSharkStatus } from "../integrations/wailsBridge";
 import { isAbortLikeError, isOperationTimeoutError, withTimeout } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
-import { useAnalysisProgress, phaseLabelForMediaProgress, phaseLabelForThreatProgress, EMPTY_MEDIA_ANALYSIS_PROGRESS, EMPTY_THREAT_ANALYSIS_PROGRESS } from "./hooks/useAnalysisProgress";
+import {
+  EMPTY_MEDIA_ANALYSIS_PROGRESS,
+  EMPTY_THREAT_ANALYSIS_PROGRESS,
+  phaseLabelForMediaProgress,
+  phaseLabelForThreatProgress,
+  useAnalysisProgress,
+  type MediaAnalysisProgress,
+  type ThreatAnalysisProgress,
+} from "./hooks/useAnalysisProgress";
+import {
+  classifyMediaProgressPhase,
+  classifyThreatProgressPhase,
+  computeMediaProgressPercent,
+  computeThreatProgressPercent,
+} from "./progressHelpers";
+import { MAX_RECENT_CAPTURES, readRecentCaptures, writeRecentCaptures } from "./recentCaptures";
+import {
+  getCurrentPacketPage,
+  getNextPacketCursor,
+  getPacketPageCursor,
+  getPrevPacketCursor,
+  getTotalPacketPages,
+  normalizePacketCursor,
+  normalizePacketId,
+  packetPageHasPacket,
+} from "./packetPagination";
+import {
+  keepSelectedPacketDetailForId,
+  preserveSelectedPacketId,
+  resolveSelectedPacket,
+  shouldLoadSelectedPacketArtifacts,
+  shouldLoadSelectedPacketDetail,
+} from "./selectedPacketState";
+import {
+  PAGE_SIZE,
+  PRELOAD_POLL_INTERVAL_MS,
+  PRELOAD_SIGNAL_WAIT_MS,
+  RAW_STREAM_PAGE_SIZE,
+  STARTUP_TLS_CONFIG_TIMEOUT_MS,
+  STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
+  STREAM_PREFETCH_LIMIT,
+} from "./captureConstants";
+import {
+  EMPTY_BINARY_STREAM,
+  EMPTY_HTTP_STREAM,
+  EMPTY_SWITCH_METRICS,
+  SWITCH_SAMPLE_LIMIT,
+  applyStreamChunkPatches,
+  buildLoadingBinaryStream,
+  buildLoadingHttpStream,
+  buildSwitchStat,
+  isFastPathLoad,
+  markCachedLoad,
+  prettySize,
+} from "./streamState";
 
 interface PreparedPacketStream {
   packet: Packet | null;
   protocol: "HTTP" | "TCP" | "UDP" | null;
   streamId: number | null;
-}
-
-interface MediaAnalysisProgress {
-  active: boolean;
-  current: number;
-  total: number;
-  label: string;
-  phase: "prepare" | "scan" | "organize" | "rebuild" | "complete" | "unknown";
-  phaseLabel: string;
-  percent: number;
-  recent: string[];
-}
-
-interface ThreatAnalysisProgress {
-  active: boolean;
-  current: number;
-  total: number;
-  label: string;
-  phase: "prepare" | "packets" | "objects" | "streams" | "scan" | "complete" | "unknown";
-  phaseLabel: string;
-  percent: number;
-  recent: string[];
 }
 
 interface SentinelContextValue {
@@ -123,251 +153,6 @@ interface SentinelContextValue {
 }
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
-
-const PAGE_SIZE = 2000;
-const RAW_STREAM_PAGE_SIZE = 96;
-const STREAM_PREFETCH_LIMIT = 0;
-const PRELOAD_POLL_INTERVAL_MS = 120;
-const PRELOAD_SIGNAL_WAIT_MS = 1000;
-const STARTUP_TOOL_RUNTIME_TIMEOUT_MS = 3500;
-const STARTUP_TLS_CONFIG_TIMEOUT_MS = 2500;
-const RECENT_CAPTURES_STORAGE_KEY = "gshark.recent-captures.v1";
-const MAX_RECENT_CAPTURES = 8;
-
-const EMPTY_HTTP_STREAM: HttpStream = {
-  id: -1,
-  client: "",
-  server: "",
-  request: "",
-  response: "",
-  chunks: [],
-};
-
-const EMPTY_BINARY_STREAM: BinaryStream = {
-  id: -1,
-  protocol: "TCP",
-  from: "",
-  to: "",
-  chunks: [],
-  nextCursor: 0,
-  totalChunks: 0,
-  hasMore: false,
-};
-
-const EMPTY_SWITCH_STAT: StreamSwitchStat = {
-  count: 0,
-  lastMs: 0,
-  p50Ms: 0,
-  p95Ms: 0,
-  cacheHitRate: 0,
-};
-
-const EMPTY_SWITCH_METRICS: StreamSwitchMetrics = {
-  overall: { ...EMPTY_SWITCH_STAT },
-  byProtocol: {
-    HTTP: { ...EMPTY_SWITCH_STAT },
-    TCP: { ...EMPTY_SWITCH_STAT },
-    UDP: { ...EMPTY_SWITCH_STAT },
-  },
-};
-
-function classifyMediaProgressPhase(label: string): MediaAnalysisProgress["phase"] {
-  const normalized = label.trim();
-  if (!normalized) return "unknown";
-  if (normalized.includes("准备")) return "prepare";
-  if (normalized.includes("扫描")) return "scan";
-  if (normalized.includes("整理")) return "organize";
-  if (normalized.includes("重建")) return "rebuild";
-  if (normalized.includes("完成")) return "complete";
-  return "unknown";
-}
-
-function computeMediaProgressPercent(phase: MediaAnalysisProgress["phase"], current: number, total: number): number {
-  const safeTotal = total > 0 ? total : 0;
-  const local = safeTotal > 0 ? Math.max(0, Math.min(1, current / Math.max(safeTotal, 1))) : 0;
-  switch (phase) {
-    case "prepare":
-      return Math.max(1, local * 5);
-    case "scan":
-      return 5 + local * 67;
-    case "organize":
-      return 72 + local * 10;
-    case "rebuild":
-      return 82 + local * 18;
-    case "complete":
-      return 100;
-    default:
-      return safeTotal > 0 ? local * 100 : 0;
-  }
-}
-
-function classifyThreatProgressPhase(label: string): ThreatAnalysisProgress["phase"] {
-  const normalized = label.trim();
-  if (!normalized) return "unknown";
-  if (normalized.includes("准备")) return "prepare";
-  if (normalized.includes("基础特征") || normalized.includes("数据包")) return "packets";
-  if (normalized.includes("对象")) return "objects";
-  if (normalized.includes("重组流") || normalized.includes("扫描目标")) return "streams";
-  if (normalized.includes("YARA") || normalized.includes("扫描")) return "scan";
-  if (normalized.includes("完成")) return "complete";
-  return "unknown";
-}
-
-function computeThreatProgressPercent(phase: ThreatAnalysisProgress["phase"], current: number, total: number): number {
-  if (total > 0) {
-    return Math.max(0, Math.min(100, Math.round((current / total) * 100)));
-  }
-  switch (phase) {
-    case "prepare":
-      return 8;
-    case "packets":
-      return 24;
-    case "objects":
-      return 42;
-    case "streams":
-      return 64;
-    case "scan":
-      return 84;
-    case "complete":
-      return 100;
-    default:
-      return 12;
-  }
-}
-
-const SWITCH_SAMPLE_LIMIT = 300;
-
-function calcPercentile(values: number[], percentile: number): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.max(0, Math.min(sorted.length - 1, Math.ceil((percentile / 100) * sorted.length) - 1));
-  return Number(sorted[idx].toFixed(1));
-}
-
-function buildSwitchStat(values: number[], hitCount: number): StreamSwitchStat {
-  const count = values.length;
-  if (count === 0) return { ...EMPTY_SWITCH_STAT };
-  const lastMs = Number(values[count - 1].toFixed(1));
-  const p50Ms = calcPercentile(values, 50);
-  const p95Ms = calcPercentile(values, 95);
-  const cacheHitRate = Number(((hitCount / count) * 100).toFixed(1));
-  return { count, lastMs, p50Ms, p95Ms, cacheHitRate };
-}
-
-function isFastPathLoad(meta?: StreamLoadMeta): boolean {
-  if (!meta) return false;
-  return Boolean(meta.cacheHit || meta.indexHit || meta.source === "memory" || meta.source === "cache");
-}
-
-function markCachedLoad<T extends HttpStream | BinaryStream>(stream: T): T {
-  return {
-    ...stream,
-    loadMeta: {
-      ...(stream.loadMeta ?? {}),
-      source: "cache",
-      cacheHit: true,
-    },
-  };
-}
-
-function buildLoadingHttpStream(streamId: number): HttpStream {
-  return {
-    id: streamId,
-    client: "",
-    server: "",
-    request: "",
-    response: "",
-    chunks: [],
-    loadMeta: {
-      source: "loading",
-      loading: true,
-    },
-  };
-}
-
-function buildLoadingBinaryStream(protocol: "TCP" | "UDP", streamId: number): BinaryStream {
-  return {
-    id: streamId,
-    protocol,
-    from: "",
-    to: "",
-    chunks: [],
-    nextCursor: 0,
-    totalChunks: 0,
-    hasMore: false,
-    loadMeta: {
-      source: "loading",
-      loading: true,
-    },
-  };
-}
-
-function prettySize(bytes: number) {
-  const mb = bytes / 1024 / 1024;
-  return `${mb.toFixed(1)} MB`;
-}
-
-function readRecentCaptures(): RecentCapture[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(RECENT_CAPTURES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item) => ({
-        path: String(item?.path ?? "").trim(),
-        name: String(item?.name ?? "").trim(),
-        sizeBytes: Number(item?.sizeBytes ?? 0),
-        lastOpenedAt: String(item?.lastOpenedAt ?? "").trim(),
-      }))
-      .filter((item) => item.path)
-      .slice(0, MAX_RECENT_CAPTURES);
-  } catch {
-    return [];
-  }
-}
-
-function writeRecentCaptures(items: RecentCapture[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RECENT_CAPTURES_STORAGE_KEY, JSON.stringify(items.slice(0, MAX_RECENT_CAPTURES)));
-  } catch {
-    // ignore persistence failures
-  }
-}
-
-function applyStreamChunkPatches<T extends HttpStream | BinaryStream>(
-  stream: T,
-  patches: Array<{ index: number; body: string }>,
-): T {
-  if (patches.length === 0 || stream.chunks.length === 0) return stream;
-
-  const patchMap = new Map<number, string>();
-  for (const patch of patches) {
-    if (patch.index < 0) continue;
-    patchMap.set(patch.index, patch.body);
-  }
-  if (patchMap.size === 0) return stream;
-
-  const nextChunks = stream.chunks.map((chunk, index) => (
-    patchMap.has(index) ? { ...chunk, body: patchMap.get(index) ?? chunk.body } : chunk
-  ));
-
-  if ("request" in stream && "response" in stream) {
-    return {
-      ...stream,
-      chunks: nextChunks,
-      request: nextChunks.filter((chunk) => chunk.direction === "client").map((chunk) => chunk.body).join(""),
-      response: nextChunks.filter((chunk) => chunk.direction === "server").map((chunk) => chunk.body).join(""),
-    };
-  }
-
-  return {
-    ...stream,
-    chunks: nextChunks,
-  };
-}
 
 export function SentinelProvider({ children }: PropsWithChildren) {
   const [packets, setPackets] = useState<Packet[]>([]);
@@ -526,11 +311,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setPackets(page.items);
     setSelectedPacketId((prev) => {
       if (prev == null) return null;
-      return page.items.some((p) => p.id === prev) ? prev : null;
+      return packetPageHasPacket(page.items, prev) ? prev : null;
     });
     setSelectedPacketDetail((prev) => {
       if (!prev) return null;
-      return page.items.some((p) => p.id === prev.id) ? prev : null;
+      return packetPageHasPacket(page.items, prev.id) ? prev : null;
     });
     setSelectedPacketRawHex("");
     setSelectedPacketLayers(null);
@@ -617,7 +402,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     const task = captureTaskScopeRef.current.beginTask("packet-page");
     setIsPageLoading(true);
     try {
-      const safeCursor = Math.max(0, cursor);
+      const safeCursor = normalizePacketCursor(cursor);
       const page = await bridge.listPacketsPage(safeCursor, PAGE_SIZE, filterOverride ?? displayFilter, task.signal);
       if (!task.isCurrent() || requestSeq !== packetPageSeqRef.current) {
         return null;
@@ -643,24 +428,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [backendConnected, commitPacketPage, displayFilter]);
 
   const loadMorePackets = useCallback(async () => {
-    const next = pageStartRef.current + PAGE_SIZE;
+    const next = getNextPacketCursor(pageStartRef.current, PAGE_SIZE);
     await loadPacketPage(next);
   }, [loadPacketPage]);
 
   const loadPrevPackets = useCallback(async () => {
-    const prev = Math.max(0, pageStartRef.current - PAGE_SIZE);
+    const prev = getPrevPacketCursor(pageStartRef.current, PAGE_SIZE);
     await loadPacketPage(prev);
   }, [loadPacketPage]);
 
   const jumpToPage = useCallback(async (page: number) => {
-    const totalPagesHint = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
-    const targetPage = Math.max(1, Math.min(Number.isFinite(page) ? Math.floor(page) : 1, totalPagesHint));
-    const cursor = (targetPage - 1) * PAGE_SIZE;
+    const cursor = getPacketPageCursor(page, totalPackets, PAGE_SIZE);
     await loadPacketPage(cursor);
   }, [loadPacketPage, totalPackets]);
 
   const locatePacketById = useCallback(async (packetId: number, filterOverride?: string) => {
-    const normalized = Number.isFinite(packetId) ? Math.floor(packetId) : 0;
+    const normalized = normalizePacketId(packetId);
     if (normalized <= 0 || !activeCapturePathRef.current) return null;
     const task = captureTaskScopeRef.current.beginTask("packet-locate");
     try {
@@ -848,21 +631,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const filteredPackets = useMemo(() => packets, [packets]);
 
-  const selectedPacket = useMemo(() => {
-    const fallback = selectedPacketId == null
-      ? filteredPackets[0] ?? null
-      : filteredPackets.find((p) => p.id === selectedPacketId) ?? null;
-    if (!fallback) {
-      return selectedPacketDetail;
-    }
-    if (selectedPacketDetail && selectedPacketDetail.id === fallback.id) {
-      return {
-        ...fallback,
-        ...selectedPacketDetail,
-      };
-    }
-    return fallback;
-  }, [filteredPackets, selectedPacketDetail, selectedPacketId]);
+  const selectedPacket = useMemo(
+    () => resolveSelectedPacket(filteredPackets, selectedPacketId, selectedPacketDetail),
+    [filteredPackets, selectedPacketDetail, selectedPacketId],
+  );
 
   const refreshAnalysisResult = useCallback(async (
     options?: {
@@ -1281,7 +1053,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
       dispose = bridge.subscribeEvents({
         packet: (packet) => {
-          setSelectedPacketId((prev) => prev ?? packet.id);
+          setSelectedPacketId((prev) => preserveSelectedPacketId(prev, packet.id));
           if (preloadingRef.current) {
             return;
           }
@@ -1374,7 +1146,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    if (selectedPacketDetail?.id === selectedPacketId) {
+    if (!shouldLoadSelectedPacketDetail(selectedPacketId, selectedPacketDetail)) {
       return;
     }
 
@@ -1400,7 +1172,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [selectedPacketDetail?.id, selectedPacketId]);
 
   useEffect(() => {
-    if (selectedPacketId == null || !selectedPacket) {
+    if (!shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket)) {
       setSelectedPacketRawHex("");
       return;
     }
@@ -1427,7 +1199,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [selectedPacketId, selectedPacket?.id]);
 
   useEffect(() => {
-    if (selectedPacketId == null || !selectedPacket) {
+    if (!shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket)) {
       setSelectedPacketLayers(null);
       return;
     }
@@ -1662,7 +1434,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const selectPacket = useCallback((id: number) => {
     setSelectedPacketId(id);
-    setSelectedPacketDetail((prev) => (prev?.id === id ? prev : null));
+    setSelectedPacketDetail((prev) => keepSelectedPacketDetailForId(prev, id));
   }, []);
 
   const updateDecryptionConfig = useCallback((patch: Partial<DecryptionConfig>) => {
@@ -1710,8 +1482,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [selectedPacketLayers, selectedPacket],
   );
   const hexDump = useMemo(() => buildHexDump(selectedPacket), [selectedPacket]);
-  const currentPage = useMemo(() => Math.floor(pageStart / PAGE_SIZE) + 1, [pageStart]);
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalPackets / PAGE_SIZE)), [totalPackets]);
+  const currentPage = useMemo(() => getCurrentPacketPage(pageStart, PAGE_SIZE), [pageStart]);
+  const totalPages = useMemo(() => getTotalPacketPages(totalPackets, PAGE_SIZE), [totalPackets]);
 
   const value = useMemo<SentinelContextValue>(
     () => ({

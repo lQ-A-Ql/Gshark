@@ -1,0 +1,7 @@
+export const PAGE_SIZE = 2000;
+export const RAW_STREAM_PAGE_SIZE = 96;
+export const STREAM_PREFETCH_LIMIT = 0;
+export const PRELOAD_POLL_INTERVAL_MS = 120;
+export const PRELOAD_SIGNAL_WAIT_MS = 1000;
+export const STARTUP_TOOL_RUNTIME_TIMEOUT_MS = 3500;
+export const STARTUP_TLS_CONFIG_TIMEOUT_MS = 2500;

@@ -34,7 +34,22 @@ Invoke-Step "Backend tests" {
 
 Invoke-Step "Frontend tests" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run test
+  pnpm run test:run
+}
+
+Invoke-Step "Frontend typecheck" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run typecheck
+}
+
+Invoke-Step "Frontend lint" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run lint
+}
+
+Invoke-Step "Frontend format check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run format:check
 }
 
 Invoke-Step "Frontend build" {

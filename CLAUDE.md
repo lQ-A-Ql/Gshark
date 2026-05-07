@@ -18,7 +18,7 @@ GShark-Sentinel is a desktop-first offline traffic analysis tool for PCAP/PCAPNG
 - Required tools: Go, Node.js 20+, `pnpm`, `tshark`, Wails CLI.
 - Root module targets Go 1.22; backend/workspace targets Go 1.25.
 - Development is desktop-only: start via Wails scripts, not separate frontend/backend web workflows.
-- No ESLint/Prettier configured for frontend; only `gofmt` for Go.
+- ESLint is part of frontend CI. Prettier is configured as a scoped baseline check for touched/split frontend files; only `gofmt` is mandatory for Go.
 - Frontend uses `@` path alias (`@` → `./src`) configured in `vite.config.ts`.
 
 ## Common Commands
@@ -69,10 +69,19 @@ cd backend && go test ./internal/engine/...
 cd backend && go test ./internal/engine/... -run TestName
 
 # Frontend tests (Vitest single run)
-cd frontend && pnpm run test
+cd frontend && pnpm run test:run
+
+# Frontend typecheck
+cd frontend && pnpm run typecheck
+
+# Frontend CI bundle
+cd frontend && pnpm run ci
+
+# Frontend lint
+cd frontend && pnpm run lint
 
 # Frontend single test file
-cd frontend && pnpm run test -- src/app/pages/VehicleAnalysis.test.ts
+cd frontend && pnpm run test:run -- src/app/pages/VehicleAnalysis.test.ts
 
 # Frontend test by name
 cd frontend && npx vitest run -t "test name"
@@ -89,6 +98,10 @@ cd backend && gofmt -w .
 
 # Full project checks (desktop tests + backend fmt/tests + frontend tests/build)
 ./scripts/check-all.ps1
+
+# Optional frontend lint/format checks for touched code
+cd frontend && pnpm run lint
+cd frontend && pnpm run format:check
 ```
 
 ### Build
@@ -186,8 +199,8 @@ Frontend data flow:
 
 - GitHub Actions (`.github/workflows/ci.yml`): triggers on push (any branch) and PRs.
 - Backend job: `gofmt -l .` check + `go test ./...` on ubuntu-latest.
-- Frontend job: `npm ci` + `npm run build` on ubuntu-latest (tests are NOT run in CI).
-- Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend tests/build).
+- Frontend job: `corepack enable` + `pnpm install --frozen-lockfile` + `pnpm run ci` on ubuntu-latest (`typecheck` + ESLint + Vitest + build).
+- Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend tests/typecheck/lint/scoped-format/build).
 
 ## Operational knobs that affect behavior
 
