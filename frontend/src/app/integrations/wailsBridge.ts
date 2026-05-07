@@ -47,11 +47,14 @@ import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMa
 import { asC2SampleAnalysis } from "./mappers/c2SampleMapper";
 import { parseEvidenceRecords } from "./mappers/evidenceMapper";
 import { asIndustrialAnalysis } from "./mappers/industrialMapper";
+import { asPlainObject } from "./mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream, asPacket, asThreatHit } from "./mappers/packetStreamMapper";
+import { asPluginSource, toPluginSourceRequest } from "./mappers/pluginSourceMapper";
 import { asMediaAnalysis } from "./mappers/mediaMapper";
 import { asObjectList } from "./mappers/objectMapper";
 import { asDBCProfiles, asPluginItem, asPluginItems } from "./mappers/pluginMapper";
 import { asHTTPLoginAnalysis, asMySQLAnalysis, asShiroRememberMeAnalysis, asSMTPAnalysis } from "./mappers/protocolToolMapper";
+import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import {
   asMiscModuleImportResult,
   asMiscModuleManifests,
@@ -61,6 +64,7 @@ import {
   asSMB3SessionCandidates,
   asWinRMDecryptResult,
 } from "./mappers/toolMapper";
+import { asDecryptionConfig } from "./mappers/tlsMapper";
 import { asGlobalTrafficStats } from "./mappers/trafficMapper";
 import { asUSBAnalysis } from "./mappers/usbMapper";
 import { asVehicleAnalysis } from "./mappers/vehicleMapper";
@@ -964,36 +968,15 @@ export const bridge: BackendBridge = {
 
   async getPluginSource(id: string) {
     const payload = await request<any>(`/api/plugins/source?id=${encodeURIComponent(id)}`);
-    return {
-      id: String(payload.id ?? id),
-      configPath: String(payload.config_path ?? ""),
-      configContent: String(payload.config_content ?? ""),
-      logicPath: String(payload.logic_path ?? ""),
-      logicContent: String(payload.logic_content ?? ""),
-      entry: String(payload.entry ?? ""),
-    };
+    return asPluginSource(payload, id);
   },
 
   async savePluginSource(source: PluginSource) {
     const payload = await request<any>(`/api/plugins/source`, {
       method: "POST",
-      body: JSON.stringify({
-        id: source.id,
-        config_path: source.configPath,
-        config_content: source.configContent,
-        logic_path: source.logicPath,
-        logic_content: source.logicContent,
-        entry: source.entry,
-      }),
+      body: JSON.stringify(toPluginSourceRequest(source)),
     });
-    return {
-      id: String(payload.id ?? source.id),
-      configPath: String(payload.config_path ?? ""),
-      configContent: String(payload.config_content ?? ""),
-      logicPath: String(payload.logic_path ?? ""),
-      logicContent: String(payload.logic_content ?? ""),
-      entry: String(payload.entry ?? ""),
-    };
+    return asPluginSource(payload, source.id);
   },
 
   async addPlugin(plugin: PluginItem) {
@@ -1033,11 +1016,7 @@ export const bridge: BackendBridge = {
   async getTLSConfig() {
     try {
       const cfg = await request<any>("/api/tls");
-      return {
-        sslKeyLogPath: cfg.ssl_key_log_file ?? "",
-        privateKeyPath: cfg.rsa_private_key ?? "",
-        privateKeyIpPort: cfg.target_ip_port ?? "",
-      };
+      return asDecryptionConfig(cfg);
     } catch {
       return null;
     }
@@ -1280,67 +1259,6 @@ function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {
         }))
       : [],
   };
-}
-
-function asToolRuntimeSnapshot(input: any): ToolRuntimeSnapshot {
-  return {
-    config: {
-      tsharkPath: String(input?.config?.tshark_path ?? ""),
-      ffmpegPath: String(input?.config?.ffmpeg_path ?? ""),
-      pythonPath: String(input?.config?.python_path ?? ""),
-      voskModelPath: String(input?.config?.vosk_model_path ?? ""),
-      yaraEnabled: Boolean(input?.config?.yara_enabled),
-      yaraBin: String(input?.config?.yara_bin ?? ""),
-      yaraRules: String(input?.config?.yara_rules ?? ""),
-      yaraTimeoutMs: Number(input?.config?.yara_timeout_ms ?? 0) || 25000,
-    },
-    tshark: {
-      available: Boolean(input?.tshark?.available),
-      path: String(input?.tshark?.path ?? ""),
-      message: String(input?.tshark?.message ?? ""),
-      customPath: String(input?.tshark?.custom_path ?? "") || undefined,
-      usingCustomPath: Boolean(input?.tshark?.using_custom_path),
-    },
-    ffmpeg: {
-      available: Boolean(input?.ffmpeg?.available),
-      path: String(input?.ffmpeg?.path ?? ""),
-      message: String(input?.ffmpeg?.message ?? ""),
-      customPath: String(input?.ffmpeg?.custom_path ?? "") || undefined,
-      usingCustomPath: Boolean(input?.ffmpeg?.using_custom_path),
-    },
-    speech: {
-      available: Boolean(input?.speech?.available),
-      engine: String(input?.speech?.engine ?? ""),
-      language: String(input?.speech?.language ?? ""),
-      pythonAvailable: Boolean(input?.speech?.python_available),
-      pythonCommand: String(input?.speech?.python_command ?? "") || undefined,
-      ffmpegAvailable: Boolean(input?.speech?.ffmpeg_available),
-      voskAvailable: Boolean(input?.speech?.vosk_available),
-      modelAvailable: Boolean(input?.speech?.model_available),
-      modelPath: String(input?.speech?.model_path ?? "") || undefined,
-      message: String(input?.speech?.message ?? ""),
-    },
-    yara: {
-      available: Boolean(input?.yara?.available),
-      enabled: Boolean(input?.yara?.enabled),
-      path: String(input?.yara?.path ?? "") || undefined,
-      rulePath: String(input?.yara?.rule_path ?? "") || undefined,
-      message: String(input?.yara?.message ?? ""),
-      lastScanMessage: String(input?.yara?.last_scan_message ?? "") || undefined,
-      customBin: String(input?.yara?.custom_bin ?? "") || undefined,
-      customRules: String(input?.yara?.custom_rules ?? "") || undefined,
-      usingCustomBin: Boolean(input?.yara?.using_custom_bin),
-      usingCustomRules: Boolean(input?.yara?.using_custom_rules),
-      timeoutMs: Number(input?.yara?.timeout_ms ?? 0) || 25000,
-    },
-  };
-}
-
-function asPlainObject(input: unknown): Record<string, unknown> | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-  return input as Record<string, unknown>;
 }
 
 async function selectLocalFile(): Promise<File> {

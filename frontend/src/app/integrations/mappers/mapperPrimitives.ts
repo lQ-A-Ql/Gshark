@@ -28,3 +28,10 @@ export function asPositiveFiniteNumbers(input: unknown): number[] {
   if (!Array.isArray(input)) return [];
   return input.map((value) => Number(value ?? 0)).filter((value) => Number.isFinite(value) && value > 0);
 }
+
+export function asPlainObject(input: unknown): Record<string, unknown> | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+  return input as Record<string, unknown>;
+}
