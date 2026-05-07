@@ -28,7 +28,7 @@ describe("evidenceSchema", () => {
       summary: "C2 技术证据关联 Silver Fox 候选",
     });
 
-    expect(record.module).toBe("c2-analysis");
+    expect(record.module).toBe("c2");
     expect(record.confidenceLabel).toBe("medium");
     expect(record.tags).toContain("ValleyRAT");
     expect(record.tags).toContain("missing:missing-object");
@@ -56,10 +56,10 @@ describe("evidenceSchema", () => {
       match: "eval",
     });
 
-    expect(c2.module).toBe("c2-analysis");
+    expect(c2.module).toBe("c2");
     expect(c2.confidenceLabel).toBe("high");
     expect(c2.tags).toContain("actor:silver-fox");
-    expect(threat.module).toBe("threat-hunting");
+    expect(threat.module).toBe("hunting");
     expect(threat.severity).toBe("high");
     expect(threat.caveats[0]).toContain("规则命中");
   });

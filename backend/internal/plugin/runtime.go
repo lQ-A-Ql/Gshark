@@ -42,7 +42,7 @@ type runtimeCandidate struct {
 	logicPath string
 }
 
-func (m *Manager) NewPacketPluginRunner() *PacketPluginRunner {
+func (m *Manager) NewPacketPluginRunner(ctx context.Context) *PacketPluginRunner {
 	candidates := m.runtimeCandidates()
 	if len(candidates) == 0 {
 		return nil
@@ -51,7 +51,7 @@ func (m *Manager) NewPacketPluginRunner() *PacketPluginRunner {
 	sessions := make([]packetPluginSession, 0, len(candidates))
 	warnings := make([]string, 0)
 	for _, candidate := range candidates {
-		session, err := newPacketPluginSession(candidate.meta, candidate.logicPath)
+		session, err := newPacketPluginSession(ctx, candidate.meta, candidate.logicPath)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: %v", candidate.meta.ID, err))
 			continue
@@ -108,8 +108,8 @@ func (r *PacketPluginRunner) Warnings() []string {
 	return out
 }
 
-func (m *Manager) RunEnabledPacketPlugins(packets []model.Packet, startID int64) []model.ThreatHit {
-	runner := m.NewPacketPluginRunner()
+func (m *Manager) RunEnabledPacketPlugins(ctx context.Context, packets []model.Packet, startID int64) []model.ThreatHit {
+	runner := m.NewPacketPluginRunner(ctx)
 	if runner == nil {
 		return nil
 	}
@@ -143,12 +143,12 @@ func (m *Manager) runtimeCandidates() []runtimeCandidate {
 	return candidates
 }
 
-func newPacketPluginSession(meta model.Plugin, logicPath string) (packetPluginSession, error) {
+func newPacketPluginSession(ctx context.Context, meta model.Plugin, logicPath string) (packetPluginSession, error) {
 	switch strings.ToLower(filepath.Ext(logicPath)) {
 	case ".js", ".mjs", ".cjs":
 		return newJSPacketSession(meta, logicPath)
 	case ".py":
-		return newPythonPacketSession(meta, logicPath)
+		return newPythonPacketSession(ctx, meta, logicPath)
 	default:
 		return nil, fmt.Errorf("unsupported plugin runtime: %s", logicPath)
 	}
@@ -327,7 +327,7 @@ type pythonPacketSession struct {
 	warned    map[string]struct{}
 }
 
-func newPythonPacketSession(meta model.Plugin, logicPath string) (*pythonPacketSession, error) {
+func newPythonPacketSession(ctx context.Context, meta model.Plugin, logicPath string) (*pythonPacketSession, error) {
 	if !pluginHasCapability(meta, "packet.read") {
 		return nil, fmt.Errorf("plugin %s is missing required capability packet.read", meta.ID)
 	}
@@ -337,7 +337,7 @@ func newPythonPacketSession(meta model.Plugin, logicPath string) (*pythonPacketS
 		return nil, err
 	}
 
-	cmdCtx, cancel := context.WithCancel(context.Background())
+	cmdCtx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(cmdCtx, args[0], append(args[1:], logicPath)...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

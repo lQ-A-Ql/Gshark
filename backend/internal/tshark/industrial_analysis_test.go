@@ -95,6 +95,89 @@ func TestBuildModbusBitRangeUsesExplicitBitFields(t *testing.T) {
 	}
 }
 
+func TestDecodeModbusInputTextFromObjectString(t *testing.T) {
+	got := decodeModbusInputText("  station-ready\r\n", "", "", "")
+	if got != "station-ready" {
+		t.Fatalf("decodeModbusInputText() = %q, want station-ready", got)
+	}
+}
+
+func TestDecodeModbusInputTextFromHexBytes(t *testing.T) {
+	got := decodeModbusInputText("", "68:65:6c:6c:6f:20:6d:6f:64:62:75:73:00", "", "")
+	if got != "hello modbus" {
+		t.Fatalf("decodeModbusInputText() = %q, want hello modbus", got)
+	}
+}
+
+func TestDecodeModbusInputTextFromCompactHexBytes(t *testing.T) {
+	got := decodeModbusInputText("", "68656c6c6f206d6f64627573", "", "")
+	if got != "hello modbus" {
+		t.Fatalf("decodeModbusInputText() = %q, want hello modbus", got)
+	}
+}
+
+func TestDecodeModbusInputTextFromRegisterValues(t *testing.T) {
+	got := decodeModbusInputText("", "", "26725,27756,28416", "")
+	if got != "hello" {
+		t.Fatalf("decodeModbusInputText() = %q, want hello", got)
+	}
+}
+
+func TestDecodeModbusInputTextIgnoresBinaryNoise(t *testing.T) {
+	got := decodeModbusInputText("", "00:01:02:ff:00", "0,1,2", "")
+	if got != "" {
+		t.Fatalf("decodeModbusInputText() = %q, want empty", got)
+	}
+}
+
+func TestBuildModbusDecodedInputsFromSequentialASCIIWrites(t *testing.T) {
+	inputs := buildModbusDecodedInputs([]model.ModbusTransaction{
+		{PacketID: 10, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, FunctionName: "写多寄存器", Kind: "request", Reference: "Ref 40001", RegisterValues: "104"},
+		{PacketID: 11, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, FunctionName: "写多寄存器", Kind: "request", Reference: "Ref 40001", RegisterValues: "105"},
+		{PacketID: 12, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, FunctionName: "写多寄存器", Kind: "request", Reference: "Ref 40001", RegisterValues: "33"},
+		{PacketID: 13, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, FunctionName: "写多寄存器", Kind: "request", Reference: "Ref 40001", RegisterValues: "33"},
+	}, nil)
+
+	if len(inputs) != 1 {
+		t.Fatalf("len(inputs) = %d, want 1", len(inputs))
+	}
+	if inputs[0].Text != "hi!!" {
+		t.Fatalf("inputs[0].Text = %q, want hi!!", inputs[0].Text)
+	}
+	if inputs[0].Encoding != "ascii->utf-8" {
+		t.Fatalf("inputs[0].Encoding = %q, want ascii->utf-8", inputs[0].Encoding)
+	}
+	if inputs[0].StartPacketID != 10 || inputs[0].EndPacketID != 13 {
+		t.Fatalf("packet range = %d-%d, want 10-13", inputs[0].StartPacketID, inputs[0].EndPacketID)
+	}
+}
+
+func TestBuildModbusDecodedInputsDecodesNestedHexText(t *testing.T) {
+	inputs := buildModbusDecodedInputs([]model.ModbusTransaction{
+		{PacketID: 20, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "54"},
+		{PacketID: 21, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "54"},
+		{PacketID: 22, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "54"},
+		{PacketID: 23, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "99"},
+		{PacketID: 24, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "54"},
+		{PacketID: 25, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "49"},
+		{PacketID: 26, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "54"},
+		{PacketID: 27, Source: "10.0.0.1", Destination: "10.0.0.2", UnitID: 1, FunctionCode: 16, Kind: "request", Reference: "Ref 40001", RegisterValues: "55"},
+	}, nil)
+
+	if len(inputs) != 1 {
+		t.Fatalf("len(inputs) = %d, want 1", len(inputs))
+	}
+	if inputs[0].Text != "flag" {
+		t.Fatalf("inputs[0].Text = %q, want flag", inputs[0].Text)
+	}
+	if inputs[0].RawText != "666c6167" {
+		t.Fatalf("inputs[0].RawText = %q, want 666c6167", inputs[0].RawText)
+	}
+	if inputs[0].Encoding != "ascii-hex->utf-8" {
+		t.Fatalf("inputs[0].Encoding = %q, want ascii-hex->utf-8", inputs[0].Encoding)
+	}
+}
+
 func TestBuildModbusFunctionMutationRuleHits(t *testing.T) {
 	hits := buildModbusFunctionMutationRuleHits([]model.ModbusTransaction{
 		{

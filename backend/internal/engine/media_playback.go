@@ -47,10 +47,6 @@ func (s *Service) FFmpegStatus() FFmpegStatus {
 	}
 }
 
-func (s *Service) MediaPlayback(token string) (string, string, error) {
-	return s.MediaPlaybackWithContext(context.Background(), token)
-}
-
 func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (string, string, error) {
 	if ctx == nil {
 		ctx = context.Background()

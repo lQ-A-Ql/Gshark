@@ -40,6 +40,7 @@ import type {
   SMB3RandomSessionKeyRequest,
   SMB3RandomSessionKeyResult,
 } from "../core/types";
+import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
 import { downloadBlob } from "../utils/browserFile";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
@@ -161,6 +162,7 @@ export interface BackendBridge {
   getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
   listObjects(signal?: AbortSignal): Promise<ExtractedObject[]>;
+  downloadObjectsZip(ids: number[]): Promise<void>;
   getHttpStream(streamId: number, signal?: AbortSignal): Promise<HttpStream>;
   getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
   getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
@@ -184,6 +186,8 @@ export interface BackendBridge {
   getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
   decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal): Promise<C2DecryptResult>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
+  getEvidence(signal?: AbortSignal): Promise<UnifiedEvidenceRecord[]>;
+  getEvidenceWithFilter(modules?: string[], signal?: AbortSignal): Promise<UnifiedEvidenceRecord[]>;
   downloadMediaArtifact(token: string, filename: string): Promise<void>;
   getMediaPlaybackBlob(token: string): Promise<Blob>;
   listVehicleDBCProfiles(): Promise<DBCProfile[]>;
@@ -302,6 +306,7 @@ function asObject(input: any): ExtractedObject {
     name: String(input.name ?? "object.bin"),
     sizeBytes: Number(input.size_bytes ?? 0),
     mime: String(input.mime ?? "application/octet-stream"),
+    magic: String(input.magic ?? ""),
     source: source === "FTP" ? "FTP" : "HTTP",
   };
 }
@@ -1167,6 +1172,16 @@ export const bridge: BackendBridge = {
     return rows.map(asObject);
   },
 
+  async downloadObjectsZip(ids: number[]) {
+    const body = JSON.stringify({ ids });
+    const blob = await requestBlob("/api/objects/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    downloadBlob("exported_objects.zip", blob);
+  },
+
   async getHttpStream(streamId: number, signal?: AbortSignal) {
     const stream = await request<any>(`/api/streams/http?streamId=${encodeURIComponent(String(streamId))}`, { signal });
     return asHttpStream(stream);
@@ -1362,6 +1377,22 @@ export const bridge: BackendBridge = {
         unitIds: Array.isArray(payload.modbus?.unit_ids) ? payload.modbus.unit_ids.map(asBucket) : [],
         referenceHits: Array.isArray(payload.modbus?.reference_hits) ? payload.modbus.reference_hits.map(asBucket) : [],
         exceptionCodes: Array.isArray(payload.modbus?.exception_codes) ? payload.modbus.exception_codes.map(asBucket) : [],
+        decodedInputs: Array.isArray(payload.modbus?.decoded_inputs)
+          ? payload.modbus.decoded_inputs.map((item: any) => ({
+              startPacketId: Number(item.start_packet_id ?? 0),
+              endPacketId: Number(item.end_packet_id ?? 0),
+              source: String(item.source ?? "") || undefined,
+              destination: String(item.destination ?? "") || undefined,
+              unitId: Number(item.unit_id ?? 0) || undefined,
+              functionCode: Number(item.function_code ?? 0) || undefined,
+              functionName: String(item.function_name ?? "") || undefined,
+              reference: String(item.reference ?? "") || undefined,
+              encoding: String(item.encoding ?? ""),
+              text: String(item.text ?? ""),
+              rawText: String(item.raw_text ?? "") || undefined,
+              summary: String(item.summary ?? "") || undefined,
+            }))
+          : [],
         transactions: Array.isArray(payload.modbus?.transactions)
           ? payload.modbus.transactions.map((item: any) => ({
               packetId: Number(item.packet_id ?? 0),
@@ -1378,6 +1409,7 @@ export const bridge: BackendBridge = {
               exceptionCode: Number(item.exception_code ?? 0),
               responseTime: String(item.response_time ?? ""),
               registerValues: String(item.register_values ?? "") || undefined,
+              inputText: String(item.input_text ?? "") || undefined,
               bitRange: item.bit_range && typeof item.bit_range === "object"
                 ? {
                     type: String(item.bit_range.type ?? "") || undefined,
@@ -2083,6 +2115,22 @@ export const bridge: BackendBridge = {
       evidence: Array.isArray(payload.evidence) ? payload.evidence.map(asAPTRecord) : [],
       notes: Array.isArray(payload.notes) ? payload.notes.map((value: unknown) => String(value ?? "")) : [],
     } as APTAnalysis;
+  },
+
+  async getEvidence(signal?: AbortSignal) {
+    const payload = await request<any>("/api/evidence", { signal });
+    return parseEvidenceRecords(payload);
+  },
+
+  async getEvidenceWithFilter(modules?: string[], signal?: AbortSignal) {
+    const params = new URLSearchParams();
+    if (modules && modules.length > 0) {
+      params.set("modules", modules.join(","));
+    }
+    const qs = params.toString();
+    const path = qs ? `/api/evidence?${qs}` : "/api/evidence";
+    const payload = await request<any>(path, { signal });
+    return parseEvidenceRecords(payload);
   },
 
   async downloadMediaArtifact(token: string, filename: string) {
@@ -2811,6 +2859,54 @@ function asBucket(input: any) {
     label: String(input.label ?? ""),
     count: Number(input.count ?? 0),
   };
+}
+
+function parseEvidenceRecords(payload: any): UnifiedEvidenceRecord[] {
+  const records = Array.isArray(payload?.records) ? payload.records : [];
+  return records.map((item: any): UnifiedEvidenceRecord => ({
+    id: String(item.id ?? ""),
+    module: normalizeEvidenceModule(String(item.module ?? "unknown")),
+    sourceModule: String(item.source_module ?? "") || undefined,
+    packetId: Number(item.packet_id ?? 0) || undefined,
+    streamId: Number(item.stream_id ?? 0) || undefined,
+    family: String(item.family ?? "") || undefined,
+    actorId: String(item.actor_id ?? "") || undefined,
+    actorName: String(item.actor_name ?? "") || undefined,
+    sourceType: String(item.source_type ?? ""),
+    summary: String(item.summary ?? ""),
+    value: String(item.value ?? "") || undefined,
+    confidence: typeof item.confidence === "number" ? item.confidence : undefined,
+    confidenceLabel: evidenceConfidenceLabel(item.confidence),
+    severity: String(item.severity ?? "info") as UnifiedEvidenceRecord["severity"],
+    source: String(item.source ?? "") || undefined,
+    destination: String(item.destination ?? "") || undefined,
+    host: String(item.host ?? "") || undefined,
+    uri: String(item.uri ?? "") || undefined,
+    tags: Array.isArray(item.tags) ? item.tags.map((t: unknown) => String(t)) : [],
+    caveats: Array.isArray(item.caveats) ? item.caveats.map((c: unknown) => String(c)) : [],
+  }));
+}
+
+function normalizeEvidenceModule(raw: string): UnifiedEvidenceRecord["module"] {
+  const lower = raw.toLowerCase();
+  if (lower.includes("c2")) return "c2";
+  if (lower.includes("apt")) return "apt";
+  if (lower.includes("hunting") || lower.includes("yara") || lower.includes("threat")) return "hunting";
+  if (lower.includes("industrial")) return "industrial";
+  if (lower.includes("vehicle")) return "vehicle";
+  if (lower.includes("usb")) return "usb";
+  if (lower.includes("object")) return "object";
+  if (lower.includes("misc") || lower.includes("webshell") || lower.includes("decoder")) return "misc";
+  if (lower.includes("stream")) return "stream";
+  return "unknown";
+}
+
+function evidenceConfidenceLabel(confidence?: number): UnifiedEvidenceRecord["confidenceLabel"] {
+  if (confidence === undefined || Number.isNaN(confidence)) return "unknown";
+  if (confidence >= 75) return "high";
+  if (confidence >= 45) return "medium";
+  if (confidence > 0) return "low";
+  return "unknown";
 }
 
 function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {

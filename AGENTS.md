@@ -92,6 +92,8 @@ If `wails dev` doesn't pick up your backend changes, delete all three + clear Go
 | Frontend lifecycle | `SentinelContext.tsx`: `prepareForCaptureReplacement`, `captureTaskScope`; `useAbortableRequest` hook |
 | Frontend types | `core/types/`: 13 个子模块（packet, stream, traffic, c2, apt, industrial, vehicle, media, usb, misc-protocols, misc-modules, tools, index） |
 | Frontend feature hooks | `features/*/use*.ts`: 8 个 hooks（c2, apt, industrial, vehicle, media, usb, traffic, object） |
+| Evidence schema | `frontend/src/app/features/evidence/evidenceSchema.ts`: `UnifiedEvidenceRecord` |
+| Evidence aggregation | `backend/internal/engine/evidence.go`: `GatherEvidence` 聚合 5 模块证据（hunting/c2/apt/industrial/object）；`/api/evidence` 端点支持 module 过滤 |
 
 Full audit history: `docs/audit-development-report-archive-2026-05-02/`
 

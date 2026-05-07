@@ -5,10 +5,8 @@ import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
 import { AnalysisEmptyState, AnalysisPanel, AnalysisStatCard } from "../components/analysis/AnalysisPrimitives";
-import { buildTrafficStatsCacheKey, buildStatsFromPackets, useTrafficGraph } from "../features/traffic/useTrafficGraph";
+import { useTrafficGraph } from "../features/traffic/useTrafficGraph";
 import { useSentinel } from "../state/SentinelContext";
-
-export { buildTrafficStatsCacheKey, buildStatsFromPackets };
 
 interface Bucket {
   label: string;

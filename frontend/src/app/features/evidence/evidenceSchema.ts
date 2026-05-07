@@ -1,10 +1,13 @@
 import type { APTEvidenceRecord, C2IndicatorRecord, ThreatHit, ThreatLevel } from "../../core/types";
 
 export type EvidenceModule =
-  | "apt-analysis"
-  | "c2-analysis"
-  | "threat-hunting"
-  | "object-export"
+  | "apt"
+  | "c2"
+  | "hunting"
+  | "industrial"
+  | "object"
+  | "vehicle"
+  | "usb"
   | "misc"
   | "stream"
   | "unknown";
@@ -74,7 +77,7 @@ export function fromAPTEvidence(item: APTEvidenceRecord, index = 0): UnifiedEvid
   const confidence = normalizeConfidence(item.confidence);
   return {
     id: `apt:${item.packetId}:${item.actorId ?? "unknown"}:${item.sourceModule ?? "unknown"}:${index}`,
-    module: normalizeEvidenceModule(item.sourceModule, "apt-analysis"),
+    module: normalizeEvidenceModule(item.sourceModule, "apt"),
     sourceModule: item.sourceModule,
     packetId: item.packetId,
     streamId: item.streamId,
@@ -96,11 +99,12 @@ export function fromAPTEvidence(item: APTEvidenceRecord, index = 0): UnifiedEvid
   };
 }
 
+/** @deprecated Use useEvidence hook with backend /api/evidence endpoint instead. */
 export function fromC2Indicator(item: C2IndicatorRecord, index = 0): UnifiedEvidenceRecord {
   const confidence = normalizeConfidence(item.confidence ?? item.attributionConfidence);
   return {
     id: `c2:${item.packetId}:${item.family}:${item.indicatorType ?? "indicator"}:${index}`,
-    module: "c2-analysis",
+    module: "c2",
     sourceModule: "c2-analysis",
     packetId: item.packetId,
     streamId: item.streamId,
@@ -129,11 +133,12 @@ export function fromC2Indicator(item: C2IndicatorRecord, index = 0): UnifiedEvid
   };
 }
 
+/** @deprecated Use useEvidence hook with backend /api/evidence endpoint instead. */
 export function fromThreatHit(item: ThreatHit): UnifiedEvidenceRecord {
   const severity = threatLevelToSeverity(item.level);
   return {
     id: `threat:${item.id}:${item.packetId}`,
-    module: "threat-hunting",
+    module: "hunting",
     sourceModule: "threat-hunting",
     packetId: item.packetId,
     sourceType: item.category || "threat-hit",
@@ -153,10 +158,13 @@ function normalizeConfidence(confidence?: number) {
 
 function normalizeEvidenceModule(sourceModule: string | undefined, fallback: EvidenceModule): EvidenceModule {
   const normalized = String(sourceModule ?? "").toLowerCase();
-  if (normalized.includes("c2")) return "c2-analysis";
-  if (normalized.includes("apt")) return "apt-analysis";
-  if (normalized.includes("hunting") || normalized.includes("yara") || normalized.includes("threat")) return "threat-hunting";
-  if (normalized.includes("object")) return "object-export";
+  if (normalized.includes("c2")) return "c2";
+  if (normalized.includes("apt")) return "apt";
+  if (normalized.includes("hunting") || normalized.includes("yara") || normalized.includes("threat")) return "hunting";
+  if (normalized.includes("industrial")) return "industrial";
+  if (normalized.includes("vehicle")) return "vehicle";
+  if (normalized.includes("usb")) return "usb";
+  if (normalized.includes("object")) return "object";
   if (normalized.includes("misc") || normalized.includes("webshell") || normalized.includes("decoder")) return "misc";
   if (normalized.includes("stream")) return "stream";
   return fallback;

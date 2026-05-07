@@ -1,5 +1,5 @@
 import { Mail, Paperclip, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { SMTPAnalysis, SMTPSession } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
+import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -26,42 +26,16 @@ type SessionFilter = "ALL" | "AUTH" | "ATTACHMENT";
 export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
-  const [analysis, setAnalysis] = useState<SMTPAnalysis>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const fetchAnalysis = useCallback((signal: AbortSignal) => bridge.getSMTPAnalysis(signal), []);
+  const { analysis, loading, error, refresh } = useMiscModuleAnalysis<SMTPAnalysis>({
+    fetch: fetchAnalysis,
+    emptyData: EMPTY_ANALYSIS,
+    errorMessage: "加载 SMTP 会话重建失败",
+  });
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("ALL");
   const [query, setQuery] = useState("");
   const [selectedStreamId, setSelectedStreamId] = useState<number>(0);
   const embedded = surfaceVariant === "embedded";
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
-
-  const loadAnalysis = useCallback((preserveSelection = false) => {
-    if (!hasCapture) {
-      cancelAnalysisRequest();
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedStreamId(0);
-      setError("");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    return runAnalysisRequest({
-      request: (signal) => bridge.getSMTPAnalysis(signal),
-      onSuccess: (payload) => {
-        setAnalysis(payload);
-        setSelectedStreamId((current) => preserveSelection && current && payload.sessions.some((item) => item.streamId === current) ? current : payload.sessions[0]?.streamId ?? 0);
-      },
-      onError: (err) => {
-        setAnalysis(EMPTY_ANALYSIS);
-        setSelectedStreamId(0);
-        setError(err instanceof Error ? err.message : "加载 SMTP 会话重建失败");
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
-
-  useEffect(() => loadAnalysis(false), [fileMeta.path, loadAnalysis]);
 
   const filteredSessions = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -151,7 +125,7 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void loadAnalysis(true)} disabled={!hasCapture || loading} className="gap-2 bg-white text-sky-700">
+            <Button type="button" variant="outline" onClick={() => void refresh()} disabled={!hasCapture || loading} className="gap-2 bg-white text-sky-700">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新"}
             </Button>

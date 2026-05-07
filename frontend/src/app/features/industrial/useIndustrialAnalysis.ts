@@ -17,6 +17,7 @@ export const EMPTY_INDUSTRIAL_ANALYSIS: IndustrialAnalysisData = {
     referenceHits: [],
     exceptionCodes: [],
     transactions: [],
+    decodedInputs: [],
   },
   ruleHits: [],
   details: [],

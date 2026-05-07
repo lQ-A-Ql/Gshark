@@ -131,6 +131,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/c2-analysis", s.handleC2Analysis)
 	mux.HandleFunc("/api/c2-analysis/decrypt", s.handleC2Decrypt)
 	mux.HandleFunc("/api/apt-analysis", s.handleAPTAnalysis)
+	mux.HandleFunc("/api/evidence", s.handleEvidence)
 	mux.HandleFunc("/api/analysis/media/export", s.handleMediaArtifactDownload)
 	mux.HandleFunc("/api/analysis/media/play", s.handleMediaArtifactPlayback)
 	mux.HandleFunc("/api/analysis/media/transcribe", s.handleMediaArtifactTranscription)
@@ -684,6 +685,28 @@ func (s *Server) handleAPTAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, analysis)
+}
+
+func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
+	var filter model.EvidenceFilter
+	if modulesParam := r.URL.Query().Get("modules"); modulesParam != "" {
+		for _, m := range strings.Split(modulesParam, ",") {
+			m = strings.TrimSpace(m)
+			if m != "" {
+				filter.Modules = append(filter.Modules, m)
+			}
+		}
+	}
+	result, err := s.svc.GatherEvidence(r.Context(), filter)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			writeError(w, http.StatusRequestTimeout, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleMediaArtifactDownload(w http.ResponseWriter, r *http.Request) {

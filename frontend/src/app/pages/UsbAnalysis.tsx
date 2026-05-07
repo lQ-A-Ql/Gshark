@@ -15,10 +15,8 @@ import type {
   USBMouseEvent,
   USBPacketRecord,
 } from "../core/types";
-import { buildUSBAnalysisCacheKey, useUsbAnalysis } from "../features/usb/useUsbAnalysis";
+import { useUsbAnalysis } from "../features/usb/useUsbAnalysis";
 import { useSentinel } from "../state/SentinelContext";
-
-export { buildUSBAnalysisCacheKey };
 
 type UsbPrimaryTab = "hid" | "mass-storage" | "other";
 type HidSubTab = "keyboard" | "mouse";

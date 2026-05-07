@@ -1,4 +1,5 @@
 import { AlertTriangle, Factory, Shield, Workflow } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
@@ -13,9 +14,9 @@ import {
   type AnalysisTone,
 } from "../components/analysis/AnalysisPrimitives";
 import { useSentinel } from "../state/SentinelContext";
-import { buildIndustrialAnalysisCacheKey, useIndustrialAnalysis } from "../features/industrial/useIndustrialAnalysis";
-
-export { buildIndustrialAnalysisCacheKey };
+import { useIndustrialAnalysis } from "../features/industrial/useIndustrialAnalysis";
+import { EvidenceActions } from "../misc/EvidenceActions";
+import { cn } from "../components/ui/utils";
 
 const INDUSTRIAL_PROTOCOL_TAGS = [
   "Modbus",
@@ -37,6 +38,27 @@ export default function IndustrialAnalysis() {
     totalPackets,
     captureRevision,
   });
+
+  const [modbusUnitFilter, setModbusUnitFilter] = useState("all");
+  const [modbusFunctionFilter, setModbusFunctionFilter] = useState("all");
+
+  const modbusUnitOptions = useMemo(() => {
+    const units = new Set(analysis.modbus.transactions.map((t) => String(t.unitId)));
+    return ["all", ...Array.from(units).sort()];
+  }, [analysis.modbus.transactions]);
+
+  const modbusFunctionOptions = useMemo(() => {
+    const fns = new Set(analysis.modbus.transactions.map((t) => String(t.functionCode)));
+    return ["all", ...Array.from(fns).sort()];
+  }, [analysis.modbus.transactions]);
+
+  const filteredModbusTransactions = useMemo(() => {
+    return analysis.modbus.transactions.filter((t) => {
+      if (modbusUnitFilter !== "all" && String(t.unitId) !== modbusUnitFilter) return false;
+      if (modbusFunctionFilter !== "all" && String(t.functionCode) !== modbusFunctionFilter) return false;
+      return true;
+    });
+  }, [analysis.modbus.transactions, modbusUnitFilter, modbusFunctionFilter]);
 
   return (
     <PageShell className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.26),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]">
@@ -192,12 +214,76 @@ export default function IndustrialAnalysis() {
                   </div>
                 ) : "--",
               },
+              {
+                key: "actions",
+                header: "定位",
+                widthClassName: "w-16",
+                render: (sw) => sw.samplePacketId ? <EvidenceActions packetId={sw.samplePacketId} /> : "--",
+              },
             ]}
             data={analysis.suspiciousWrites ?? []}
             rowKey={(_sw, idx) => `sw-${idx}`}
             maxHeightClassName="max-h-[420px]"
             tableClassName="min-w-[920px]"
             emptyText="暂无可疑写操作"
+          />
+        </Panel>
+      )}
+
+      {(analysis.modbus.decodedInputs?.length ?? 0) > 0 && (
+        <Panel title={`Modbus UTF-8 输入重组 (${analysis.modbus.decodedInputs!.length})`} className="mt-4">
+          <AnalysisCallout className="mb-2" tone="blue" icon={<Workflow className="h-4 w-4" />}>
+            将连续写寄存器中的 ASCII 数值按时间顺序重组；若重组结果本身是十六进制文本，则继续转为 UTF-8 显示。
+          </AnalysisCallout>
+          <DataTable
+            columns={[
+              {
+                key: "range",
+                header: "包范围",
+                widthClassName: "w-28",
+                cellClassName: "font-mono text-slate-500",
+                render: (item) => `${item.startPacketId}-${item.endPacketId}`,
+              },
+              { key: "source", header: "源", widthClassName: "w-36", render: (item) => item.source || "--" },
+              { key: "destination", header: "目标", widthClassName: "w-36", render: (item) => item.destination || "--" },
+              {
+                key: "function",
+                header: "功能码",
+                widthClassName: "w-28",
+                render: (item) => (
+                  <div>
+                    <div className="font-mono">{item.functionCode || "--"}</div>
+                    <div className="text-slate-500">{item.functionName || "--"}</div>
+                  </div>
+                ),
+              },
+              { key: "encoding", header: "编码", widthClassName: "w-32", cellClassName: "font-mono text-blue-700", render: (item) => item.encoding || "--" },
+              {
+                key: "text",
+                header: "输入内容",
+                render: (item) => (
+                  <div className="max-h-32 overflow-y-auto rounded border border-emerald-100 bg-emerald-50/70 px-2 py-1 font-mono text-[11px] text-emerald-800">
+                    <div className="whitespace-pre-wrap break-words">{item.text}</div>
+                    {item.rawText && item.rawText !== item.text && (
+                      <div className="mt-1 border-t border-emerald-100 pt-1 text-emerald-700/75">
+                        原始 ASCII: <span className="whitespace-pre-wrap break-words">{item.rawText}</span>
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "actions",
+                header: "定位",
+                widthClassName: "w-16",
+                render: (item) => item.startPacketId ? <EvidenceActions packetId={item.startPacketId} /> : "--",
+              },
+            ]}
+            data={analysis.modbus.decodedInputs ?? []}
+            rowKey={(item, idx) => `decoded-input-${item.startPacketId}-${item.endPacketId}-${idx}`}
+            maxHeightClassName="max-h-[420px]"
+            tableClassName="min-w-[1120px]"
+            emptyText="暂无可重组 UTF-8 输入"
           />
         </Panel>
       )}
@@ -229,7 +315,41 @@ export default function IndustrialAnalysis() {
         </Panel>
       )}
 
-      <Panel title={`Modbus 事务明细 (${analysis.modbus.transactions.length})`} className="mt-4">
+      <Panel title={`Modbus 事务明细 (${filteredModbusTransactions.length})`} className="mt-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-slate-500">Unit ID:</span>
+          {modbusUnitOptions.map((u) => (
+            <button
+              key={u}
+              type="button"
+              onClick={() => setModbusUnitFilter(u)}
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all",
+                modbusUnitFilter === u
+                  ? "border-blue-200 bg-blue-100 text-blue-700"
+                  : "border-slate-200 bg-white/80 text-slate-500 hover:border-blue-200",
+              )}
+            >
+              {u === "all" ? "全部" : u}
+            </button>
+          ))}
+          <span className="ml-3 text-[11px] font-medium text-slate-500">功能码:</span>
+          {modbusFunctionOptions.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setModbusFunctionFilter(f)}
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all",
+                modbusFunctionFilter === f
+                  ? "border-blue-200 bg-blue-100 text-blue-700"
+                  : "border-slate-200 bg-white/80 text-slate-500 hover:border-blue-200",
+              )}
+            >
+              {f === "all" ? "全部" : f}
+            </button>
+          ))}
+        </div>
         <DataTable
           columns={[
             { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: "font-mono text-slate-500", render: (item) => item.packetId },
@@ -263,12 +383,18 @@ export default function IndustrialAnalysis() {
                       位值解析: {item.bitRange.preview}
                     </div>
                   )}
+                  {item.inputText && (
+                    <div className="mt-1 max-h-24 overflow-y-auto rounded border border-emerald-100 bg-emerald-50/70 px-2 py-1 font-mono text-[11px] text-emerald-800">
+                      <span className="font-semibold">UTF-8输入: </span>
+                      <span className="whitespace-pre-wrap break-words">{item.inputText}</span>
+                    </div>
+                  )}
                   {item.registerValues && <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{item.registerValues}</div>}
                 </div>
               ),
             },
           ]}
-          data={analysis.modbus.transactions}
+          data={filteredModbusTransactions}
           rowKey={(item) => `${item.packetId}-${item.transactionId}-${item.kind}`}
           maxHeightClassName="max-h-[520px]"
           tableClassName="min-w-[1200px]"

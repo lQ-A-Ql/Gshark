@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -594,6 +596,157 @@ func TestC2DecryptCSAESDirectKey(t *testing.T) {
 	}
 	if result.DecryptedCount == 0 || !hasDecryptedRecord(result, "sleep", "") {
 		t.Fatalf("expected CS decrypted record, got %+v", result)
+	}
+}
+
+func TestC2DecryptCSAesRandHMACVerifiedHTTPResponse(t *testing.T) {
+	rawKey := []byte("0123456789abcdef")
+	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
+	plaintext := []byte{0, 0, 0, 16}
+	plaintext = append(plaintext, []byte("whoami\x00cmd.exe")...)
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), plaintext)
+	mac := hmac.New(sha256.New, hmacKey)
+	mac.Write(ciphertext)
+	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{
+		ID:        30,
+		Timestamp: "2026-05-06T10:00:00Z",
+		Protocol:  "HTTP",
+		Info:      "HTTP/1.1 200 OK",
+		Payload:   "HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\n" + base64.StdEncoding.EncodeToString(blob),
+		StreamID:  12,
+	}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	result, err := svc.C2Decrypt(context.Background(), model.C2DecryptRequest{
+		Family: "cs",
+		Scope:  model.C2DecryptScope{PacketIDs: []int64{30}},
+		CS:     model.C2CSDecryptOptions{KeyMode: "aes_rand", AESRand: hex.EncodeToString(rawKey), TransformMode: "auto"},
+	})
+	if err != nil {
+		t.Fatalf("C2Decrypt() error = %v", err)
+	}
+	if result.DecryptedCount == 0 || !hasDecryptedRecord(result, "whoami", "verified") {
+		t.Fatalf("expected HMAC verified CS record, got %+v", result)
+	}
+	if !hasDecryptedRecord(result, "beacon_prefix", "verified") {
+		t.Fatalf("expected structured CS preview, got %+v", result.Records)
+	}
+	if !noteContains(result.Notes, "HMAC 校验通过") {
+		t.Fatalf("expected HMAC note, got %+v", result.Notes)
+	}
+}
+
+func TestC2DecryptCSLengthPrefixedTruncatedHMAC(t *testing.T) {
+	rawKey := []byte("0123456789abcdef")
+	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
+	plaintext := []byte{0, 0, 0, 2, 0, 0, 0, 35, 0, 0, 0, 30}
+	plaintext = append(plaintext, []byte(`WIN-TEST\administrator`)...)
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), plaintext)
+	body := make([]byte, 4+len(ciphertext))
+	binary.BigEndian.PutUint32(body[:4], uint32(len(ciphertext)))
+	copy(body[4:], ciphertext)
+	mac := hmac.New(sha256.New, hmacKey)
+	mac.Write(body)
+	blob := append(append([]byte{}, body...), mac.Sum(nil)[:16]...)
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{
+		ID:        33,
+		Timestamp: "2026-05-06T10:00:03Z",
+		Protocol:  "HTTP",
+		Info:      "POST /submit.php HTTP/1.1",
+		Payload:   "POST /submit.php HTTP/1.1\r\nHost: c2.test\r\n\r\n" + hex.EncodeToString(blob),
+		StreamID:  15,
+	}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	result, err := svc.C2Decrypt(context.Background(), model.C2DecryptRequest{
+		Family: "cs",
+		Scope:  model.C2DecryptScope{PacketIDs: []int64{33}},
+		CS:     model.C2CSDecryptOptions{KeyMode: "aes_rand", AESRand: hex.EncodeToString(rawKey), TransformMode: "auto"},
+	})
+	if err != nil {
+		t.Fatalf("C2Decrypt() error = %v", err)
+	}
+	if result.DecryptedCount == 0 || !hasDecryptedRecord(result, "WIN-TEST", "verified") {
+		t.Fatalf("expected length-prefixed truncated-HMAC CS record, got %+v", result)
+	}
+	if !hasDecryptedRecordWithAlgorithm(result, "WIN-TEST", "cs-length-prefix-hmac-sha256-16") {
+		t.Fatalf("expected length-prefix HMAC tag, got %+v", result.Records)
+	}
+}
+
+func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
+	rawKey := []byte("0123456789abcdef")
+	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), []byte("whoami"))
+	mac := hmac.New(sha256.New, hmacKey)
+	mac.Write(ciphertext)
+	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{
+		ID:        31,
+		Timestamp: "2026-05-06T10:00:01Z",
+		Protocol:  "HTTP",
+		Info:      "POST /submit.php HTTP/1.1",
+		Payload:   "POST /submit.php HTTP/1.1\r\nHost: c2.test\r\n\r\n" + base64.StdEncoding.EncodeToString(blob),
+		StreamID:  13,
+	}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	result, err := svc.C2Decrypt(context.Background(), model.C2DecryptRequest{
+		Family: "cs",
+		Scope:  model.C2DecryptScope{PacketIDs: []int64{31}},
+		CS:     model.C2CSDecryptOptions{KeyMode: "aes_rand", AESRand: "ffffffffffffffffffffffffffffffff", TransformMode: "auto"},
+	})
+	if err != nil {
+		t.Fatalf("C2Decrypt() error = %v", err)
+	}
+	if result.DecryptedCount != 0 || result.Status != "failed" {
+		t.Fatalf("wrong Raw key should not decrypt, got %+v", result)
+	}
+	if !noteContains(result.Notes, "HMAC 不匹配") {
+		t.Fatalf("expected HMAC mismatch note, got %+v", result.Notes)
+	}
+}
+
+func TestC2DecryptCSMetadataExplainsRawKeyRequirement(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{
+		ID:        32,
+		Timestamp: "2026-05-06T10:00:02Z",
+		Protocol:  "HTTP",
+		Info:      "GET /jquery-3.3.1.min.js HTTP/1.1",
+		Payload:   "GET /jquery-3.3.1.min.js HTTP/1.1\r\nHost: c2.test\r\nCookie: " + base64.StdEncoding.EncodeToString([]byte("encrypted-metadata-candidate")) + "\r\n\r\n",
+		StreamID:  14,
+	}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	result, err := svc.C2Decrypt(context.Background(), model.C2DecryptRequest{
+		Family: "cs",
+		Scope:  model.C2DecryptScope{PacketIDs: []int64{32}},
+		CS:     model.C2CSDecryptOptions{KeyMode: "aes_hmac"},
+	})
+	if err != nil {
+		t.Fatalf("C2Decrypt() error = %v", err)
+	}
+	if result.DecryptedCount != 0 {
+		t.Fatalf("metadata without key should not decrypt, got %+v", result)
+	}
+	if !noteContains(result.Notes, "metadata 密文候选") || !noteContains(result.Notes, "无法直接算出 Raw key") {
+		t.Fatalf("expected metadata/raw-key notes, got %+v", result.Notes)
 	}
 }
 

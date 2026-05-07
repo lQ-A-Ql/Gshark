@@ -3,7 +3,7 @@ import { ArrowLeftRight, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { useSentinel } from "../state/SentinelContext";
 import { cn } from "../components/ui/utils";
-import { StreamChunkCard, StreamControlBar, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/DesignSystem";
+import { StreamChunkCard, StreamControlBar, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/stream/StreamWorkbench";
 import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
 import { parseChunkBytes, bytesToAscii, bytesToHexDump, estimatePayloadBytes } from "../core/stream-utils";

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildC2SampleAnalysisCacheKey } from "./C2Analysis";
-import { buildIndustrialAnalysisCacheKey } from "./IndustrialAnalysis";
-import { buildTrafficStatsCacheKey } from "./TrafficGraph";
-import { buildUSBAnalysisCacheKey } from "./UsbAnalysis";
-import { buildVehicleAnalysisCacheKey } from "./VehicleAnalysis";
+import { buildC2SampleAnalysisCacheKey } from "../features/c2/useC2Analysis";
+import { buildIndustrialAnalysisCacheKey } from "../features/industrial/useIndustrialAnalysis";
+import { buildTrafficStatsCacheKey } from "../features/traffic/useTrafficGraph";
+import { buildUSBAnalysisCacheKey } from "../features/usb/useUsbAnalysis";
+import { buildVehicleAnalysisCacheKey } from "../features/vehicle/useVehicleAnalysis";
 
 describe("analysis cache keys", () => {
   it("includes capture revision for industrial analysis", () => {

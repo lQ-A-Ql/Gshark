@@ -32,6 +32,8 @@ import type {
 import { bridge, type TSharkStatus } from "../integrations/wailsBridge";
 import { isAbortLikeError, isOperationTimeoutError, withTimeout } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
+import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
+import { useAnalysisProgress, phaseLabelForMediaProgress, phaseLabelForThreatProgress, EMPTY_MEDIA_ANALYSIS_PROGRESS, EMPTY_THREAT_ANALYSIS_PROGRESS } from "./hooks/useAnalysisProgress";
 
 interface PreparedPacketStream {
   packet: Packet | null;
@@ -129,17 +131,8 @@ const PRELOAD_POLL_INTERVAL_MS = 120;
 const PRELOAD_SIGNAL_WAIT_MS = 1000;
 const STARTUP_TOOL_RUNTIME_TIMEOUT_MS = 3500;
 const STARTUP_TLS_CONFIG_TIMEOUT_MS = 2500;
-const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
-const TOOL_RUNTIME_STORAGE_KEY = "gshark.tool-runtime.v1";
 const RECENT_CAPTURES_STORAGE_KEY = "gshark.recent-captures.v1";
 const MAX_RECENT_CAPTURES = 8;
-const EMPTY_TSHARK_STATUS: TSharkStatus = {
-  available: false,
-  path: "",
-  message: "",
-  customPath: "",
-  usingCustomPath: false,
-};
 
 const EMPTY_HTTP_STREAM: HttpStream = {
   id: -1,
@@ -178,77 +171,6 @@ const EMPTY_SWITCH_METRICS: StreamSwitchMetrics = {
   },
 };
 
-const EMPTY_MEDIA_ANALYSIS_PROGRESS: MediaAnalysisProgress = {
-  active: false,
-  current: 0,
-  total: 0,
-  label: "",
-  phase: "unknown",
-  phaseLabel: "",
-  percent: 0,
-  recent: [],
-};
-
-const EMPTY_THREAT_ANALYSIS_PROGRESS: ThreatAnalysisProgress = {
-  active: false,
-  current: 0,
-  total: 0,
-  label: "",
-  phase: "unknown",
-  phaseLabel: "",
-  percent: 0,
-  recent: [],
-};
-
-const EMPTY_TOOL_RUNTIME_CONFIG: ToolRuntimeConfig = {
-  tsharkPath: "",
-  ffmpegPath: "",
-  pythonPath: "",
-  voskModelPath: "",
-  yaraEnabled: true,
-  yaraBin: "",
-  yaraRules: "",
-  yaraTimeoutMs: 25000,
-};
-
-function readToolRuntimeConfig(): ToolRuntimeConfig {
-  if (typeof window === "undefined") return { ...EMPTY_TOOL_RUNTIME_CONFIG };
-  try {
-    const raw = window.localStorage.getItem(TOOL_RUNTIME_STORAGE_KEY);
-    if (!raw) {
-      const legacyTsharkPath = window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY)?.trim() ?? "";
-      return { ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: legacyTsharkPath };
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      tsharkPath: String(parsed?.tsharkPath ?? window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY) ?? "").trim(),
-      ffmpegPath: String(parsed?.ffmpegPath ?? "").trim(),
-      pythonPath: String(parsed?.pythonPath ?? "").trim(),
-      voskModelPath: String(parsed?.voskModelPath ?? "").trim(),
-      yaraEnabled: parsed?.yaraEnabled !== false,
-      yaraBin: String(parsed?.yaraBin ?? "").trim(),
-      yaraRules: String(parsed?.yaraRules ?? "").trim(),
-      yaraTimeoutMs: Number(parsed?.yaraTimeoutMs ?? 25000) || 25000,
-    };
-  } catch {
-    return { ...EMPTY_TOOL_RUNTIME_CONFIG };
-  }
-}
-
-function writeToolRuntimeConfig(config: ToolRuntimeConfig) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(TOOL_RUNTIME_STORAGE_KEY, JSON.stringify(config));
-    if (config.tsharkPath) {
-      window.localStorage.setItem(TSHARK_PATH_STORAGE_KEY, config.tsharkPath);
-    } else {
-      window.localStorage.removeItem(TSHARK_PATH_STORAGE_KEY);
-    }
-  } catch {
-    // ignore persistence failures
-  }
-}
-
 function classifyMediaProgressPhase(label: string): MediaAnalysisProgress["phase"] {
   const normalized = label.trim();
   if (!normalized) return "unknown";
@@ -258,23 +180,6 @@ function classifyMediaProgressPhase(label: string): MediaAnalysisProgress["phase
   if (normalized.includes("重建")) return "rebuild";
   if (normalized.includes("完成")) return "complete";
   return "unknown";
-}
-
-function phaseLabelForMediaProgress(phase: MediaAnalysisProgress["phase"]): string {
-  switch (phase) {
-    case "prepare":
-      return "准备";
-    case "scan":
-      return "扫描";
-    case "organize":
-      return "整理";
-    case "rebuild":
-      return "重建";
-    case "complete":
-      return "完成";
-    default:
-      return "处理中";
-  }
 }
 
 function computeMediaProgressPercent(phase: MediaAnalysisProgress["phase"], current: number, total: number): number {
@@ -306,25 +211,6 @@ function classifyThreatProgressPhase(label: string): ThreatAnalysisProgress["pha
   if (normalized.includes("YARA") || normalized.includes("扫描")) return "scan";
   if (normalized.includes("完成")) return "complete";
   return "unknown";
-}
-
-function phaseLabelForThreatProgress(phase: ThreatAnalysisProgress["phase"]): string {
-  switch (phase) {
-    case "prepare":
-      return "准备";
-    case "packets":
-      return "包级特征";
-    case "objects":
-      return "对象导出";
-    case "streams":
-      return "重组流";
-    case "scan":
-      return "YARA 扫描";
-    case "complete":
-      return "完成";
-    default:
-      return "处理中";
-  }
 }
 
 function computeThreatProgressPercent(phase: ThreatAnalysisProgress["phase"], current: number, total: number): number {
@@ -501,16 +387,25 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendStatus, setBackendStatus] = useState("等待后端连接");
-  const [mediaAnalysisProgress, setMediaAnalysisProgress] = useState<MediaAnalysisProgress>(EMPTY_MEDIA_ANALYSIS_PROGRESS);
-  const [tsharkStatus, setTsharkStatus] = useState<TSharkStatus>(EMPTY_TSHARK_STATUS);
-  const [isTSharkChecking, setIsTSharkChecking] = useState(false);
-  const [toolRuntimeSnapshot, setToolRuntimeSnapshot] = useState<ToolRuntimeSnapshot | null>(null);
-  const [isToolRuntimeLoading, setIsToolRuntimeLoading] = useState(false);
-  const [toolRuntimeCheckDegraded, setToolRuntimeCheckDegraded] = useState(false);
-  const [threatHits, setThreatHits] = useState<ThreatHit[]>([]);
-  const [isThreatAnalysisLoading, setIsThreatAnalysisLoading] = useState(false);
-  const [threatAnalysisProgress, setThreatAnalysisProgress] = useState<ThreatAnalysisProgress>(EMPTY_THREAT_ANALYSIS_PROGRESS);
-  const [extractedObjects, setExtractedObjects] = useState<ExtractedObject[]>([]);
+  const threatAnalysisSeqRef = useRef(0);
+  const {
+    threatHits, setThreatHits,
+    isThreatAnalysisLoading, setIsThreatAnalysisLoading,
+    threatAnalysisProgress, setThreatAnalysisProgress,
+    extractedObjects, setExtractedObjects,
+    mediaAnalysisProgress, setMediaAnalysisProgress,
+    refreshAnalysisResult: refreshAnalysisResultImpl,
+  } = useAnalysisProgress(threatAnalysisSeqRef);
+  const {
+    tsharkStatus, setTsharkStatus,
+    isTSharkChecking, setIsTSharkChecking,
+    toolRuntimeSnapshot, setToolRuntimeSnapshot,
+    isToolRuntimeLoading, setIsToolRuntimeLoading,
+    toolRuntimeCheckDegraded, setToolRuntimeCheckDegraded,
+    setTSharkPath: setTSharkPathImpl,
+    refreshToolRuntimeSnapshot: refreshToolRuntimeSnapshotImpl,
+    saveToolRuntimeConfig: saveToolRuntimeConfigImpl,
+  } = useToolRuntime();
   const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
   const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
   const [udpStream, setUdpStream] = useState<BinaryStream>({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
@@ -520,7 +415,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     udp: [],
   });
   const [fileMeta, setFileMeta] = useState({
-    name: "未打开文件",
+    name: "",
     sizeBytes: 0,
     path: "",
   });
@@ -548,7 +443,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
-  const threatAnalysisSeqRef = useRef(0);
   const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
   const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
   const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
@@ -941,156 +835,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, []);
 
   const setTSharkPath = useCallback(async (path: string) => {
-    const nextPath = path.trim();
-    writeToolRuntimeConfig({
-      ...(toolRuntimeSnapshot?.config ?? readToolRuntimeConfig()),
-      tsharkPath: nextPath,
-    });
-    if (!backendConnected) {
-      setTsharkStatus((prev) => ({
-        ...prev,
-        customPath: nextPath,
-        usingCustomPath: nextPath.length > 0,
-      }));
-      return;
-    }
-
-      const status = await bridge.setTSharkPath(nextPath);
-      setToolRuntimeCheckDegraded(false);
-      setTsharkStatus(status);
-      setToolRuntimeSnapshot((prev) => prev ? ({
-        ...prev,
-        config: { ...prev.config, tsharkPath: nextPath },
-        tshark: {
-          ...prev.tshark,
-          available: status.available,
-          path: status.path,
-          message: status.message,
-          customPath: status.customPath || undefined,
-          usingCustomPath: status.usingCustomPath,
-        },
-      }) : prev);
-
-      if (status.available) {
-        if (status.message && status.message !== "ok") {
-          setBackendStatus(status.message);
-        } else {
-        setBackendStatus(status.usingCustomPath ? `tshark ready: ${status.path}` : "tshark ready");
-      }
-      return;
-      }
-      setBackendStatus(status.message || "tshark is unavailable");
-      throw new Error(status.message || "tshark is unavailable");
-    }, [backendConnected, cancelPacketPageLoad, toolRuntimeSnapshot]);
+    await setTSharkPathImpl(path, backendConnected, setBackendStatus);
+  }, [setTSharkPathImpl, backendConnected]);
 
   const refreshToolRuntimeSnapshot = useCallback(async () => {
-    if (!backendConnected) {
-      return null;
-    }
-    setIsToolRuntimeLoading(true);
-    try {
-      const snapshot = await bridge.getToolRuntimeSnapshot();
-      setToolRuntimeCheckDegraded(false);
-      setToolRuntimeSnapshot(snapshot);
-      setTsharkStatus({
-        available: snapshot.tshark.available,
-        path: snapshot.tshark.path,
-        message: snapshot.tshark.message,
-        customPath: snapshot.tshark.customPath ?? "",
-        usingCustomPath: snapshot.tshark.usingCustomPath,
-      });
-      return snapshot;
-    } finally {
-      setIsToolRuntimeLoading(false);
-    }
-  }, [backendConnected]);
+    return await refreshToolRuntimeSnapshotImpl(backendConnected);
+  }, [refreshToolRuntimeSnapshotImpl, backendConnected]);
 
   const saveToolRuntimeConfig = useCallback(async (patch: Partial<ToolRuntimeConfig>) => {
-    const base = toolRuntimeSnapshot?.config ?? readToolRuntimeConfig();
-    const nextConfig: ToolRuntimeConfig = {
-      ...base,
-      ...patch,
-      tsharkPath: String(patch.tsharkPath ?? base.tsharkPath ?? "").trim(),
-      ffmpegPath: String(patch.ffmpegPath ?? base.ffmpegPath ?? "").trim(),
-      pythonPath: String(patch.pythonPath ?? base.pythonPath ?? "").trim(),
-      voskModelPath: String(patch.voskModelPath ?? base.voskModelPath ?? "").trim(),
-      yaraEnabled: patch.yaraEnabled ?? base.yaraEnabled,
-      yaraBin: String(patch.yaraBin ?? base.yaraBin ?? "").trim(),
-      yaraRules: String(patch.yaraRules ?? base.yaraRules ?? "").trim(),
-      yaraTimeoutMs: Number(patch.yaraTimeoutMs ?? base.yaraTimeoutMs ?? 25000) || 25000,
-    };
-
-    writeToolRuntimeConfig(nextConfig);
-    if (!backendConnected) {
-      const offlineSnapshot: ToolRuntimeSnapshot = {
-        config: nextConfig,
-        tshark: {
-          available: false,
-          path: "",
-          message: "后端未连接",
-          customPath: nextConfig.tsharkPath || undefined,
-          usingCustomPath: Boolean(nextConfig.tsharkPath),
-        },
-        ffmpeg: {
-          available: false,
-          path: "",
-          message: "后端未连接",
-          customPath: nextConfig.ffmpegPath || undefined,
-          usingCustomPath: Boolean(nextConfig.ffmpegPath),
-        },
-        speech: {
-          available: false,
-          engine: "vosk",
-          language: "zh-CN",
-          pythonAvailable: false,
-          ffmpegAvailable: false,
-          voskAvailable: false,
-          modelAvailable: false,
-          modelPath: nextConfig.voskModelPath || undefined,
-          message: "后端未连接",
-        },
-        yara: {
-          available: false,
-          enabled: nextConfig.yaraEnabled,
-          message: "后端未连接",
-          customBin: nextConfig.yaraBin || undefined,
-          customRules: nextConfig.yaraRules || undefined,
-          usingCustomBin: Boolean(nextConfig.yaraBin),
-          usingCustomRules: Boolean(nextConfig.yaraRules),
-          timeoutMs: nextConfig.yaraTimeoutMs,
-        },
-      };
-      setToolRuntimeSnapshot(offlineSnapshot);
-      setTsharkStatus((prev) => ({
-        ...prev,
-        customPath: nextConfig.tsharkPath,
-        usingCustomPath: nextConfig.tsharkPath.length > 0,
-      }));
-      return offlineSnapshot;
-    }
-
-    setIsToolRuntimeLoading(true);
-    try {
-      const snapshot = await bridge.updateToolRuntimeConfig(nextConfig);
-      setToolRuntimeCheckDegraded(false);
-      setToolRuntimeSnapshot(snapshot);
-      setTsharkStatus({
-        available: snapshot.tshark.available,
-        path: snapshot.tshark.path,
-        message: snapshot.tshark.message,
-        customPath: snapshot.tshark.customPath ?? "",
-        usingCustomPath: snapshot.tshark.usingCustomPath,
-      });
-      if (snapshot.tshark.available) {
-        setBackendStatus(snapshot.tshark.message && snapshot.tshark.message !== "ok" ? snapshot.tshark.message : "工具路径已更新");
-      } else {
-        setBackendStatus(snapshot.tshark.message || "tshark is unavailable");
-      }
-      return snapshot;
-    } finally {
-      setIsToolRuntimeLoading(false);
-    }
-  }, [backendConnected, toolRuntimeSnapshot]);
+    return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatus);
+  }, [saveToolRuntimeConfigImpl, backendConnected]);
 
   const filteredPackets = useMemo(() => packets, [packets]);
 
@@ -1116,56 +870,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       quietSuccess?: boolean;
     },
   ) => {
-    if (!backendConnected) return;
-    const capturePath = options?.capturePath ?? activeCapturePathRef.current;
-    if (!capturePath) return;
-    const seq = threatAnalysisSeqRef.current + 1;
-    threatAnalysisSeqRef.current = seq;
-    const task = captureTaskScopeRef.current.beginTask("threat-analysis");
-    setIsThreatAnalysisLoading(true);
-    setThreatAnalysisProgress((prev) => ({
-      ...EMPTY_THREAT_ANALYSIS_PROGRESS,
-      active: true,
-      current: 0,
-      total: 5,
-      label: "准备威胁分析",
-      phase: "prepare",
-      phaseLabel: phaseLabelForThreatProgress("prepare"),
-      percent: prev.active && prev.percent > 0 ? prev.percent : 8,
-      recent: ["准备威胁分析"],
-    }));
-    try {
-      const objects = await bridge.listObjects(task.signal);
-      if (!task.isCurrent() || threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
-        return;
-      }
-      setExtractedObjects(objects);
-
-      const hits = await bridge.listThreatHits(["flag{", "ctf{"], task.signal);
-      if (!task.isCurrent() || threatAnalysisSeqRef.current !== seq || activeCapturePathRef.current !== capturePath) {
-        return;
-      }
-      setThreatHits(hits);
-      if (!options?.quietSuccess) {
-        setBackendStatus(`威胁分析已更新: ${hits.length} 条命中`);
-      }
-    } catch (error) {
-      if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-        return;
-      }
-      if (threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
-        setBackendStatus("威胁分析刷新失败");
-        setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
-      }
-    } finally {
-      const isCurrent = task.isCurrent();
-      task.finish();
-      if (isCurrent && threatAnalysisSeqRef.current === seq && activeCapturePathRef.current === capturePath) {
-        setIsThreatAnalysisLoading(false);
-        setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
-      }
-    }
-  }, [backendConnected]);
+    await refreshAnalysisResultImpl({
+      ...options,
+      backendConnected,
+      activeCapturePath: activeCapturePathRef.current,
+      captureTaskScope: captureTaskScopeRef.current,
+      setBackendStatus,
+    });
+  }, [refreshAnalysisResultImpl, backendConnected]);
 
   const refreshStreamIndex = useCallback(async () => {
     if (!backendConnected) return;

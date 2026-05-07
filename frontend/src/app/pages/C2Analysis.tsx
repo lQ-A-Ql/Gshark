@@ -1,5 +1,6 @@
-import { Bug, ChevronDown, ChevronRight, KeyRound, Radio, Server, Shield, Unlock, Workflow } from "lucide-react";
+import { Bug, ChevronDown, ChevronRight, FileKey2, Info, KeyRound, Radio, Server, Shield, Unlock, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { EmptyState, MetricCard, StatusHint } from "../components/DesignSystem";
@@ -12,7 +13,7 @@ import { cn } from "../components/ui/utils";
 import type { C2DecryptRequest, C2DecryptResult, C2DNSAggregate, C2FamilyAnalysis, C2HTTPEndpointAggregate, C2IndicatorRecord, C2StreamAggregate } from "../core/types";
 import { C2FeatureCard, C2FamilyTabButton, C2NotesPanel, C2Panel, VShellEvidenceSummaryGrid } from "../features/c2/C2DisplayComponents";
 import { C2_APT_HANDOFF_NOTES, CS_EVIDENCE_CARDS, VSHELL_EVIDENCE_CARDS, buildVShellEvidenceSummary } from "../features/c2/c2EvidenceModel";
-import { buildC2SampleAnalysisCacheKey, useC2Analysis } from "../features/c2/useC2Analysis";
+import { useC2Analysis } from "../features/c2/useC2Analysis";
 import { bridge } from "../integrations/wailsBridge";
 import { EvidenceActions } from "../misc/EvidenceActions";
 import { FilterActions } from "../misc/FilterActions";
@@ -271,18 +272,40 @@ function C2DecryptWorkbench({ family, familyAnalysis, captureRevision }: { famil
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                    <Info className="h-3.5 w-3.5" />
+                    Raw key 来源说明
+                  </div>
+                  <p>CS Raw key 通常不是从 PCAP 直接算出。PCAP 只能提供 GET Cookie/URI 中的 RSA-encrypted metadata；需要 TeamServer 的 <span className="font-mono">.cobaltstrike.beacon_keys</span> 或 RSA private key 解 metadata 后恢复 Raw key，再派生 AES/HMAC 解 POST 与 200 response。</p>
+                </div>
                 <LabeledSelect label="Key material" value={csKeyMode} onChange={(value) => setCSKeyMode(value as typeof csKeyMode)} options={[
                   ["aes_hmac", "AES/HMAC keys"],
-                  ["aes_rand", "AES rand 派生"],
-                  ["rsa_private_key", "RSA private key 恢复 AES rand"],
+                  ["aes_rand", "Raw key / AES rand 派生"],
+                  ["rsa_private_key", "RSA private key 恢复 Raw key"],
                 ]} />
+                {csKeyMode === "aes_hmac" ? (
+                  <KeyModeHint icon="AES/HMAC">
+                    直接输入已知 session AES key/HMAC key。未填 HMAC key 时只能尝试 AES-CBC，结果会标记为 unverified。
+                  </KeyModeHint>
+                ) : null}
+                {csKeyMode === "aes_rand" ? (
+                  <KeyModeHint icon="Raw">
+                    输入 cs-decrypt-metadata.py 这类工具输出的 Raw key。后端会按 SHA256(Raw key) 派生 AES/HMAC，只解 POST 与 HTTP 200 响应候选。
+                  </KeyModeHint>
+                ) : null}
+                {csKeyMode === "rsa_private_key" ? (
+                  <KeyModeHint icon="RSA">
+                    输入 TeamServer RSA private key PEM。后端会优先尝试 GET Cookie/URI metadata，恢复 Raw key 后再解任务/回传。
+                  </KeyModeHint>
+                ) : null}
                 {csKeyMode === "aes_hmac" && (
                   <>
                     <LabeledInput label="AES key" value={csAESKey} onChange={setCSAESKey} placeholder="hex / base64 / raw" />
                     <LabeledInput label="HMAC key（可空）" value={csHMACKey} onChange={setCSHMACKey} placeholder="hex / base64 / raw" />
                   </>
                 )}
-                {csKeyMode === "aes_rand" && <LabeledInput label="AES rand" value={csAESRand} onChange={setCSAESRand} placeholder="16-byte hex / base64 / raw" />}
+                {csKeyMode === "aes_rand" && <LabeledInput label="Raw key / AES rand" value={csAESRand} onChange={setCSAESRand} placeholder="16-byte hex / base64 / raw，例如 a4553a..." />}
                 {csKeyMode === "rsa_private_key" && (
                   <label className="block text-xs">
                     <span className="mb-1 block font-semibold text-slate-600">RSA private key PEM</span>
@@ -318,6 +341,15 @@ function LabeledInput({ label, value, onChange, placeholder }: { label: string; 
       <span className="mb-1 block font-semibold text-slate-600">{label}</span>
       <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 font-mono text-[11px] text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100" />
     </label>
+  );
+}
+
+function KeyModeHint({ icon, children }: { icon: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+      <FileKey2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+      <div><span className="font-semibold text-slate-800">{icon}</span>：{children}</div>
+    </div>
   );
 }
 
@@ -379,6 +411,19 @@ function C2DecryptResultPanel({ result }: { result: C2DecryptResult | null }) {
         </div>
       </div>
       {result.notes.length > 0 ? <C2NotesPanel notes={result.notes} emptyText="" /> : null}
+      {result.family === "cs" ? (
+        <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-2 text-xs leading-5 text-sky-900">
+          <div className="mb-1 flex items-center gap-1.5 font-semibold">
+            <Info className="h-3.5 w-3.5" />
+            CS 解密阅读提示
+          </div>
+          <p>
+            verified 表示 payload HMAC 已通过；failed 通常表示该记录是 GET metadata、心跳/空响应、profile transform 未还原，或 Raw key 不匹配。Raw key 不是 PCAP 直接字段，通常要用 TeamServer
+            <span className="font-mono"> .cobaltstrike.beacon_keys </span>
+            / RSA private key 解 GET Cookie/URI metadata 后得到；POST 和 HTTP 200 才作为任务/回传密文解。
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="min-w-0 flex-1">
           <span className="sr-only">搜索解密结果</span>
@@ -1272,5 +1317,3 @@ function TagLine({ values }: { values: string[] }) {
     </div>
   );
 }
-
-export { buildC2SampleAnalysisCacheKey };

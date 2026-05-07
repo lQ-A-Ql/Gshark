@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/aes"
@@ -18,6 +19,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"regexp"
 	"sort"
@@ -27,6 +29,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 const (
@@ -44,6 +47,17 @@ type c2DecryptCandidate struct {
 	label     string
 	transform string
 	direction string
+}
+
+type c2CSDecryptStats struct {
+	total           int
+	httpFocused     int
+	metadata        int
+	hmacVerified    int
+	decryptedWeak   int
+	hmacRejected    int
+	cryptoRejected  int
+	metadataSkipped int
 }
 
 func (s *Service) C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error) {
@@ -167,8 +181,9 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 		}
 		_, packetSelected := packetIDs[packet.ID]
 		_, streamSelected := streamIDs[packet.StreamID]
+		csGlobalDecryptCandidate := family == "cs" && isLikelyCSPacketLevelDecryptSource(packet)
 		if len(packetIDs) > 0 || len(streamIDs) > 0 {
-			if !packetSelected && !streamSelected {
+			if !packetSelected && !streamSelected && !csGlobalDecryptCandidate {
 				return nil
 			}
 		}
@@ -193,6 +208,9 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 			err = streamErr
 		}
 	}
+	if err == nil && family == "cs" {
+		_ = s.collectCSHTTPFieldDecryptCandidates(ctx, seen, &out)
+	}
 	if err == nil {
 		for _, candidate := range packetCandidates {
 			if appendC2DecryptCandidate(&out, seen, candidate) {
@@ -215,6 +233,12 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 func c2DecryptCandidatePriority(candidate c2DecryptCandidate) int {
 	if strings.HasPrefix(candidate.transform, "raw-stream-") {
 		return 0
+	}
+	if strings.HasPrefix(candidate.transform, "cs-http-") {
+		return 0
+	}
+	if strings.HasPrefix(candidate.transform, "cs-metadata-") {
+		return 2
 	}
 	return 1
 }
@@ -244,6 +268,9 @@ func appendC2DecryptCandidateWithLimit(out *[]c2DecryptCandidate, seen map[strin
 }
 
 func extractC2PacketCandidateBytes(packet model.Packet, family string) []c2DecryptCandidate {
+	if family == "cs" {
+		return extractCSPacketCandidateBytes(packet)
+	}
 	values := make([]string, 0, 8)
 	if strings.TrimSpace(packet.Payload) != "" {
 		values = append(values, packet.Payload)
@@ -281,6 +308,260 @@ func extractC2PacketCandidateBytes(packet model.Packet, family string) []c2Decry
 		}
 	}
 	return out
+}
+
+func extractCSPacketCandidateBytes(packet model.Packet) []c2DecryptCandidate {
+	out := make([]c2DecryptCandidate, 0, 8)
+	if strings.TrimSpace(packet.Payload) != "" {
+		for _, value := range csHTTPDecryptPayloadValues(packet.Payload) {
+			appendC2TransformedPacketCandidates(&out, packet, value, "cs-http")
+		}
+		for _, value := range csMetadataPayloadValues(packet.Payload) {
+			appendC2TransformedPacketCandidates(&out, packet, value, "cs-metadata")
+		}
+	}
+	if transportPayload := extractPacketTransportPayload(packet); transportPayload != "" && isLikelyCSHTTPDecryptPacket(packet, "") {
+		appendC2TransformedPacketCandidates(&out, packet, transportPayload, "cs-http-transport")
+	}
+	if strings.TrimSpace(packet.RawHex) != "" && isLikelyCSHTTPDecryptPacket(packet, "") {
+		appendC2TransformedPacketCandidates(&out, packet, packet.RawHex, "cs-http-rawhex")
+	}
+	return out
+}
+
+func appendC2TransformedPacketCandidates(out *[]c2DecryptCandidate, packet model.Packet, value string, prefix string) {
+	for _, transformed := range decodeC2TransformCandidates(value, "auto") {
+		if len(transformed.raw) < 8 {
+			continue
+		}
+		*out = append(*out, c2DecryptCandidate{
+			packet:    packet,
+			raw:       transformed.raw,
+			label:     transformed.label,
+			transform: prefix + "-" + transformed.transform,
+		})
+	}
+}
+
+func csHTTPDecryptPayloadValues(payload string) []string {
+	normalized := strings.ReplaceAll(payload, "\r\n", "\n")
+	firstLine := strings.TrimSpace(strings.SplitN(normalized, "\n", 2)[0])
+	fields := strings.Fields(firstLine)
+	if len(fields) == 0 {
+		return nil
+	}
+	method := strings.ToUpper(fields[0])
+	isResponse200 := strings.HasPrefix(strings.ToUpper(firstLine), "HTTP/") && strings.Contains(firstLine, " 200")
+	isPostLike := method == "POST" || method == "PUT" || method == "PATCH"
+	if !isResponse200 && !isPostLike {
+		return nil
+	}
+	out := []string{}
+	if body := strings.TrimSpace(httpBody(payload)); body != "" {
+		out = append(out, body)
+		if values, err := url.ParseQuery(body); err == nil {
+			for _, list := range values {
+				out = append(out, list...)
+			}
+		}
+	}
+	return out
+}
+
+func csMetadataPayloadValues(payload string) []string {
+	normalized := strings.ReplaceAll(payload, "\r\n", "\n")
+	firstLine := strings.TrimSpace(strings.SplitN(normalized, "\n", 2)[0])
+	fields := strings.Fields(firstLine)
+	if len(fields) == 0 || strings.ToUpper(fields[0]) != "GET" {
+		return nil
+	}
+	out := []string{}
+	for _, line := range strings.Split(normalized, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(trimmed), "cookie:") || strings.HasPrefix(strings.ToLower(trimmed), "authorization:") {
+			out = append(out, strings.TrimSpace(strings.SplitN(trimmed, ":", 2)[1]))
+		}
+	}
+	if len(fields) >= 2 {
+		if parsed, err := url.Parse(fields[1]); err == nil {
+			for _, list := range parsed.Query() {
+				out = append(out, list...)
+			}
+		}
+	}
+	return out
+}
+
+func isLikelyCSHTTPDecryptPacket(packet model.Packet, payload string) bool {
+	text := strings.TrimSpace(payload)
+	if text == "" {
+		text = strings.TrimSpace(packet.Payload)
+	}
+	info := strings.ToUpper(packet.Info + "\n" + text)
+	return strings.Contains(info, "HTTP/1.") && (strings.Contains(info, " 200") || strings.Contains(info, "POST ") || strings.Contains(info, "PUT ") || strings.Contains(info, "PATCH "))
+}
+
+func isLikelyCSPacketLevelDecryptSource(packet model.Packet) bool {
+	payload := strings.TrimSpace(packet.Payload)
+	if payload == "" {
+		return false
+	}
+	if len(csHTTPDecryptPayloadValues(payload)) > 0 || len(csMetadataPayloadValues(payload)) > 0 {
+		return true
+	}
+	return isLikelyCSHTTPDecryptPacket(packet, payload)
+}
+
+func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
+	s.mu.RLock()
+	pcap := strings.TrimSpace(s.pcap)
+	s.mu.RUnlock()
+	if pcap == "" || len(*out) >= c2DecryptMaxRecords {
+		return nil
+	}
+	cmd, err := tshark.CommandContext(ctx,
+		"-r", pcap,
+		"-Y", `http && (http.request.method == POST || (http.response.code == 200 && http.content_length < 100000) || http.cookie || http.authorization)`,
+		"-T", "fields",
+		"-E", "separator=/t",
+		"-e", "frame.number",
+		"-e", "tcp.stream",
+		"-e", "frame.time_epoch",
+		"-e", "ip.src",
+		"-e", "tcp.srcport",
+		"-e", "ip.dst",
+		"-e", "tcp.dstport",
+		"-e", "http.request.method",
+		"-e", "http.request.uri",
+		"-e", "http.response.code",
+		"-e", "http.cookie",
+		"-e", "http.authorization",
+		"-e", "http.file_data",
+		"-e", "data.data",
+	)
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	readErr := readCSHTTPFieldCandidates(ctx, stdout, seen, out)
+	waitErr := cmd.Wait()
+	if readErr != nil {
+		return readErr
+	}
+	if waitErr != nil {
+		return waitErr
+	}
+	return nil
+}
+
+func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
+	buf := bufio.NewReaderSize(reader, 1024*1024)
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		line, err := buf.ReadString('\n')
+		if len(*out) < c2DecryptMaxRecords && len(strings.TrimSpace(line)) > 0 {
+			appendCSHTTPFieldCandidatesFromLine(line, seen, out)
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func appendCSHTTPFieldCandidatesFromLine(line string, seen map[string]struct{}, out *[]c2DecryptCandidate) {
+	fields := strings.Split(strings.TrimRight(line, "\r\n"), "\t")
+	for len(fields) < 14 {
+		fields = append(fields, "")
+	}
+	frameID, _ := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
+	streamID, _ := strconv.ParseInt(strings.TrimSpace(fields[1]), 10, 64)
+	sourcePort, _ := strconv.Atoi(strings.TrimSpace(fields[4]))
+	destPort, _ := strconv.Atoi(strings.TrimSpace(fields[6]))
+	method := strings.ToUpper(strings.TrimSpace(fields[7]))
+	status := strings.TrimSpace(fields[9])
+	packet := model.Packet{
+		ID:         frameID,
+		StreamID:   streamID,
+		Timestamp:  strings.TrimSpace(fields[2]),
+		SourceIP:   strings.TrimSpace(fields[3]),
+		SourcePort: sourcePort,
+		DestIP:     strings.TrimSpace(fields[5]),
+		DestPort:   destPort,
+		Protocol:   "HTTP",
+	}
+	direction := c2DecryptDirectionUnknown
+	if method == "POST" || method == "PUT" || method == "PATCH" {
+		direction = "client_to_server"
+	} else if status == "200" {
+		direction = "server_to_client"
+	}
+	for _, item := range []struct {
+		value string
+		tag   string
+	}{
+		{fields[12], "http_file_data"},
+		{fields[13], "data_data"},
+	} {
+		raw, ok := decodeColonOrPlainHex(item.value)
+		if !ok || len(raw) < 8 || len(raw) > 128*1024 {
+			continue
+		}
+		candidate := c2DecryptCandidate{
+			packet:    packet,
+			raw:       raw,
+			label:     "tshark:" + item.tag,
+			transform: "cs-http-tshark-" + item.tag + "-hex",
+			direction: direction,
+		}
+		if appendC2DecryptCandidate(out, seen, candidate) {
+			return
+		}
+	}
+	for _, item := range []struct {
+		value string
+		tag   string
+	}{
+		{fields[10], "cookie"},
+		{fields[11], "authorization"},
+		{fields[8], "uri"},
+	} {
+		for _, transformed := range decodeC2TransformCandidates(item.value, "auto") {
+			if len(transformed.raw) < 8 {
+				continue
+			}
+			candidate := c2DecryptCandidate{
+				packet:    packet,
+				raw:       transformed.raw,
+				label:     transformed.label,
+				transform: "cs-metadata-tshark-" + item.tag + "-" + transformed.transform,
+				direction: "client_to_server",
+			}
+			if appendC2DecryptCandidate(out, seen, candidate) {
+				return
+			}
+		}
+	}
+}
+
+func decodeColonOrPlainHex(raw string) ([]byte, bool) {
+	cleaned := regexp.MustCompile(`(?i)[^0-9a-f]`).ReplaceAllString(raw, "")
+	if len(cleaned) < 8 || len(cleaned)%2 != 0 {
+		return nil, false
+	}
+	decoded, err := hex.DecodeString(cleaned)
+	return decoded, err == nil
 }
 
 func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, streamIDs map[int64]struct{}, representatives map[int64]model.Packet, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
@@ -860,18 +1141,40 @@ func decryptCSCandidates(ctx context.Context, req model.C2DecryptRequest, candid
 	aesKey, hmacKey, notes := resolveCSKeys(req, candidates)
 	result.Notes = append(result.Notes, notes...)
 	if len(aesKey) == 0 {
-		result.Notes = append(result.Notes, "CS 解密需要 AES/HMAC、AES rand 或 RSA private key；首版不自动猜测 key，也不实现完整 Malleable C2 profile parser。")
+		metadataCount := countCSMetadataCandidates(candidates)
+		if metadataCount > 0 {
+			result.Notes = append(result.Notes, fmt.Sprintf("已从 GET Cookie/URI 等位置提取 %d 条疑似 CS metadata 密文候选；metadata 需要 TeamServer RSA private key 才能恢复 Raw key/AES rand。", metadataCount))
+		}
+		result.Notes = append(result.Notes, "CS 解密需要 AES/HMAC、Raw key(AES rand) 或 TeamServer RSA private key；仅靠 PCAP 通常只能拿到 metadata 密文，无法直接算出 Raw key。")
 		return result
 	}
 	transformMode := strings.TrimSpace(req.CS.TransformMode)
 	if transformMode == "" {
 		transformMode = "auto"
 	}
+	stats := c2CSDecryptStats{total: len(candidates)}
 	for _, candidate := range candidates {
 		if ctx.Err() != nil || len(result.Records) >= c2DecryptMaxRecords {
 			break
 		}
-		record, ok := tryDecryptCSBlob(candidate, candidate.raw, aesKey, hmacKey)
+		if isCSMetadataCandidate(candidate) {
+			stats.metadataSkipped++
+			continue
+		}
+		if isCSHTTPFocusedCandidate(candidate) {
+			stats.httpFocused++
+		}
+		record, outcome := tryDecryptCSBlob(candidate, candidate.raw, aesKey, hmacKey)
+		if outcome == "hmac-verified" {
+			stats.hmacVerified++
+		} else if outcome == "decrypted-weak" {
+			stats.decryptedWeak++
+		} else if outcome == "hmac-rejected" {
+			stats.hmacRejected++
+		} else {
+			stats.cryptoRejected++
+		}
+		ok := outcome == "hmac-verified" || outcome == "decrypted-weak"
 		if ok {
 			result.Records = append(result.Records, record)
 			continue
@@ -890,15 +1193,28 @@ func decryptCSCandidates(ctx context.Context, req model.C2DecryptRequest, candid
 			if len(result.Records) >= c2DecryptMaxRecords {
 				break
 			}
-			record, ok := tryDecryptCSBlob(candidate, transformed.raw, aesKey, hmacKey)
+			record, outcome = tryDecryptCSBlob(candidate, transformed.raw, aesKey, hmacKey)
+			if outcome == "hmac-verified" {
+				stats.hmacVerified++
+			} else if outcome == "decrypted-weak" {
+				stats.decryptedWeak++
+			} else if outcome == "hmac-rejected" {
+				stats.hmacRejected++
+			} else {
+				stats.cryptoRejected++
+			}
+			ok = outcome == "hmac-verified" || outcome == "decrypted-weak"
 			if !ok {
 				record = baseDecryptRecord(candidate, transformed.raw, "cs-aes-cbc")
-				record.Error = "CS 解密失败：key/transform 不匹配，或 payload 不是当前首版支持的 AES-CBC blob"
+				record.Error = "CS 解密失败：HMAC 不匹配、key/transform 不匹配，或 payload 不是当前支持的 CS AES-CBC blob"
 			}
 			result.Records = append(result.Records, record)
 		}
 	}
-	result.Notes = append(result.Notes, "CS 首版按 keyed offline workbench 处理已可见 payload；HTTPS 仍需先通过 TLS keylog/private key 让 HTTP payload 可见。")
+	result.Notes = append(result.Notes, buildCSDecryptStatsNotes(stats)...)
+	result.Notes = append(result.Notes, "CS 已按 keyed offline workbench 处理 HTTP POST / 200 response 负载；GET Cookie/URI metadata 默认只作为 Raw key 恢复输入，不当作任务/回传明文解密。")
+	result.Notes = append(result.Notes, "Raw key 获取路径：PCAP 提供 RSA-encrypted metadata；TeamServer 的 .cobaltstrike.beacon_keys/RSA private key 解 metadata 后得到 Raw key，再按 SHA256(Raw key) 派生 AES/HMAC session keys。")
+	result.Notes = append(result.Notes, "HTTPS 样本仍需先通过 TLS keylog/private key 让 HTTP payload 可见。")
 	return result
 }
 
@@ -908,11 +1224,14 @@ func resolveCSKeys(req model.C2DecryptRequest, candidates []c2DecryptCandidate) 
 	case "aes_hmac":
 		aesKey := parseFlexibleKey(req.CS.AESKey)
 		hmacKey := parseFlexibleKey(req.CS.HMACKey)
+		if len(aesKey) > 0 && len(hmacKey) == 0 {
+			notes = append(notes, "已使用 AES key；未提供 HMAC key，结果只能标记为 unverified，可能出现误解密噪声。")
+		}
 		return aesKey, hmacKey, notes
 	case "aes_rand":
 		aesRand := parseFlexibleKey(req.CS.AESRand)
 		aesKey, hmacKey := deriveCSKeysFromAESRand(aesRand)
-		return aesKey, hmacKey, append(notes, "已按 SHA256(AES rand) 派生 AES/HMAC session keys。")
+		return aesKey, hmacKey, append(notes, "已按 SHA256(Raw key/AES rand) 派生 AES/HMAC session keys；Raw key 通常来自 RSA private key 解 GET metadata，不是单靠 PCAP 直接提取。")
 	case "rsa_private_key":
 		privateKey, err := parseRSAPrivateKey(req.CS.RSAPrivateKey)
 		if err != nil {
@@ -920,6 +1239,9 @@ func resolveCSKeys(req model.C2DecryptRequest, candidates []c2DecryptCandidate) 
 		}
 		for _, candidate := range candidates {
 			for _, transformed := range decodeC2TransformCandidates(string(candidate.raw), "auto") {
+				if !isCSMetadataCandidate(candidate) {
+					continue
+				}
 				plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, transformed.raw)
 				if err != nil || len(plaintext) < 16 {
 					continue
@@ -928,48 +1250,119 @@ func resolveCSKeys(req model.C2DecryptRequest, candidates []c2DecryptCandidate) 
 				return aesKey, hmacKey, []string{"已从 RSA metadata 候选中恢复 AES rand 并派生 session keys。"}
 			}
 		}
-		return nil, nil, []string{"RSA private key 可解析，但未从当前 CS metadata 候选恢复 AES rand。"}
+		return nil, nil, []string{"RSA private key 可解析，但未从当前 GET Cookie/URI metadata 候选恢复 AES rand；请确认 profile transform、Cookie 位置或 beacon_keys 是否匹配该样本。"}
 	default:
 		return nil, nil, []string{"CS keyMode 需为 aes_hmac、aes_rand 或 rsa_private_key。"}
 	}
 }
 
-func tryDecryptCSBlob(candidate c2DecryptCandidate, raw []byte, aesKey []byte, hmacKey []byte) (model.C2DecryptedRecord, bool) {
+func tryDecryptCSBlob(candidate c2DecryptCandidate, raw []byte, aesKey []byte, hmacKey []byte) (model.C2DecryptedRecord, string) {
 	if len(aesKey) != 16 && len(aesKey) != 24 && len(aesKey) != 32 {
-		return model.C2DecryptedRecord{}, false
+		return model.C2DecryptedRecord{}, "invalid-key"
 	}
-	blobs := [][]byte{raw}
-	if len(hmacKey) > 0 && len(raw) > 32 {
-		body := raw[:len(raw)-32]
-		mac := raw[len(raw)-32:]
-		expected := hmac.New(sha256.New, hmacKey)
-		expected.Write(body)
-		if hmac.Equal(mac, expected.Sum(nil)) {
-			blobs = append([][]byte{body}, blobs...)
+	if len(hmacKey) > 0 {
+		for _, variant := range csEncryptedBlobVariants(raw) {
+			if len(variant.mac) == 0 {
+				continue
+			}
+			expected := hmac.New(sha256.New, hmacKey)
+			expected.Write(variant.macBody)
+			sum := expected.Sum(nil)
+			if len(sum) < len(variant.mac) || !hmac.Equal(variant.mac, sum[:len(variant.mac)]) {
+				continue
+			}
+			if record, ok := decryptCSAESBlob(candidate, variant.ciphertext, aesKey, c2DecryptKeyStatusOK); ok {
+				record.RawLength = len(raw)
+				record.Tags = append(record.Tags, "hmac-verified", variant.tag)
+				return record, "hmac-verified"
+			}
+			return model.C2DecryptedRecord{}, "crypto-rejected"
+		}
+		return model.C2DecryptedRecord{}, "hmac-rejected"
+	}
+	for _, variant := range csEncryptedBlobVariants(raw) {
+		if record, ok := decryptCSAESBlob(candidate, variant.ciphertext, aesKey, c2DecryptKeyStatusWeak); ok {
+			record.RawLength = len(raw)
+			record.Tags = append(record.Tags, variant.tag)
+			return record, "decrypted-weak"
 		}
 	}
+	return model.C2DecryptedRecord{}, "crypto-rejected"
+}
+
+type csEncryptedBlobVariant struct {
+	ciphertext []byte
+	macBody    []byte
+	mac        []byte
+	tag        string
+}
+
+func csEncryptedBlobVariants(raw []byte) []csEncryptedBlobVariant {
+	out := make([]csEncryptedBlobVariant, 0, 4)
+	add := func(ciphertext, macBody, mac []byte, tag string) {
+		if len(ciphertext) == 0 || len(ciphertext)%aes.BlockSize != 0 {
+			return
+		}
+		out = append(out, csEncryptedBlobVariant{
+			ciphertext: ciphertext,
+			macBody:    macBody,
+			mac:        mac,
+			tag:        tag,
+		})
+	}
+	if len(raw) > 16 {
+		body := raw[:len(raw)-16]
+		add(body, body, raw[len(raw)-16:], "cs-hmac-sha256-16")
+		if len(body) >= 4 {
+			size := int(binary.BigEndian.Uint32(body[:4]))
+			if size > 0 && size == len(body)-4 {
+				add(body[4:], body, raw[len(raw)-16:], "cs-length-prefix-hmac-sha256-16")
+			}
+		}
+	}
+	if len(raw) > 32 {
+		body := raw[:len(raw)-32]
+		add(body, body, raw[len(raw)-32:], "cs-hmac-sha256-32")
+		if len(body) >= 4 {
+			size := int(binary.BigEndian.Uint32(body[:4]))
+			if size > 0 && size == len(body)-4 {
+				add(body[4:], body, raw[len(raw)-32:], "cs-length-prefix-hmac-sha256-32")
+			}
+		}
+	}
+	add(raw, nil, nil, "cs-raw-ciphertext")
+	if len(raw) >= 4 {
+		size := int(binary.BigEndian.Uint32(raw[:4]))
+		if size > 0 && size == len(raw)-4 {
+			add(raw[4:], nil, nil, "cs-length-prefix")
+		}
+	}
+	return out
+}
+
+func decryptCSAESBlob(candidate c2DecryptCandidate, blob []byte, aesKey []byte, keyStatus string) (model.C2DecryptedRecord, bool) {
 	ivs := [][]byte{
 		[]byte("abcdefghijklmnop"),
 		make([]byte, aes.BlockSize),
 	}
-	for _, blob := range blobs {
-		if len(blob) > aes.BlockSize && (len(blob)-aes.BlockSize)%aes.BlockSize == 0 {
-			if plaintext, err := decryptAESCBC(blob[aes.BlockSize:], aesKey, blob[:aes.BlockSize]); err == nil {
-				record := buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", c2DecryptKeyStatusWeak)
-				if len(hmacKey) > 0 {
-					record.KeyStatus = c2DecryptKeyStatusOK
-					record.Tags = append(record.Tags, "hmac-checked-or-keyed")
-				}
-				return record, true
-			}
-		}
-		if len(blob)%aes.BlockSize != 0 {
-			continue
-		}
+	if len(blob)%aes.BlockSize == 0 && keyStatus == c2DecryptKeyStatusOK {
 		for _, iv := range ivs {
 			if plaintext, err := decryptAESCBC(blob, aesKey, iv); err == nil {
-				return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", c2DecryptKeyStatusWeak), true
+				return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
 			}
+		}
+	}
+	if len(blob) > aes.BlockSize && (len(blob)-aes.BlockSize)%aes.BlockSize == 0 {
+		if plaintext, err := decryptAESCBC(blob[aes.BlockSize:], aesKey, blob[:aes.BlockSize]); err == nil {
+			return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
+		}
+	}
+	if len(blob)%aes.BlockSize != 0 {
+		return model.C2DecryptedRecord{}, false
+	}
+	for _, iv := range ivs {
+		if plaintext, err := decryptAESCBC(blob, aesKey, iv); err == nil {
+			return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
 		}
 	}
 	return model.C2DecryptedRecord{}, false
@@ -981,6 +1374,41 @@ func deriveCSKeysFromAESRand(aesRand []byte) ([]byte, []byte) {
 	}
 	sum := sha256.Sum256(aesRand)
 	return sum[:16], sum[16:]
+}
+
+func isCSMetadataCandidate(candidate c2DecryptCandidate) bool {
+	return strings.HasPrefix(candidate.transform, "cs-metadata-")
+}
+
+func isCSHTTPFocusedCandidate(candidate c2DecryptCandidate) bool {
+	return strings.HasPrefix(candidate.transform, "cs-http-")
+}
+
+func countCSMetadataCandidates(candidates []c2DecryptCandidate) int {
+	count := 0
+	for _, candidate := range candidates {
+		if isCSMetadataCandidate(candidate) {
+			count++
+		}
+	}
+	return count
+}
+
+func buildCSDecryptStatsNotes(stats c2CSDecryptStats) []string {
+	notes := []string{}
+	if stats.total > 0 {
+		notes = append(notes, fmt.Sprintf("CS 候选收敛：总候选 %d，HTTP POST/200 解密候选 %d，metadata 候选跳过 %d。", stats.total, stats.httpFocused, stats.metadataSkipped))
+	}
+	if stats.hmacVerified > 0 {
+		notes = append(notes, fmt.Sprintf("HMAC 校验通过 %d 条；这些记录标记为 verified。", stats.hmacVerified))
+	}
+	if stats.decryptedWeak > 0 {
+		notes = append(notes, fmt.Sprintf("无 HMAC 校验但 AES-CBC 可解 %d 条；这些记录标记为 unverified，需要人工复核。", stats.decryptedWeak))
+	}
+	if stats.hmacRejected > 0 {
+		notes = append(notes, fmt.Sprintf("HMAC 不匹配 %d 次；通常表示 Raw key/HMAC key 不对应、心跳/metadata 混入、或 profile transform 未正确还原。", stats.hmacRejected))
+	}
+	return notes
 }
 
 func buildDecryptedRecord(candidate c2DecryptCandidate, raw []byte, plaintext []byte, algorithm string, keyStatus string) model.C2DecryptedRecord {
@@ -1003,6 +1431,7 @@ func buildDecryptedRecord(candidate c2DecryptCandidate, raw []byte, plaintext []
 	if keyStatus == c2DecryptKeyStatusOK {
 		confidence = 90
 	}
+	preview, tags := previewCSPlaintext(candidate, plaintext)
 	return model.C2DecryptedRecord{
 		PacketID:         candidate.packet.ID,
 		StreamID:         candidate.packet.StreamID,
@@ -1011,12 +1440,82 @@ func buildDecryptedRecord(candidate c2DecryptCandidate, raw []byte, plaintext []
 		Algorithm:        algorithm,
 		KeyStatus:        keyStatus,
 		Confidence:       confidence,
-		PlaintextPreview: previewC2Plaintext(plaintext),
+		PlaintextPreview: preview,
 		Parsed:           parsed,
 		RawLength:        len(raw),
 		DecryptedLength:  len(plaintext),
-		Tags:             []string{candidate.transform},
+		Tags:             append([]string{candidate.transform}, tags...),
 	}
+}
+
+func previewCSPlaintext(candidate c2DecryptCandidate, plaintext []byte) (string, []string) {
+	if !strings.HasPrefix(candidate.transform, "cs-") {
+		return previewC2Plaintext(plaintext), nil
+	}
+	if preview, tags := previewCSStructuredPayload(plaintext); preview != "" {
+		return preview, tags
+	}
+	return previewC2Plaintext(plaintext), []string{"cs-binary-plaintext"}
+}
+
+func previewCSStructuredPayload(raw []byte) (string, []string) {
+	if len(raw) == 0 {
+		return "", nil
+	}
+	var parts []string
+	tags := []string{"cs-structured-preview"}
+	if len(raw) >= 4 {
+		value := binary.BigEndian.Uint32(raw[:4])
+		if value > 0 && value <= uint32(len(raw)-4) {
+			parts = append(parts, fmt.Sprintf("beacon_length=%d", value))
+			tags = append(tags, "cs-length-prefix")
+		} else {
+			parts = append(parts, fmt.Sprintf("beacon_prefix=0x%08x", value))
+		}
+	}
+	textFragments := extractPrintableASCIIFragments(raw, 4)
+	if len(textFragments) > 0 {
+		tags = append(tags, "cs-ascii-fragments")
+		if len(textFragments) > 6 {
+			textFragments = textFragments[:6]
+		}
+		parts = append(parts, "ascii="+strings.Join(textFragments, " | "))
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	if len(raw) > 0 {
+		parts = append(parts, fmt.Sprintf("raw_hex_prefix=%s", hex.EncodeToString(raw[:minInt(len(raw), 48)])))
+	}
+	return strings.Join(parts, "\n"), tags
+}
+
+func extractPrintableASCIIFragments(raw []byte, minLen int) []string {
+	out := []string{}
+	start := -1
+	for i, b := range raw {
+		if b >= 0x20 && b <= 0x7e {
+			if start < 0 {
+				start = i
+			}
+			continue
+		}
+		if start >= 0 && i-start >= minLen {
+			out = append(out, string(raw[start:i]))
+		}
+		start = -1
+	}
+	if start >= 0 && len(raw)-start >= minLen {
+		out = append(out, string(raw[start:]))
+	}
+	return out
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func baseDecryptRecord(candidate c2DecryptCandidate, raw []byte, algorithm string) model.C2DecryptedRecord {

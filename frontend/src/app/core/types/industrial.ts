@@ -23,8 +23,24 @@ export interface ModbusTransaction {
   exceptionCode: number;
   responseTime: string;
   registerValues?: string;
+  inputText?: string;
   bitRange?: ModbusBitRange;
   summary: string;
+}
+
+export interface ModbusDecodedInput {
+  startPacketId: number;
+  endPacketId: number;
+  source?: string;
+  destination?: string;
+  unitId?: number;
+  functionCode?: number;
+  functionName?: string;
+  reference?: string;
+  encoding: string;
+  text: string;
+  rawText?: string;
+  summary?: string;
 }
 
 export interface ModbusAnalysis {
@@ -37,6 +53,7 @@ export interface ModbusAnalysis {
   referenceHits: TrafficBucket[];
   exceptionCodes: TrafficBucket[];
   transactions: ModbusTransaction[];
+  decodedInputs?: ModbusDecodedInput[];
 }
 
 export interface IndustrialProtocolRecord {

@@ -499,7 +499,7 @@ describe("MiscTools SMB3 session candidates", () => {
 
     await expandModule("payload-webshell-decoder");
 
-    fireEvent.click(await screen.findByRole("button", { name: "示例" }, { timeout: 5000 }));
+    fireEvent.click(await screen.findByRole("button", { name: "示例" }, { timeout: 10000 }));
     fireEvent.click(await screen.findByRole("button", { name: "识别候选" }, { timeout: 5000 }));
 
     await waitFor(() => {

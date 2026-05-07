@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,7 +78,7 @@ func TestRunEnabledPacketPluginsExecutesJSLogic(t *testing.T) {
 		t.Fatalf("LoadFromDir() error = %v", err)
 	}
 
-	hits := manager.RunEnabledPacketPlugins([]model.Packet{
+	hits := manager.RunEnabledPacketPlugins(context.Background(), []model.Packet{
 		{ID: 41, Protocol: "TCP", Info: "leaked flag{demo_token}"},
 		{ID: 42, Protocol: "TCP", Info: "normal payload"},
 	}, 100)
@@ -130,7 +131,7 @@ for raw in sys.stdin:
 		t.Fatalf("expected a python plugin, got %+v", plugins)
 	}
 
-	hits := manager.RunEnabledPacketPlugins([]model.Packet{
+	hits := manager.RunEnabledPacketPlugins(context.Background(), []model.Packet{
 		{ID: 7, Protocol: "TCP", Info: "flag{python_runtime}"},
 		{ID: 8, Protocol: "TCP", Info: "normal payload"},
 	}, 200)
@@ -284,7 +285,7 @@ func TestRunEnabledPacketPluginsTimesOutHungJS(t *testing.T) {
 		t.Fatalf("LoadFromDir() error = %v", err)
 	}
 
-	runner := manager.NewPacketPluginRunner()
+	runner := manager.NewPacketPluginRunner(context.Background())
 	if runner == nil {
 		t.Fatal("expected runner to be created")
 	}
@@ -323,7 +324,7 @@ time.sleep(1)
 		t.Fatalf("LoadFromDir() error = %v", err)
 	}
 
-	runner := manager.NewPacketPluginRunner()
+	runner := manager.NewPacketPluginRunner(context.Background())
 	if runner == nil {
 		t.Fatal("expected runner to be created")
 	}
@@ -373,7 +374,7 @@ func TestRunEnabledPacketPluginsEnforcesThreatEmitCapability(t *testing.T) {
 		t.Fatalf("LoadFromDir() error = %v", err)
 	}
 
-	runner := manager.NewPacketPluginRunner()
+	runner := manager.NewPacketPluginRunner(context.Background())
 	if runner == nil {
 		t.Fatal("expected runner to be created")
 	}
@@ -414,7 +415,7 @@ func TestRunEnabledPacketPluginsRequiresPacketReadCapability(t *testing.T) {
 		t.Fatalf("LoadFromDir() error = %v", err)
 	}
 
-	runner := manager.NewPacketPluginRunner()
+	runner := manager.NewPacketPluginRunner(context.Background())
 	if runner == nil {
 		t.Fatal("expected runner to be created with warning")
 	}

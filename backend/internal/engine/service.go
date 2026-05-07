@@ -826,7 +826,7 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 	hunter := newThreatHunter(prefixes, 1)
 	var pluginRunner *plugin.PacketPluginRunner
 	if s.pluginManger != nil {
-		pluginRunner = s.pluginManger.NewPacketPluginRunner()
+		pluginRunner = s.pluginManger.NewPacketPluginRunner(ctx)
 	}
 
 	const pluginBatchSize = 1024

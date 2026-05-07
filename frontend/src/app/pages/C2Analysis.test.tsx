@@ -41,7 +41,8 @@ vi.mock("react-router", async (importOriginal) => {
   };
 });
 
-import C2Analysis, { buildC2SampleAnalysisCacheKey } from "./C2Analysis";
+import { buildC2SampleAnalysisCacheKey } from "../features/c2/useC2Analysis";
+import C2Analysis from "./C2Analysis";
 
 function findAncestorWithClass(node: Element, className: string) {
   let current: Element | null = node;

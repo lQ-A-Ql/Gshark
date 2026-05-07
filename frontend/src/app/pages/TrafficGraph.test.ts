@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStatsFromPackets } from "./TrafficGraph";
+import { buildStatsFromPackets } from "../features/traffic/useTrafficGraph";
 import type { Packet } from "../core/types";
 
 describe("buildStatsFromPackets", () => {

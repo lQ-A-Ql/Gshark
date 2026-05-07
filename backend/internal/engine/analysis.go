@@ -119,12 +119,22 @@ func ExtractObjects(packets []model.Packet) []model.ObjectFile {
 		}
 		name := guessObjectName(packet)
 		mime := guessMIME(name)
+		magic := detectMagic(packet.RawHex)
+		if magic == "" {
+			magic = detectMagicFromPayload(packet.Payload)
+		}
+		if magic != "" && mime == "application/octet-stream" {
+			if inferred := magicToMIME(magic); inferred != "" {
+				mime = inferred
+			}
+		}
 		objects = append(objects, model.ObjectFile{
 			ID:        seq,
 			PacketID:  packet.ID,
 			Name:      name,
 			SizeBytes: int64(packet.Length * 12),
 			MIME:      mime,
+			Magic:     magic,
 			Source:    packet.Protocol,
 		})
 		seq++
@@ -254,12 +264,139 @@ func guessMIME(name string) string {
 		return "image/png"
 	case strings.HasSuffix(n, ".jpg") || strings.HasSuffix(n, ".jpeg"):
 		return "image/jpeg"
+	case strings.HasSuffix(n, ".gif"):
+		return "image/gif"
+	case strings.HasSuffix(n, ".webp"):
+		return "image/webp"
+	case strings.HasSuffix(n, ".bmp"):
+		return "image/bmp"
 	case strings.HasSuffix(n, ".zip"):
 		return "application/zip"
+	case strings.HasSuffix(n, ".pdf"):
+		return "application/pdf"
 	case strings.HasSuffix(n, ".txt"):
 		return "text/plain"
+	case strings.HasSuffix(n, ".html") || strings.HasSuffix(n, ".htm"):
+		return "text/html"
 	default:
 		return "application/octet-stream"
+	}
+}
+
+var magicSigs = []struct {
+	sig  []byte
+	mime string
+	name string
+}{
+	{[]byte{0x89, 0x50, 0x4E, 0x47}, "image/png", "PNG"},
+	{[]byte{0xFF, 0xD8, 0xFF}, "image/jpeg", "JPEG"},
+	{[]byte("GIF87a"), "image/gif", "GIF87a"},
+	{[]byte("GIF89a"), "image/gif", "GIF89a"},
+	{[]byte("RIFF"), "image/webp", "RIFF"},
+	{[]byte{0x42, 0x4D}, "image/bmp", "BMP"},
+	{[]byte{0x50, 0x4B, 0x03, 0x04}, "application/zip", "ZIP"},
+	{[]byte{0x50, 0x4B, 0x05, 0x06}, "application/zip", "ZIP (empty)"},
+	{[]byte{0x1F, 0x8B}, "application/gzip", "GZIP"},
+	{[]byte("BZh"), "application/x-bzip2", "BZIP2"},
+	{[]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, "application/x-xz", "XZ"},
+	{[]byte{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07}, "application/x-rar", "RAR"},
+	{[]byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}, "application/x-7z-compressed", "7z"},
+	{[]byte("%PDF"), "application/pdf", "PDF"},
+	{[]byte{0x25, 0x21}, "application/postscript", "PS"},
+	{[]byte{0x00, 0x00, 0x01, 0x00}, "image/x-icon", "ICO"},
+	{[]byte{0x4F, 0x67, 0x67, 0x53}, "application/ogg", "OGG"},
+	{[]byte{0x1A, 0x45, 0xDF, 0xA3}, "video/webm", "MKV/WebM"},
+	{[]byte{0x00, 0x00, 0x00}, "video/mp4", "MP4 (ftyp)"},
+	{[]byte("FLV"), "video/x-flv", "FLV"},
+	{[]byte{0x49, 0x44, 0x33}, "audio/mpeg", "MP3 (ID3)"},
+	{[]byte{0xFF, 0xFB}, "audio/mpeg", "MP3 (sync)"},
+	{[]byte("fLaC"), "audio/flac", "FLAC"},
+	{[]byte{0xCA, 0xFE, 0xBA, 0xBE}, "application/java-archive", "Java class/Mach-O"},
+	{[]byte{0x7F, 0x45, 0x4C, 0x46}, "application/x-elf", "ELF"},
+	{[]byte{0x4D, 0x5A}, "application/x-dosexec", "PE/DOS MZ"},
+	{[]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}, "application/msword", "OLE2 (doc/xls)"},
+	{[]byte{0x50, 0x4B, 0x03, 0x04}, "application/zip", "ZIP/DOCX/XLSX"},
+}
+
+func detectMagic(rawHex string) string {
+	if len(rawHex) < 2 {
+		return ""
+	}
+	raw, err := hex.DecodeString(rawHex)
+	if err != nil || len(raw) < 4 {
+		return ""
+	}
+	for _, sig := range magicSigs {
+		if len(raw) >= len(sig.sig) && bytes.Equal(raw[:len(sig.sig)], sig.sig) {
+			return sig.name
+		}
+	}
+	return ""
+}
+
+func detectMagicFromPayload(payload string) string {
+	payload = strings.TrimSpace(payload)
+	if len(payload) < 8 {
+		return ""
+	}
+	raw, err := hex.DecodeString(payload)
+	if err != nil {
+		return ""
+	}
+	if len(raw) < 4 {
+		return ""
+	}
+	for _, sig := range magicSigs {
+		if len(raw) >= len(sig.sig) && bytes.Equal(raw[:len(sig.sig)], sig.sig) {
+			return sig.name
+		}
+	}
+	return ""
+}
+
+func magicToMIME(magic string) string {
+	m := strings.ToLower(magic)
+	switch {
+	case strings.Contains(m, "png"):
+		return "image/png"
+	case strings.Contains(m, "jpeg"):
+		return "image/jpeg"
+	case strings.Contains(m, "gif"):
+		return "image/gif"
+	case strings.Contains(m, "webp") || strings.Contains(m, "riff"):
+		return "image/webp"
+	case strings.Contains(m, "bmp"):
+		return "image/bmp"
+	case strings.Contains(m, "zip") || strings.Contains(m, "docx") || strings.Contains(m, "xlsx"):
+		return "application/zip"
+	case strings.Contains(m, "pdf"):
+		return "application/pdf"
+	case strings.Contains(m, "gzip"):
+		return "application/gzip"
+	case strings.Contains(m, "rar"):
+		return "application/x-rar"
+	case strings.Contains(m, "7z"):
+		return "application/x-7z-compressed"
+	case strings.Contains(m, "elf"):
+		return "application/x-elf"
+	case strings.Contains(m, "pe") || strings.Contains(m, "dos") || strings.Contains(m, "mz"):
+		return "application/x-dosexec"
+	case strings.Contains(m, "ole") || strings.Contains(m, "doc"):
+		return "application/msword"
+	case strings.Contains(m, "mp3"):
+		return "audio/mpeg"
+	case strings.Contains(m, "flac"):
+		return "audio/flac"
+	case strings.Contains(m, "mp4"):
+		return "video/mp4"
+	case strings.Contains(m, "mkv") || strings.Contains(m, "webm"):
+		return "video/webm"
+	case strings.Contains(m, "flv"):
+		return "video/x-flv"
+	case strings.Contains(m, "ogg"):
+		return "application/ogg"
+	default:
+		return ""
 	}
 }
 

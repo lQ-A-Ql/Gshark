@@ -8,8 +8,6 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { AppUpdateStatus } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes } from "../state/SentinelContext";
@@ -18,6 +16,7 @@ import { PageShell } from "../components/PageShell";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
+import { LazyMarkdown } from "../components/LazyMarkdown";
 
 function formatReleaseTime(value: string) {
   const parsed = new Date(value);
@@ -198,8 +197,7 @@ export default function UpdateCenter() {
             </CardHeader>
             <CardContent>
               <div className="max-h-[420px] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                <LazyMarkdown
                   components={{
                     h1: ({ children }) => <h1 className="mt-1 text-2xl font-semibold text-slate-900 first:mt-0">{children}</h1>,
                     h2: ({ children }) => <h2 className="mt-6 text-xl font-semibold text-slate-900 first:mt-0">{children}</h2>,
@@ -249,7 +247,7 @@ export default function UpdateCenter() {
                   }}
                 >
                   {notes}
-                </ReactMarkdown>
+                </LazyMarkdown>
               </div>
             </CardContent>
           </Card>

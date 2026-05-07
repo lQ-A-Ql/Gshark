@@ -30,6 +30,7 @@ export const router = createBrowserRouter([
       { path: "vehicle-analysis", lazy: lazyPage(() => import("./pages/VehicleAnalysis")) },
       { path: "media-analysis", lazy: lazyPage(() => import("./pages/MediaAnalysis")) },
       { path: "usb-analysis", lazy: lazyPage(() => import("./pages/UsbAnalysis")) },
+      { path: "evidence", lazy: lazyPage(() => import("./pages/EvidencePanel")) },
     ],
   },
 ]);

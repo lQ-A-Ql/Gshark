@@ -19,12 +19,10 @@ import {
 } from "../components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../core/types";
-import { buildMediaAnalysisCacheKey, EMPTY_BATCH_STATUS, useMediaAnalysis } from "../features/media/useMediaAnalysis";
+import { EMPTY_BATCH_STATUS, useMediaAnalysis } from "../features/media/useMediaAnalysis";
 import { bridge } from "../integrations/wailsBridge";
 import { formatBytes, useSentinel } from "../state/SentinelContext";
 import { copyTextToClipboard } from "../utils/browserFile";
-
-export { buildMediaAnalysisCacheKey };
 
 type MediaTab = "all" | "video" | "audio";
 

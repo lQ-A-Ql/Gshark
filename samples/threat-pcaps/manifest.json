@@ -1,0 +1,63 @@
+{
+    "schemaVersion":  1,
+    "updatedAt":  "2026-05-07T00:00:00+08:00",
+    "policy":  {
+                   "purpose":  "blue-team CS/VShell public-threat PCAP regression",
+                   "maxBytes":  209715200,
+                   "allowedExtensions":  [
+                                             ".pcap",
+                                             ".pcapng",
+                                             ".cap",
+                                             ".zip"
+                                         ],
+                   "archivePolicy":  "ZIP sources may contain PCAP/CAP/PCAPNG only; executable/script entries are rejected.",
+                   "executionPolicy":  "Never execute samples or extracted content."
+               },
+    "samples":  [
+                    {
+                        "id":  "mta-2021-06-15-hancitor-ficker-cobalt-strike",
+                        "family":  "cs",
+                        "sourceName":  "Malware-Traffic-Analysis.net",
+                        "sourceUrl":  "https://www.malware-traffic-analysis.net/2021/06/15/2021-06-15-Hancitor-with-Ficker-Stealer-and-Cobalt-Strike.pcap.zip",
+                        "localPath":  "samples/threat-pcaps/cs/2021-06-15-Hancitor-with-Ficker-Stealer-and-Cobalt-Strike.pcap",
+                        "sha256":  "dda121a5ef34959a58759dda2c2a89cefb88c13d9a9cef4d1a9d9fef12331f9b",
+                        "bytes":  4325317,
+                        "status":  "downloaded",
+                        "skippedReason":  "",
+                        "licenseNote":  "Public malware traffic exercise PCAP; do not redistribute without reviewing source terms.",
+                        "archivePassword":  "infected_20210615",
+                        "knownKeys":  {
+
+                                      },
+                        "expected":  {
+                                         "detectionOnly":  true,
+                                         "needles":  [
+                                                         "cs",
+                                                         "cobalt"
+                                                     ]
+                                     },
+                        "downloadedAt":  "2026-05-07T20:16:20.1925079+08:00"
+                    },
+                    {
+                        "id":  "public-vshell-direct-pcap-pending",
+                        "family":  "vshell",
+                        "sourceName":  "Public VShell PCAP search",
+                        "sourceUrl":  "",
+                        "localPath":  "samples/threat-pcaps/vshell/",
+                        "sha256":  "",
+                        "bytes":  0,
+                        "status":  "pending",
+                        "skippedReason":  "No stable public direct-download VShell PCAP identified; keep authorized local GSHARK_SAMPLE_VSHELL regression.",
+                        "licenseNote":  "Pending public source.",
+                        "knownKeys":  {
+
+                                      },
+                        "expected":  {
+                                         "detectionOnly":  true,
+                                         "needles":  [
+                                                         "vshell"
+                                                     ]
+                                     }
+                    }
+                ]
+}

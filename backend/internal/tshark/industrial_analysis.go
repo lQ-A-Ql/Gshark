@@ -2,7 +2,10 @@ package tshark
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -66,6 +69,7 @@ type modbusTransactionScratch struct {
 	RawReference   string
 	RawQuantity    string
 	RawData        string
+	RawRegisterU16 string
 	RawBitNumbers  string
 	RawBitValues   string
 	RequestFrameID int64
@@ -158,13 +162,20 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 		reference := formatModbusReference(rawReference)
 		rawQuantity := FirstNonEmpty(safeTrim(parts, 27), safeTrim(parts, 28), safeTrim(parts, 26), safeTrim(parts, 29), safeTrim(parts, 30))
 		quantity := rawQuantity
+		rawRegisterU16 := safeTrim(parts, 33)
 		registerValues := compactJoin(", ",
-			safeTrim(parts, 33),
+			rawRegisterU16,
 			safeTrim(parts, 34),
 			safeTrim(parts, 35),
 			safeTrim(parts, 36),
 			safeTrim(parts, 37),
 			safeTrim(parts, 38),
+		)
+		inputText := decodeModbusInputText(
+			safeTrim(parts, 38),
+			safeTrim(parts, 39),
+			safeTrim(parts, 33),
+			safeTrim(parts, 34),
 		)
 		rawBitData := safeTrim(parts, 39)
 		rawBitNumbers := safeTrim(parts, 40)
@@ -222,6 +233,7 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 			ExceptionCode:  exceptionCode,
 			ResponseTime:   responseTime,
 			RegisterValues: registerValues,
+			InputText:      inputText,
 			BitRange:       bitRange,
 			Summary:        info,
 		})
@@ -231,6 +243,7 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 			RawReference:   rawReference,
 			RawQuantity:    rawQuantity,
 			RawData:        rawBitData,
+			RawRegisterU16: rawRegisterU16,
 			RawBitNumbers:  rawBitNumbers,
 			RawBitValues:   rawBitValues,
 			RequestFrameID: requestFrameID,
@@ -267,6 +280,7 @@ func scanModbusAnalysis(filePath string) (model.ModbusAnalysis, map[string]conve
 		)
 	}
 
+	stats.DecodedInputs = buildModbusDecodedInputs(stats.Transactions, transactionScratch)
 	stats.FunctionCodes = topBuckets(functionMap, 0)
 	stats.UnitIDs = topBuckets(unitMap, 0)
 	stats.ReferenceHits = topBuckets(referenceMap, 0)
@@ -385,6 +399,308 @@ func compactJoin(sep string, values ...string) string {
 		filtered = append(filtered, value)
 	}
 	return strings.Join(filtered, sep)
+}
+
+func decodeModbusInputText(objectString, rawData, rawUInt16, rawInt16 string) string {
+	for _, candidate := range []string{
+		normalizeModbusTextCandidate(objectString),
+		decodeModbusHexText(rawData),
+		decodeModbusRegisterText(rawUInt16),
+		decodeModbusRegisterText(rawInt16),
+	} {
+		if isUsefulModbusText(candidate) {
+			return truncateModbusInputText(candidate)
+		}
+	}
+	return ""
+}
+
+func normalizeModbusTextCandidate(raw string) string {
+	return cleanModbusInputText(strings.TrimSpace(raw))
+}
+
+func decodeModbusHexText(raw string) string {
+	parts := modbusHexByteStrings(raw)
+	if len(parts) == 0 {
+		return ""
+	}
+	buf := make([]byte, 0, len(parts))
+	for _, part := range parts {
+		value, ok := parseModbusHexByte(part)
+		if !ok {
+			return ""
+		}
+		buf = append(buf, value)
+	}
+	return textFromModbusBytes(buf)
+}
+
+func modbusHexByteStrings(raw string) []string {
+	parts := splitHexBytes(raw)
+	if len(parts) != 1 {
+		return parts
+	}
+	part := strings.TrimSpace(parts[0])
+	part = strings.TrimPrefix(strings.TrimPrefix(part, "0x"), "0X")
+	if len(part) <= 2 || len(part)%2 != 0 {
+		return parts
+	}
+	out := make([]string, 0, len(part)/2)
+	for idx := 0; idx < len(part); idx += 2 {
+		out = append(out, part[idx:idx+2])
+	}
+	return out
+}
+
+func decodeModbusRegisterText(raw string) string {
+	values := splitCommaSeparatedField(raw)
+	if len(values) == 0 {
+		return ""
+	}
+	buf := make([]byte, 0, len(values)*2)
+	for _, value := range values {
+		parsed := parseFlexibleInt(value)
+		if parsed < 0 || parsed > 0xffff {
+			return ""
+		}
+		buf = append(buf, byte(parsed>>8), byte(parsed))
+	}
+	return textFromModbusBytes(buf)
+}
+
+func parseModbusHexByte(raw string) (byte, bool) {
+	part := strings.TrimSpace(raw)
+	part = strings.TrimPrefix(strings.TrimPrefix(part, "0x"), "0X")
+	if len(part) == 0 || len(part) > 2 {
+		return 0, false
+	}
+	value, err := strconv.ParseUint(part, 16, 8)
+	if err != nil {
+		return 0, false
+	}
+	return byte(value), true
+}
+
+func textFromModbusBytes(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	trimmed := strings.Trim(string(raw), "\x00 \t\r\n")
+	if trimmed == "" || !utf8.ValidString(trimmed) {
+		return ""
+	}
+	return cleanModbusInputText(trimmed)
+}
+
+func cleanModbusInputText(raw string) string {
+	var builder strings.Builder
+	lastWasSpace := false
+	for _, r := range raw {
+		switch {
+		case r == '\r' || r == '\n' || r == '\t':
+			if !lastWasSpace {
+				builder.WriteByte(' ')
+				lastWasSpace = true
+			}
+		case unicode.IsControl(r):
+			continue
+		default:
+			builder.WriteRune(r)
+			lastWasSpace = unicode.IsSpace(r)
+		}
+	}
+	return strings.TrimSpace(builder.String())
+}
+
+func isUsefulModbusText(text string) bool {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return false
+	}
+	visible := 0
+	nonSpace := 0
+	for _, r := range text {
+		if unicode.IsPrint(r) && !unicode.IsControl(r) {
+			visible++
+			if !unicode.IsSpace(r) {
+				nonSpace++
+			}
+		}
+	}
+	if visible == 0 || nonSpace == 0 {
+		return false
+	}
+	if nonSpace >= 3 {
+		return true
+	}
+	lower := strings.ToLower(text)
+	return lower == "ok" || lower == "on" || lower == "off"
+}
+
+func truncateModbusInputText(text string) string {
+	const limit = 240
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit]) + "..."
+}
+
+func buildModbusDecodedInputs(transactions []model.ModbusTransaction, scratch []modbusTransactionScratch) []model.ModbusDecodedInput {
+	type sequenceKey struct {
+		source       string
+		destination  string
+		unitID       int
+		functionCode int
+	}
+
+	var outputs []model.ModbusDecodedInput
+	var currentKey sequenceKey
+	var currentBytes []byte
+	var startPacketID int64
+	var endPacketID int64
+	flush := func() {
+		if len(currentBytes) == 0 {
+			return
+		}
+		rawText := cleanModbusInputText(string(currentBytes))
+		if !isUsefulModbusSequenceText(rawText) {
+			currentBytes = nil
+			return
+		}
+		text := rawText
+		encoding := "ascii->utf-8"
+		if nested := decodeNestedHexUTF8(rawText); nested != "" {
+			text = nested
+			encoding = "ascii-hex->utf-8"
+		}
+		outputs = append(outputs, model.ModbusDecodedInput{
+			StartPacketID: startPacketID,
+			EndPacketID:   endPacketID,
+			Source:        currentKey.source,
+			Destination:   currentKey.destination,
+			UnitID:        currentKey.unitID,
+			FunctionCode:  currentKey.functionCode,
+			FunctionName:  modbusFunctionName(currentKey.functionCode),
+			Encoding:      encoding,
+			Text:          truncateModbusDecodedSequence(text),
+			RawText:       truncateModbusDecodedSequence(rawText),
+			Summary:       fmt.Sprintf("packet #%d-%d 连续写入 ASCII 输入", startPacketID, endPacketID),
+		})
+		currentBytes = nil
+	}
+
+	for idx, tx := range transactions {
+		rawRegisterU16 := ""
+		if idx < len(scratch) {
+			rawRegisterU16 = scratch[idx].RawRegisterU16
+		}
+		bytes, ok := modbusASCIIBytesFromTransaction(tx, rawRegisterU16)
+		key := sequenceKey{
+			source:       tx.Source,
+			destination:  tx.Destination,
+			unitID:       tx.UnitID,
+			functionCode: tx.FunctionCode,
+		}
+		if !ok || tx.Kind != "request" {
+			flush()
+			currentKey = sequenceKey{}
+			continue
+		}
+		if len(currentBytes) > 0 && key != currentKey {
+			flush()
+		}
+		if len(currentBytes) == 0 {
+			currentKey = key
+			startPacketID = tx.PacketID
+		}
+		currentBytes = append(currentBytes, bytes...)
+		endPacketID = tx.PacketID
+	}
+	flush()
+
+	const maxDecodedInputs = 20
+	if len(outputs) > maxDecodedInputs {
+		return outputs[:maxDecodedInputs]
+	}
+	return outputs
+}
+
+func modbusASCIIBytesFromTransaction(tx model.ModbusTransaction, rawRegisterU16 string) ([]byte, bool) {
+	if tx.FunctionCode != 6 && tx.FunctionCode != 16 && tx.FunctionCode != 23 {
+		return nil, false
+	}
+	values := splitCommaSeparatedField(FirstNonEmpty(rawRegisterU16, tx.RegisterValues))
+	if len(values) == 0 {
+		return nil, false
+	}
+	out := make([]byte, 0, len(values))
+	for _, raw := range values {
+		value := parseFlexibleInt(raw)
+		if value == 0 {
+			return nil, false
+		}
+		if value == '\t' || value == '\n' || value == '\r' || (value >= 0x20 && value <= 0x7e) {
+			out = append(out, byte(value))
+			continue
+		}
+		return nil, false
+	}
+	if len(out) == 0 {
+		return nil, false
+	}
+	return out, true
+}
+
+func isUsefulModbusSequenceText(text string) bool {
+	text = strings.TrimSpace(text)
+	if len([]rune(text)) < 4 {
+		return false
+	}
+	visible := 0
+	letters := 0
+	for _, r := range text {
+		if r >= 0x20 && r <= 0x7e {
+			visible++
+		}
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			letters++
+		}
+	}
+	if visible < 4 {
+		return false
+	}
+	if visible < 6 && letters < 2 {
+		return false
+	}
+	return true
+}
+
+func decodeNestedHexUTF8(raw string) string {
+	compact := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, raw)
+	if len(compact) < 4 || len(compact)%2 != 0 {
+		return ""
+	}
+	for _, r := range compact {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return ""
+		}
+	}
+	return decodeModbusHexText(compact)
+}
+
+func truncateModbusDecodedSequence(text string) string {
+	const limit = 512
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit]) + "..."
 }
 
 func buildModbusBitContext(functionCode int, rawReference, rawQuantity string) (modbusBitContext, bool) {
@@ -635,6 +951,9 @@ func industrialNotes(stats model.IndustrialAnalysis) []string {
 	notes := make([]string, 0, 6)
 	if stats.Modbus.TotalFrames > 0 {
 		notes = append(notes, "Modbus/TCP 已做字段级提取，可直接查看功能码、寄存器引用、异常码和请求/响应节奏。")
+	}
+	if len(stats.Modbus.DecodedInputs) > 0 {
+		notes = append(notes, fmt.Sprintf("已从连续 Modbus 写寄存器事务中重组 %d 段 ASCII/UTF-8 输入内容。", len(stats.Modbus.DecodedInputs)))
 	}
 	if len(stats.Details) > 0 {
 		names := make([]string, 0, len(stats.Details))

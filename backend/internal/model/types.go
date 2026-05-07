@@ -515,6 +515,7 @@ type ObjectFile struct {
 	Name      string `json:"name"`
 	SizeBytes int64  `json:"size_bytes"`
 	MIME      string `json:"mime"`
+	Magic     string `json:"magic,omitempty"`
 	Source    string `json:"source"`
 	Path      string `json:"-"`
 }
@@ -926,6 +927,21 @@ type ModbusBitRange struct {
 	Preview string `json:"preview,omitempty"`
 }
 
+type ModbusDecodedInput struct {
+	StartPacketID int64  `json:"start_packet_id"`
+	EndPacketID   int64  `json:"end_packet_id"`
+	Source        string `json:"source,omitempty"`
+	Destination   string `json:"destination,omitempty"`
+	UnitID        int    `json:"unit_id,omitempty"`
+	FunctionCode  int    `json:"function_code,omitempty"`
+	FunctionName  string `json:"function_name,omitempty"`
+	Reference     string `json:"reference,omitempty"`
+	Encoding      string `json:"encoding"`
+	Text          string `json:"text"`
+	RawText       string `json:"raw_text,omitempty"`
+	Summary       string `json:"summary,omitempty"`
+}
+
 type ModbusTransaction struct {
 	PacketID       int64           `json:"packet_id"`
 	Time           string          `json:"time"`
@@ -941,20 +957,22 @@ type ModbusTransaction struct {
 	ExceptionCode  int             `json:"exception_code"`
 	ResponseTime   string          `json:"response_time"`
 	RegisterValues string          `json:"register_values,omitempty"`
+	InputText      string          `json:"input_text,omitempty"`
 	BitRange       *ModbusBitRange `json:"bit_range,omitempty"`
 	Summary        string          `json:"summary"`
 }
 
 type ModbusAnalysis struct {
-	TotalFrames    int                 `json:"total_frames"`
-	Requests       int                 `json:"requests"`
-	Responses      int                 `json:"responses"`
-	Exceptions     int                 `json:"exceptions"`
-	FunctionCodes  []TrafficBucket     `json:"function_codes"`
-	UnitIDs        []TrafficBucket     `json:"unit_ids"`
-	ReferenceHits  []TrafficBucket     `json:"reference_hits"`
-	ExceptionCodes []TrafficBucket     `json:"exception_codes"`
-	Transactions   []ModbusTransaction `json:"transactions"`
+	TotalFrames    int                  `json:"total_frames"`
+	Requests       int                  `json:"requests"`
+	Responses      int                  `json:"responses"`
+	Exceptions     int                  `json:"exceptions"`
+	FunctionCodes  []TrafficBucket      `json:"function_codes"`
+	UnitIDs        []TrafficBucket      `json:"unit_ids"`
+	ReferenceHits  []TrafficBucket      `json:"reference_hits"`
+	ExceptionCodes []TrafficBucket      `json:"exception_codes"`
+	Transactions   []ModbusTransaction  `json:"transactions"`
+	DecodedInputs  []ModbusDecodedInput `json:"decoded_inputs,omitempty"`
 }
 
 type IndustrialProtocolRecord struct {
@@ -1451,4 +1469,36 @@ type USBAnalysis struct {
 	MassStorage        USBMassStorageAnalysis `json:"mass_storage"`
 	Other              USBOtherAnalysis       `json:"other"`
 	Notes              []string               `json:"notes"`
+}
+
+type EvidenceRecord struct {
+	ID           string   `json:"id"`
+	Module       string   `json:"module"`
+	SourceModule string   `json:"source_module,omitempty"`
+	PacketID     int64    `json:"packet_id,omitempty"`
+	StreamID     int64    `json:"stream_id,omitempty"`
+	Family       string   `json:"family,omitempty"`
+	ActorID      string   `json:"actor_id,omitempty"`
+	ActorName    string   `json:"actor_name,omitempty"`
+	SourceType   string   `json:"source_type"`
+	Summary      string   `json:"summary"`
+	Value        string   `json:"value,omitempty"`
+	Confidence   int      `json:"confidence,omitempty"`
+	Severity     string   `json:"severity"`
+	Source       string   `json:"source,omitempty"`
+	Destination  string   `json:"destination,omitempty"`
+	Host         string   `json:"host,omitempty"`
+	URI          string   `json:"uri,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+	Caveats      []string `json:"caveats,omitempty"`
+}
+
+type EvidenceResponse struct {
+	Records []EvidenceRecord `json:"records"`
+	Total   int              `json:"total"`
+	Notes   []string         `json:"notes,omitempty"`
+}
+
+type EvidenceFilter struct {
+	Modules []string `json:"modules,omitempty"`
 }

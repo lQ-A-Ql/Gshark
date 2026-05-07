@@ -5,13 +5,14 @@
 ## 推荐阅读顺序
 
 1. [项目根 README](../README.md)：了解产品定位、核心功能、启动方式和当前边界。
-2. [2026-05-02 归档索引](./audit-development-report-archive-2026-05-02/README.md)：查看最新 C2 / APT / MISC 证据链产品化、前端模块化和验证结果。
-3. [当前开发态势与下一步规划](./audit-development-report-archive-2026-04-30/current-development-status-and-roadmap-2026-04-30.md)：查看上一轮跨方向状态、风险和建议优先级。
-4. [2026-04-30 归档索引](./audit-development-report-archive-2026-04-30/README.md)：查看前端一致性、MISC 风格基线、方向摘要和路线图。
-5. [2026-04-29 归档索引](./audit-development-report-archive-2026-04-29/README.md)：查看上一日 C2 / APT 与前端设计审计历史。
+2. [2026-05-05 归档索引](./audit-development-report-archive-2026-05-05/README.md)：查看主线收口、Evidence 范围澄清、Vehicle / USB 证据接入和验证结果。
+3. [2026-05-02 归档索引](./audit-development-report-archive-2026-05-02/README.md)：查看上一轮 C2 / APT / MISC 证据链产品化、前端模块化和验证结果。
+4. [当前开发态势与下一步规划](./audit-development-report-archive-2026-04-30/current-development-status-and-roadmap-2026-04-30.md)：查看上一轮跨方向状态、风险和建议优先级。
+5. [2026-04-30 归档索引](./audit-development-report-archive-2026-04-30/README.md)：查看前端一致性、MISC 风格基线、方向摘要和路线图。
 
 ## 当前方向摘要
 
+- [主线收口与 Evidence 范围澄清报告](./audit-development-report-archive-2026-05-05/mainline-evidence-scope-and-validation-report-2026-05-05.md)：明确 MISC 不接入 Evidence，新增 Vehicle / USB 主线证据，修复前端模块归类，补齐验证与文档索引。
 - [C2 / APT / MISC 证据链产品化报告](./audit-development-report-archive-2026-05-02/c2-apt-misc-productization-report-2026-05-02.md)：C2 VShell、APT actor registry、MISC Payload / WebShell、误导文案清理、前端骨架审计与模块化拆分（types 目录拆分、feature hooks 提取、UI 组件收敛）、测试验证和下一步优先级。
 - [前端设计与交互开发合并摘要](./audit-development-report-archive-2026-04-30/merged-frontend-design-development-summary-2026-04-30.md)：MISC 浅色准线、共享组件、浮层、拖拽屏蔽、HEX 可读性、cancellable 请求与前端一致性。
 - [协议专项与 MISC 工具箱合并摘要](./audit-development-report-archive-2026-04-30/merged-protocol-misc-development-summary-2026-04-30.md)：HTTP 登录、SMTP、MySQL、Shiro、Payload / WebShell、WinRM、SMB3 与 MISC manifest 语义。
@@ -36,6 +37,7 @@
 
 ## 归档说明
 
+- `audit-development-report-archive-2026-05-05/`：主线收口、Evidence 范围澄清、Vehicle / USB 主线证据接入、验证记录与文档评审。
 - `audit-development-report-archive-2026-05-02/`：最新 C2 / APT / MISC 证据链产品化、WebShell 解码表达、前端模块化和验证报告。
 - `audit-development-report-archive-2026-04-29/`：上一日 C2 / APT 系列、前端设计 round16 至 round27 与 WinRM 历史补丁报告。
 - `audit-development-report-archive-2026-04-30/`：上一阶段归档，包含前端 round28 至 round37、四个方向合并摘要与跨方向路线图。

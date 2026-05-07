@@ -89,5 +89,6 @@ export interface ExtractedObject {
   name: string;
   sizeBytes: number;
   mime: string;
+  magic: string;
   source: "HTTP" | "FTP";
 }

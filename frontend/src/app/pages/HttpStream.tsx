@@ -6,7 +6,7 @@ import {
 import { useLocation, useNavigate } from "react-router";
 import { ungzip } from "pako";
 import { cn } from "../components/ui/utils";
-import { StreamChunkCard, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/DesignSystem";
+import { StreamChunkCard, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/stream/StreamWorkbench";
 import { useSentinel } from "../state/SentinelContext";
 import type { StreamLoadMeta } from "../core/types";
 import { downloadText } from "../utils/browserFile";

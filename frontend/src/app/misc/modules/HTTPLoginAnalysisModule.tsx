@@ -1,5 +1,5 @@
 import { AlertTriangle, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { HTTPLoginAnalysis, HTTPLoginEndpoint } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
+import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 
@@ -29,46 +29,16 @@ type ResultFilter = "ALL" | "SUCCESS" | "FAILURE" | "UNCERTAIN";
 export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
-  const [analysis, setAnalysis] = useState<HTTPLoginAnalysis>(EMPTY_ANALYSIS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const fetchAnalysis = useCallback((signal: AbortSignal) => bridge.getHTTPLoginAnalysis(signal), []);
+  const { analysis, loading, error, refresh } = useMiscModuleAnalysis<HTTPLoginAnalysis>({
+    fetch: fetchAnalysis,
+    emptyData: EMPTY_ANALYSIS,
+    errorMessage: "加载 HTTP 登录行为分析失败",
+  });
   const [resultFilter, setResultFilter] = useState<ResultFilter>("ALL");
   const [query, setQuery] = useState("");
   const [selectedEndpointKey, setSelectedEndpointKey] = useState("");
   const embedded = surfaceVariant === "embedded";
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
-
-  const loadAnalysis = useCallback((preserveSelection = false) => {
-    if (!hasCapture) {
-      cancelAnalysisRequest();
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedEndpointKey("");
-      setError("");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    return runAnalysisRequest({
-      request: (signal) => bridge.getHTTPLoginAnalysis(signal),
-      onSuccess: (payload) => {
-        setAnalysis(payload);
-        setSelectedEndpointKey((current) => preserveSelection && current && payload.endpoints.some((item) => item.key === current) ? current : payload.endpoints[0]?.key ?? "");
-      },
-      onError: (err) => {
-        setAnalysis(EMPTY_ANALYSIS);
-        setSelectedEndpointKey("");
-        setError(err instanceof Error ? err.message : "加载 HTTP 登录行为分析失败");
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
-
-  useEffect(() => loadAnalysis(false), [fileMeta.path, loadAnalysis]);
-
-  function refresh() {
-    loadAnalysis(true);
-  }
 
   const filteredEndpoints = useMemo(() => {
     const keyword = query.trim().toLowerCase();

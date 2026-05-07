@@ -22,7 +22,12 @@ var (
 	commandExecFunctionPattern     = regexp.MustCompile(`(?i)(system\s*\(|exec\s*\(|shell_exec\s*\(|passthru\s*\(|popen\s*\(|proc_open\s*\(|assert\s*\(|eval\s*\(|base64_decode\s*\(|Runtime\.getRuntime\s*\(|ProcessBuilder\s*\(|getInputStream\s*\(|WScript\.Shell|CreateObject\s*\(|ProcessStartInfo|cmd\.exe|powershell|whoami|ipconfig|ifconfig|net\s+user|uname\s+-a|/bin/sh|/bin/bash)`)
 )
 
-const payloadSourceRepeatWindowSeconds = 30
+const (
+	payloadSourceRepeatWindowSeconds        = 30
+	payloadSourceStreamBodyFallbackLimit    = 64
+	payloadSourceStreamBodyFallbackTimeout  = 2 * time.Second
+	payloadSourceStreamBodyFallbackMinScore = 20
+)
 
 type payloadSourceHTTPMeta struct {
 	method      string
@@ -57,23 +62,33 @@ func (s *Service) ListStreamPayloadSources(limit int) ([]model.StreamPayloadSour
 		if !ok {
 			return nil
 		}
-		if !hasHTTPBody(meta.raw) && packet.StreamID >= 0 {
-			needsStreamBody = append(needsStreamBody, pendingPacket{packet, meta})
-			return nil
-		}
 		s.collectPayloadSourcesFromMeta(packet, meta, &collected, seen)
+		if !hasHTTPBody(meta.raw) && packet.StreamID >= 0 && shouldFetchPayloadSourceStreamBody(meta) {
+			needsStreamBody = append(needsStreamBody, pendingPacket{packet, meta})
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if len(needsStreamBody) > 0 {
+	if len(needsStreamBody) > 0 && !payloadSourcesHaveStrongWebshellHint(collected) {
+		sort.SliceStable(needsStreamBody, func(i, j int) bool {
+			leftRank := payloadSourceStreamBodyFetchRank(needsStreamBody[i].meta)
+			rightRank := payloadSourceStreamBodyFetchRank(needsStreamBody[j].meta)
+			if leftRank != rightRank {
+				return leftRank > rightRank
+			}
+			return needsStreamBody[i].packet.ID < needsStreamBody[j].packet.ID
+		})
 		streamBodies := map[int64][]string{}
 		for _, pp := range needsStreamBody {
 			sid := pp.packet.StreamID
 			if _, fetched := streamBodies[sid]; fetched {
 				continue
+			}
+			if len(streamBodies) >= payloadSourceStreamBodyFallbackLimit {
+				break
 			}
 			streamBodies[sid] = s.fetchStreamRequestBodies(sid)
 		}
@@ -86,6 +101,9 @@ func (s *Service) ListStreamPayloadSources(limit int) ([]model.StreamPayloadSour
 					enriched := pp.meta
 					enriched.raw = body
 					s.collectPayloadSourcesFromMeta(pp.packet, enriched, &collected, seen)
+				}
+				if payloadSourcesHaveStrongWebshellHint(collected) {
+					break
 				}
 			}
 		}
@@ -155,8 +173,80 @@ func hasHTTPBody(raw string) bool {
 	return strings.Contains(raw, "\r\n\r\n") || strings.Contains(raw, "\n\n")
 }
 
+func shouldFetchPayloadSourceStreamBody(meta payloadSourceHTTPMeta) bool {
+	return payloadSourceStreamBodyFetchRank(meta) >= payloadSourceStreamBodyFallbackMinScore
+}
+
+func payloadSourcesHaveStrongWebshellHint(sources []model.StreamPayloadSource) bool {
+	for _, source := range sources {
+		if source.FamilyHint == "antsword_like" || source.FamilyHint == "godzilla_like" || source.FamilyHint == "aes_webshell_like" {
+			return true
+		}
+		if source.SourceRole == "script_or_command" {
+			return true
+		}
+		if streamPayloadSourceHasDecoder(source, "behinder", "antsword", "godzilla") {
+			return true
+		}
+		for _, signal := range source.Signals {
+			switch signal {
+			case "antsword_like", "godzilla_like", "aes_webshell_like", "command-exec-function", "script-keyword", "script-after-base64":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func streamPayloadSourceHasDecoder(source model.StreamPayloadSource, decoders ...string) bool {
+	for _, hint := range source.DecoderHints {
+		for _, decoder := range decoders {
+			if strings.EqualFold(strings.TrimSpace(hint), decoder) {
+				return true
+			}
+		}
+	}
+	if source.DecoderOptionsHint == nil {
+		return false
+	}
+	raw, ok := source.DecoderOptionsHint["decoder"].(string)
+	if !ok {
+		return false
+	}
+	for _, decoder := range decoders {
+		if strings.EqualFold(strings.TrimSpace(raw), decoder) {
+			return true
+		}
+	}
+	return false
+}
+
+func payloadSourceStreamBodyFetchRank(meta payloadSourceHTTPMeta) int {
+	method := strings.ToUpper(strings.TrimSpace(meta.method))
+	switch method {
+	case "POST", "PUT", "PATCH":
+	default:
+		return 0
+	}
+
+	score := 10
+	if strings.TrimSpace(meta.contentType) != "" {
+		score += 15
+	}
+	uri := strings.ToLower(meta.uri)
+	if suspiciousWebshellURIPattern.MatchString(meta.uri) {
+		score += 35
+	}
+	for _, needle := range []string{"upload", "pass", "cmd", "shell", "exec", "eval", "assert"} {
+		if strings.Contains(uri, needle) {
+			score += 10
+		}
+	}
+	return score
+}
+
 func (s *Service) fetchStreamRequestBodies(streamID int64) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), payloadSourceStreamBodyFallbackTimeout)
 	defer cancel()
 	stream := s.HTTPStream(ctx, streamID)
 	if len(stream.Chunks) == 0 && stream.Request == "" {
