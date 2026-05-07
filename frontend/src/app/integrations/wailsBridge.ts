@@ -49,6 +49,15 @@ import { asIndustrialAnalysis } from "./mappers/industrialMapper";
 import { asMediaAnalysis } from "./mappers/mediaMapper";
 import { asObjectList } from "./mappers/objectMapper";
 import { asDBCProfiles, asPluginItem, asPluginItems } from "./mappers/pluginMapper";
+import {
+  asMiscModuleImportResult,
+  asMiscModuleManifests,
+  asMiscModuleRunResult,
+  asNTLMSessionMaterials,
+  asSMB3RandomSessionKeyResult,
+  asSMB3SessionCandidates,
+  asWinRMDecryptResult,
+} from "./mappers/toolMapper";
 import { asGlobalTrafficStats } from "./mappers/trafficMapper";
 import { asUSBAnalysis } from "./mappers/usbMapper";
 import { asVehicleAnalysis } from "./mappers/vehicleMapper";
@@ -1608,20 +1617,7 @@ export const bridge: BackendBridge = {
         extract_command_output: Boolean(req.extractCommandOutput),
       }),
     });
-    return {
-      resultId: String(payload.result_id ?? ""),
-      captureName: String(payload.capture_name ?? ""),
-      port: Number(payload.port ?? req.port ?? 0),
-      authMode: String(payload.auth_mode ?? ""),
-      previewText: String(payload.preview_text ?? ""),
-      previewTruncated: Boolean(payload.preview_truncated),
-      lineCount: Number(payload.line_count ?? 0),
-      frameCount: Number(payload.frame_count ?? 0),
-      errorFrameCount: Number(payload.error_frame_count ?? 0),
-      extractedFrameCount: Number(payload.extracted_frame_count ?? 0),
-      exportFilename: String(payload.export_filename ?? "winrm-decrypt.txt"),
-      message: String(payload.message ?? ""),
-    };
+    return asWinRMDecryptResult(payload, req.port);
   },
 
   async getWinRMDecryptResultText(resultId: string) {
@@ -1660,55 +1656,7 @@ export const bridge: BackendBridge = {
 
   async listMiscModules() {
     const rows = await request<any[]>("/api/tools/misc/modules");
-    return rows.map((item) => ({
-      id: String(item.id ?? ""),
-      kind: String(item.kind ?? ""),
-      title: String(item.title ?? ""),
-      summary: String(item.summary ?? ""),
-      tags: Array.isArray(item.tags) ? item.tags.map((tag: any) => String(tag ?? "")) : [],
-      apiPrefix: String(item.api_prefix ?? ""),
-      docsPath: String(item.docs_path ?? "") || undefined,
-      requiresCapture: Boolean(item.requires_capture),
-      protocolDomain: String(item.protocol_domain ?? "") || undefined,
-      supportsExport: Boolean(item.supports_export),
-      cancellable: Boolean(item.cancellable),
-      dependsOn: Array.isArray(item.depends_on) ? item.depends_on.map((value: any) => String(value ?? "")) : undefined,
-      formSchema: item.form_schema && typeof item.form_schema === "object"
-        ? {
-            description: String(item.form_schema.description ?? "") || undefined,
-            submitLabel: String(item.form_schema.submit_label ?? "") || undefined,
-            resultTitle: String(item.form_schema.result_title ?? "") || undefined,
-            fields: Array.isArray(item.form_schema.fields)
-              ? item.form_schema.fields.map((field: any) => ({
-                  name: String(field.name ?? ""),
-                  label: String(field.label ?? ""),
-                  type: String(field.type ?? "text"),
-                  placeholder: String(field.placeholder ?? "") || undefined,
-                  defaultValue: String(field.default_value ?? "") || undefined,
-                  helpText: String(field.help_text ?? "") || undefined,
-                  required: Boolean(field.required),
-                  secret: Boolean(field.secret),
-                  rows: Number(field.rows ?? 0) || undefined,
-                  options: Array.isArray(field.options)
-                    ? field.options.map((option: any) => ({
-                        value: String(option.value ?? ""),
-                        label: String(option.label ?? ""),
-                      }))
-                    : undefined,
-                }))
-              : [],
-          }
-        : undefined,
-      interfaceSchema: item.interface_schema && typeof item.interface_schema === "object"
-        ? {
-            method: String(item.interface_schema.method ?? "") || undefined,
-            invokePath: String(item.interface_schema.invoke_path ?? "") || undefined,
-            runtime: String(item.interface_schema.runtime ?? "") || undefined,
-            entry: String(item.interface_schema.entry ?? "") || undefined,
-            hostBridge: Boolean(item.interface_schema.host_bridge),
-          }
-        : undefined,
-    }));
+    return asMiscModuleManifests(rows);
   },
 
   async importMiscModulePackage(file: File) {
@@ -1718,22 +1666,7 @@ export const bridge: BackendBridge = {
       method: "POST",
       body: form,
     });
-    return {
-      module: {
-        id: String(payload.module?.id ?? ""),
-        kind: String(payload.module?.kind ?? ""),
-        title: String(payload.module?.title ?? ""),
-        summary: String(payload.module?.summary ?? ""),
-        tags: Array.isArray(payload.module?.tags) ? payload.module.tags.map((tag: unknown) => String(tag ?? "")) : [],
-        apiPrefix: String(payload.module?.api_prefix ?? ""),
-        docsPath: String(payload.module?.docs_path ?? "") || undefined,
-        requiresCapture: Boolean(payload.module?.requires_capture),
-        formSchema: payload.module?.form_schema,
-        interfaceSchema: payload.module?.interface_schema,
-      },
-      installedPath: String(payload.installed_path ?? ""),
-      message: String(payload.message ?? ""),
-    };
+    return asMiscModuleImportResult(payload);
   },
 
   async deleteMiscModule(id: string) {
@@ -1747,47 +1680,12 @@ export const bridge: BackendBridge = {
       method: "POST",
       body: JSON.stringify({ values }),
     });
-    return {
-      message: String(payload.message ?? ""),
-      text: String(payload.text ?? "") || undefined,
-      output: payload.output,
-      table: payload.table && typeof payload.table === "object"
-        ? {
-            columns: Array.isArray(payload.table.columns)
-              ? payload.table.columns.map((column: any) => ({
-                  key: String(column.key ?? ""),
-                  label: String(column.label ?? ""),
-                }))
-              : [],
-            rows: Array.isArray(payload.table.rows)
-              ? payload.table.rows.map((row: any) => {
-                  const next: Record<string, string> = {};
-                  for (const [key, value] of Object.entries(row ?? {})) {
-                    next[String(key)] = String(value ?? "");
-                  }
-                  return next;
-                })
-              : [],
-          }
-        : undefined,
-    };
+    return asMiscModuleRunResult(payload);
   },
 
   async listSMB3SessionCandidates() {
     const rows = await request<any[]>("/api/tools/smb3-session-candidates");
-    return rows.map((item) => ({
-      sessionId: String(item.session_id ?? ""),
-      username: String(item.username ?? ""),
-      domain: String(item.domain ?? ""),
-      ntProofStr: String(item.nt_proof_str ?? ""),
-      encryptedSessionKey: String(item.encrypted_session_key ?? ""),
-      src: String(item.src ?? ""),
-      dst: String(item.dst ?? ""),
-      frameNumber: String(item.frame_number ?? ""),
-      timestamp: String(item.timestamp ?? ""),
-      complete: Boolean(item.complete),
-      displayLabel: String(item.display_label ?? ""),
-    }));
+    return asSMB3SessionCandidates(rows);
   },
 
   async generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest) {
@@ -1801,37 +1699,12 @@ export const bridge: BackendBridge = {
         encrypted_session_key: req.encryptedSessionKey,
       }),
     });
-    return {
-      randomSessionKey: String(payload.random_session_key ?? ""),
-      message: String(payload.message ?? ""),
-    };
+    return asSMB3RandomSessionKeyResult(payload);
   },
 
   async listNTLMSessionMaterials() {
     const payload = await request<any[]>("/api/tools/ntlm-sessions");
-    return payload.map((item: any) => ({
-      protocol: String(item.protocol ?? ""),
-      transport: String(item.transport ?? "") || undefined,
-      frameNumber: String(item.frame_number ?? ""),
-      timestamp: String(item.timestamp ?? "") || undefined,
-      src: String(item.src ?? "") || undefined,
-      dst: String(item.dst ?? "") || undefined,
-      srcPort: String(item.src_port ?? "") || undefined,
-      dstPort: String(item.dst_port ?? "") || undefined,
-      direction: String(item.direction ?? "") || undefined,
-      username: String(item.username ?? "") || undefined,
-      domain: String(item.domain ?? "") || undefined,
-      userDisplay: String(item.user_display ?? "") || undefined,
-      challenge: String(item.challenge ?? "") || undefined,
-      ntProofStr: String(item.nt_proof_str ?? "") || undefined,
-      encryptedSessionKey: String(item.encrypted_session_key ?? "") || undefined,
-      sessionId: String(item.session_id ?? "") || undefined,
-      authHeader: String(item.auth_header ?? "") || undefined,
-      wwwAuthenticate: String(item.www_authenticate ?? "") || undefined,
-      info: String(item.info ?? "") || undefined,
-      complete: Boolean(item.complete),
-      displayLabel: String(item.display_label ?? ""),
-    })) as NTLMSessionMaterial[];
+    return asNTLMSessionMaterials(payload);
   },
 
   async getHTTPLoginAnalysis(signal?: AbortSignal) {
