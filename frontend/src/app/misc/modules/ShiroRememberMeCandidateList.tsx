@@ -1,4 +1,5 @@
 import type { ShiroRememberMeCandidate } from "../../core/types";
+import { isShiroDeleteMeCandidate, renderShiroCandidateTitle } from "./ShiroRememberMeUtils";
 
 interface ShiroRememberMeCandidateListProps {
   candidates: ShiroRememberMeCandidate[];
@@ -47,14 +48,14 @@ export function ShiroRememberMeCandidateList({
                       Key 命中
                     </span>
                   ) : null}
-                  {(item.notes ?? []).some((note) => note.toLowerCase().includes("deleteme")) ? (
+                  {isShiroDeleteMeCandidate(item) ? (
                     <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
                       deleteMe
                     </span>
                   ) : null}
                   <span className="text-[11px] text-slate-500">{item.sourceHeader || "Cookie"}</span>
                 </div>
-                <div className="mt-2 break-all font-medium text-slate-800">{renderCandidateTitle(item)}</div>
+                <div className="mt-2 break-all font-medium text-slate-800">{renderShiroCandidateTitle(item)}</div>
                 <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{item.cookiePreview || "--"}</div>
               </button>
             );
@@ -63,9 +64,4 @@ export function ShiroRememberMeCandidateList({
       </div>
     </div>
   );
-}
-
-function renderCandidateTitle(item: ShiroRememberMeCandidate) {
-  const location = item.host ? `${item.host}${item.path || "/"}` : item.path || "/";
-  return `${item.cookieName || "rememberMe"} @ ${location}`;
 }

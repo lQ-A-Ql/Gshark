@@ -1,6 +1,6 @@
 import { KeyRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ShiroRememberMeAnalysis, ShiroRememberMeCandidate } from "../../core/types";
+import type { ShiroRememberMeAnalysis } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
@@ -9,8 +9,16 @@ import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, NotesList } from "../ui";
 import { ShiroRememberMeCandidateList } from "./ShiroRememberMeCandidateList";
-import { ShiroRememberMeControls, type ShiroRememberMeCandidateFilter } from "./ShiroRememberMeControls";
+import { ShiroRememberMeControls } from "./ShiroRememberMeControls";
 import { ShiroRememberMeKeyResultsPanel } from "./ShiroRememberMeKeyResultsPanel";
+import {
+  filterShiroCandidates,
+  parseShiroCustomKeyLines,
+  renderShiroAnalysisText,
+  selectShiroCandidate,
+  shouldPreserveShiroSelection,
+  type ShiroRememberMeCandidateFilter,
+} from "./ShiroRememberMeUtils";
 
 const EMPTY_ANALYSIS: ShiroRememberMeAnalysis = {
   candidateCount: 0,
@@ -31,14 +39,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
   const embedded = surfaceVariant === "embedded";
   const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  const keyLines = useMemo(
-    () =>
-      customKeys
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean),
-    [customKeys],
-  );
+  const keyLines = useMemo(() => parseShiroCustomKeyLines(customKeys), [customKeys]);
 
   const loadAnalysis = useCallback(
     (keys: string[], preserveSelection = true) => {
@@ -57,7 +58,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
         onSuccess: (payload) => {
           setAnalysis(payload);
           setSelectedPacketId((current) =>
-            preserveSelection && current && payload.candidates.some((item) => item.packetId === current)
+            preserveSelection && shouldPreserveShiroSelection(payload.candidates, current)
               ? current
               : (payload.candidates[0]?.packetId ?? 0),
           );
@@ -75,17 +76,13 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
 
   useEffect(() => loadAnalysis([], false), [fileMeta.path, loadAnalysis]);
 
-  const filteredCandidates = useMemo(() => {
-    return analysis.candidates.filter((item) => {
-      if (candidateFilter === "HIT") return (item.hitCount ?? 0) > 0;
-      if (candidateFilter === "DELETEME")
-        return (item.notes ?? []).some((note) => note.toLowerCase().includes("deleteme"));
-      return true;
-    });
-  }, [analysis.candidates, candidateFilter]);
+  const filteredCandidates = useMemo(
+    () => filterShiroCandidates(analysis.candidates, candidateFilter),
+    [analysis.candidates, candidateFilter],
+  );
 
   const selectedCandidate = useMemo(
-    () => filteredCandidates.find((item) => item.packetId === selectedPacketId) ?? filteredCandidates[0] ?? null,
+    () => selectShiroCandidate(filteredCandidates, selectedPacketId),
     [filteredCandidates, selectedPacketId],
   );
 
@@ -147,34 +144,4 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
       </CardContent>
     </Card>
   );
-}
-
-function renderCandidateTitle(item: ShiroRememberMeCandidate) {
-  const location = item.host ? `${item.host}${item.path || "/"}` : item.path || "/";
-  return `${item.cookieName || "rememberMe"} @ ${location}`;
-}
-
-function renderShiroAnalysisText(analysis: ShiroRememberMeAnalysis) {
-  const lines = [
-    "Shiro rememberMe 分析",
-    `候选: ${analysis.candidateCount}`,
-    `密钥命中: ${analysis.hitCount}`,
-    "",
-    "候选详情:",
-  ];
-  for (const candidate of analysis.candidates) {
-    lines.push(`- #${candidate.packetId} ${renderCandidateTitle(candidate)}`);
-    lines.push(
-      `  来源: ${candidate.sourceHeader || "Cookie"} / stream=${candidate.streamId ?? "--"} / hit=${candidate.hitCount ?? 0}`,
-    );
-    if ((candidate.notes?.length ?? 0) > 0) {
-      lines.push(`  备注: ${candidate.notes!.join("; ")}`);
-    }
-    for (const result of candidate.keyResults ?? []) {
-      lines.push(
-        `  Key ${result.label}: ${result.hit ? "HIT" : "MISS"} ${result.algorithm || ""} ${result.payloadClass || result.reason || ""}`.trim(),
-      );
-    }
-  }
-  return lines.join("\n");
 }

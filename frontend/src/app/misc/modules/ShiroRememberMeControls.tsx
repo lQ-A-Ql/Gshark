@@ -3,8 +3,8 @@ import { Button } from "../../components/ui/button";
 import type { MiscModuleManifest } from "../../core/types";
 import type { MiscExportFormat } from "../exportResult";
 import { ExportButtons, Field, MetaChip } from "../ui";
-
-export type ShiroRememberMeCandidateFilter = "ALL" | "HIT" | "DELETEME";
+import { getShiroFilterLabel, shiroFilterOptions, type ShiroRememberMeCandidateFilter } from "./ShiroRememberMeUtils";
+export type { ShiroRememberMeCandidateFilter } from "./ShiroRememberMeUtils";
 
 interface ShiroRememberMeControlsProps {
   candidateCount: number;
@@ -20,14 +20,6 @@ interface ShiroRememberMeControlsProps {
   onCustomKeysChange: (keys: string) => void;
   onExport: (format: MiscExportFormat) => void;
   onRefresh: () => void;
-}
-
-const shiroFilterOptions: ShiroRememberMeCandidateFilter[] = ["ALL", "HIT", "DELETEME"];
-
-function getShiroFilterLabel(filter: ShiroRememberMeCandidateFilter) {
-  if (filter === "HIT") return "命中";
-  if (filter === "DELETEME") return "deleteMe";
-  return "全部";
 }
 
 export function ShiroRememberMeControls({
