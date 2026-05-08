@@ -1,88 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Binary, Bug, Cog, KeyRound, LoaderCircle, Search, ShieldAlert, Wand2 } from "lucide-react";
-import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection, StreamPayloadSource } from "../core/types";
+import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { copyTextToClipboard, downloadText } from "../utils/browserFile";
+import {
+  asKnownDecoder,
+  buildDecoderOptions,
+  candidateHintBadges,
+  clampBatchOrdinal,
+  EMPTY_SELECT_VALUE,
+  MAX_BATCH_FAILURE_DETAILS,
+  mergeDecoderHintSources,
+  mergeHintIntoSettings,
+  normalizeTransportPayload,
+  prepareDecoderInput,
+  isAbortError,
+  persistDecoderSettings,
+  readDecoderSettings,
+  type BatchDecodeProgress,
+  type BatchItem,
+  type DecoderApplyMode,
+  type DecoderHintSource,
+  type DecoderSettings,
+} from "./StreamDecoderWorkbenchUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-
-type DecoderSettings = {
-  behinder: {
-    pass: string;
-    key: string;
-    iv: string;
-    extractParam: boolean;
-    deriveKeyFromPass: boolean;
-    urlDecodeRounds: number;
-    inputEncoding: "auto" | "base64" | "hex";
-    cipherMode: "ecb" | "cbc";
-  };
-  antsword: {
-    pass: string;
-    extractParam: boolean;
-    urlDecodeRounds: number;
-    encoder: "" | "rot13";
-  };
-  godzilla: {
-    pass: string;
-    key: string;
-    extractParam: boolean;
-    stripMarkers: boolean;
-    urlDecodeRounds: number;
-    inputEncoding: "auto" | "base64" | "hex";
-    cipher: "aes_ecb" | "aes_cbc" | "xor";
-  };
-};
-
-type BatchItem = {
-  index: number;
-  payload: string;
-  label: string;
-};
-
-type BatchDecodeProgress = {
-  total: number;
-  done: number;
-  success: number;
-  failed: number;
-  currentLabel: string;
-};
-
-type DecoderApplyMode = "preview" | "derived" | "overwrite";
-
-const MAX_BATCH_FAILURE_DETAILS = 20;
-
-const SETTINGS_STORAGE_KEY = "gshark.stream-decoders.v1";
-const EMPTY_SELECT_VALUE = "__empty__";
-
-type DecoderHintSource = Pick<StreamPayloadSource, "familyHint" | "decoderOptionsHint" | "sourceRole" | "decoderHints" | "paramName">;
-
-const DEFAULT_SETTINGS: DecoderSettings = {
-  behinder: {
-    pass: "rebeyond",
-    key: "",
-    iv: "",
-    extractParam: true,
-    deriveKeyFromPass: true,
-    urlDecodeRounds: 0,
-    inputEncoding: "auto",
-    cipherMode: "ecb",
-  },
-  antsword: {
-    pass: "pass",
-    extractParam: true,
-    urlDecodeRounds: 1,
-    encoder: "",
-  },
-  godzilla: {
-    pass: "pass",
-    key: "",
-    extractParam: true,
-    stripMarkers: true,
-    urlDecodeRounds: 0,
-    inputEncoding: "auto",
-    cipher: "aes_ecb",
-  },
-};
 
 export function StreamDecoderWorkbench({
   payload,
@@ -148,9 +89,12 @@ export function StreamDecoderWorkbench({
     setApplyMode("derived");
   }, [payload, chunkLabel]);
 
-  useEffect(() => () => {
-    activeDecodeAbortRef.current?.abort();
-  }, []);
+  useEffect(
+    () => () => {
+      activeDecodeAbortRef.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!canOverwrite && applyMode === "overwrite") {
@@ -205,13 +149,15 @@ export function StreamDecoderWorkbench({
     }
     setInspectionLoading(true);
     setInspectionError("");
-    void bridge.inspectStreamPayload(payload, controller.signal)
+    void bridge
+      .inspectStreamPayload(payload, controller.signal)
       .then((next) => {
         if (cancelled) return;
         setInspection(next);
-        const suggested = next.suggestedCandidateId && next.candidates.some((item) => item.id === next.suggestedCandidateId)
-          ? next.suggestedCandidateId
-          : next.candidates[0]?.id ?? "";
+        const suggested =
+          next.suggestedCandidateId && next.candidates.some((item) => item.id === next.suggestedCandidateId)
+            ? next.suggestedCandidateId
+            : (next.candidates[0]?.id ?? "");
         setSelectedCandidateId(suggested);
       })
       .catch((error) => {
@@ -289,7 +235,7 @@ export function StreamDecoderWorkbench({
 
         for (let idx = 0; idx < selected.length; idx += 1) {
           const item = selected[idx];
-          setBatchProgress((prev) => prev ? { ...prev, currentLabel: item.label } : prev);
+          setBatchProgress((prev) => (prev ? { ...prev, currentLabel: item.label } : prev));
           try {
             if (controller.signal.aborted) {
               throw new Error("解码已取消");
@@ -312,12 +258,16 @@ export function StreamDecoderWorkbench({
               failureMessages.push(`[${item.index}] ${item.label}: ${message}`);
             }
           }
-          setBatchProgress((prev) => prev ? {
-            ...prev,
-            done: idx + 1,
-            success: successCount,
-            failed: failedCount,
-          } : prev);
+          setBatchProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  done: idx + 1,
+                  success: successCount,
+                  failed: failedCount,
+                }
+              : prev,
+          );
         }
 
         setBatchFailureDetails(failureMessages);
@@ -328,7 +278,9 @@ export function StreamDecoderWorkbench({
 
         await onApplyDecodedBatch?.(patches);
         setResult(lastResult);
-        setApplyMessage(`已批量解码并持久化 ${patches.length}/${selected.length} 个片段（失败 ${failedCount} 条），区间 ${from}-${to}`);
+        setApplyMessage(
+          `已批量解码并持久化 ${patches.length}/${selected.length} 个片段（失败 ${failedCount} 条），区间 ${from}-${to}`,
+        );
         return;
       }
 
@@ -338,7 +290,9 @@ export function StreamDecoderWorkbench({
         await onApplyDecoded(next.text);
         setApplyMessage(`已使用 ${next.summary} 覆盖当前片段并写回持久层`);
       } else if (applyMode === "derived") {
-        setApplyMessage(`已基于${selectedCandidate?.label || "当前 payload"}生成衍生视图，可继续对照原文后再决定是否覆盖。`);
+        setApplyMessage(
+          `已基于${selectedCandidate?.label || "当前 payload"}生成衍生视图，可继续对照原文后再决定是否覆盖。`,
+        );
       } else {
         setApplyMessage("当前为仅预览模式，结果不会覆盖原始 payload。");
       }
@@ -456,7 +410,11 @@ export function StreamDecoderWorkbench({
           <ApplyModeButton label="仅预览" active={applyMode === "preview"} onClick={() => setApplyMode("preview")} />
           <ApplyModeButton label="衍生视图" active={applyMode === "derived"} onClick={() => setApplyMode("derived")} />
           {canOverwrite ? (
-            <ApplyModeButton label="覆盖原文" active={applyMode === "overwrite"} onClick={() => setApplyMode("overwrite")} />
+            <ApplyModeButton
+              label="覆盖原文"
+              active={applyMode === "overwrite"}
+              onClick={() => setApplyMode("overwrite")}
+            />
           ) : (
             <span className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
               MISC 分析模式，不写回抓包
@@ -470,10 +428,14 @@ export function StreamDecoderWorkbench({
         </div>
 
         {inspectionLoading && (
-          <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">正在识别候选 payload...</div>
+          <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+            正在识别候选 payload...
+          </div>
         )}
         {inspectionError && (
-          <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700">{inspectionError}</div>
+          <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700">
+            {inspectionError}
+          </div>
         )}
         {!inspectionLoading && !inspectionError && (
           <div className="mt-3 space-y-3">
@@ -482,7 +444,9 @@ export function StreamDecoderWorkbench({
                 <div className="mb-1 font-semibold text-foreground">识别依据</div>
                 <div className="flex flex-wrap gap-2">
                   {inspection.reasons.map((reason) => (
-                    <span key={reason} className="rounded-md border border-border bg-background px-2 py-1">{reason}</span>
+                    <span key={reason} className="rounded-md border border-border bg-background px-2 py-1">
+                      {reason}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -508,27 +472,42 @@ export function StreamDecoderWorkbench({
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">{candidate.kind}</span>
+                      <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">
+                        {candidate.kind}
+                      </span>
                       {typeof candidate.confidence === "number" && candidate.confidence > 0 && (
-                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{candidate.confidence}%</span>
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                          {candidate.confidence}%
+                        </span>
                       )}
                       {candidate.paramName && (
-                        <span className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">{candidate.paramName}</span>
+                        <span className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                          {candidate.paramName}
+                        </span>
                       )}
                       {candidate.familyHint && (
-                        <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">{candidate.familyHint}</span>
+                        <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
+                          {candidate.familyHint}
+                        </span>
                       )}
                       {candidate.sourceRole && (
-                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{candidate.sourceRole}</span>
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                          {candidate.sourceRole}
+                        </span>
                       )}
                       {candidateHintBadges(candidate).map((badge) => (
-                        <span key={`${candidate.id}-${badge}`} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-700">
+                        <span
+                          key={`${candidate.id}-${badge}`}
+                          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-700"
+                        >
                           {badge}
                         </span>
                       ))}
                     </div>
                     <div className="mt-2 text-xs font-semibold text-foreground">{candidate.label}</div>
-                    <div className="mt-1 line-clamp-3 break-all font-mono text-[11px] text-muted-foreground">{candidate.preview || candidate.value || "(empty)"}</div>
+                    <div className="mt-1 line-clamp-3 break-all font-mono text-[11px] text-muted-foreground">
+                      {candidate.preview || candidate.value || "(empty)"}
+                    </div>
                     {(candidate.decoderHints?.length ?? 0) > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {candidate.decoderHints!.map((hint) => (
@@ -552,7 +531,10 @@ export function StreamDecoderWorkbench({
                     {(candidate.fingerprints?.length ?? 0) > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {candidate.fingerprints!.map((fingerprint) => (
-                          <span key={`${candidate.id}-${fingerprint}`} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                          <span
+                            key={`${candidate.id}-${fingerprint}`}
+                            className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"
+                          >
                             {fingerprint}
                           </span>
                         ))}
@@ -584,23 +566,22 @@ export function StreamDecoderWorkbench({
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-[120px_120px_minmax(0,1fr)]">
-            <LabeledInput
-              label="起始序号"
-              value={rangeStart}
-              onChange={setRangeStart}
-              placeholder="1"
-            />
-            <LabeledInput
-              label="结束序号"
-              value={rangeEnd}
-              onChange={setRangeEnd}
-              placeholder={String(batchCount)}
-            />
+            <LabeledInput label="起始序号" value={rangeStart} onChange={setRangeStart} placeholder="1" />
+            <LabeledInput label="结束序号" value={rangeEnd} onChange={setRangeEnd} placeholder={String(batchCount)} />
             <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-              将按当前列表顺序处理第 {clampBatchOrdinal(rangeStart, batchCount)} 到 {clampBatchOrdinal(rangeEnd, batchCount)} 条。
+              将按当前列表顺序处理第 {clampBatchOrdinal(rangeStart, batchCount)} 到{" "}
+              {clampBatchOrdinal(rangeEnd, batchCount)} 条。
               {batchItems && batchItems.length > 0 && (
-                <div className="mt-1 truncate text-foreground" title={batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]?.label}>
-                  起点: {batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]?.label ?? "--"}
+                <div
+                  className="mt-1 truncate text-foreground"
+                  title={
+                    batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]
+                      ?.label
+                  }
+                >
+                  起点:{" "}
+                  {batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]
+                    ?.label ?? "--"}
                 </div>
               )}
             </div>
@@ -609,8 +590,12 @@ export function StreamDecoderWorkbench({
           {batchProgress && (
             <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>进度：{batchProgress.done}/{batchProgress.total}</span>
-                <span>成功：{batchProgress.success} · 失败：{batchProgress.failed}</span>
+                <span>
+                  进度：{batchProgress.done}/{batchProgress.total}
+                </span>
+                <span>
+                  成功：{batchProgress.success} · 失败：{batchProgress.failed}
+                </span>
               </div>
               {batchProgress.total > 0 && (
                 <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
@@ -649,7 +634,9 @@ export function StreamDecoderWorkbench({
                 <LabeledInput
                   label="Pass"
                   value={settings.behinder.pass}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, pass: value } }))}
+                  onChange={(value) =>
+                    setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, pass: value } }))
+                  }
                 />
                 <LabeledInput
                   label="手动 Key"
@@ -660,8 +647,20 @@ export function StreamDecoderWorkbench({
                 <LabeledSelect
                   label="输入编码"
                   value={settings.behinder.inputEncoding}
-                  options={[["auto", "自动"], ["base64", "Base64"], ["hex", "Hex"]]}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, inputEncoding: value as DecoderSettings["behinder"]["inputEncoding"] } }))}
+                  options={[
+                    ["auto", "自动"],
+                    ["base64", "Base64"],
+                    ["hex", "Hex"],
+                  ]}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      behinder: {
+                        ...prev.behinder,
+                        inputEncoding: value as DecoderSettings["behinder"]["inputEncoding"],
+                      },
+                    }))
+                  }
                 />
                 <LabeledInput
                   label="URL 解码轮数"
@@ -679,24 +678,38 @@ export function StreamDecoderWorkbench({
                 <LabeledToggle
                   label="从表单中提取 pass 参数"
                   checked={settings.behinder.extractParam}
-                  onChange={(checked) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, extractParam: checked } }))}
+                  onChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, extractParam: checked } }))
+                  }
                 />
                 <LabeledToggle
                   label="自动从 pass 派生 key"
                   checked={settings.behinder.deriveKeyFromPass}
-                  onChange={(checked) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, deriveKeyFromPass: checked } }))}
+                  onChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, deriveKeyFromPass: checked } }))
+                  }
                 />
                 <LabeledSelect
                   label="加密模式"
                   value={settings.behinder.cipherMode}
-                  options={[["ecb", "AES-ECB (冰蝎4.x默认)"], ["cbc", "AES-CBC (冰蝎2.x/3.x)"]]}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, cipherMode: value as DecoderSettings["behinder"]["cipherMode"] } }))}
+                  options={[
+                    ["ecb", "AES-ECB (冰蝎4.x默认)"],
+                    ["cbc", "AES-CBC (冰蝎2.x/3.x)"],
+                  ]}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      behinder: { ...prev.behinder, cipherMode: value as DecoderSettings["behinder"]["cipherMode"] },
+                    }))
+                  }
                 />
                 {settings.behinder.cipherMode === "cbc" && (
                   <LabeledInput
                     label="IV (留空则全零)"
                     value={settings.behinder.iv}
-                    onChange={(value) => setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, iv: value } }))}
+                    onChange={(value) =>
+                      setSettings((prev) => ({ ...prev, behinder: { ...prev.behinder, iv: value } }))
+                    }
                     placeholder="留空则使用全零 IV"
                   />
                 )}
@@ -709,12 +722,16 @@ export function StreamDecoderWorkbench({
                 <LabeledInput
                   label="Pass"
                   value={settings.antsword.pass}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, pass: value } }))}
+                  onChange={(value) =>
+                    setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, pass: value } }))
+                  }
                 />
                 <LabeledToggle
                   label="从表单中提取 pass 参数"
                   checked={settings.antsword.extractParam}
-                  onChange={(checked) => setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, extractParam: checked } }))}
+                  onChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, extractParam: checked } }))
+                  }
                 />
                 <LabeledInput
                   label="URL 解码轮数"
@@ -732,8 +749,16 @@ export function StreamDecoderWorkbench({
                 <LabeledSelect
                   label="编码器"
                   value={settings.antsword.encoder}
-                  options={[["", "默认 (Base64)"], ["rot13", "ROT13"]]}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, antsword: { ...prev.antsword, encoder: value as DecoderSettings["antsword"]["encoder"] } }))}
+                  options={[
+                    ["", "默认 (Base64)"],
+                    ["rot13", "ROT13"],
+                  ]}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      antsword: { ...prev.antsword, encoder: value as DecoderSettings["antsword"]["encoder"] },
+                    }))
+                  }
                 />
               </div>
             </DecoderSettingsSection>
@@ -744,7 +769,9 @@ export function StreamDecoderWorkbench({
                 <LabeledInput
                   label="Pass"
                   value={settings.godzilla.pass}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, pass: value } }))}
+                  onChange={(value) =>
+                    setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, pass: value } }))
+                  }
                 />
                 <LabeledInput
                   label="Key"
@@ -754,14 +781,35 @@ export function StreamDecoderWorkbench({
                 <LabeledSelect
                   label="输入编码"
                   value={settings.godzilla.inputEncoding}
-                  options={[["auto", "自动"], ["base64", "Base64"], ["hex", "Hex"]]}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, inputEncoding: value as DecoderSettings["godzilla"]["inputEncoding"] } }))}
+                  options={[
+                    ["auto", "自动"],
+                    ["base64", "Base64"],
+                    ["hex", "Hex"],
+                  ]}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      godzilla: {
+                        ...prev.godzilla,
+                        inputEncoding: value as DecoderSettings["godzilla"]["inputEncoding"],
+                      },
+                    }))
+                  }
                 />
                 <LabeledSelect
                   label="加密算法"
                   value={settings.godzilla.cipher}
-                  options={[["aes_ecb", "AES-ECB"], ["aes_cbc", "AES-CBC"], ["xor", "XOR (PHP)"]]}
-                  onChange={(value) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, cipher: value as DecoderSettings["godzilla"]["cipher"] } }))}
+                  options={[
+                    ["aes_ecb", "AES-ECB"],
+                    ["aes_cbc", "AES-CBC"],
+                    ["xor", "XOR (PHP)"],
+                  ]}
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      godzilla: { ...prev.godzilla, cipher: value as DecoderSettings["godzilla"]["cipher"] },
+                    }))
+                  }
                 />
                 <LabeledInput
                   label="URL 解码轮数"
@@ -779,12 +827,16 @@ export function StreamDecoderWorkbench({
                 <LabeledToggle
                   label="从表单中提取 pass 参数"
                   checked={settings.godzilla.extractParam}
-                  onChange={(checked) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, extractParam: checked } }))}
+                  onChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, extractParam: checked } }))
+                  }
                 />
                 <LabeledToggle
                   label="剥离 MD5 头尾标记"
                   checked={settings.godzilla.stripMarkers}
-                  onChange={(checked) => setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, stripMarkers: checked } }))}
+                  onChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, godzilla: { ...prev.godzilla, stripMarkers: checked } }))
+                  }
                 />
               </div>
             </DecoderSettingsSection>
@@ -794,7 +846,13 @@ export function StreamDecoderWorkbench({
 
       <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PayloadPane
-          title={selectedCandidate ? `候选 payload / ${selectedCandidate.label}` : preparedPayload === payload ? "原始 payload" : "原始 payload（已自动提取）"}
+          title={
+            selectedCandidate
+              ? `候选 payload / ${selectedCandidate.label}`
+              : preparedPayload === payload
+                ? "原始 payload"
+                : "原始 payload（已自动提取）"
+          }
           content={effectivePayload || "(empty payload)"}
           footer={
             selectedCandidate
@@ -819,183 +877,6 @@ export function StreamDecoderWorkbench({
       </div>
     </div>
   );
-}
-
-function clampBatchOrdinal(rawValue: string | number | undefined, total: number) {
-  if (total <= 0) return 1;
-  const parsed = Number(String(rawValue ?? "").replace(/[^0-9]/g, ""));
-  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
-  return Math.max(1, Math.min(total, Math.floor(parsed)));
-}
-
-function asKnownDecoder(value: unknown): StreamDecoderKind | null {
-  switch (String(value ?? "").trim().toLowerCase()) {
-    case "auto":
-      return "auto";
-    case "base64":
-      return "base64";
-    case "behinder":
-      return "behinder";
-    case "antsword":
-      return "antsword";
-    case "godzilla":
-      return "godzilla";
-    default:
-      return null;
-  }
-}
-
-function mergeDecoderHintSources(candidate?: DecoderHintSource | null, source?: DecoderHintSource): DecoderHintSource | undefined {
-  if (!candidate) return source;
-  if (!source) return candidate;
-  return {
-    ...candidate,
-    familyHint: source.familyHint || candidate.familyHint,
-    sourceRole: source.sourceRole || candidate.sourceRole,
-    paramName: source.paramName || candidate.paramName,
-    decoderHints: uniqueStrings([...(source.decoderHints ?? []), ...(candidate.decoderHints ?? [])]),
-    decoderOptionsHint: {
-      ...(candidate.decoderOptionsHint ?? {}),
-      ...(source.decoderOptionsHint ?? {}),
-    },
-  };
-}
-
-function uniqueStrings(items: string[]): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    const key = String(item ?? "").trim();
-    if (!key || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    out.push(key);
-  }
-  return out;
-}
-
-function decoderFromHintSource(source?: DecoderHintSource): StreamDecoderKind | null {
-  const optionsDecoder = asKnownDecoder(source?.decoderOptionsHint?.decoder);
-  if (optionsDecoder && optionsDecoder !== "base64" && optionsDecoder !== "auto") {
-    return optionsDecoder;
-  }
-  for (const hint of source?.decoderHints ?? []) {
-    const decoder = asKnownDecoder(hint);
-    if (decoder && decoder !== "base64" && decoder !== "auto") {
-      return decoder;
-    }
-  }
-  switch (source?.familyHint) {
-    case "antsword_like":
-      return "antsword";
-    case "godzilla_like":
-      return "godzilla";
-    case "aes_webshell_like":
-      return "behinder";
-    default:
-      return null;
-  }
-}
-
-function buildDecoderOptions(decoder: StreamDecoderKind, settings: DecoderSettings, source?: DecoderHintSource): Record<string, unknown> {
-  if (decoder === "base64") {
-    return {};
-  }
-  const hintedDecoder = decoderFromHintSource(source);
-  const effectiveDecoder = decoder === "auto" ? hintedDecoder : decoder;
-  if (effectiveDecoder === "behinder") {
-    return mergeHintOptionsForDecoder("behinder", settings.behinder, source);
-  }
-  if (effectiveDecoder === "antsword") {
-    return mergeHintOptionsForDecoder("antsword", settings.antsword, source);
-  }
-  if (effectiveDecoder === "godzilla") {
-    return mergeHintOptionsForDecoder("godzilla", settings.godzilla, source);
-  }
-  return {};
-}
-
-function mergeHintIntoSettings(settings: DecoderSettings, source?: DecoderHintSource): DecoderSettings {
-  const decoder = decoderFromHintSource(source);
-  if (decoder === "behinder") {
-    return {
-      ...settings,
-      behinder: mergeHintOptionsForDecoder("behinder", settings.behinder, source) as DecoderSettings["behinder"],
-    };
-  }
-  if (decoder === "antsword") {
-    return {
-      ...settings,
-      antsword: mergeHintOptionsForDecoder("antsword", settings.antsword, source) as DecoderSettings["antsword"],
-    };
-  }
-  if (decoder === "godzilla") {
-    return {
-      ...settings,
-      godzilla: mergeHintOptionsForDecoder("godzilla", settings.godzilla, source) as DecoderSettings["godzilla"],
-    };
-  }
-  return settings;
-}
-
-function mergeHintOptionsForDecoder(
-  decoder: Exclude<StreamDecoderKind, "auto" | "base64">,
-  current: Record<string, unknown>,
-  source?: DecoderHintSource,
-): Record<string, unknown> {
-  const rawHint = source?.decoderOptionsHint ?? {};
-  const hintedDecoder = asKnownDecoder(rawHint.decoder) ?? decoderFromHintSource(source);
-  if (hintedDecoder && hintedDecoder !== decoder) {
-    return current;
-  }
-  const allowed = allowedHintKeysForDecoder(decoder);
-  const merged: Record<string, unknown> = { ...current };
-  for (const key of allowed) {
-    const value = rawHint[key];
-    if (value === undefined || value === null || value === "") {
-      continue;
-    }
-    if ((decoder === "godzilla" && key === "key") || (decoder === "behinder" && (key === "key" || key === "iv"))) {
-      if (String(current[key] ?? "").trim()) {
-        continue;
-      }
-    }
-    merged[key] = value;
-  }
-  if (source?.paramName && !String(merged.pass ?? "").trim()) {
-    merged.pass = source.paramName;
-  }
-  return merged;
-}
-
-function allowedHintKeysForDecoder(decoder: Exclude<StreamDecoderKind, "auto" | "base64">): string[] {
-  if (decoder === "antsword") {
-    return ["pass", "extractParam", "urlDecodeRounds", "encoder"];
-  }
-  if (decoder === "godzilla") {
-    return ["pass", "extractParam", "urlDecodeRounds", "inputEncoding", "cipher", "stripMarkers"];
-  }
-  return ["pass", "extractParam", "urlDecodeRounds", "inputEncoding", "cipherMode", "deriveKeyFromPass"];
-}
-
-function candidateHintBadges(source: DecoderHintSource): string[] {
-  const options = source.decoderOptionsHint ?? {};
-  const badges: string[] = [];
-  for (const key of ["decoder", "pass", "inputEncoding", "cipher", "cipherMode"] as const) {
-    const value = options[key];
-    if (value !== undefined && value !== null && String(value).trim()) {
-      badges.push(`${key}:${String(value)}`);
-    }
-  }
-  return badges;
-}
-
-function prepareDecoderInput(decoder: StreamDecoderKind, payload: string): string {
-  if (decoder === "base64") {
-    return extractBestBase64Candidate(payload);
-  }
-  return payload;
 }
 
 function DecoderButton({
@@ -1023,15 +904,7 @@ function DecoderButton({
   );
 }
 
-function ApplyModeButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function ApplyModeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -1072,7 +945,10 @@ function DecoderSettingsSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold text-foreground">{title}</div>
-        <button onClick={onClose} className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
+        <button
+          onClick={onClose}
+          className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
           收起
         </button>
       </div>
@@ -1120,10 +996,7 @@ function LabeledSelect({
   return (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
       <span>{label}</span>
-      <Select
-        value={selectedValue}
-        onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
-      >
+      <Select value={selectedValue} onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}>
         <SelectTrigger className="h-9 rounded-md border-border bg-background text-xs text-foreground focus:border-blue-500 focus:ring-blue-100">
           <SelectValue />
         </SelectTrigger>
@@ -1150,7 +1023,12 @@ function LabeledToggle({
 }) {
   return (
     <label className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="accent-blue-600" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="accent-blue-600"
+      />
       <span>{label}</span>
     </label>
   );
@@ -1204,32 +1082,38 @@ function PayloadPane({
           {loading && <span className="text-[11px] text-blue-600">解码中...</span>}
           {downloadable && (
             <>
-              <button type="button" onClick={copyContent} className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+              <button
+                type="button"
+                onClick={copyContent}
+                className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
                 复制
               </button>
-              <button type="button" onClick={exportContent} className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+              <button
+                type="button"
+                onClick={exportContent}
+                className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
                 导出
               </button>
             </>
           )}
         </div>
       </div>
-      <pre className={`max-h-72 min-w-0 overflow-auto whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs leading-5 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-border bg-card text-foreground"}`}>
+      <pre
+        className={`max-h-72 min-w-0 overflow-auto whitespace-pre-wrap break-all rounded-md border px-3 py-2 text-xs leading-5 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-border bg-card text-foreground"}`}
+      >
         {content}
       </pre>
-      {(warnings?.length ?? 0) > 0 && (
-        <TagList title="警告" items={warnings!} tone="amber" />
-      )}
-      {(signals?.length ?? 0) > 0 && (
-        <TagList title="信号" items={signals!} tone="blue" />
-      )}
-      {(attemptErrors?.length ?? 0) > 0 && (
-        <TagList title="自动检测失败阶段" items={attemptErrors!} tone="rose" />
-      )}
+      {(warnings?.length ?? 0) > 0 && <TagList title="警告" items={warnings!} tone="amber" />}
+      {(signals?.length ?? 0) > 0 && <TagList title="信号" items={signals!} tone="blue" />}
+      {(attemptErrors?.length ?? 0) > 0 && <TagList title="自动检测失败阶段" items={attemptErrors!} tone="rose" />}
       {bytesHex && !error && (
         <div className="mt-2 rounded-md border border-border bg-card px-3 py-2">
           <div className="mb-1 text-[11px] font-semibold text-muted-foreground">Hex</div>
-          <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-muted-foreground">{bytesHex}</pre>
+          <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-muted-foreground">
+            {bytesHex}
+          </pre>
         </div>
       )}
       {footer && <div className="mt-2 text-[11px] text-blue-700">{footer}</div>}
@@ -1239,9 +1123,11 @@ function PayloadPane({
 
 function TagList({ title, items, tone }: { title: string; items: string[]; tone: "amber" | "blue" | "rose" }) {
   const toneClass =
-    tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-700" :
-      tone === "rose" ? "border-rose-200 bg-rose-50 text-rose-700" :
-        "border-blue-200 bg-blue-50 text-blue-700";
+    tone === "amber"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : tone === "rose"
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : "border-blue-200 bg-blue-50 text-blue-700";
   return (
     <div className="mt-2 rounded-md border border-border bg-card px-3 py-2">
       <div className="mb-1 text-[11px] font-semibold text-muted-foreground">{title}</div>
@@ -1254,72 +1140,4 @@ function TagList({ title, items, tone }: { title: string; items: string[]; tone:
       </div>
     </div>
   );
-}
-
-function isAbortError(error: unknown) {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
-const HTTP_METHOD_PREFIXES = ["GET ", "POST ", "PUT ", "DELETE ", "PATCH ", "HEAD ", "OPTIONS ", "CONNECT ", "TRACE "];
-
-function normalizeTransportPayload(raw: string): string {
-  const current = String(raw ?? "").trim();
-  if (!current) {
-    return "";
-  }
-  if (looksLikeHttpMessage(current)) {
-    return extractHttpBody(current).trim();
-  }
-  return current;
-}
-
-function looksLikeHttpMessage(raw: string): boolean {
-  const text = raw.trim();
-  if (!text) return false;
-  if (text.startsWith("HTTP/")) {
-    return true;
-  }
-  for (const method of HTTP_METHOD_PREFIXES) {
-    if (text.startsWith(method)) {
-      return true;
-    }
-  }
-  return text.includes("\nHost:") || text.includes("\r\nHost:");
-}
-
-function extractHttpBody(raw: string): string {
-  const crlfIndex = raw.indexOf("\r\n\r\n");
-  if (crlfIndex >= 0) return raw.slice(crlfIndex + 4);
-  const lfIndex = raw.indexOf("\n\n");
-  if (lfIndex >= 0) return raw.slice(lfIndex + 2);
-  return raw;
-}
-
-function extractBestBase64Candidate(raw: string): string {
-  return raw.trim();
-}
-
-function readDecoderSettings(): DecoderSettings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw);
-    return {
-      behinder: { ...DEFAULT_SETTINGS.behinder, ...(parsed.behinder ?? {}) },
-      antsword: { ...DEFAULT_SETTINGS.antsword, ...(parsed.antsword ?? {}) },
-      godzilla: { ...DEFAULT_SETTINGS.godzilla, ...(parsed.godzilla ?? {}) },
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
-
-function persistDecoderSettings(settings: DecoderSettings) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // ignore persistence errors
-  }
 }
