@@ -48,6 +48,7 @@ import {
   type PacketLocateResult,
   type PacketsPageResult,
 } from "./clients/captureClient";
+import { createDesktopClient, type DesktopAppBinding } from "./clients/desktopClient";
 import { createEventClient, type EventHandlers } from "./clients/eventClient";
 import { createHuntingClient, type HuntingRuntimeConfig } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
@@ -68,13 +69,9 @@ const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "ht
 
 export type { OpenFileResult } from "./clients/captureClient";
 
-interface DesktopAppBinding {
-  BackendStatus?: () => Promise<string>;
+interface AppBridgeBinding extends DesktopAppBinding {
   GetBackendAuthToken?: () => Promise<string | null | undefined>;
   OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
-  OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
-  CheckAppUpdate?: () => Promise<AppUpdateStatus | null | undefined>;
-  InstallAppUpdate?: () => Promise<void>;
 }
 
 export interface BackendBridge {
@@ -202,11 +199,11 @@ async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   return await res.blob();
 }
 
-function getDesktopAppBinding(): DesktopAppBinding | undefined {
+function getDesktopAppBinding(): AppBridgeBinding | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
-  return (window as any)?.go?.main?.DesktopApp as DesktopAppBinding | undefined;
+  return (window as any)?.go?.main?.DesktopApp as AppBridgeBinding | undefined;
 }
 
 let backendAuthTokenPromise: Promise<string> | null = null;
@@ -265,87 +262,13 @@ const objectClient = createObjectClient(request, requestBlob);
 const huntingClient = createHuntingClient(request);
 const c2DecryptClient = createC2DecryptClient(request);
 const eventClient = createEventClient(API_BASE, getBackendAuthToken);
+const desktopClient = createDesktopClient(request, getDesktopAppBinding);
 
 export const bridge: BackendBridge = {
-  async isAvailable() {
-    const desktopApp = getDesktopAppBinding();
-    if (desktopApp?.BackendStatus) {
-      try {
-        const status = String(await desktopApp.BackendStatus()).trim().toLowerCase();
-        if (status && status !== "running" && status !== "running (reused-existing)" && status !== "starting") {
-          return false;
-        }
-      } catch {
-        // Ignore desktop status errors and fall through to HTTP health check.
-      }
-    }
-    try {
-      await request<{ status: string }>("/health");
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
-  async getDesktopBackendStatus() {
-    const desktopApp = getDesktopAppBinding();
-    if (!desktopApp?.BackendStatus) {
-      return "";
-    }
-    try {
-      return String(await desktopApp.BackendStatus()).trim();
-    } catch {
-      return "";
-    }
-  },
-
-  async checkAppUpdate() {
-    const desktopApp = getDesktopAppBinding();
-    if (!desktopApp?.CheckAppUpdate) {
-      throw new Error("当前环境不支持桌面端更新");
-    }
-    const result = await desktopApp.CheckAppUpdate();
-    if (!result) {
-      throw new Error("更新状态为空");
-    }
-    return {
-      currentVersion: String(result.currentVersion ?? ""),
-      currentVersionDisplay: String(result.currentVersionDisplay ?? ""),
-      currentVersionSource: String(result.currentVersionSource ?? ""),
-      currentExecutable: String(result.currentExecutable ?? ""),
-      localHash: String(result.localHash ?? ""),
-      repo: String(result.repo ?? ""),
-      authMode: String(result.authMode ?? ""),
-      checkedAt: String(result.checkedAt ?? ""),
-      apiUrl: String(result.apiUrl ?? ""),
-      hasUpdate: Boolean(result.hasUpdate),
-      upToDate: Boolean(result.upToDate),
-      hashMismatch: Boolean(result.hashMismatch),
-      latestTag: String(result.latestTag ?? ""),
-      latestName: String(result.latestName ?? ""),
-      latestPublishedAt: String(result.latestPublishedAt ?? ""),
-      releaseUrl: String(result.releaseUrl ?? ""),
-      releaseNotes: String(result.releaseNotes ?? ""),
-      selectedAsset: result.selectedAsset
-        ? {
-            name: String(result.selectedAsset.name ?? ""),
-            downloadUrl: String(result.selectedAsset.downloadUrl ?? ""),
-            sizeBytes: Number(result.selectedAsset.sizeBytes ?? 0),
-            contentType: String(result.selectedAsset.contentType ?? "") || undefined,
-          }
-        : undefined,
-      canInstall: Boolean(result.canInstall),
-      message: String(result.message ?? ""),
-    };
-  },
-
-  async installAppUpdate() {
-    const desktopApp = getDesktopAppBinding();
-    if (!desktopApp?.InstallAppUpdate) {
-      throw new Error("当前环境不支持桌面端更新");
-    }
-    await desktopApp.InstallAppUpdate();
-  },
+  isAvailable: desktopClient.isAvailable,
+  getDesktopBackendStatus: desktopClient.getDesktopBackendStatus,
+  checkAppUpdate: desktopClient.checkAppUpdate,
+  installAppUpdate: desktopClient.installAppUpdate,
 
   checkTShark: toolRuntimeClient.checkTShark,
   checkFFmpeg: toolRuntimeClient.checkFFmpeg,
@@ -362,21 +285,7 @@ export const bridge: BackendBridge = {
   listPackets: captureClient.listPackets,
   listPacketsPage: captureClient.listPacketsPage,
 
-  async openDBCFile() {
-    const desktopApp = getDesktopAppBinding();
-    if (!desktopApp?.OpenDBCDialog) {
-      throw new Error("当前环境不支持原生 DBC 文件选择");
-    }
-    const result = await desktopApp.OpenDBCDialog();
-    if (!result?.filePath) {
-      throw new Error("未选择 DBC 文件");
-    }
-    return {
-      filePath: String(result.filePath),
-      fileSize: Number(result.fileSize ?? 0),
-      fileName: String(result.fileName ?? String(result.filePath).split(/[\\/]/).pop() ?? "database.dbc"),
-    };
-  },
+  openDBCFile: desktopClient.openDBCFile,
 
   locatePacketPage: captureClient.locatePacketPage,
   getPacket: captureClient.getPacket,

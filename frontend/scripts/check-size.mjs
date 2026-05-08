@@ -7,7 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const budgets = [
   {
     path: "src/app/integrations/wailsBridge.ts",
-    maxLines: 500,
+    maxLines: 430,
     reason: "bridge facade should keep shrinking as domain clients move out",
   },
   {
