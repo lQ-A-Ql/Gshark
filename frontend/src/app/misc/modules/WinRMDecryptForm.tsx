@@ -1,8 +1,8 @@
 import { CheckCircle2, FileText } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Field } from "../ui";
-
-export type WinRMAuthMode = "password" | "nt_hash";
+import { sanitizeWinRMNumericInput, type WinRMAuthMode } from "./WinRMDecryptUtils";
+export type { WinRMAuthMode } from "./WinRMDecryptUtils";
 
 interface WinRMDecryptFormProps {
   authMode: WinRMAuthMode;
@@ -49,7 +49,7 @@ export function WinRMDecryptForm({
       <Field label="WinRM 服务端口">
         <Input
           value={port}
-          onChange={(event) => onPortChange(event.target.value.replace(/[^0-9]/g, ""))}
+          onChange={(event) => onPortChange(sanitizeWinRMNumericInput(event.target.value))}
           className="font-mono text-sm shadow-sm"
           placeholder="默认 5985"
         />
@@ -84,7 +84,7 @@ export function WinRMDecryptForm({
       <Field label="预览截断行数">
         <Input
           value={previewLines}
-          onChange={(event) => onPreviewLinesChange(event.target.value.replace(/[^0-9]/g, ""))}
+          onChange={(event) => onPreviewLinesChange(sanitizeWinRMNumericInput(event.target.value))}
           className="font-mono text-sm shadow-sm"
           placeholder="200"
         />

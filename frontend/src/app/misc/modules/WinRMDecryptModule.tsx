@@ -1,5 +1,5 @@
 import { Terminal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { WinRMDecryptResult } from "../../core/types";
@@ -11,14 +11,20 @@ import { WinRMDecryptActions } from "./WinRMDecryptActions";
 import { WinRMDecryptForm, type WinRMAuthMode } from "./WinRMDecryptForm";
 import { WinRMPreviewDialog } from "./WinRMPreviewDialog";
 import { WinRMResultSummary } from "./WinRMResultSummary";
+import {
+  buildWinRMDecryptRequest,
+  DEFAULT_WINRM_PORT,
+  DEFAULT_WINRM_PREVIEW_LINES,
+  getWinRMResultResetState,
+} from "./WinRMDecryptUtils";
 
 export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
-  const [winrmPort, setWinrmPort] = useState("5985");
+  const [winrmPort, setWinrmPort] = useState(DEFAULT_WINRM_PORT);
   const [winrmAuthMode, setWinrmAuthMode] = useState<WinRMAuthMode>("password");
   const [winrmPassword, setWinrmPassword] = useState("");
   const [winrmHash, setWinrmHash] = useState("");
-  const [winrmPreviewLines, setWinrmPreviewLines] = useState("200");
+  const [winrmPreviewLines, setWinrmPreviewLines] = useState(DEFAULT_WINRM_PREVIEW_LINES);
   const [winrmLoading, setWinrmLoading] = useState(false);
   const [winrmError, setWinrmError] = useState("");
   const [winrmResult, setWinrmResult] = useState<WinRMDecryptResult | null>(null);
@@ -28,11 +34,6 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
   const [winrmPreviewDialogError, setWinrmPreviewDialogError] = useState("");
 
   const hasCapture = Boolean(fileMeta.path);
-  const normalizedWinrmPort = useMemo(() => Number(winrmPort.replace(/[^0-9]/g, "") || "0"), [winrmPort]);
-  const normalizedPreviewLines = useMemo(
-    () => Number(winrmPreviewLines.replace(/[^0-9]/g, "") || "0"),
-    [winrmPreviewLines],
-  );
   const embedded = surfaceVariant === "embedded";
 
   async function runWinRM() {
@@ -43,15 +44,15 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
     setWinrmLoading(true);
     setWinrmError("");
     try {
-      const result = await bridge.runWinRMDecrypt({
-        port: normalizedWinrmPort,
-        authMode: winrmAuthMode,
-        password: winrmAuthMode === "password" ? winrmPassword : "",
-        ntHash: winrmAuthMode === "nt_hash" ? winrmHash : "",
-        previewLines: normalizedPreviewLines,
-        includeErrorFrames: false,
-        extractCommandOutput: true,
-      });
+      const result = await bridge.runWinRMDecrypt(
+        buildWinRMDecryptRequest({
+          authMode: winrmAuthMode,
+          hash: winrmHash,
+          password: winrmPassword,
+          port: winrmPort,
+          previewLines: winrmPreviewLines,
+        }),
+      );
       setWinrmResult(result);
       setWinrmPreviewOpen(false);
       setWinrmPreviewDialogText("");
@@ -111,11 +112,12 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
   }
 
   function clearWinRMResult() {
-    setWinrmResult(null);
-    setWinrmError("");
-    setWinrmPreviewOpen(false);
-    setWinrmPreviewDialogText("");
-    setWinrmPreviewDialogError("");
+    const resetState = getWinRMResultResetState();
+    setWinrmResult(resetState.result);
+    setWinrmError(resetState.error);
+    setWinrmPreviewOpen(resetState.previewOpen);
+    setWinrmPreviewDialogText(resetState.previewDialogText);
+    setWinrmPreviewDialogError(resetState.previewDialogError);
   }
 
   return (
