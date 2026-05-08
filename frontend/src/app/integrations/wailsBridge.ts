@@ -48,6 +48,7 @@ import {
   type PacketLocateResult,
   type PacketsPageResult,
 } from "./clients/captureClient";
+import { createEventClient, type EventHandlers } from "./clients/eventClient";
 import { createHuntingClient, type HuntingRuntimeConfig } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
 import { createObjectClient } from "./clients/objectClient";
@@ -55,13 +56,13 @@ import { createPluginClient } from "./clients/pluginClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
 import { createToolRuntimeClient, type FFmpegStatus, type TSharkStatus } from "./clients/toolRuntimeClient";
-import { asPacket } from "./mappers/packetStreamMapper";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
+export type { EventHandlers, EventType } from "./clients/eventClient";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -74,14 +75,6 @@ interface DesktopAppBinding {
   OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
   CheckAppUpdate?: () => Promise<AppUpdateStatus | null | undefined>;
   InstallAppUpdate?: () => Promise<void>;
-}
-
-export type EventType = "packet" | "status" | "error";
-
-interface EventHandlers {
-  packet?: (packet: Packet) => void;
-  status?: (message: string) => void;
-  error?: (message: string) => void;
 }
 
 export interface BackendBridge {
@@ -271,6 +264,7 @@ const toolRuntimeClient = createToolRuntimeClient(request);
 const objectClient = createObjectClient(request, requestBlob);
 const huntingClient = createHuntingClient(request);
 const c2DecryptClient = createC2DecryptClient(request);
+const eventClient = createEventClient(API_BASE, getBackendAuthToken);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -456,73 +450,5 @@ export const bridge: BackendBridge = {
   getMySQLAnalysis: toolClient.getMySQLAnalysis,
   getShiroRememberMeAnalysis: toolClient.getShiroRememberMeAnalysis,
 
-  subscribeEvents(handlers: EventHandlers) {
-    let disposed = false;
-    let retryMs = 1000;
-    let source: EventSource | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function connect() {
-      if (disposed) return;
-
-      void getBackendAuthToken().then((token) => {
-        if (disposed) return;
-        const url = token
-          ? `${API_BASE}/api/events?access_token=${encodeURIComponent(token)}`
-          : `${API_BASE}/api/events`;
-        source = new EventSource(url);
-
-        source.addEventListener("ready", () => {
-          retryMs = 1000; // reset backoff on successful connection
-        });
-
-        source.addEventListener("packet", (event) => {
-          try {
-            handlers.packet?.(asPacket(JSON.parse((event as MessageEvent).data)));
-          } catch {
-            return;
-          }
-        });
-        source.addEventListener("status", (event) => {
-          try {
-            const payload = JSON.parse((event as MessageEvent).data);
-            handlers.status?.(String(payload.message ?? ""));
-          } catch {
-            return;
-          }
-        });
-        source.addEventListener("error", (event) => {
-          try {
-            const payload = JSON.parse((event as MessageEvent).data);
-            handlers.error?.(String(payload.message ?? ""));
-          } catch {
-            // connection lost – attempt reconnect with exponential backoff
-            if (source) {
-              source.close();
-              source = null;
-            }
-            if (!disposed) {
-              handlers.error?.(`后端连接断开，${(retryMs / 1000).toFixed(0)}s 后重连...`);
-              retryTimer = setTimeout(() => {
-                retryMs = Math.min(retryMs * 2, 30000);
-                connect();
-              }, retryMs);
-            }
-          }
-        });
-      }).catch(() => {
-        if (!disposed) {
-          handlers.error?.("后端鉴权初始化失败");
-        }
-      });
-    }
-
-    connect();
-
-    return () => {
-      disposed = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      if (source) source.close();
-    };
-  },
+  subscribeEvents: eventClient.subscribeEvents,
 };
