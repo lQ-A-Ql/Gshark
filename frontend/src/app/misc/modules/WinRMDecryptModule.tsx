@@ -1,13 +1,13 @@
-import { Copy, Download, Play, Terminal, Trash2 } from "lucide-react";
+import { Terminal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { WinRMDecryptResult } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
 import { ErrorBlock } from "../ui";
 import { copyTextToClipboard } from "../../utils/browserFile";
+import { WinRMDecryptActions } from "./WinRMDecryptActions";
 import { WinRMDecryptForm, type WinRMAuthMode } from "./WinRMDecryptForm";
 import { WinRMPreviewDialog } from "./WinRMPreviewDialog";
 import { WinRMResultSummary } from "./WinRMResultSummary";
@@ -110,6 +110,14 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
     }
   }
 
+  function clearWinRMResult() {
+    setWinrmResult(null);
+    setWinrmError("");
+    setWinrmPreviewOpen(false);
+    setWinrmPreviewDialogText("");
+    setWinrmPreviewDialogError("");
+  }
+
   return (
     <>
       <Card
@@ -145,56 +153,16 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
             previewLines={winrmPreviewLines}
           />
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button
-              onClick={() => void runWinRM()}
-              disabled={winrmLoading || !hasCapture}
-              className="gap-2 bg-sky-600 text-white shadow-sm hover:bg-sky-700"
-            >
-              <Play className="h-4 w-4" fill="currentColor" />
-              {winrmLoading ? "解密分析中..." : "启动提取"}
-            </Button>
-
-            {winrmResult && (
-              <>
-                <div className="mx-1 h-6 w-px bg-slate-200" />
-                <Button
-                  variant="outline"
-                  onClick={() => void openWinRMPreview()}
-                  className="gap-2 text-slate-700 shadow-sm"
-                >
-                  <Terminal className="h-4 w-4 text-sky-600" />
-                  打开预览视图
-                </Button>
-                <Button variant="outline" onClick={() => void exportWinRM()} className="gap-2 text-slate-700 shadow-sm">
-                  <Download className="h-4 w-4 text-emerald-600" />
-                  保存导出 TXT
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void copyWinRMPreview()}
-                  className="gap-2 text-slate-700 shadow-sm"
-                >
-                  <Copy className="h-4 w-4 text-blue-600" />
-                  复制结果
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setWinrmResult(null);
-                    setWinrmError("");
-                    setWinrmPreviewOpen(false);
-                    setWinrmPreviewDialogText("");
-                    setWinrmPreviewDialogError("");
-                  }}
-                  className="gap-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  清空
-                </Button>
-              </>
-            )}
-          </div>
+          <WinRMDecryptActions
+            hasCapture={hasCapture}
+            hasResult={Boolean(winrmResult)}
+            loading={winrmLoading}
+            onClear={clearWinRMResult}
+            onCopy={() => void copyWinRMPreview()}
+            onExport={() => void exportWinRM()}
+            onOpenPreview={() => void openWinRMPreview()}
+            onRun={() => void runWinRM()}
+          />
 
           {winrmError && (
             <div className="animate-in slide-in-from-bottom-2 duration-300 fade-in">
