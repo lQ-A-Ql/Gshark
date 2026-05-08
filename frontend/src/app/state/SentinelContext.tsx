@@ -17,7 +17,6 @@ import type {
   Packet,
   RecentCapture,
   ToolRuntimeConfig,
-  StreamProtocol,
   StreamSwitchMetrics,
 } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
@@ -79,14 +78,7 @@ import {
   STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
   STREAM_PREFETCH_LIMIT,
 } from "./captureConstants";
-import {
-  EMPTY_BINARY_STREAM,
-  EMPTY_HTTP_STREAM,
-  EMPTY_SWITCH_METRICS,
-  SWITCH_SAMPLE_LIMIT,
-  buildSwitchStat,
-  prettySize,
-} from "./streamState";
+import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, EMPTY_SWITCH_METRICS, prettySize } from "./streamState";
 import { pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolveStreamPrefetchTask } from "./streamPrefetchTask";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
@@ -107,6 +99,7 @@ import {
   createEmptyStreamSwitchHits,
   resetStreamRuntimeRefs,
 } from "./streamRuntimeReset";
+import { recordStreamSwitchMetricSample } from "./streamSwitchMetrics";
 import {
   waitForCaptureSignal as waitForCaptureSignalUtil,
   wakeCaptureWaiters as wakeCaptureWaitersUtil,
@@ -210,31 +203,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const streamSwitchDurationsRef = useRef(createEmptyStreamSwitchDurations());
   const streamSwitchHitsRef = useRef(createEmptyStreamSwitchHits());
 
-  const recordStreamSwitchMetric = useCallback((protocol: StreamProtocol, elapsedMs: number, cacheHit: boolean) => {
-    const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
-    const appendSample = (bucket: "ALL" | StreamProtocol) => {
-      const arr = streamSwitchDurationsRef.current[bucket];
-      arr.push(elapsed);
-      if (arr.length > SWITCH_SAMPLE_LIMIT) {
-        arr.splice(0, arr.length - SWITCH_SAMPLE_LIMIT);
-      }
-      if (cacheHit) {
-        streamSwitchHitsRef.current[bucket] += 1;
-      }
-    };
-
-    appendSample("ALL");
-    appendSample(protocol);
-
-    setStreamSwitchMetrics({
-      overall: buildSwitchStat(streamSwitchDurationsRef.current.ALL, streamSwitchHitsRef.current.ALL),
-      byProtocol: {
-        HTTP: buildSwitchStat(streamSwitchDurationsRef.current.HTTP, streamSwitchHitsRef.current.HTTP),
-        TCP: buildSwitchStat(streamSwitchDurationsRef.current.TCP, streamSwitchHitsRef.current.TCP),
-        UDP: buildSwitchStat(streamSwitchDurationsRef.current.UDP, streamSwitchHitsRef.current.UDP),
-      },
-    });
-  }, []);
+  const recordStreamSwitchMetric = useCallback(
+    (protocol: "HTTP" | "TCP" | "UDP", elapsedMs: number, cacheHit: boolean) => {
+      setStreamSwitchMetrics(
+        recordStreamSwitchMetricSample({
+          protocol,
+          elapsedMs,
+          cacheHit,
+          switchDurationsRef: streamSwitchDurationsRef,
+          switchHitsRef: streamSwitchHitsRef,
+        }),
+      );
+    },
+    [],
+  );
 
   const cancelAllFrontendCaptureTasks = useCallback(() => {
     captureTaskScopeRef.current.invalidate();
