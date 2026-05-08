@@ -65,11 +65,11 @@ export function normalizeC2DecryptResultForDisplay(result: C2DecryptResult): C2D
 
   const hiddenCount = result.records.length - visibleRecords.length;
   if (
-    hiddenCount <= 0
-    && convertedCount <= 0
-    && bestEffortConvertedCount <= 0
-    && truncatedHexPreviewCount <= 0
-    && ansiStrippedCount <= 0
+    hiddenCount <= 0 &&
+    convertedCount <= 0 &&
+    bestEffortConvertedCount <= 0 &&
+    truncatedHexPreviewCount <= 0 &&
+    ansiStrippedCount <= 0
   ) {
     return result;
   }
@@ -94,7 +94,9 @@ export function normalizeC2DecryptResultForDisplay(result: C2DecryptResult): C2D
     notes.push(`前端接口层已隐藏 ${timestampOnlyCount} 条仅包含时间戳的 VShell 记录。`);
   }
   if (shortBinaryControlCount > 0) {
-    notes.push(`前端接口层已隐藏 ${shortBinaryControlCount} 条 VShell 短二进制控制帧/心跳帧，避免短控制载荷淹没明文结果。`);
+    notes.push(
+      `前端接口层已隐藏 ${shortBinaryControlCount} 条 VShell 短二进制控制帧/心跳帧，避免短控制载荷淹没明文结果。`,
+    );
   }
 
   return {
@@ -153,10 +155,7 @@ function normalizeC2DecryptedRecordPreview(record: C2DecryptedRecord): C2Preview
         converted: false,
         bestEffortConverted: true,
         truncatedHexPreview: hexPreview.truncated,
-        tags: [
-          "utf8-best-effort-from-hex-preview",
-          ...(hexPreview.truncated ? ["truncated-hex-preview"] : []),
-        ],
+        tags: ["utf8-best-effort-from-hex-preview", ...(hexPreview.truncated ? ["truncated-hex-preview"] : [])],
       });
     }
   }
@@ -171,7 +170,9 @@ function normalizeDecodedC2Preview(
 ): C2PreviewNormalization {
   const normalized = normalizePreviewTextForDisplay(value);
   const baseTags = record.tags ?? [];
-  const tags = [...new Set([...baseTags, ...(options.tags ?? []), ...(normalized.ansiStripped ? ["ansi-stripped"] : [])])];
+  const tags = [
+    ...new Set([...baseTags, ...(options.tags ?? []), ...(normalized.ansiStripped ? ["ansi-stripped"] : [])]),
+  ];
 
   if (!hasMeaningfulVisibleText(normalized.text)) {
     return {
@@ -334,7 +335,11 @@ function hasForensicTextSignal(value: string): boolean {
   if (/\b\d+(?:\.\d+){1,3}\b/.test(normalized)) {
     return true;
   }
-  if (/(?:[A-Za-z]:\\|\\\\|\/(?:bin|etc|home|tmp|usr|var)\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.test(normalized)) {
+  if (
+    /(?:[A-Za-z]:\\|\\\\|\/(?:bin|etc|home|tmp|usr|var)\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.test(
+      normalized,
+    )
+  ) {
     return true;
   }
   if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(normalized)) {
@@ -356,18 +361,19 @@ function isLowInfoHexPreview(preview: string, decryptedLength: number): boolean 
     return false;
   }
 
-  const meaningfulVisibleBytes = visibleAsciiBytes.filter((byte) => (
-    (byte >= 0x30 && byte <= 0x39)
-    || (byte >= 0x41 && byte <= 0x5a)
-    || (byte >= 0x61 && byte <= 0x7a)
-    || byte === 0x2e
-    || byte === 0x2f
-    || byte === 0x5f
-    || byte === 0x2d
-    || byte === 0x3a
-    || byte === 0x7b
-    || byte === 0x7d
-  ));
+  const meaningfulVisibleBytes = visibleAsciiBytes.filter(
+    (byte) =>
+      (byte >= 0x30 && byte <= 0x39) ||
+      (byte >= 0x41 && byte <= 0x5a) ||
+      (byte >= 0x61 && byte <= 0x7a) ||
+      byte === 0x2e ||
+      byte === 0x2f ||
+      byte === 0x5f ||
+      byte === 0x2d ||
+      byte === 0x3a ||
+      byte === 0x7b ||
+      byte === 0x7d,
+  );
   if (meaningfulVisibleBytes.length >= 2 && visibleAsciiBytes.length / bytes.length >= 0.35) {
     return false;
   }
