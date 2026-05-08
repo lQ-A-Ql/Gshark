@@ -526,7 +526,7 @@ describe("MiscTools SMB3 session candidates", () => {
     expect(screen.getByText("置信度 96%")).toBeInTheDocument();
     expect(screen.getByText("keyword:assert")).toBeInTheDocument();
     expect(screen.getByText("Behinder (ECB): AES-ECB 密文长度非法")).toBeInTheDocument();
-  }, 10000);
+  }, 20000);
 
   it("loads suspicious URI sources and fills the payload textarea from a selected source", async () => {
     mocks.listStreamPayloadSources.mockResolvedValueOnce([

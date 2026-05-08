@@ -4,7 +4,6 @@ import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
   AnalysisBucketChart as BucketChart,
-  AnalysisDataTable as DataTable,
   AnalysisPanel as Panel,
   AnalysisStatCard as StatCard,
 } from "../components/analysis/AnalysisPrimitives";
@@ -13,8 +12,15 @@ import type {
   USBKeyboardEvent,
   USBMassStorageOperation,
   USBMouseEvent,
-  USBPacketRecord,
 } from "../core/types";
+import {
+  ControlRequestTable,
+  KeyboardEventTable,
+  MassStorageFilters,
+  MassStorageOperationTable,
+  MouseEventTable,
+  USBRecordTable,
+} from "../features/usb/UsbTables";
 import { useUsbAnalysis } from "../features/usb/useUsbAnalysis";
 import { useSentinel } from "../state/SentinelContext";
 
@@ -24,10 +30,6 @@ type MassStorageSubTab = "overview" | "read" | "write";
 type OtherSubTab = "overview" | "control" | "raw";
 
 const USB_PROTOCOL_TAGS = ["HID", "Mass Storage", "其他"];
-const USB_TABLE_WRAPPER_CLASS = "border-slate-200 bg-white shadow-sm";
-const USB_TABLE_HEADER_CLASS = "bg-gradient-to-r from-slate-100 to-blue-50 text-slate-700";
-const USB_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-white even:bg-slate-50/45 hover:bg-blue-50/45";
-const USB_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export default function UsbAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
@@ -68,7 +70,10 @@ export default function UsbAnalysis() {
   const readOperations = analysis.massStorage.readOperations;
   const writeOperations = analysis.massStorage.writeOperations;
   const massStorageNotes = analysis.massStorage.notes.length > 0 ? analysis.massStorage.notes : analysis.notes;
-  const allMassStorageOperations = useMemo(() => [...readOperations, ...writeOperations], [readOperations, writeOperations]);
+  const allMassStorageOperations = useMemo(
+    () => [...readOperations, ...writeOperations],
+    [readOperations, writeOperations],
+  );
 
   useEffect(() => {
     setActivePrimaryTab((prev) => (domainHasData(analysis, prev) ? prev : pickDefaultPrimaryTab(analysis)));
@@ -79,10 +84,22 @@ export default function UsbAnalysis() {
     });
   }, [analysis, hidKeyboardEvents.length, hidMouseEvents.length]);
 
-  const keyboardDevices = useMemo(() => uniqueStrings(hidKeyboardEvents.map((item) => item.device || item.endpoint).filter(Boolean)), [hidKeyboardEvents]);
-  const mouseDevices = useMemo(() => uniqueStrings(hidMouseEvents.map((item) => item.device || item.endpoint).filter(Boolean)), [hidMouseEvents]);
-  const massStorageDevices = useMemo(() => uniqueStrings(allMassStorageOperations.map((item) => item.device).filter(Boolean)), [allMassStorageOperations]);
-  const massStorageLUNs = useMemo(() => uniqueStrings(allMassStorageOperations.map((item) => item.lun).filter(Boolean)), [allMassStorageOperations]);
+  const keyboardDevices = useMemo(
+    () => uniqueStrings(hidKeyboardEvents.map((item) => item.device || item.endpoint).filter(Boolean)),
+    [hidKeyboardEvents],
+  );
+  const mouseDevices = useMemo(
+    () => uniqueStrings(hidMouseEvents.map((item) => item.device || item.endpoint).filter(Boolean)),
+    [hidMouseEvents],
+  );
+  const massStorageDevices = useMemo(
+    () => uniqueStrings(allMassStorageOperations.map((item) => item.device).filter(Boolean)),
+    [allMassStorageOperations],
+  );
+  const massStorageLUNs = useMemo(
+    () => uniqueStrings(allMassStorageOperations.map((item) => item.lun).filter(Boolean)),
+    [allMassStorageOperations],
+  );
 
   useEffect(() => {
     if (keyboardDevices.length === 0) {
@@ -136,7 +153,10 @@ export default function UsbAnalysis() {
     [activeMassStorageDevice, activeMassStorageLUN],
   );
   const filteredReadOperations = useMemo(() => massStorageFilter(readOperations), [massStorageFilter, readOperations]);
-  const filteredWriteOperations = useMemo(() => massStorageFilter(writeOperations), [massStorageFilter, writeOperations]);
+  const filteredWriteOperations = useMemo(
+    () => massStorageFilter(writeOperations),
+    [massStorageFilter, writeOperations],
+  );
 
   useEffect(() => {
     setKeyboardCursor((prev) => Math.min(prev, Math.max(filteredKeyboardEvents.length - 1, 0)));
@@ -162,7 +182,9 @@ export default function UsbAnalysis() {
   }, [filteredKeyboardEvents.length, isKeyboardPlaying, keyboardCursor]);
 
   const keyboardStats = useMemo(() => {
-    const uniqueKeys = new Set(filteredKeyboardEvents.flatMap((item) => [...item.keys, ...item.pressedKeys, ...item.releasedKeys]));
+    const uniqueKeys = new Set(
+      filteredKeyboardEvents.flatMap((item) => [...item.keys, ...item.pressedKeys, ...item.releasedKeys]),
+    );
     return {
       printableCount: filteredKeyboardEvents.filter((item) => Boolean(item.text && item.text.length > 0)).length,
       comboCount: filteredKeyboardEvents.filter((item) => item.modifiers.length > 0).length,
@@ -246,13 +268,25 @@ export default function UsbAnalysis() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <PrimaryTabButton active={activePrimaryTab === "hid"} onClick={() => setActivePrimaryTab("hid")} icon={<Keyboard className="h-4 w-4" />}>
+        <PrimaryTabButton
+          active={activePrimaryTab === "hid"}
+          onClick={() => setActivePrimaryTab("hid")}
+          icon={<Keyboard className="h-4 w-4" />}
+        >
           HID
         </PrimaryTabButton>
-        <PrimaryTabButton active={activePrimaryTab === "mass-storage"} onClick={() => setActivePrimaryTab("mass-storage")} icon={<HardDrive className="h-4 w-4" />}>
+        <PrimaryTabButton
+          active={activePrimaryTab === "mass-storage"}
+          onClick={() => setActivePrimaryTab("mass-storage")}
+          icon={<HardDrive className="h-4 w-4" />}
+        >
           Mass Storage
         </PrimaryTabButton>
-        <PrimaryTabButton active={activePrimaryTab === "other"} onClick={() => setActivePrimaryTab("other")} icon={<Usb className="h-4 w-4" />}>
+        <PrimaryTabButton
+          active={activePrimaryTab === "other"}
+          onClick={() => setActivePrimaryTab("other")}
+          icon={<Usb className="h-4 w-4" />}
+        >
           其他
         </PrimaryTabButton>
       </div>
@@ -293,7 +327,9 @@ export default function UsbAnalysis() {
                     replayText={keyboardReplayText}
                     total={filteredKeyboardEvents.length}
                     onCursorChange={setKeyboardCursor}
-                    onNext={() => setKeyboardCursor((prev) => Math.min(prev + 1, Math.max(filteredKeyboardEvents.length - 1, 0)))}
+                    onNext={() =>
+                      setKeyboardCursor((prev) => Math.min(prev + 1, Math.max(filteredKeyboardEvents.length - 1, 0)))
+                    }
                     onPrev={() => setKeyboardCursor((prev) => Math.max(prev - 1, 0))}
                     onTogglePlay={() => {
                       if (filteredKeyboardEvents.length <= 1) return;
@@ -362,13 +398,22 @@ export default function UsbAnalysis() {
       {activePrimaryTab === "mass-storage" && (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <SecondaryTabButton active={activeMassStorageSubTab === "overview"} onClick={() => setActiveMassStorageSubTab("overview")}>
+            <SecondaryTabButton
+              active={activeMassStorageSubTab === "overview"}
+              onClick={() => setActiveMassStorageSubTab("overview")}
+            >
               概览
             </SecondaryTabButton>
-            <SecondaryTabButton active={activeMassStorageSubTab === "read"} onClick={() => setActiveMassStorageSubTab("read")}>
+            <SecondaryTabButton
+              active={activeMassStorageSubTab === "read"}
+              onClick={() => setActiveMassStorageSubTab("read")}
+            >
               读请求
             </SecondaryTabButton>
-            <SecondaryTabButton active={activeMassStorageSubTab === "write"} onClick={() => setActiveMassStorageSubTab("write")}>
+            <SecondaryTabButton
+              active={activeMassStorageSubTab === "write"}
+              onClick={() => setActiveMassStorageSubTab("write")}
+            >
               写请求
             </SecondaryTabButton>
           </div>
@@ -406,8 +451,16 @@ export default function UsbAnalysis() {
                 onDeviceChange={setActiveMassStorageDevice}
                 onLunChange={setActiveMassStorageLUN}
               />
-              <Panel title={activeMassStorageSubTab === "read" ? `读请求 (${filteredReadOperations.length})` : `写请求 (${filteredWriteOperations.length})`}>
-                <MassStorageOperationTable rows={activeMassStorageSubTab === "read" ? filteredReadOperations : filteredWriteOperations} />
+              <Panel
+                title={
+                  activeMassStorageSubTab === "read"
+                    ? `读请求 (${filteredReadOperations.length})`
+                    : `写请求 (${filteredWriteOperations.length})`
+                }
+              >
+                <MassStorageOperationTable
+                  rows={activeMassStorageSubTab === "read" ? filteredReadOperations : filteredWriteOperations}
+                />
               </Panel>
             </>
           )}
@@ -417,10 +470,16 @@ export default function UsbAnalysis() {
       {activePrimaryTab === "other" && (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <SecondaryTabButton active={activeOtherSubTab === "overview"} onClick={() => setActiveOtherSubTab("overview")}>
+            <SecondaryTabButton
+              active={activeOtherSubTab === "overview"}
+              onClick={() => setActiveOtherSubTab("overview")}
+            >
               概览
             </SecondaryTabButton>
-            <SecondaryTabButton active={activeOtherSubTab === "control"} onClick={() => setActiveOtherSubTab("control")}>
+            <SecondaryTabButton
+              active={activeOtherSubTab === "control"}
+              onClick={() => setActiveOtherSubTab("control")}
+            >
               控制请求
             </SecondaryTabButton>
             <SecondaryTabButton active={activeOtherSubTab === "raw"} onClick={() => setActiveOtherSubTab("raw")}>
@@ -434,7 +493,10 @@ export default function UsbAnalysis() {
                 <StatCard title="其他 USB 包" value={analysis.other.totalPackets.toLocaleString()} />
                 <StatCard title="设备数" value={String(analysis.other.devices.length)} />
                 <StatCard title="端点数" value={String(analysis.other.endpoints.length)} />
-                <StatCard title="Setup 请求数" value={String(analysis.other.setupRequests.reduce((sum, item) => sum + item.count, 0))} />
+                <StatCard
+                  title="Setup 请求数"
+                  value={String(analysis.other.setupRequests.reduce((sum, item) => sum + item.count, 0))}
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -537,7 +599,15 @@ function PrimaryTabButton({
   );
 }
 
-function SecondaryTabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function SecondaryTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -563,7 +633,9 @@ function DeviceChips({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {devices.length === 0 ? (
-        <span className="rounded border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">{emptyLabel}</span>
+        <span className="rounded border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
+          {emptyLabel}
+        </span>
       ) : (
         devices.map((device) => (
           <button
@@ -609,17 +681,30 @@ function KeyboardReplay({
     <div className="space-y-4">
       <div className="rounded-xl border border-border bg-[linear-gradient(180deg,#eff6ff,#f8fafc)] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={onPrev} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent">
+          <button
+            type="button"
+            onClick={onPrev}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button type="button" onClick={onTogglePlay} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-white hover:bg-blue-700">
+          <button
+            type="button"
+            onClick={onTogglePlay}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-white hover:bg-blue-700"
+          >
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </button>
-          <button type="button" onClick={onNext} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent">
+          <button
+            type="button"
+            onClick={onNext}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
           <div className="ml-auto text-xs text-muted-foreground">
-            第 <span className="font-mono text-foreground">{Math.min(currentIndex + 1, total)}</span> / <span className="font-mono text-foreground">{total}</span> 条
+            第 <span className="font-mono text-foreground">{Math.min(currentIndex + 1, total)}</span> /{" "}
+            <span className="font-mono text-foreground">{total}</span> 条
           </div>
         </div>
 
@@ -649,7 +734,14 @@ function KeyboardReplay({
 
       <div className="rounded-lg border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
         <div className="font-medium text-foreground">{currentEvent?.summary || "当前事件无摘要"}</div>
-        <div className="mt-1">文本输出：{currentEvent?.text ? <span className="font-mono text-foreground">{JSON.stringify(currentEvent.text)}</span> : "--"}</div>
+        <div className="mt-1">
+          文本输出：
+          {currentEvent?.text ? (
+            <span className="font-mono text-foreground">{JSON.stringify(currentEvent.text)}</span>
+          ) : (
+            "--"
+          )}
+        </div>
       </div>
     </div>
   );
@@ -677,15 +769,28 @@ function MouseTrajectory({ events }: { events: USBMouseEvent[] }) {
             </pattern>
           </defs>
           <rect width={width} height={height} fill="url(#mouse-grid)" />
-          <polyline fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" points={polyline} />
+          <polyline
+            fill="none"
+            stroke="#2563eb"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            points={polyline}
+          />
           {start && <circle cx={start.split(",")[0]} cy={start.split(",")[1]} r="5" fill="#16a34a" />}
           {end && <circle cx={end.split(",")[0]} cy={end.split(",")[1]} r="5" fill="#dc2626" />}
         </svg>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> 起点</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> 终点</span>
-        <span className="inline-flex items-center gap-1"><Route className="h-3.5 w-3.5" /> 轨迹基于相对位移累计</span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> 起点
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> 终点
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Route className="h-3.5 w-3.5" /> 轨迹基于相对位移累计
+        </span>
       </div>
     </div>
   );
@@ -725,16 +830,38 @@ function MouseHeatmap({ events }: { events: USBMouseEvent[] }) {
           {hotspots.map((item) => {
             const radius = 8 + (item.count / maxCount) * 18;
             const opacity = 0.18 + (item.count / maxCount) * 0.55;
-            return <circle key={`${item.x}-${item.y}`} cx={item.x} cy={item.y} r={radius} fill={`rgba(37,99,235,${opacity})`} />;
+            return (
+              <circle
+                key={`${item.x}-${item.y}`}
+                cx={item.x}
+                cy={item.y}
+                r={radius}
+                fill={`rgba(37,99,235,${opacity})`}
+              />
+            );
           })}
-          {hotspots.filter((item) => item.clicks > 0).map((item) => (
-            <circle key={`click-${item.x}-${item.y}`} cx={item.x} cy={item.y} r={6 + Math.min(item.clicks, 4) * 2} fill="rgba(220,38,38,0.55)" stroke="rgba(185,28,28,0.9)" strokeWidth="1.5" />
-          ))}
+          {hotspots
+            .filter((item) => item.clicks > 0)
+            .map((item) => (
+              <circle
+                key={`click-${item.x}-${item.y}`}
+                cx={item.x}
+                cy={item.y}
+                r={6 + Math.min(item.clicks, 4) * 2}
+                fill="rgba(220,38,38,0.55)"
+                stroke="rgba(185,28,28,0.9)"
+                strokeWidth="1.5"
+              />
+            ))}
         </svg>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> 停留密度</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> 点击热点</span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> 停留密度
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> 点击热点
+        </span>
       </div>
     </div>
   );
@@ -747,233 +874,23 @@ function MouseBehaviorList({ rows }: { rows: USBMouseEvent[] }) {
   return (
     <div className="max-h-[320px] space-y-2 overflow-auto">
       {rows.map((row) => (
-        <div key={`${row.packetId}-${row.positionX}-${row.positionY}`} className="rounded-lg border border-border bg-background px-3 py-2 text-xs">
+        <div
+          key={`${row.packetId}-${row.positionX}-${row.positionY}`}
+          className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
+        >
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-muted-foreground">#{row.packetId} {row.time}</span>
+            <span className="font-mono text-muted-foreground">
+              #{row.packetId} {row.time}
+            </span>
             <span className="rounded border border-border px-2 py-0.5 text-[11px]">{mouseActionBadge(row)}</span>
           </div>
           <div className="mt-1 text-foreground">{row.summary}</div>
-          <div className="mt-1 font-mono text-[11px] text-muted-foreground">pos=({row.positionX}, {row.positionY}) / delta=({row.xDelta}, {row.yDelta})</div>
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+            pos=({row.positionX}, {row.positionY}) / delta=({row.xDelta}, {row.yDelta})
+          </div>
         </div>
       ))}
     </div>
-  );
-}
-
-function KeyboardEventTable({ rows }: { rows: USBKeyboardEvent[] }) {
-  return (
-    <DataTable<USBKeyboardEvent>
-      data={rows}
-      rowKey={(row, index) => `${row.packetId}-${row.summary}-${index}`}
-      maxHeightClassName="max-h-[520px]"
-      wrapperClassName={USB_TABLE_WRAPPER_CLASS}
-      headerClassName={USB_TABLE_HEADER_CLASS}
-      tableClassName="min-w-[1180px]"
-      rowClassName={USB_TABLE_ROW_CLASS}
-      emptyText="暂无键盘行为"
-      columns={[
-        { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.packetId },
-        { key: "time", header: "时间", widthClassName: "w-28", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.time || "--" },
-        { key: "device", header: "设备", widthClassName: "w-40", render: (row) => row.device || row.endpoint || "--" },
-        { key: "modifiers", header: "当前修饰键", widthClassName: "w-28", render: (row) => row.modifiers.join(", ") || "--" },
-        { key: "pressedModifiers", header: "按下修饰键", widthClassName: "w-28", render: (row) => row.pressedModifiers.join(", ") || "--" },
-        { key: "releasedModifiers", header: "释放修饰键", widthClassName: "w-28", render: (row) => row.releasedModifiers.join(", ") || "--" },
-        { key: "keys", header: "当前按键", widthClassName: "w-32", render: (row) => row.keys.join(", ") || "--" },
-        { key: "pressedKeys", header: "按下键", widthClassName: "w-32", render: (row) => row.pressedKeys.join(", ") || "--" },
-        { key: "releasedKeys", header: "释放键", widthClassName: "w-32", render: (row) => row.releasedKeys.join(", ") || "--" },
-        { key: "text", header: "文本", widthClassName: "w-24", cellClassName: "whitespace-pre-wrap font-mono text-slate-600", render: (row) => row.text || "--" },
-        { key: "summary", header: "摘要", render: (row) => row.summary || "--" },
-      ]}
-    />
-  );
-}
-
-function MouseEventTable({ rows }: { rows: USBMouseEvent[] }) {
-  return (
-    <DataTable<USBMouseEvent>
-      data={rows}
-      rowKey={(row, index) => `${row.packetId}-${row.positionX}-${row.positionY}-${index}`}
-      maxHeightClassName="max-h-[520px]"
-      wrapperClassName={USB_TABLE_WRAPPER_CLASS}
-      headerClassName={USB_TABLE_HEADER_CLASS}
-      tableClassName="min-w-[1260px]"
-      rowClassName={USB_TABLE_ROW_CLASS}
-      emptyText="暂无鼠标行为"
-      columns={[
-        { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.packetId },
-        { key: "time", header: "时间", widthClassName: "w-28", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.time || "--" },
-        { key: "device", header: "设备", widthClassName: "w-36", render: (row) => row.device || row.endpoint || "--" },
-        { key: "buttons", header: "当前按钮", widthClassName: "w-28", render: (row) => row.buttons.join(", ") || "--" },
-        { key: "pressedButtons", header: "按下按钮", widthClassName: "w-28", render: (row) => row.pressedButtons.join(", ") || "--" },
-        { key: "releasedButtons", header: "释放按钮", widthClassName: "w-28", render: (row) => row.releasedButtons.join(", ") || "--" },
-        { key: "xDelta", header: "dX", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.xDelta },
-        { key: "yDelta", header: "dY", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.yDelta },
-        { key: "wheelVertical", header: "滚轮V", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.wheelVertical },
-        { key: "wheelHorizontal", header: "滚轮H", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.wheelHorizontal },
-        { key: "positionX", header: "X", widthClassName: "w-24", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.positionX },
-        { key: "positionY", header: "Y", widthClassName: "w-24", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.positionY },
-        { key: "summary", header: "摘要", render: (row) => row.summary || "--" },
-      ]}
-    />
-  );
-}
-
-function MassStorageFilters({
-  devices,
-  luns,
-  activeDevice,
-  activeLun,
-  onDeviceChange,
-  onLunChange,
-}: {
-  devices: string[];
-  luns: string[];
-  activeDevice: string;
-  activeLun: string;
-  onDeviceChange: (value: string) => void;
-  onLunChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-card p-4 shadow-sm md:grid-cols-2">
-      <SelectField label="设备" value={activeDevice} onChange={onDeviceChange} options={["all", ...devices]} labels={{ all: "全部设备" }} />
-      <SelectField label="LUN" value={activeLun} onChange={onLunChange} options={["all", ...luns]} labels={{ all: "全部 LUN" }} />
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  labels = {},
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  labels?: Record<string, string>;
-}) {
-  return (
-    <label className="flex flex-col gap-2 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none ring-0 transition-colors focus:border-blue-500">
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {labels[option] ?? option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function MassStorageOperationTable({ rows }: { rows: USBMassStorageOperation[] }) {
-  return (
-    <DataTable<USBMassStorageOperation>
-      data={rows}
-      rowKey={(row, index) => `${row.packetId}-${row.requestFrame}-${row.responseFrame}-${index}`}
-      maxHeightClassName="max-h-[560px]"
-      wrapperClassName={USB_TABLE_WRAPPER_CLASS}
-      headerClassName={USB_TABLE_HEADER_CLASS}
-      tableClassName="min-w-[1180px]"
-      rowClassName={USB_TABLE_ROW_CLASS}
-      emptyText="暂无读写行为记录"
-      columns={[
-        { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.packetId },
-        { key: "time", header: "时间", widthClassName: "w-24", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.time || "--" },
-        { key: "device", header: "设备", widthClassName: "w-36", render: (row) => row.device || "--" },
-        { key: "endpoint", header: "端点", widthClassName: "w-24", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.endpoint || "--" },
-        { key: "lun", header: "LUN", widthClassName: "w-20", render: (row) => row.lun || "--" },
-        { key: "command", header: "命令", widthClassName: "w-28", render: (row) => row.command || "--" },
-        { key: "length", header: "长度", widthClassName: "w-16", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.transferLength },
-        { key: "status", header: "状态", widthClassName: "w-20", render: (row) => row.status || "--" },
-        { key: "requestFrame", header: "请求帧", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.requestFrame ?? "--" },
-        { key: "responseFrame", header: "响应帧", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.responseFrame ?? "--" },
-        { key: "latency", header: "延迟", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.latencyMs == null ? "--" : `${row.latencyMs.toFixed(2)} ms` },
-        {
-          key: "summary",
-          header: "摘要",
-          render: (row) => (
-            <div>
-              <div>{row.summary || "--"}</div>
-              {row.dataResidue != null && row.dataResidue > 0 && <div className="mt-1 font-mono text-[11px] text-amber-600">residue={row.dataResidue}</div>}
-            </div>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-function ControlRequestTable({ rows }: { rows: USBPacketRecord[] }) {
-  return (
-    <DataTable<USBPacketRecord>
-      data={rows}
-      rowKey={(row, index) => `${row.packetId}-${row.summary}-${index}`}
-      maxHeightClassName="max-h-[560px]"
-      wrapperClassName={USB_TABLE_WRAPPER_CLASS}
-      headerClassName={USB_TABLE_HEADER_CLASS}
-      tableClassName="min-w-[880px]"
-      rowClassName={USB_TABLE_ROW_CLASS}
-      emptyText="暂无控制请求"
-      columns={[
-        { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.packetId },
-        { key: "time", header: "时间", widthClassName: "w-28", cellClassName: USB_MONO_CELL_CLASS, render: (row) => row.time || "--" },
-        { key: "device", header: "设备", widthClassName: "w-24", render: (row) => joinParts(row.busId, row.deviceAddress) },
-        { key: "direction", header: "方向", widthClassName: "w-24", render: (row) => row.direction || "--" },
-        { key: "status", header: "状态", widthClassName: "w-28", render: (row) => row.status || "--" },
-        { key: "setup", header: "Setup 请求", widthClassName: "w-44", render: (row) => row.setupRequest || "--" },
-        {
-          key: "summary",
-          header: "摘要 / Payload",
-          render: (row) => (
-            <div>
-              <div>{row.summary || "--"}</div>
-              {row.payloadPreview && <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{row.payloadPreview}</div>}
-            </div>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-function USBRecordTable({ rows }: { rows: USBPacketRecord[] }) {
-  return (
-    <DataTable<USBPacketRecord>
-      data={rows}
-      rowKey={(item, index) => `${item.packetId}-${item.endpoint}-${item.summary}-${index}`}
-      maxHeightClassName="max-h-[560px]"
-      wrapperClassName={USB_TABLE_WRAPPER_CLASS}
-      headerClassName={USB_TABLE_HEADER_CLASS}
-      tableClassName="min-w-[1160px]"
-      rowClassName={USB_TABLE_ROW_CLASS}
-      emptyText="暂无其他 USB 记录"
-      columns={[
-        { key: "packet", header: "包号", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (item) => item.packetId },
-        { key: "time", header: "时间", widthClassName: "w-28", cellClassName: USB_MONO_CELL_CLASS, render: (item) => item.time || "--" },
-        { key: "protocol", header: "协议", widthClassName: "w-24", render: (item) => item.protocol || "--" },
-        { key: "device", header: "设备", widthClassName: "w-28", render: (item) => joinParts(item.busId, item.deviceAddress) },
-        { key: "endpoint", header: "端点", widthClassName: "w-28", cellClassName: USB_MONO_CELL_CLASS, render: (item) => item.endpoint || "--" },
-        { key: "direction", header: "方向", widthClassName: "w-20", render: (item) => item.direction || "--" },
-        { key: "transfer", header: "传输", widthClassName: "w-24", render: (item) => item.transferType || "--" },
-        { key: "urb", header: "URB", widthClassName: "w-24", render: (item) => item.urbType || "--" },
-        { key: "status", header: "状态", widthClassName: "w-24", render: (item) => item.status || "--" },
-        { key: "length", header: "长度", widthClassName: "w-20", cellClassName: USB_MONO_CELL_CLASS, render: (item) => item.dataLength },
-        { key: "setup", header: "Setup", widthClassName: "w-28", render: (item) => item.setupRequest || "--" },
-        {
-          key: "summary",
-          header: "摘要",
-          render: (item) => (
-            <div>
-              <div>{item.summary || "--"}</div>
-              {item.payloadPreview && <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{item.payloadPreview}</div>}
-            </div>
-          ),
-        },
-      ]}
-    />
   );
 }
 
@@ -984,7 +901,10 @@ function NotesList({ notes, emptyLabel }: { notes: string[]; emptyLabel: string 
   return (
     <div className="space-y-2 text-sm">
       {notes.map((note, index) => (
-        <div key={`${note}-${index}`} className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
+        <div
+          key={`${note}-${index}`}
+          className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2"
+        >
           <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
           <span>{note}</span>
         </div>
@@ -1032,20 +952,18 @@ function uniqueStrings(values: string[]) {
   return Array.from(new Set(values));
 }
 
-function joinParts(busId: string, deviceAddress: string) {
-  const parts = [busId && `bus ${busId}`, deviceAddress && `dev ${deviceAddress}`].filter(Boolean);
-  return parts.length > 0 ? parts.join(" / ") : "--";
-}
-
 function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">{children}</div>;
+  return (
+    <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+      {children}
+    </div>
+  );
 }
 
 function Banner({ children, tone }: { children: ReactNode; tone: "muted" | "warning" }) {
-  const className = tone === "warning"
-    ? "mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"
-    : "mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground";
+  const className =
+    tone === "warning"
+      ? "mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+      : "mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground";
   return <div className={className}>{children}</div>;
 }
-
-
