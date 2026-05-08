@@ -77,6 +77,11 @@ import {
   getPacketFilterWorkingStatus,
 } from "./packetFilterStatus";
 import {
+  getCaptureCloseErrorMessage,
+  getCaptureStopDoneStatus,
+  getCaptureStopRequestStatus,
+} from "./captureStopStatus";
+import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
   PRELOAD_SIGNAL_WAIT_MS,
@@ -1248,9 +1253,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     wakeCaptureWaiters();
     clearCaptureUiState();
     threatAnalysisSeqRef.current += 1;
-    setBackendStatus(
-      backendConnected ? "当前抓包已从界面移除，正在请求后端清理线程" : "当前抓包已从界面移除；后端未连接",
-    );
+    setBackendStatus(getCaptureStopRequestStatus(backendConnected));
     if (!backendConnected) return;
 
     let closeError = "";
@@ -1258,11 +1261,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       await bridge.cancelMediaBatchTranscription().catch(() => null);
       await bridge.closeCapture();
     } catch (error) {
-      closeError = error instanceof Error ? error.message : "关闭抓包失败";
+      closeError = getCaptureCloseErrorMessage(error);
     }
-    setBackendStatus(
-      closeError ? `当前抓包已从界面移除；后端清理返回: ${closeError}` : "当前抓包已关闭，临时数据库已清理",
-    );
+    setBackendStatus(getCaptureStopDoneStatus(closeError));
   }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, wakeCaptureWaiters]);
 
   const protocolTree = useMemo(
