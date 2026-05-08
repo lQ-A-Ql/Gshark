@@ -11,7 +11,14 @@ import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 import { useSentinel } from "../../state/SentinelContext";
 import { MySQLSessionDetails } from "./MySQLSessionDetails";
-import { MySQLSessionList, renderMySQLSessionTitle } from "./MySQLSessionList";
+import { MySQLSessionList } from "./MySQLSessionList";
+import {
+  filterMySQLSessions,
+  MYSQL_SESSION_FILTERS,
+  renderMySQLAnalysisText,
+  selectMySQLSession,
+  type MySQLSessionFilter,
+} from "./MySQLSessionAnalysisUtils";
 
 const EMPTY_ANALYSIS: MySQLAnalysis = {
   sessionCount: 0,
@@ -23,8 +30,6 @@ const EMPTY_ANALYSIS: MySQLAnalysis = {
   notes: [],
 };
 
-type SessionFilter = "ALL" | "LOGIN" | "ERROR";
-
 export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
@@ -34,39 +39,17 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
     emptyData: EMPTY_ANALYSIS,
     errorMessage: "加载 MySQL 会话重建失败",
   });
-  const [sessionFilter, setSessionFilter] = useState<SessionFilter>("ALL");
+  const [sessionFilter, setSessionFilter] = useState<MySQLSessionFilter>("ALL");
   const [query, setQuery] = useState("");
   const [selectedStreamId, setSelectedStreamId] = useState<number>(0);
   const embedded = surfaceVariant === "embedded";
 
   const filteredSessions = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    return analysis.sessions.filter((item) => {
-      if (sessionFilter === "LOGIN" && !item.username) return false;
-      if (sessionFilter === "ERROR" && item.errCount <= 0) return false;
-      if (!keyword) return true;
-      const haystack = [
-        item.streamId,
-        item.client,
-        item.server,
-        item.username,
-        item.database,
-        item.serverVersion,
-        item.authPlugin,
-        item.commandTypes?.join(" "),
-        item.notes?.join(" "),
-        item.queries
-          .map((row) => [row.command, row.sql, row.database, row.responseKind, row.responseSummary].join(" "))
-          .join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(keyword);
-    });
+    return filterMySQLSessions(analysis.sessions, sessionFilter, query);
   }, [analysis.sessions, query, sessionFilter]);
 
   const selectedSession = useMemo(
-    () => filteredSessions.find((item) => item.streamId === selectedStreamId) ?? filteredSessions[0] ?? null,
+    () => selectMySQLSession(filteredSessions, selectedStreamId),
     [filteredSessions, selectedStreamId],
   );
 
@@ -110,7 +93,7 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
         <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)_auto]">
           <Field label="会话筛选">
             <div className="relative isolate flex h-10 w-full rounded-md bg-slate-100/90 p-1 ring-1 ring-inset ring-slate-200/50">
-              {(["ALL", "LOGIN", "ERROR"] as SessionFilter[]).map((item) => (
+              {MYSQL_SESSION_FILTERS.map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -167,36 +150,4 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
       </CardContent>
     </Card>
   );
-}
-
-function renderMySQLAnalysisText(analysis: MySQLAnalysis) {
-  const lines: string[] = [
-    `MySQL session count: ${analysis.sessionCount}`,
-    `login count: ${analysis.loginCount}`,
-    `query count: ${analysis.queryCount}`,
-    `error count: ${analysis.errorCount}`,
-    `resultset count: ${analysis.resultsetCount}`,
-    "",
-  ];
-  if (analysis.notes.length > 0) {
-    lines.push("Notes:");
-    for (const note of analysis.notes) {
-      lines.push(`- ${note}`);
-    }
-    lines.push("");
-  }
-  for (const session of analysis.sessions) {
-    lines.push(`[MySQL stream #${session.streamId}] ${renderMySQLSessionTitle(session)}`);
-    lines.push(`Version: ${session.serverVersion || "--"}`);
-    lines.push(`User: ${session.username || "--"}`);
-    lines.push(`Database: ${session.database || "--"}`);
-    lines.push(`Plugin: ${session.authPlugin || "--"}`);
-    for (const row of session.queries) {
-      lines.push(
-        `  - ${row.command || "CMD"}: ${row.sql || row.database || row.responseSummary || "--"} [${row.responseKind || "--"}]`,
-      );
-    }
-    lines.push("");
-  }
-  return lines.join("\n");
 }

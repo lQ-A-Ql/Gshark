@@ -1,4 +1,5 @@
 import type { MySQLSession } from "../../core/types";
+import { renderMySQLSessionTitle } from "./MySQLSessionAnalysisUtils";
 
 interface MySQLSessionListProps {
   sessions: MySQLSession[];
@@ -66,14 +67,4 @@ export function MySQLSessionList({ sessions, selectedStreamId, hasCapture, onSel
       </div>
     </div>
   );
-}
-
-export function renderMySQLSessionTitle(session: MySQLSession) {
-  const left = session.client
-    ? `${session.client}${session.clientPort ? `:${session.clientPort}` : ""}`
-    : `stream #${session.streamId}`;
-  const right = session.server
-    ? `${session.server}${session.serverPort ? `:${session.serverPort}` : ""}`
-    : "MySQL server";
-  return `${left} → ${right}`;
 }
