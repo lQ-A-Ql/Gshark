@@ -1,6 +1,6 @@
 import { AlertTriangle, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import type { HTTPLoginAnalysis, HTTPLoginEndpoint } from "../../core/types";
+import type { HTTPLoginAnalysis } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
@@ -11,6 +11,7 @@ import { AnalysisDataTable as DataTable } from "../../components/analysis/Analys
 import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
+import { HTTPLoginEndpointList, renderHTTPLoginEndpointTitle } from "./HTTPLoginEndpointList";
 
 const EMPTY_ANALYSIS: HTTPLoginAnalysis = {
   totalAttempts: 0,
@@ -55,7 +56,9 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
         item.requestKeys?.join(" "),
         item.responseIndicators?.join(" "),
         item.notes?.join(" "),
-      ].join(" ").toLowerCase();
+      ]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(keyword);
     });
   }, [analysis.endpoints, query, resultFilter]);
@@ -80,7 +83,13 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
   }
 
   return (
-    <Card className={embedded ? "min-w-0 h-fit border-0 bg-transparent shadow-none" : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"}>
+    <Card
+      className={
+        embedded
+          ? "min-w-0 h-fit border-0 bg-transparent shadow-none"
+          : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"
+      }
+    >
       <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600">
@@ -98,7 +107,11 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
           <MetaChip label="成功" value={analysis.successCount} color="emerald" />
           <MetaChip label="失败" value={analysis.failureCount} color="rose" />
           <MetaChip label="待确认" value={analysis.uncertainCount} color="slate" />
-          <MetaChip label="疑似爆破" value={analysis.bruteforceCount} color={analysis.bruteforceCount > 0 ? "rose" : "slate"} />
+          <MetaChip
+            label="疑似爆破"
+            value={analysis.bruteforceCount}
+            color={analysis.bruteforceCount > 0 ? "rose" : "slate"}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)_auto]">
@@ -127,7 +140,13 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void refresh()} disabled={!hasCapture || loading} className="gap-2 bg-white text-cyan-700">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void refresh()}
+              disabled={!hasCapture || loading}
+              className="gap-2 bg-white text-cyan-700"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新"}
             </Button>
@@ -142,47 +161,12 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
         {error && <ErrorBlock message={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-800">认证端点</div>
-              <div className="text-[11px] text-slate-500">{filteredEndpoints.length} 条</div>
-            </div>
-            <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
-              {filteredEndpoints.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-[13px] text-slate-500">
-                  {hasCapture ? "未识别到符合条件的 HTTP 登录端点" : "未加载抓包"}
-                </div>
-              ) : (
-                filteredEndpoints.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setSelectedEndpointKey(item.key)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
-                      selectedEndpoint?.key === item.key
-                        ? "border-cyan-400 bg-cyan-50 shadow-sm ring-2 ring-cyan-100"
-                        : "border-slate-200 bg-white hover:border-cyan-200 hover:bg-cyan-50/40"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 font-mono text-[11px] font-semibold text-cyan-700">{item.method || "HTTP"}</span>
-                      {item.possibleBruteforce && (
-                        <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">疑似爆破</span>
-                      )}
-                      <span className="text-[11px] text-slate-500">{item.attemptCount} 次尝试</span>
-                    </div>
-                    <div className="mt-2 break-all font-medium text-slate-800">{renderEndpointTitle(item)}</div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                      <span>成功 {item.successCount}</span>
-                      <span>失败 {item.failureCount}</span>
-                      <span>待确认 {item.uncertainCount}</span>
-                      {item.usernameVariants ? <span>用户变体 {item.usernameVariants}</span> : null}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
+          <HTTPLoginEndpointList
+            hasCapture={hasCapture}
+            endpoints={filteredEndpoints}
+            selectedEndpoint={selectedEndpoint}
+            onSelectEndpoint={setSelectedEndpointKey}
+          />
 
           <div className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -210,7 +194,11 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                   <div className="grid gap-3 md:grid-cols-2">
                     <InfoBlock title="请求键" values={selectedEndpoint.requestKeys} empty="无已提取参数键" />
                     <InfoBlock title="响应信号" values={selectedEndpoint.responseIndicators} empty="无明显响应信号" />
-                    <InfoBlock title="状态码分布" values={(selectedEndpoint.statusCodes ?? []).map((item) => `${item.label} × ${item.count}`)} empty="无状态码" />
+                    <InfoBlock
+                      title="状态码分布"
+                      values={(selectedEndpoint.statusCodes ?? []).map((item) => `${item.label} × ${item.count}`)}
+                      empty="无状态码"
+                    />
                     <InfoBlock title="端点说明" values={selectedEndpoint.notes} empty="暂无说明" />
                   </div>
                 </div>
@@ -253,7 +241,7 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     widthClassName: "w-[84px]",
                     headerClassName: "whitespace-nowrap",
                     cellClassName: "whitespace-nowrap font-mono text-[12px] text-slate-600",
-                    render: (item) => item.responsePacketId ? `#${item.responsePacketId}` : "--",
+                    render: (item) => (item.responsePacketId ? `#${item.responsePacketId}` : "--"),
                   },
                   {
                     key: "result",
@@ -261,7 +249,11 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     widthClassName: "w-[104px]",
                     headerClassName: "whitespace-nowrap",
                     cellClassName: "whitespace-nowrap",
-                    render: (item) => <span className={attemptBadge(item.result, item.possibleBruteforce)}>{renderAttemptLabel(item.result, item.possibleBruteforce)}</span>,
+                    render: (item) => (
+                      <span className={attemptBadge(item.result, item.possibleBruteforce)}>
+                        {renderAttemptLabel(item.result, item.possibleBruteforce)}
+                      </span>
+                    ),
                   },
                   {
                     key: "status",
@@ -276,7 +268,14 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     header: "用户名",
                     widthClassName: "w-[140px]",
                     headerClassName: "whitespace-nowrap",
-                    render: (item) => <div className="max-w-[128px] truncate font-mono text-[11px] text-slate-700" title={item.username || "--"}>{item.username || "--"}</div>,
+                    render: (item) => (
+                      <div
+                        className="max-w-[128px] truncate font-mono text-[11px] text-slate-700"
+                        title={item.username || "--"}
+                      >
+                        {item.username || "--"}
+                      </div>
+                    ),
                   },
                   {
                     key: "keys",
@@ -285,7 +284,11 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     headerClassName: "whitespace-nowrap",
                     render: (item) => {
                       const keys = (item.requestKeys ?? []).join(", ") || "--";
-                      return <div className="max-w-[158px] truncate font-mono text-[11px] text-slate-600" title={keys}>{keys}</div>;
+                      return (
+                        <div className="max-w-[158px] truncate font-mono text-[11px] text-slate-600" title={keys}>
+                          {keys}
+                        </div>
+                      );
                     },
                   },
                   {
@@ -303,7 +306,9 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                     render: (item) => (
                       <div className="space-y-1.5">
                         <PreviewLine label="REQ" value={item.requestPreview || "--"} tone="sky" />
-                        {item.responsePreview ? <PreviewLine label="RESP" value={item.responsePreview} tone="slate" /> : null}
+                        {item.responsePreview ? (
+                          <PreviewLine label="RESP" value={item.responsePreview} tone="slate" />
+                        ) : null}
                       </div>
                     ),
                   },
@@ -318,7 +323,8 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                   发现疑似爆破 / 批量验证
                 </div>
                 <div className="mt-2 text-[13px] leading-relaxed">
-                  当前结果中共有 {analysis.bruteforceCount} 个认证端点命中爆破特征，建议优先回到 HTTP 流追踪页复核失败序列、用户名变化和限速/验证码响应。
+                  当前结果中共有 {analysis.bruteforceCount} 个认证端点命中爆破特征，建议优先回到 HTTP
+                  流追踪页复核失败序列、用户名变化和限速/验证码响应。
                 </div>
               </div>
             )}
@@ -329,7 +335,8 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
                   已识别成功认证信号
                 </div>
                 <div className="mt-2 text-[13px] leading-relaxed">
-                  成功线索通常来自 2xx/3xx + Set-Cookie、token 返回或跳转到非登录页面。你可以结合包号和 stream 继续向下追踪后续会话行为。
+                  成功线索通常来自 2xx/3xx + Set-Cookie、token 返回或跳转到非登录页面。你可以结合包号和 stream
+                  继续向下追踪后续会话行为。
                 </div>
               </div>
             )}
@@ -341,12 +348,9 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
 }
 
 function endpointKeyForAttempt(item: HTTPLoginAnalysis["attempts"][number]) {
-  return `${String(item.method ?? "").trim().toUpperCase()}|${String(item.host ?? "").trim()}|${String(item.path ?? "").trim()}`;
-}
-
-function renderEndpointTitle(item: HTTPLoginEndpoint) {
-  const base = item.host ? `${item.host}${item.path || "/"}` : item.path || "/";
-  return `${item.method || "HTTP"} ${base}`;
+  return `${String(item.method ?? "")
+    .trim()
+    .toUpperCase()}|${String(item.host ?? "").trim()}|${String(item.path ?? "").trim()}`;
 }
 
 function InfoBlock({ title, values, empty }: { title: string; values?: string[]; empty: string }) {
@@ -356,7 +360,12 @@ function InfoBlock({ title, values, empty }: { title: string; values?: string[];
       {(values?.length ?? 0) > 0 ? (
         <div className="flex flex-wrap gap-2">
           {values!.map((value) => (
-            <span key={value} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700">{value}</span>
+            <span
+              key={value}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700"
+            >
+              {value}
+            </span>
           ))}
         </div>
       ) : (
@@ -422,8 +431,10 @@ function renderHTTPLoginAnalysisText(analysis: HTTPLoginAnalysis) {
     "端点详情:",
   ];
   for (const endpoint of analysis.endpoints) {
-    lines.push(`- ${renderEndpointTitle(endpoint)}`);
-    lines.push(`  尝试 ${endpoint.attemptCount} / 成功 ${endpoint.successCount} / 失败 ${endpoint.failureCount} / 待确认 ${endpoint.uncertainCount}`);
+    lines.push(`- ${renderHTTPLoginEndpointTitle(endpoint)}`);
+    lines.push(
+      `  尝试 ${endpoint.attemptCount} / 成功 ${endpoint.successCount} / 失败 ${endpoint.failureCount} / 待确认 ${endpoint.uncertainCount}`,
+    );
     if (endpoint.possibleBruteforce) {
       lines.push("  标记: 疑似爆破");
     }
