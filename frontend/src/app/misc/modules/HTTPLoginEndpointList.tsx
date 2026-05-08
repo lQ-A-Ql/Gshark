@@ -1,4 +1,5 @@
 import type { HTTPLoginEndpoint } from "../../core/types";
+import { renderHTTPLoginEndpointTitle } from "./HTTPLoginAnalysisUtils";
 
 interface HTTPLoginEndpointListProps {
   hasCapture: boolean;
@@ -60,9 +61,4 @@ export function HTTPLoginEndpointList({
       </div>
     </div>
   );
-}
-
-export function renderHTTPLoginEndpointTitle(item: HTTPLoginEndpoint) {
-  const base = item.host ? `${item.host}${item.path || "/"}` : item.path || "/";
-  return `${item.method || "HTTP"} ${base}`;
 }

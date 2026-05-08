@@ -11,7 +11,15 @@ import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
 import { HTTPLoginDetailsPanel } from "./HTTPLoginDetailsPanel";
-import { HTTPLoginEndpointList, renderHTTPLoginEndpointTitle } from "./HTTPLoginEndpointList";
+import { HTTPLoginEndpointList } from "./HTTPLoginEndpointList";
+import {
+  filterHTTPLoginAttemptsForEndpoint,
+  filterHTTPLoginEndpoints,
+  HTTP_LOGIN_RESULT_FILTERS,
+  renderHTTPLoginAnalysisText,
+  selectHTTPLoginEndpoint,
+  type HTTPLoginResultFilter,
+} from "./HTTPLoginAnalysisUtils";
 
 const EMPTY_ANALYSIS: HTTPLoginAnalysis = {
   totalAttempts: 0,
@@ -25,8 +33,6 @@ const EMPTY_ANALYSIS: HTTPLoginAnalysis = {
   notes: [],
 };
 
-type ResultFilter = "ALL" | "SUCCESS" | "FAILURE" | "UNCERTAIN";
-
 export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
@@ -36,41 +42,22 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
     emptyData: EMPTY_ANALYSIS,
     errorMessage: "加载 HTTP 登录行为分析失败",
   });
-  const [resultFilter, setResultFilter] = useState<ResultFilter>("ALL");
+  const [resultFilter, setResultFilter] = useState<HTTPLoginResultFilter>("ALL");
   const [query, setQuery] = useState("");
   const [selectedEndpointKey, setSelectedEndpointKey] = useState("");
   const embedded = surfaceVariant === "embedded";
 
   const filteredEndpoints = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    return analysis.endpoints.filter((item) => {
-      if (resultFilter === "SUCCESS" && item.successCount <= 0) return false;
-      if (resultFilter === "FAILURE" && item.failureCount <= 0) return false;
-      if (resultFilter === "UNCERTAIN" && item.uncertainCount <= 0) return false;
-      if (!keyword) return true;
-      const haystack = [
-        item.key,
-        item.method,
-        item.host,
-        item.path,
-        item.requestKeys?.join(" "),
-        item.responseIndicators?.join(" "),
-        item.notes?.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(keyword);
-    });
+    return filterHTTPLoginEndpoints(analysis.endpoints, resultFilter, query);
   }, [analysis.endpoints, query, resultFilter]);
 
   const selectedEndpoint = useMemo(
-    () => filteredEndpoints.find((item) => item.key === selectedEndpointKey) ?? filteredEndpoints[0] ?? null,
+    () => selectHTTPLoginEndpoint(filteredEndpoints, selectedEndpointKey),
     [filteredEndpoints, selectedEndpointKey],
   );
 
   const filteredAttempts = useMemo(() => {
-    if (!selectedEndpoint) return [];
-    return analysis.attempts.filter((item) => endpointKeyForAttempt(item) === selectedEndpoint.key);
+    return filterHTTPLoginAttemptsForEndpoint(analysis.attempts, selectedEndpoint);
   }, [analysis.attempts, selectedEndpoint]);
 
   function exportAnalysis(format: MiscExportFormat) {
@@ -117,7 +104,7 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
         <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)_auto]">
           <Field label="结果筛选">
             <div className="relative isolate flex h-10 w-full rounded-md bg-slate-100/90 p-1 ring-1 ring-inset ring-slate-200/50">
-              {(["ALL", "SUCCESS", "FAILURE", "UNCERTAIN"] as ResultFilter[]).map((item) => (
+              {HTTP_LOGIN_RESULT_FILTERS.map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -178,40 +165,4 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
       </CardContent>
     </Card>
   );
-}
-
-function endpointKeyForAttempt(item: HTTPLoginAnalysis["attempts"][number]) {
-  return `${String(item.method ?? "")
-    .trim()
-    .toUpperCase()}|${String(item.host ?? "").trim()}|${String(item.path ?? "").trim()}`;
-}
-
-function renderHTTPLoginAnalysisText(analysis: HTTPLoginAnalysis) {
-  const lines: string[] = [
-    "HTTP 登录行为分析",
-    `总尝试: ${analysis.totalAttempts}`,
-    `候选端点: ${analysis.candidateEndpoints}`,
-    `成功: ${analysis.successCount}`,
-    `失败: ${analysis.failureCount}`,
-    `待确认: ${analysis.uncertainCount}`,
-    `疑似爆破: ${analysis.bruteforceCount}`,
-    "",
-    "端点详情:",
-  ];
-  for (const endpoint of analysis.endpoints) {
-    lines.push(`- ${renderHTTPLoginEndpointTitle(endpoint)}`);
-    lines.push(
-      `  尝试 ${endpoint.attemptCount} / 成功 ${endpoint.successCount} / 失败 ${endpoint.failureCount} / 待确认 ${endpoint.uncertainCount}`,
-    );
-    if (endpoint.possibleBruteforce) {
-      lines.push("  标记: 疑似爆破");
-    }
-    if ((endpoint.requestKeys?.length ?? 0) > 0) {
-      lines.push(`  请求键: ${endpoint.requestKeys!.join(", ")}`);
-    }
-    if ((endpoint.responseIndicators?.length ?? 0) > 0) {
-      lines.push(`  响应信号: ${endpoint.responseIndicators!.join(", ")}`);
-    }
-  }
-  return lines.join("\n");
 }
