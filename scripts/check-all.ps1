@@ -32,6 +32,11 @@ Invoke-Step "Backend tests" {
   go test ./...
 }
 
+Invoke-Step "Frontend package manager check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run package-manager:check
+}
+
 Invoke-Step "Frontend tests" {
   Set-Location (Join-Path $root "frontend")
   pnpm run test:run
@@ -50,6 +55,11 @@ Invoke-Step "Frontend lint" {
 Invoke-Step "Frontend format check" {
   Set-Location (Join-Path $root "frontend")
   pnpm run format:check
+}
+
+Invoke-Step "Frontend size check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run size:check
 }
 
 Invoke-Step "Frontend build" {

@@ -15,8 +15,21 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
+	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+func newTestServerWithTempMiscPackages(t *testing.T) *Server {
+	t.Helper()
+
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	manager := miscpkg.NewManager()
+	if err := manager.LoadFromDir(t.TempDir()); err != nil {
+		t.Fatalf("LoadFromDir(temp misc package dir) error = %v", err)
+	}
+	server.miscPkgMgr = manager
+	return server
+}
 
 func TestWithCORSAllowsLoopbackDeletePreflight(t *testing.T) {
 	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +289,7 @@ func TestHandleMiscModulesReturnsBuiltinsAndCustomModules(t *testing.T) {
 }
 
 func TestHandleImportMiscModulePackageAndInvoke(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := newTestServerWithTempMiscPackages(t)
 	moduleID := fmt.Sprintf("echo-demo-test-%d", time.Now().UnixNano())
 
 	body := new(bytes.Buffer)
@@ -327,7 +340,7 @@ func TestHandleImportMiscModulePackageAndInvoke(t *testing.T) {
 }
 
 func TestHandleDeletePackagedMiscModule(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := newTestServerWithTempMiscPackages(t)
 	moduleID := fmt.Sprintf("delete-demo-%d", time.Now().UnixNano())
 
 	body := new(bytes.Buffer)
