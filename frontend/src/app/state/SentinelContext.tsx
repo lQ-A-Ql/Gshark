@@ -94,10 +94,11 @@ import {
   buildSwitchStat,
   prettySize,
 } from "./streamState";
-import { canSchedulePrefetch, pickAdjacentStreamTargets } from "./streamPrefetchPlan";
+import { pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
+import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -604,76 +605,37 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
     for (const targetId of targets) {
       if (protocol === "HTTP") {
-        if (!canSchedulePrefetch({
-          hasCached: httpStreamCacheRef.current.has(targetId),
-          inFlight: httpPrefetchInFlightRef.current.has(targetId),
-          inFlightSize: httpPrefetchInFlightRef.current.size,
-        })) continue;
-        const task = captureTaskScopeRef.current.beginTask(`prefetch-http-${targetId}`);
-        httpPrefetchInFlightRef.current.add(targetId);
-        void bridge
-          .getHttpStream(targetId, task.signal)
-          .then((http) => {
-            if (task.isCurrent()) {
-              httpStreamCacheRef.current.set(http.id, http);
-            }
-          })
-          .catch(() => {
-            // Prefetch is opportunistic; failures and aborts should not surface in UI.
-          })
-          .finally(() => {
-            task.finish();
-            httpPrefetchInFlightRef.current.delete(targetId);
-          });
+        scheduleStreamPrefetch({
+          targetId,
+          taskKey: `prefetch-http-${targetId}`,
+          cache: httpStreamCacheRef.current,
+          inFlight: httpPrefetchInFlightRef.current,
+          beginTask: captureTaskScopeRef.current.beginTask,
+          fetchStream: (id, signal) => bridge.getHttpStream(id, signal),
+        });
         continue;
       }
 
       if (protocol === "TCP") {
-        if (!canSchedulePrefetch({
-          hasCached: tcpStreamCacheRef.current.has(targetId),
-          inFlight: tcpPrefetchInFlightRef.current.has(targetId),
-          inFlightSize: tcpPrefetchInFlightRef.current.size,
-        })) continue;
-        const task = captureTaskScopeRef.current.beginTask(`prefetch-tcp-${targetId}`);
-        tcpPrefetchInFlightRef.current.add(targetId);
-        void bridge
-          .getRawStreamPage("TCP", targetId, 0, RAW_STREAM_PAGE_SIZE, task.signal)
-          .then((raw) => {
-            if (task.isCurrent()) {
-              tcpStreamCacheRef.current.set(raw.id, raw);
-            }
-          })
-          .catch(() => {
-            // Prefetch is opportunistic; failures and aborts should not surface in UI.
-          })
-          .finally(() => {
-            task.finish();
-            tcpPrefetchInFlightRef.current.delete(targetId);
-          });
+        scheduleStreamPrefetch({
+          targetId,
+          taskKey: `prefetch-tcp-${targetId}`,
+          cache: tcpStreamCacheRef.current,
+          inFlight: tcpPrefetchInFlightRef.current,
+          beginTask: captureTaskScopeRef.current.beginTask,
+          fetchStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+        });
         continue;
       }
 
-      if (!canSchedulePrefetch({
-        hasCached: udpStreamCacheRef.current.has(targetId),
-        inFlight: udpPrefetchInFlightRef.current.has(targetId),
-        inFlightSize: udpPrefetchInFlightRef.current.size,
-      })) continue;
-      const task = captureTaskScopeRef.current.beginTask(`prefetch-udp-${targetId}`);
-      udpPrefetchInFlightRef.current.add(targetId);
-      void bridge
-        .getRawStreamPage("UDP", targetId, 0, RAW_STREAM_PAGE_SIZE, task.signal)
-        .then((raw) => {
-          if (task.isCurrent()) {
-            udpStreamCacheRef.current.set(raw.id, raw);
-          }
-        })
-        .catch(() => {
-          // Prefetch is opportunistic; failures and aborts should not surface in UI.
-        })
-        .finally(() => {
-          task.finish();
-          udpPrefetchInFlightRef.current.delete(targetId);
-        });
+      scheduleStreamPrefetch({
+        targetId,
+        taskKey: `prefetch-udp-${targetId}`,
+        cache: udpStreamCacheRef.current,
+        inFlight: udpPrefetchInFlightRef.current,
+        beginTask: captureTaskScopeRef.current.beginTask,
+        fetchStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+      });
     }
   }, [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp]);
 
