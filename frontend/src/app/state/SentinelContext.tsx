@@ -100,8 +100,13 @@ import {
   bumpStreamSwitchSequence,
   createStreamSwitchSequences,
   isLatestStreamSwitchSequence,
-  resetStreamSwitchSequences,
 } from "./streamSwitchSequence";
+import {
+  clearStreamPrefetchInFlight,
+  createEmptyStreamSwitchDurations,
+  createEmptyStreamSwitchHits,
+  resetStreamRuntimeRefs,
+} from "./streamRuntimeReset";
 import {
   waitForCaptureSignal as waitForCaptureSignalUtil,
   wakeCaptureWaiters as wakeCaptureWaitersUtil,
@@ -202,18 +207,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
   const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
-  const streamSwitchDurationsRef = useRef<Record<"ALL" | StreamProtocol, number[]>>({
-    ALL: [],
-    HTTP: [],
-    TCP: [],
-    UDP: [],
-  });
-  const streamSwitchHitsRef = useRef<Record<"ALL" | StreamProtocol, number>>({
-    ALL: 0,
-    HTTP: 0,
-    TCP: 0,
-    UDP: 0,
-  });
+  const streamSwitchDurationsRef = useRef(createEmptyStreamSwitchDurations());
+  const streamSwitchHitsRef = useRef(createEmptyStreamSwitchHits());
 
   const recordStreamSwitchMetric = useCallback((protocol: StreamProtocol, elapsedMs: number, cacheHit: boolean) => {
     const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
@@ -246,9 +241,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     packetPageSeqRef.current += 1;
     threatAnalysisSeqRef.current += 1;
     bumpAllStreamSwitchSequences(streamSwitchSequencesRef.current);
-    httpPrefetchInFlightRef.current.clear();
-    tcpPrefetchInFlightRef.current.clear();
-    udpPrefetchInFlightRef.current.clear();
+    clearStreamPrefetchInFlight({
+      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
+      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
+      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
+    });
     if (loadMoreScheduledRef.current != null) {
       window.clearTimeout(loadMoreScheduledRef.current);
       loadMoreScheduledRef.current = null;
@@ -329,24 +326,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setTcpStream(EMPTY_BINARY_STREAM);
     setUdpStream({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
     setStreamIds({ http: [], tcp: [], udp: [] });
-    httpStreamCacheRef.current.clear();
-    tcpStreamCacheRef.current.clear();
-    udpStreamCacheRef.current.clear();
-    httpPrefetchInFlightRef.current.clear();
-    tcpPrefetchInFlightRef.current.clear();
-    udpPrefetchInFlightRef.current.clear();
-    streamSwitchDurationsRef.current = {
-      ALL: [],
-      HTTP: [],
-      TCP: [],
-      UDP: [],
-    };
-    streamSwitchHitsRef.current = {
-      ALL: 0,
-      HTTP: 0,
-      TCP: 0,
-      UDP: 0,
-    };
+    resetStreamRuntimeRefs({
+      httpCache: httpStreamCacheRef.current,
+      tcpCache: tcpStreamCacheRef.current,
+      udpCache: udpStreamCacheRef.current,
+      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
+      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
+      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
+      switchDurationsRef: streamSwitchDurationsRef,
+      switchHitsRef: streamSwitchHitsRef,
+    });
     setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
     setFileMeta({
       name: "未打开文件",
@@ -1055,25 +1044,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         setSelectedPacketDetail(null);
         setSelectedPacketRawHex("");
         setSelectedPacketLayers(null);
-        httpStreamCacheRef.current.clear();
-        tcpStreamCacheRef.current.clear();
-        udpStreamCacheRef.current.clear();
-        httpPrefetchInFlightRef.current.clear();
-        tcpPrefetchInFlightRef.current.clear();
-        udpPrefetchInFlightRef.current.clear();
-        resetStreamSwitchSequences(streamSwitchSequencesRef.current);
-        streamSwitchDurationsRef.current = {
-          ALL: [],
-          HTTP: [],
-          TCP: [],
-          UDP: [],
-        };
-        streamSwitchHitsRef.current = {
-          ALL: 0,
-          HTTP: 0,
-          TCP: 0,
-          UDP: 0,
-        };
+        resetStreamRuntimeRefs({
+          httpCache: httpStreamCacheRef.current,
+          tcpCache: tcpStreamCacheRef.current,
+          udpCache: udpStreamCacheRef.current,
+          httpPrefetchInFlight: httpPrefetchInFlightRef.current,
+          tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
+          udpPrefetchInFlight: udpPrefetchInFlightRef.current,
+          switchSequences: streamSwitchSequencesRef.current,
+          switchDurationsRef: streamSwitchDurationsRef,
+          switchHitsRef: streamSwitchHitsRef,
+        });
         setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
         setThreatHits([]);
         setIsThreatAnalysisLoading(false);
