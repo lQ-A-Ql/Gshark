@@ -85,6 +85,31 @@ const budgets = [
     maxLines: 490,
     reason: "industrial page should keep decoded protocol panels in feature components",
   },
+  {
+    path: "src/app/features/c2/C2AggregateTables.tsx",
+    maxLines: 485,
+    reason: "C2 aggregate tables should keep row helpers and detail panels separated",
+  },
+  {
+    path: "src/app/pages/HttpStream.tsx",
+    maxLines: 485,
+    reason: "HTTP stream page should avoid absorbing decoder or evidence workflows",
+  },
+  {
+    path: "src/app/features/media/MediaSessionTable.tsx",
+    maxLines: 470,
+    reason: "media session table should keep playback panels and row helpers split",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSidebar.tsx",
+    maxLines: 470,
+    reason: "runtime settings sidebar should not grow into workflow-specific settings",
+  },
+  {
+    path: "src/app/features/usb/UsbTables.tsx",
+    maxLines: 460,
+    reason: "USB tables should keep HID and mass-storage sections modular",
+  },
 ];
 
 function countLines(text) {
