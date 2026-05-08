@@ -10,7 +10,7 @@
     "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1",
     "ci": "pnpm run package-manager:check && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run size:check && pnpm run test:run && pnpm run build",
     "format:check": "node scripts/check-format.mjs",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"eslint.config.js\" --max-warnings=0",
     "package-manager:check": "node scripts/check-package-manager.mjs",
     "preview": "vite preview",
     "size:check": "node scripts/check-size.mjs",
