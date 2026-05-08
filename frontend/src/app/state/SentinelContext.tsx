@@ -93,11 +93,11 @@ import {
   buildLoadingHttpStream,
   buildSwitchStat,
   isFastPathLoad,
-  markCachedLoad,
   prettySize,
 } from "./streamState";
 import { canSchedulePrefetch, pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
+import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -697,19 +697,28 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       return requestSeq === udpSwitchSeqRef.current;
     };
 
+    const commitCachedSwitch = <T extends HttpStream | BinaryStream>(
+      metricProtocol: "HTTP" | "TCP" | "UDP",
+      cache: Map<number, T>,
+      apply: (stream: T) => void,
+    ) => {
+      if (!applyCachedStreamSwitch({ cache, streamId, isLatest, apply })) {
+        return false;
+      }
+      cacheHit = true;
+      const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+      recordStreamSwitchMetric(metricProtocol, elapsed, cacheHit);
+      prefetchAdjacentStreams(metricProtocol, streamId);
+      return true;
+    };
+
     try {
       if (protocol === "HTTP") {
-        const cached = httpStreamCacheRef.current.get(streamId);
-        if (cached) {
-          if (!isLatest()) return;
-          const next = markCachedLoad(cached);
-          cacheHit = true;
+        if (commitCachedSwitch("HTTP", httpStreamCacheRef.current, (next) => {
           startTransition(() => {
             setHttpStream(next);
           });
-          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-          recordStreamSwitchMetric("HTTP", elapsed, cacheHit);
-          prefetchAdjacentStreams("HTTP", streamId);
+        })) {
           return;
         }
         startTransition(() => {
@@ -727,17 +736,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         return;
       }
       if (protocol === "TCP") {
-        const cached = tcpStreamCacheRef.current.get(streamId);
-        if (cached) {
-          if (!isLatest()) return;
-          const next = markCachedLoad(cached);
-          cacheHit = true;
+        if (commitCachedSwitch("TCP", tcpStreamCacheRef.current, (next) => {
           startTransition(() => {
             setTcpStream(next);
           });
-          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-          recordStreamSwitchMetric("TCP", elapsed, cacheHit);
-          prefetchAdjacentStreams("TCP", streamId);
+        })) {
           return;
         }
         startTransition(() => {
@@ -745,17 +748,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         });
       }
       if (protocol === "UDP") {
-        const cached = udpStreamCacheRef.current.get(streamId);
-        if (cached) {
-          if (!isLatest()) return;
-          const next = markCachedLoad(cached);
-          cacheHit = true;
+        if (commitCachedSwitch("UDP", udpStreamCacheRef.current, (next) => {
           startTransition(() => {
             setUdpStream(next);
           });
-          const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-          recordStreamSwitchMetric("UDP", elapsed, cacheHit);
-          prefetchAdjacentStreams("UDP", streamId);
+        })) {
           return;
         }
         startTransition(() => {
