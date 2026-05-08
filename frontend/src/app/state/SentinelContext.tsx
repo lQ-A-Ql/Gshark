@@ -30,6 +30,7 @@ import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
 import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
 import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
+import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
   EMPTY_THREAT_ANALYSIS_PROGRESS,
@@ -850,17 +851,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const refreshAnalysisResultRef = useRef(refreshAnalysisResult);
   const updateProgressFromStatusRef = useRef(updateProgressFromStatus);
 
-  useEffect(() => {
-    scheduleLoadMoreRef.current = scheduleLoadMore;
-  }, [scheduleLoadMore]);
-
-  useEffect(() => {
-    refreshAnalysisResultRef.current = refreshAnalysisResult;
-  }, [refreshAnalysisResult]);
-
-  useEffect(() => {
-    updateProgressFromStatusRef.current = updateProgressFromStatus;
-  }, [updateProgressFromStatus]);
+  useSyncedRefValue(scheduleLoadMoreRef, scheduleLoadMore);
+  useSyncedRefValue(refreshAnalysisResultRef, refreshAnalysisResult);
+  useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
 
   useEffect(() => () => {
     captureTaskScopeRef.current.invalidate();
