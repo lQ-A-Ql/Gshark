@@ -1,6 +1,6 @@
 import { Mail, Paperclip, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import type { SMTPAnalysis, SMTPSession } from "../../core/types";
+import type { SMTPAnalysis } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
@@ -11,6 +11,7 @@ import { AnalysisDataTable as DataTable } from "../../components/analysis/Analys
 import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
+import { renderSMTPSessionTitle, SMTPSessionList } from "./SMTPSessionList";
 
 const EMPTY_ANALYSIS: SMTPAnalysis = {
   sessionCount: 0,
@@ -53,8 +54,12 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
         item.rcptTo?.join(" "),
         item.authMechanisms?.join(" "),
         item.statusHints?.join(" "),
-        item.messages?.map((row) => [row.subject, row.from, row.to, row.attachmentNames?.join(" "), row.bodyPreview].join(" ")).join(" "),
-      ].join(" ").toLowerCase();
+        item.messages
+          ?.map((row) => [row.subject, row.from, row.to, row.attachmentNames?.join(" "), row.bodyPreview].join(" "))
+          .join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(keyword);
     });
   }, [analysis.sessions, query, sessionFilter]);
@@ -79,7 +84,13 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
   }
 
   return (
-    <Card className={embedded ? "min-w-0 h-fit border-0 bg-transparent shadow-none" : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"}>
+    <Card
+      className={
+        embedded
+          ? "min-w-0 h-fit border-0 bg-transparent shadow-none"
+          : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"
+      }
+    >
       <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
@@ -95,7 +106,11 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
           <MetaChip label="会话" value={analysis.sessionCount} color="slate" />
           <MetaChip label="邮件" value={analysis.messageCount} color="emerald" />
           <MetaChip label="认证" value={analysis.authCount} color={analysis.authCount > 0 ? "rose" : "slate"} />
-          <MetaChip label="附件线索" value={analysis.attachmentHintCount} color={analysis.attachmentHintCount > 0 ? "sky" : "slate"} />
+          <MetaChip
+            label="附件线索"
+            value={analysis.attachmentHintCount}
+            color={analysis.attachmentHintCount > 0 ? "sky" : "slate"}
+          />
           {module.protocolDomain && <MetaChip label="域" value={module.protocolDomain} color="slate" />}
         </div>
 
@@ -125,7 +140,13 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void refresh()} disabled={!hasCapture || loading} className="gap-2 bg-white text-sky-700">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void refresh()}
+              disabled={!hasCapture || loading}
+              className="gap-2 bg-white text-sky-700"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新"}
             </Button>
@@ -140,55 +161,13 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
         {error && <ErrorBlock message={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.96fr)_minmax(0,1.04fr)]">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-800">SMTP 会话列表</div>
-              <div className="text-[11px] text-slate-500">{filteredSessions.length} 条 / 邮件 {filteredMessageCount}</div>
-            </div>
-            <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
-              {filteredSessions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-[13px] text-slate-500">
-                  {hasCapture ? "当前筛选下没有匹配的 SMTP 会话" : "未加载抓包"}
-                </div>
-              ) : (
-                filteredSessions.map((item) => {
-                  const selected = selectedSession?.streamId === item.streamId;
-                  return (
-                    <button
-                      key={`smtp-session-${item.streamId}`}
-                      type="button"
-                      onClick={() => setSelectedStreamId(item.streamId)}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
-                        selected
-                          ? "border-sky-400 bg-sky-50 shadow-sm ring-2 ring-sky-100"
-                          : "border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50/40"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 font-mono text-[11px] font-semibold text-sky-700">SMTP #{item.streamId}</span>
-                        {item.authUsername || (item.authMechanisms?.length ?? 0) > 0 ? (
-                          <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">认证</span>
-                        ) : null}
-                        {(item.attachmentHints ?? 0) > 0 ? (
-                          <span className="rounded-md bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-700">附件 {item.attachmentHints}</span>
-                        ) : null}
-                        {item.possibleCleartext ? (
-                          <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">明文凭据风险</span>
-                        ) : null}
-                      </div>
-                      <div className="mt-2 break-all font-medium text-slate-800">{renderSessionTitle(item)}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                        <span>命令 {item.commandCount}</span>
-                        <span>邮件 {item.messageCount}</span>
-                        {(item.mailFrom?.length ?? 0) > 0 ? <span>发件人 {item.mailFrom?.length}</span> : null}
-                        {(item.rcptTo?.length ?? 0) > 0 ? <span>收件人 {item.rcptTo?.length}</span> : null}
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <SMTPSessionList
+            hasCapture={hasCapture}
+            sessions={filteredSessions}
+            selectedSession={selectedSession}
+            messageCount={filteredMessageCount}
+            onSelectSession={setSelectedStreamId}
+          />
 
           <div className="space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -206,16 +185,51 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     <MetaChip label="Stream" value={selectedSession.streamId} color="sky" />
-                    <MetaChip label="客户端" value={selectedSession.client ? `${selectedSession.client}${selectedSession.clientPort ? `:${selectedSession.clientPort}` : ""}` : "--"} color="slate" />
-                    <MetaChip label="服务端" value={selectedSession.server ? `${selectedSession.server}${selectedSession.serverPort ? `:${selectedSession.serverPort}` : ""}` : "--"} color="slate" />
+                    <MetaChip
+                      label="客户端"
+                      value={
+                        selectedSession.client
+                          ? `${selectedSession.client}${selectedSession.clientPort ? `:${selectedSession.clientPort}` : ""}`
+                          : "--"
+                      }
+                      color="slate"
+                    />
+                    <MetaChip
+                      label="服务端"
+                      value={
+                        selectedSession.server
+                          ? `${selectedSession.server}${selectedSession.serverPort ? `:${selectedSession.serverPort}` : ""}`
+                          : "--"
+                      }
+                      color="slate"
+                    />
                     <MetaChip label="HELO" value={selectedSession.helo || "--"} color="slate" />
-                    <MetaChip label="机制" value={selectedSession.authMechanisms?.join(", ") || "--"} color={(selectedSession.authMechanisms?.length ?? 0) > 0 ? "rose" : "slate"} />
+                    <MetaChip
+                      label="机制"
+                      value={selectedSession.authMechanisms?.join(", ") || "--"}
+                      color={(selectedSession.authMechanisms?.length ?? 0) > 0 ? "rose" : "slate"}
+                    />
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <InfoBlock title="认证用户名" values={selectedSession.authUsername ? [selectedSession.authUsername] : []} empty="未解析到用户名" tone="rose" />
-                    <InfoBlock title="状态提示" values={selectedSession.statusHints ?? []} empty="暂无状态提示" tone="slate" />
-                    <InfoBlock title="MAIL FROM" values={selectedSession.mailFrom ?? []} empty="无 MAIL FROM" tone="sky" />
+                    <InfoBlock
+                      title="认证用户名"
+                      values={selectedSession.authUsername ? [selectedSession.authUsername] : []}
+                      empty="未解析到用户名"
+                      tone="rose"
+                    />
+                    <InfoBlock
+                      title="状态提示"
+                      values={selectedSession.statusHints ?? []}
+                      empty="暂无状态提示"
+                      tone="slate"
+                    />
+                    <InfoBlock
+                      title="MAIL FROM"
+                      values={selectedSession.mailFrom ?? []}
+                      empty="无 MAIL FROM"
+                      tone="sky"
+                    />
                     <InfoBlock title="RCPT TO" values={selectedSession.rcptTo ?? []} empty="无 RCPT TO" tone="sky" />
                   </div>
 
@@ -246,10 +260,19 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
               ) : (
                 <div className="max-h-[420px] space-y-3 overflow-auto pr-1">
                   {(selectedSession.messages ?? []).map((message) => (
-                    <div key={`${selectedSession.streamId}-${message.sequence}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                    <div
+                      key={`${selectedSession.streamId}-${message.sequence}`}
+                      className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
+                    >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold text-sky-700">邮件 #{message.sequence}</span>
-                        {message.subject ? <span className="text-sm font-semibold text-slate-800">{message.subject}</span> : <span className="text-sm text-slate-500">(无主题)</span>}
+                        <span className="rounded-md border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold text-sky-700">
+                          邮件 #{message.sequence}
+                        </span>
+                        {message.subject ? (
+                          <span className="text-sm font-semibold text-slate-800">{message.subject}</span>
+                        ) : (
+                          <span className="text-sm text-slate-500">(无主题)</span>
+                        )}
                         {(message.attachmentNames?.length ?? 0) > 0 ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-700">
                             <Paperclip className="h-3.5 w-3.5" />
@@ -265,10 +288,17 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
                       </div>
                       {(message.attachmentNames?.length ?? 0) > 0 && (
                         <div className="mt-3">
-                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">附件文件名</div>
+                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            附件文件名
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             {message.attachmentNames?.map((name) => (
-                              <span key={`${message.sequence}-${name}`} className="rounded-md border border-sky-200 bg-white px-2 py-1 font-mono text-[11px] text-sky-700">{name}</span>
+                              <span
+                                key={`${message.sequence}-${name}`}
+                                className="rounded-md border border-sky-200 bg-white px-2 py-1 font-mono text-[11px] text-sky-700"
+                              >
+                                {name}
+                              </span>
                             ))}
                           </div>
                         </div>
@@ -289,7 +319,9 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
               </div>
               <DataTable
                 data={selectedSession?.commands ?? []}
-                rowKey={(command) => `${selectedSession?.streamId ?? "smtp"}-${command.packetId}-${command.summary || command.command || command.statusCode || "row"}`}
+                rowKey={(command) =>
+                  `${selectedSession?.streamId ?? "smtp"}-${command.packetId}-${command.summary || command.command || command.statusCode || "row"}`
+                }
                 maxHeightClassName="max-h-[320px]"
                 wrapperClassName="border-slate-100 bg-white"
                 headerClassName="bg-slate-50/95 text-slate-500"
@@ -339,12 +371,6 @@ export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: M
   );
 }
 
-function renderSessionTitle(session: SMTPSession) {
-  const left = session.client ? `${session.client}${session.clientPort ? `:${session.clientPort}` : ""}` : `stream #${session.streamId}`;
-  const right = session.server ? `${session.server}${session.serverPort ? `:${session.serverPort}` : ""}` : "SMTP server";
-  return `${left} → ${right}`;
-}
-
 function renderSMTPAnalysisText(analysis: SMTPAnalysis) {
   const lines: string[] = [
     `SMTP session count: ${analysis.sessionCount}`,
@@ -361,7 +387,7 @@ function renderSMTPAnalysisText(analysis: SMTPAnalysis) {
     lines.push("");
   }
   for (const session of analysis.sessions) {
-    lines.push(`[SMTP stream #${session.streamId}] ${renderSessionTitle(session)}`);
+    lines.push(`[SMTP stream #${session.streamId}] ${renderSMTPSessionTitle(session)}`);
     lines.push(`HELO: ${session.helo || "--"}`);
     lines.push(`AUTH: ${(session.authMechanisms ?? []).join(", ") || "--"}`);
     lines.push(`AUTH username: ${session.authUsername || "--"}`);
@@ -381,19 +407,35 @@ function renderSMTPAnalysisText(analysis: SMTPAnalysis) {
   return lines.join("\n");
 }
 
-function InfoBlock({ title, values, empty, tone = "slate" }: { title: string; values?: string[]; empty: string; tone?: "slate" | "rose" | "sky" }) {
-  const toneClass = tone === "rose"
-    ? "border-rose-200 bg-rose-50/40"
-    : tone === "sky"
-      ? "border-sky-200 bg-sky-50/40"
-      : "border-slate-200 bg-slate-50/70";
+function InfoBlock({
+  title,
+  values,
+  empty,
+  tone = "slate",
+}: {
+  title: string;
+  values?: string[];
+  empty: string;
+  tone?: "slate" | "rose" | "sky";
+}) {
+  const toneClass =
+    tone === "rose"
+      ? "border-rose-200 bg-rose-50/40"
+      : tone === "sky"
+        ? "border-sky-200 bg-sky-50/40"
+        : "border-slate-200 bg-slate-50/70";
   return (
     <div className={`rounded-lg border p-3 ${toneClass}`}>
       <div className="mb-2 text-[12px] font-semibold text-slate-700">{title}</div>
       {values && values.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {values.map((value) => (
-            <span key={`${title}-${value}`} className="rounded-md border border-white/80 bg-white px-2 py-1 font-mono text-[11px] text-slate-700 shadow-sm">{value}</span>
+            <span
+              key={`${title}-${value}`}
+              className="rounded-md border border-white/80 bg-white px-2 py-1 font-mono text-[11px] text-slate-700 shadow-sm"
+            >
+              {value}
+            </span>
           ))}
         </div>
       ) : (
