@@ -70,6 +70,13 @@ import {
   shouldLoadSelectedPacketDetail,
 } from "./selectedPacketState";
 import {
+  PACKET_FILTER_POLL_INTERVAL_MS,
+  PACKET_FILTER_POLL_TIMEOUT_MS,
+  getPacketFilterDoneStatus,
+  getPacketFilterPollingStatus,
+  getPacketFilterWorkingStatus,
+} from "./packetFilterStatus";
+import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
   PRELOAD_SIGNAL_WAIT_MS,
@@ -1167,18 +1174,18 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         const filterSeq = ++filterSeqRef.current;
         setIsFilterLoading(true);
         resetPacketViewport();
-        setBackendStatus(nextFilter.trim() ? `正在应用过滤器: ${nextFilter}` : "正在重置过滤器");
+        setBackendStatus(getPacketFilterWorkingStatus(nextFilter));
         void (async () => {
           let page = await loadPacketPage(0, nextFilter);
-          const deadline = Date.now() + 10000;
+          const deadline = Date.now() + PACKET_FILTER_POLL_TIMEOUT_MS;
           while (filterSeq === filterSeqRef.current && page?.filtering && Date.now() < deadline) {
-            setBackendStatus(nextFilter.trim() ? `过滤器仍在后台扫描: ${nextFilter}` : "正在重置过滤器");
-            await new Promise((resolve) => window.setTimeout(resolve, 300));
+            setBackendStatus(getPacketFilterPollingStatus(nextFilter));
+            await new Promise((resolve) => window.setTimeout(resolve, PACKET_FILTER_POLL_INTERVAL_MS));
             page = await loadPacketPage(0, nextFilter);
           }
           if (filterSeq === filterSeqRef.current) {
             setIsFilterLoading(false);
-            setBackendStatus(nextFilter.trim() ? `过滤器已应用: ${nextFilter}` : "过滤器已清空");
+            setBackendStatus(getPacketFilterDoneStatus(nextFilter));
           }
         })();
       }
@@ -1193,11 +1200,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       const filterSeq = ++filterSeqRef.current;
       setIsFilterLoading(true);
       resetPacketViewport();
-      setBackendStatus("正在重置过滤器");
+      setBackendStatus(getPacketFilterWorkingStatus(""));
       void loadPacketPage(0, "").finally(() => {
         if (filterSeq === filterSeqRef.current) {
           setIsFilterLoading(false);
-          setBackendStatus("过滤器已清空");
+          setBackendStatus(getPacketFilterDoneStatus(""));
         }
       });
     }
