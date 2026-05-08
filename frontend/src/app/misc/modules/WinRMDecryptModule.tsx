@@ -1,4 +1,4 @@
-import { CheckCircle2, Copy, Download, FileText, Play, Terminal, Trash2 } from "lucide-react";
+import { Copy, Download, Play, Terminal, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
@@ -6,15 +6,16 @@ import type { WinRMDecryptResult } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { ErrorBlock, Field, MetaChip } from "../ui";
+import { ErrorBlock } from "../ui";
 import { copyTextToClipboard } from "../../utils/browserFile";
+import { WinRMDecryptForm, type WinRMAuthMode } from "./WinRMDecryptForm";
 import { WinRMPreviewDialog } from "./WinRMPreviewDialog";
+import { WinRMResultSummary } from "./WinRMResultSummary";
 
 export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const [winrmPort, setWinrmPort] = useState("5985");
-  const [winrmAuthMode, setWinrmAuthMode] = useState<"password" | "nt_hash">("password");
+  const [winrmAuthMode, setWinrmAuthMode] = useState<WinRMAuthMode>("password");
   const [winrmPassword, setWinrmPassword] = useState("");
   const [winrmHash, setWinrmHash] = useState("");
   const [winrmPreviewLines, setWinrmPreviewLines] = useState("200");
@@ -128,86 +129,21 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
           <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
         </CardHeader>
         <CardContent className={embedded ? "space-y-6 px-0 pt-0" : "space-y-6 pt-6"}>
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field label="当前目标抓包" className="md:col-span-2">
-              <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-600">
-                <FileText className="h-4 w-4 text-slate-400" />
-                <span className="flex-1 truncate font-medium">
-                  {hasCapture ? `${fileMeta.name} (${fileMeta.path})` : "未加载抓包，请先在主工作区导入文件"}
-                </span>
-                {hasCapture && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
-              </div>
-            </Field>
-            <Field label="WinRM 服务端口">
-              <Input
-                value={winrmPort}
-                onChange={(event) => setWinrmPort(event.target.value.replace(/[^0-9]/g, ""))}
-                className="font-mono text-sm shadow-sm"
-                placeholder="默认 5985"
-              />
-            </Field>
-            <Field label="认证方式">
-              <div className="relative isolate flex h-9 w-full rounded-md bg-slate-100/90 p-1 ring-1 ring-inset ring-slate-200/50">
-                <div
-                  className={`absolute bottom-1 left-1 top-1 -z-10 w-[calc(50%-4px)] rounded-md bg-white shadow-sm ring-1 ring-slate-200/60 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                    winrmAuthMode === "password" ? "translate-x-0" : "translate-x-full"
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setWinrmAuthMode("password")}
-                  className={`flex flex-1 items-center justify-center rounded-md text-[13px] font-semibold transition-colors duration-300 ${
-                    winrmAuthMode === "password" ? "text-sky-700" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  Password (明文)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWinrmAuthMode("nt_hash")}
-                  className={`flex flex-1 items-center justify-center rounded-md text-[13px] font-semibold transition-colors duration-300 ${
-                    winrmAuthMode === "nt_hash" ? "text-sky-700" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  NT Hash (哈希)
-                </button>
-              </div>
-            </Field>
-            <Field label="预览截断行数">
-              <Input
-                value={winrmPreviewLines}
-                onChange={(event) => setWinrmPreviewLines(event.target.value.replace(/[^0-9]/g, ""))}
-                className="font-mono text-sm shadow-sm"
-                placeholder="200"
-              />
-            </Field>
-            {winrmAuthMode === "password" ? (
-              <Field
-                label="明文密码 (Password)"
-                className="animate-in slide-in-from-top-1 px-1 duration-300 md:col-span-2 fade-in"
-              >
-                <Input
-                  type="password"
-                  value={winrmPassword}
-                  onChange={(event) => setWinrmPassword(event.target.value)}
-                  className="font-mono text-sm shadow-sm"
-                  placeholder="输入密码..."
-                />
-              </Field>
-            ) : (
-              <Field
-                label="NT Hash (HEX)"
-                className="animate-in slide-in-from-top-1 px-1 duration-300 md:col-span-2 fade-in"
-              >
-                <Input
-                  value={winrmHash}
-                  onChange={(event) => setWinrmHash(event.target.value)}
-                  placeholder="例如: 31d6cfe...c089c0"
-                  className="font-mono text-sm shadow-sm"
-                />
-              </Field>
-            )}
-          </div>
+          <WinRMDecryptForm
+            authMode={winrmAuthMode}
+            captureName={fileMeta.name}
+            capturePath={fileMeta.path}
+            hasCapture={hasCapture}
+            hash={winrmHash}
+            onAuthModeChange={setWinrmAuthMode}
+            onHashChange={setWinrmHash}
+            onPasswordChange={setWinrmPassword}
+            onPortChange={setWinrmPort}
+            onPreviewLinesChange={setWinrmPreviewLines}
+            password={winrmPassword}
+            port={winrmPort}
+            previewLines={winrmPreviewLines}
+          />
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
@@ -265,19 +201,7 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
               <ErrorBlock message={winrmError} />
             </div>
           )}
-          {winrmResult && (
-            <div className="mt-4 animate-in slide-in-from-bottom-2 duration-300 fade-in">
-              <div className="flex flex-wrap gap-2 rounded-xl border border-sky-100 bg-sky-50/50 p-4 text-[11px] shadow-sm">
-                <MetaChip label="抓包" value={winrmResult.captureName} />
-                <MetaChip label="Port" value={winrmResult.port} />
-                <MetaChip label="Mode" value={winrmResult.authMode} />
-                <MetaChip label="总帧" value={winrmResult.frameCount} />
-                <MetaChip label="解密失败" value={winrmResult.errorFrameCount} color="rose" />
-                <MetaChip label="含Payload帧" value={winrmResult.extractedFrameCount} color="sky" />
-                <MetaChip label="输出行数" value={winrmResult.lineCount} color="emerald" />
-              </div>
-            </div>
-          )}
+          {winrmResult && <WinRMResultSummary result={winrmResult} />}
         </CardContent>
       </Card>
 
