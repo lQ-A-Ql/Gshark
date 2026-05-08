@@ -11,7 +11,7 @@ import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { cn } from "../components/ui/utils";
 import type { C2DecryptRequest, C2DecryptResult, C2DNSAggregate, C2FamilyAnalysis, C2HTTPEndpointAggregate, C2IndicatorRecord, C2StreamAggregate } from "../core/types";
-import { C2FeatureCard, C2FamilyTabButton, C2NotesPanel, C2Panel, VShellEvidenceSummaryGrid } from "../features/c2/C2DisplayComponents";
+import { C2AptHandoffNotes, C2FeatureCard, C2FamilyTabButton, C2NotesPanel, C2Panel, VShellEvidenceSummaryGrid } from "../features/c2/C2DisplayComponents";
 import { C2_APT_HANDOFF_NOTES, CS_EVIDENCE_CARDS, VSHELL_EVIDENCE_CARDS, buildVShellEvidenceSummary } from "../features/c2/c2EvidenceModel";
 import { useC2Analysis } from "../features/c2/useC2Analysis";
 import { bridge } from "../integrations/wailsBridge";
@@ -126,14 +126,7 @@ export default function C2Analysis() {
           <BeaconPatternList family={activeTab} patterns={family.beaconPatterns ?? []} />
         </C2Panel>
         <C2Panel title="APT 兼容扩展口">
-          <div className="space-y-2">
-            {C2_APT_HANDOFF_NOTES.map((note, index) => (
-              <div key={`${note}-${index}`} className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-800">
-                <Workflow className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{note}</span>
-              </div>
-            ))}
-          </div>
+          <C2AptHandoffNotes notes={C2_APT_HANDOFF_NOTES} />
         </C2Panel>
       </div>
 

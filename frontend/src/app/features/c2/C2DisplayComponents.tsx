@@ -12,7 +12,19 @@ export function C2Panel({ title, children, className }: { title: string; childre
   );
 }
 
-export function C2FamilyTabButton({ active, onClick, icon, title, description }: { active: boolean; onClick: () => void; icon: ReactNode; title: string; description: string }) {
+export function C2FamilyTabButton({
+  active,
+  onClick,
+  icon,
+  title,
+  description,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
     <button
       type="button"
@@ -24,7 +36,9 @@ export function C2FamilyTabButton({ active, onClick, icon, title, description }:
           : "border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white",
       )}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/20 bg-white/70">{icon}</span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/20 bg-white/70">
+        {icon}
+      </span>
       <span>
         <span className="block text-sm font-semibold">{title}</span>
         <span className="mt-1 block text-xs leading-5 opacity-75">{description}</span>
@@ -49,7 +63,10 @@ export function VShellEvidenceSummaryGrid({ items }: { items: VShellEvidenceSumm
   return (
     <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
       {items.map((item) => (
-        <div key={item.label} className="rounded-[22px] border border-cyan-100 bg-[linear-gradient(135deg,rgba(236,254,255,0.82),rgba(255,255,255,0.96))] px-4 py-3 shadow-[0_18px_48px_-40px_rgba(8,145,178,0.45)]">
+        <div
+          key={item.label}
+          className="rounded-[22px] border border-cyan-100 bg-[linear-gradient(135deg,rgba(236,254,255,0.82),rgba(255,255,255,0.96))] px-4 py-3 shadow-[0_18px_48px_-40px_rgba(8,145,178,0.45)]"
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-600">{item.label}</div>
             {item.source ? (
@@ -66,6 +83,22 @@ export function VShellEvidenceSummaryGrid({ items }: { items: VShellEvidenceSumm
   );
 }
 
+export function C2AptHandoffNotes({ notes }: { notes: string[] }) {
+  return (
+    <div className="space-y-2">
+      {notes.map((note, index) => (
+        <div
+          key={`${note}-${index}`}
+          className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-800"
+        >
+          <Workflow className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{note}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function C2NotesPanel({ notes, emptyText }: { notes: string[]; emptyText: string }) {
   if (notes.length === 0) {
     return <EmptyState className="text-left">{emptyText}</EmptyState>;
@@ -73,7 +106,10 @@ export function C2NotesPanel({ notes, emptyText }: { notes: string[]; emptyText:
   return (
     <div className="space-y-2">
       {notes.map((note, index) => (
-        <div key={`${note}-${index}`} className="flex items-start gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
+        <div
+          key={`${note}-${index}`}
+          className="flex items-start gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600"
+        >
           <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
           <span>{note}</span>
         </div>

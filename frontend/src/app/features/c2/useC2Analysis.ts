@@ -51,41 +51,47 @@ export function useC2Analysis({
   const [error, setError] = useState("");
   const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  const cacheKey = useMemo(() => buildC2SampleAnalysisCacheKey(captureRevision, filePath, totalPackets), [captureRevision, filePath, totalPackets]);
+  const cacheKey = useMemo(
+    () => buildC2SampleAnalysisCacheKey(captureRevision, filePath, totalPackets),
+    [captureRevision, filePath, totalPackets],
+  );
 
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!filePath || !backendConnected) {
-      cancelAnalysisRequest();
-      setAnalysis(EMPTY_C2_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    if (!force && cacheKey && c2AnalysisCache.has(cacheKey)) {
-      cancelAnalysisRequest();
-      setAnalysis(c2AnalysisCache.get(cacheKey) ?? EMPTY_C2_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    return runAnalysisRequest({
-      request: (signal) => bridge.getC2SampleAnalysis(signal),
-      onSuccess: (payload) => {
-        if (cacheKey) {
-          c2AnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-      },
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : "C2 样本分析加载失败");
+  const refreshAnalysis = useCallback(
+    (force = false) => {
+      if (!filePath || !backendConnected) {
+        cancelAnalysisRequest();
         setAnalysis(EMPTY_C2_ANALYSIS);
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest]);
+        setLoading(false);
+        setError("");
+        return;
+      }
+      if (!force && cacheKey && c2AnalysisCache.has(cacheKey)) {
+        cancelAnalysisRequest();
+        setAnalysis(c2AnalysisCache.get(cacheKey) ?? EMPTY_C2_ANALYSIS);
+        setLoading(false);
+        setError("");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      return runAnalysisRequest({
+        request: (signal) => bridge.getC2SampleAnalysis(signal),
+        onSuccess: (payload) => {
+          if (cacheKey) {
+            c2AnalysisCache.set(cacheKey, payload);
+          }
+          setAnalysis(payload);
+        },
+        onError: (err) => {
+          setError(err instanceof Error ? err.message : "C2 样本分析加载失败");
+          setAnalysis(EMPTY_C2_ANALYSIS);
+        },
+        onSettled: () => setLoading(false),
+      });
+    },
+    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest],
+  );
 
   useEffect(() => {
     if (isPreloadingCapture) return;

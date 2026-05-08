@@ -166,7 +166,9 @@ function candidateText(candidate: C2IndicatorRecord) {
     ...(candidate.transportTraits ?? []),
     ...(candidate.infrastructureHints ?? []),
     ...(candidate.ttpTags ?? []),
-  ].join(" ").toLowerCase();
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function hasAnyTerm(haystack: string, terms: string[]) {
