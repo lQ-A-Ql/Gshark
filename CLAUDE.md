@@ -199,8 +199,8 @@ Frontend data flow:
 
 - GitHub Actions (`.github/workflows/ci.yml`): triggers on push (any branch) and PRs.
 - Backend job: `gofmt -l .` check + `go test ./...` on ubuntu-latest.
-- Frontend job: `corepack enable` + `pnpm install --frozen-lockfile` + `pnpm run ci` on ubuntu-latest (`typecheck` + ESLint + Vitest + build).
-- Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend tests/typecheck/lint/scoped-format/build).
+- Frontend job: `corepack enable` + `pnpm install --frozen-lockfile` + `pnpm run ci` on ubuntu-latest (`package-manager:check` + typecheck + ESLint + scoped-format + size + Vitest + build).
+- Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend package-manager/tests/typecheck/lint/scoped-format/size/build).
 
 ## Operational knobs that affect behavior
 

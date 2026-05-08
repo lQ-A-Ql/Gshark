@@ -24,12 +24,12 @@ When running backend commands, `cd backend` first. The root module has almost no
 
 Frontend uses `pnpm` as the only package manager. `frontend/pnpm-lock.yaml` is the maintained lockfile; do not reintroduce `package-lock.json`.
 
-CI (`.github/workflows/ci.yml`) enables Corepack, runs `pnpm install --frozen-lockfile`, then `pnpm run ci` (`typecheck` + ESLint + Vitest + Vite build).
+CI (`.github/workflows/ci.yml`) enables Corepack, runs `pnpm install --frozen-lockfile`, then `pnpm run ci` (`package-manager:check` + typecheck + ESLint + scoped Prettier format check + size budgets + Vitest + Vite build).
 
 ## Frontend build quirks
 
 - `pnpm run build:wails` = `vite build` + copies backend binary into `frontend/dist/` (via `scripts/build-backend-binary.ps1`). This is the command Wails uses.
-- `pnpm run build` = plain Vite build; CI runs it through `pnpm run ci` after typecheck, ESLint, and Vitest.
+- `pnpm run build` = plain Vite build; CI runs it through `pnpm run ci` after package manager, typecheck, ESLint, scoped format, size, and Vitest checks.
 - Vite config enforces: never add `.css`, `.tsx`, `.ts` to `assetsInclude`.
 - `@` alias → `./src` (configured in `vite.config.ts`).
 - Test environment: jsdom, setup file at `src/test/setup.ts`.
@@ -59,7 +59,7 @@ Backend: `17891`. Wails dev server: `34115`. `scripts/start-wails-dev.ps1` kills
 ./scripts/check-all.ps1
 ```
 
-Runs: root Go tests (no build tag — desktop-only tests are skipped) → backend gofmt check → backend tests → frontend tests → frontend typecheck → frontend lint → frontend scoped format check → frontend build.
+Runs: root Go tests (no build tag — desktop-only tests are skipped) → backend gofmt check → backend tests → frontend package manager check → frontend tests → frontend typecheck → frontend lint → frontend scoped format check → frontend size check → frontend build.
 
 ## MISC module scaffolding
 
