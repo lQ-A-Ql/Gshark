@@ -1,0 +1,181 @@
+import type {
+  HTTPLoginAnalysis,
+  MiscModuleImportResult,
+  MiscModuleManifest,
+  MiscModuleRunResult,
+  MySQLAnalysis,
+  NTLMSessionMaterial,
+  ShiroRememberMeAnalysis,
+  SMB3RandomSessionKeyRequest,
+  SMB3RandomSessionKeyResult,
+  SMB3SessionCandidate,
+  SMTPAnalysis,
+  WinRMDecryptRequest,
+  WinRMDecryptResult,
+} from "../../core/types";
+import { downloadBlob } from "../../utils/browserFile";
+import {
+  asHTTPLoginAnalysis,
+  asMySQLAnalysis,
+  asShiroRememberMeAnalysis,
+  asSMTPAnalysis,
+} from "../mappers/protocolToolMapper";
+import {
+  asMiscModuleImportResult,
+  asMiscModuleManifests,
+  asMiscModuleRunResult,
+  asNTLMSessionMaterials,
+  asSMB3RandomSessionKeyResult,
+  asSMB3SessionCandidates,
+  asWinRMDecryptResult,
+} from "../mappers/toolMapper";
+
+type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
+type BuildHeaders = (path: string, headersInit?: HeadersInit, body?: BodyInit | null) => Promise<Headers>;
+
+export interface ToolClient {
+  runWinRMDecrypt(req: WinRMDecryptRequest): Promise<WinRMDecryptResult>;
+  getWinRMDecryptResultText(resultId: string): Promise<string>;
+  exportWinRMDecryptResult(resultId: string, filename: string): Promise<void>;
+  listMiscModules(): Promise<MiscModuleManifest[]>;
+  importMiscModulePackage(file: File): Promise<MiscModuleImportResult>;
+  deleteMiscModule(id: string): Promise<void>;
+  runMiscModule(id: string, values: Record<string, string>): Promise<MiscModuleRunResult>;
+  listSMB3SessionCandidates(): Promise<SMB3SessionCandidate[]>;
+  generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest): Promise<SMB3RandomSessionKeyResult>;
+  listNTLMSessionMaterials(): Promise<NTLMSessionMaterial[]>;
+  getHTTPLoginAnalysis(signal?: AbortSignal): Promise<HTTPLoginAnalysis>;
+  getSMTPAnalysis(signal?: AbortSignal): Promise<SMTPAnalysis>;
+  getMySQLAnalysis(signal?: AbortSignal): Promise<MySQLAnalysis>;
+  getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal): Promise<ShiroRememberMeAnalysis>;
+}
+
+export function createToolClient(request: JsonRequest, apiBase: string, buildHeaders: BuildHeaders): ToolClient {
+  return {
+    async runWinRMDecrypt(req: WinRMDecryptRequest) {
+      const payload = await request<any>("/api/tools/winrm-decrypt", {
+        method: "POST",
+        body: JSON.stringify({
+          port: req.port,
+          auth_mode: req.authMode,
+          password: req.password ?? "",
+          nt_hash: req.ntHash ?? "",
+          preview_lines: req.previewLines ?? 0,
+          include_error_frames: Boolean(req.includeErrorFrames),
+          extract_command_output: Boolean(req.extractCommandOutput),
+        }),
+      });
+      return asWinRMDecryptResult(payload, req.port);
+    },
+
+    async getWinRMDecryptResultText(resultId: string) {
+      const path = `/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`;
+      const response = await fetch(`${apiBase}${path}`, {
+        headers: await buildHeaders(path),
+      });
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "获取 WinRM 结果失败"));
+      }
+      return await response.text();
+    },
+
+    async exportWinRMDecryptResult(resultId: string, filename: string) {
+      const path = `/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`;
+      const response = await fetch(`${apiBase}${path}`, {
+        headers: await buildHeaders(path),
+      });
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "导出 WinRM 结果失败"));
+      }
+      downloadBlob(filename, await response.blob());
+    },
+
+    async listMiscModules() {
+      const rows = await request<any[]>("/api/tools/misc/modules");
+      return asMiscModuleManifests(rows);
+    },
+
+    async importMiscModulePackage(file: File) {
+      const form = new FormData();
+      form.append("file", file);
+      const payload = await request<any>("/api/tools/misc/import", {
+        method: "POST",
+        body: form,
+      });
+      return asMiscModuleImportResult(payload);
+    },
+
+    async deleteMiscModule(id: string) {
+      await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    },
+
+    async runMiscModule(id: string, values: Record<string, string>) {
+      const payload = await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}/invoke`, {
+        method: "POST",
+        body: JSON.stringify({ values }),
+      });
+      return asMiscModuleRunResult(payload);
+    },
+
+    async listSMB3SessionCandidates() {
+      const rows = await request<any[]>("/api/tools/smb3-session-candidates");
+      return asSMB3SessionCandidates(rows);
+    },
+
+    async generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest) {
+      const payload = await request<any>("/api/tools/smb3-random-session-key", {
+        method: "POST",
+        body: JSON.stringify({
+          username: req.username,
+          domain: req.domain,
+          ntlm_hash: req.ntlmHash,
+          nt_proof_str: req.ntProofStr,
+          encrypted_session_key: req.encryptedSessionKey,
+        }),
+      });
+      return asSMB3RandomSessionKeyResult(payload);
+    },
+
+    async listNTLMSessionMaterials() {
+      const payload = await request<any[]>("/api/tools/ntlm-sessions");
+      return asNTLMSessionMaterials(payload);
+    },
+
+    async getHTTPLoginAnalysis(signal?: AbortSignal) {
+      const payload = await request<any>("/api/tools/http-login-analysis", { signal });
+      return asHTTPLoginAnalysis(payload);
+    },
+
+    async getSMTPAnalysis(signal?: AbortSignal) {
+      const payload = await request<any>("/api/tools/smtp-analysis", { signal });
+      return asSMTPAnalysis(payload);
+    },
+
+    async getMySQLAnalysis(signal?: AbortSignal) {
+      const payload = await request<any>("/api/tools/mysql-analysis", { signal });
+      return asMySQLAnalysis(payload);
+    },
+
+    async getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal) {
+      const payload = await request<any>("/api/tools/shiro-rememberme", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({
+          candidate_keys: Array.isArray(candidateKeys) ? candidateKeys : [],
+        }),
+      });
+      return asShiroRememberMeAnalysis(payload);
+    },
+  };
+}
+
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json();
+    return String(payload.error ?? fallback);
+  } catch {
+    return fallback;
+  }
+}

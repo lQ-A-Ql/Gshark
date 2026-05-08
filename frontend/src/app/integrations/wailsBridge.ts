@@ -45,22 +45,13 @@ import { createAnalysisClient } from "./clients/analysisClient";
 import { createMediaClient } from "./clients/mediaClient";
 import { createPluginClient } from "./clients/pluginClient";
 import { createStreamClient } from "./clients/streamClient";
+import { createToolClient } from "./clients/toolClient";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 import { asPacket, asThreatHit } from "./mappers/packetStreamMapper";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 import { asObjectList } from "./mappers/objectMapper";
-import { asHTTPLoginAnalysis, asMySQLAnalysis, asShiroRememberMeAnalysis, asSMTPAnalysis } from "./mappers/protocolToolMapper";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
-import {
-  asMiscModuleImportResult,
-  asMiscModuleManifests,
-  asMiscModuleRunResult,
-  asNTLMSessionMaterials,
-  asSMB3RandomSessionKeyResult,
-  asSMB3SessionCandidates,
-  asWinRMDecryptResult,
-} from "./mappers/toolMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
@@ -308,6 +299,7 @@ const mediaClient = createMediaClient(request, requestBlob);
 const analysisClient = createAnalysisClient(request);
 const pluginClient = createPluginClient(request);
 const streamClient = createStreamClient(request);
+const toolClient = createToolClient(request, API_BASE, buildAuthorizedHeaders);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -722,134 +714,20 @@ export const bridge: BackendBridge = {
   getTLSConfig: pluginClient.getTLSConfig,
   updateTLSConfig: pluginClient.updateTLSConfig,
 
-  async runWinRMDecrypt(req: WinRMDecryptRequest) {
-    const payload = await request<any>("/api/tools/winrm-decrypt", {
-      method: "POST",
-      body: JSON.stringify({
-        port: req.port,
-        auth_mode: req.authMode,
-        password: req.password ?? "",
-        nt_hash: req.ntHash ?? "",
-        preview_lines: req.previewLines ?? 0,
-        include_error_frames: Boolean(req.includeErrorFrames),
-        extract_command_output: Boolean(req.extractCommandOutput),
-      }),
-    });
-    return asWinRMDecryptResult(payload, req.port);
-  },
-
-  async getWinRMDecryptResultText(resultId: string) {
-    const response = await fetch(`${API_BASE}/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`, {
-      headers: await buildAuthorizedHeaders(`/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`),
-    });
-    if (!response.ok) {
-      let message = "获取 WinRM 结果失败";
-      try {
-        const payload = await response.json();
-        message = String(payload.error ?? message);
-      } catch {
-        // ignore non-json error payload
-      }
-      throw new Error(message);
-    }
-    return await response.text();
-  },
-
-  async exportWinRMDecryptResult(resultId: string, filename: string) {
-    const response = await fetch(`${API_BASE}/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`, {
-      headers: await buildAuthorizedHeaders(`/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`),
-    });
-    if (!response.ok) {
-      let message = "导出 WinRM 结果失败";
-      try {
-        const payload = await response.json();
-        message = String(payload.error ?? message);
-      } catch {
-        // ignore non-json error payload
-      }
-      throw new Error(message);
-    }
-    downloadBlob(filename, await response.blob());
-  },
-
-  async listMiscModules() {
-    const rows = await request<any[]>("/api/tools/misc/modules");
-    return asMiscModuleManifests(rows);
-  },
-
-  async importMiscModulePackage(file: File) {
-    const form = new FormData();
-    form.append("file", file);
-    const payload = await request<any>("/api/tools/misc/import", {
-      method: "POST",
-      body: form,
-    });
-    return asMiscModuleImportResult(payload);
-  },
-
-  async deleteMiscModule(id: string) {
-    await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-  },
-
-  async runMiscModule(id: string, values: Record<string, string>) {
-    const payload = await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}/invoke`, {
-      method: "POST",
-      body: JSON.stringify({ values }),
-    });
-    return asMiscModuleRunResult(payload);
-  },
-
-  async listSMB3SessionCandidates() {
-    const rows = await request<any[]>("/api/tools/smb3-session-candidates");
-    return asSMB3SessionCandidates(rows);
-  },
-
-  async generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest) {
-    const payload = await request<any>("/api/tools/smb3-random-session-key", {
-      method: "POST",
-      body: JSON.stringify({
-        username: req.username,
-        domain: req.domain,
-        ntlm_hash: req.ntlmHash,
-        nt_proof_str: req.ntProofStr,
-        encrypted_session_key: req.encryptedSessionKey,
-      }),
-    });
-    return asSMB3RandomSessionKeyResult(payload);
-  },
-
-  async listNTLMSessionMaterials() {
-    const payload = await request<any[]>("/api/tools/ntlm-sessions");
-    return asNTLMSessionMaterials(payload);
-  },
-
-  async getHTTPLoginAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/tools/http-login-analysis", { signal });
-    return asHTTPLoginAnalysis(payload);
-  },
-
-  async getSMTPAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/tools/smtp-analysis", { signal });
-    return asSMTPAnalysis(payload);
-  },
-
-  async getMySQLAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/tools/mysql-analysis", { signal });
-    return asMySQLAnalysis(payload);
-  },
-
-  async getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal) {
-    const payload = await request<any>("/api/tools/shiro-rememberme", {
-      method: "POST",
-      signal,
-      body: JSON.stringify({
-        candidate_keys: Array.isArray(candidateKeys) ? candidateKeys : [],
-      }),
-    });
-    return asShiroRememberMeAnalysis(payload);
-  },
+  runWinRMDecrypt: toolClient.runWinRMDecrypt,
+  getWinRMDecryptResultText: toolClient.getWinRMDecryptResultText,
+  exportWinRMDecryptResult: toolClient.exportWinRMDecryptResult,
+  listMiscModules: toolClient.listMiscModules,
+  importMiscModulePackage: toolClient.importMiscModulePackage,
+  deleteMiscModule: toolClient.deleteMiscModule,
+  runMiscModule: toolClient.runMiscModule,
+  listSMB3SessionCandidates: toolClient.listSMB3SessionCandidates,
+  generateSMB3RandomSessionKey: toolClient.generateSMB3RandomSessionKey,
+  listNTLMSessionMaterials: toolClient.listNTLMSessionMaterials,
+  getHTTPLoginAnalysis: toolClient.getHTTPLoginAnalysis,
+  getSMTPAnalysis: toolClient.getSMTPAnalysis,
+  getMySQLAnalysis: toolClient.getMySQLAnalysis,
+  getShiroRememberMeAnalysis: toolClient.getShiroRememberMeAnalysis,
 
   subscribeEvents(handlers: EventHandlers) {
     let disposed = false;
