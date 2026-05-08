@@ -99,6 +99,13 @@ import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { commitStreamPayloadPatches } from "./streamPayloadPatch";
+import {
+  bumpAllStreamSwitchSequences,
+  bumpStreamSwitchSequence,
+  createStreamSwitchSequences,
+  isLatestStreamSwitchSequence,
+  resetStreamSwitchSequences,
+} from "./streamSwitchSequence";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -184,9 +191,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const httpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
-  const httpSwitchSeqRef = useRef(0);
-  const tcpSwitchSeqRef = useRef(0);
-  const udpSwitchSeqRef = useRef(0);
+  const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
   const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
   const streamSwitchDurationsRef = useRef<Record<"ALL" | StreamProtocol, number[]>>({
     ALL: [],
@@ -231,9 +236,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     captureTaskScopeRef.current.invalidate();
     packetPageSeqRef.current += 1;
     threatAnalysisSeqRef.current += 1;
-    httpSwitchSeqRef.current += 1;
-    tcpSwitchSeqRef.current += 1;
-    udpSwitchSeqRef.current += 1;
+    bumpAllStreamSwitchSequences(streamSwitchSequencesRef.current);
     httpPrefetchInFlightRef.current.clear();
     tcpPrefetchInFlightRef.current.clear();
     udpPrefetchInFlightRef.current.clear();
@@ -645,18 +648,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     let cacheHit = false;
     const task = captureTaskScopeRef.current.beginTask(`${protocol.toLowerCase()}-stream`);
 
-    const requestSeq = protocol === "HTTP"
-      ? ++httpSwitchSeqRef.current
-      : protocol === "TCP"
-        ? ++tcpSwitchSeqRef.current
-        : ++udpSwitchSeqRef.current;
+    const requestSeq = bumpStreamSwitchSequence(streamSwitchSequencesRef.current, protocol);
 
-    const isLatest = () => {
-      if (!task.isCurrent()) return false;
-      if (protocol === "HTTP") return requestSeq === httpSwitchSeqRef.current;
-      if (protocol === "TCP") return requestSeq === tcpSwitchSeqRef.current;
-      return requestSeq === udpSwitchSeqRef.current;
-    };
+    const isLatest = () => isLatestStreamSwitchSequence(
+      streamSwitchSequencesRef.current,
+      protocol,
+      requestSeq,
+      task.isCurrent,
+    );
 
     const commitCachedSwitch = <T extends HttpStream | BinaryStream>(
       metricProtocol: "HTTP" | "TCP" | "UDP",
@@ -1076,9 +1075,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       httpPrefetchInFlightRef.current.clear();
       tcpPrefetchInFlightRef.current.clear();
       udpPrefetchInFlightRef.current.clear();
-      httpSwitchSeqRef.current = 0;
-      tcpSwitchSeqRef.current = 0;
-      udpSwitchSeqRef.current = 0;
+      resetStreamSwitchSequences(streamSwitchSequencesRef.current);
       streamSwitchDurationsRef.current = {
         ALL: [],
         HTTP: [],
