@@ -10,6 +10,13 @@ import { copyTextToClipboard } from "../../utils/browserFile";
 import { NTLMSessionMaterialDetails } from "./NTLMSessionMaterialDetails";
 import { NTLMSessionMaterialList } from "./NTLMSessionMaterialList";
 import { NTLMSessionMaterialsToolbar, type NTLMSessionProtocolFilter } from "./NTLMSessionMaterialsToolbar";
+import {
+  countCompleteNTLMSessionMaterials,
+  filterNTLMSessionMaterials,
+  renderNTLMSessionMaterialsText,
+  renderNTLMSessionMaterialText,
+  selectNTLMSessionMaterial,
+} from "./NTLMSessionMaterialsUtils";
 
 export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -81,45 +88,16 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
   }, [hasCapture, fileMeta.path]);
 
   const filtered = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    return materials.filter((item) => {
-      if (protocolFilter !== "ALL" && item.protocol !== protocolFilter) {
-        return false;
-      }
-      if (!keyword) {
-        return true;
-      }
-      const haystack = [
-        item.displayLabel,
-        item.protocol,
-        item.transport,
-        item.userDisplay,
-        item.username,
-        item.domain,
-        item.src,
-        item.dst,
-        item.challenge,
-        item.ntProofStr,
-        item.encryptedSessionKey,
-        item.sessionId,
-        item.info,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(keyword);
-    });
+    return filterNTLMSessionMaterials(materials, protocolFilter, query);
   }, [materials, protocolFilter, query]);
 
-  const selected = useMemo(
-    () => filtered.find((item) => item.frameNumber === selectedFrame) ?? filtered[0] ?? null,
-    [filtered, selectedFrame],
-  );
+  const selected = useMemo(() => selectNTLMSessionMaterial(filtered, selectedFrame), [filtered, selectedFrame]);
 
-  const completeCount = useMemo(() => materials.filter((item) => item.complete).length, [materials]);
+  const completeCount = useMemo(() => countCompleteNTLMSessionMaterials(materials), [materials]);
 
   async function copySelectedMaterial() {
     if (!selected) return;
-    const text = renderMaterialText(selected);
+    const text = renderNTLMSessionMaterialText(selected);
     if (await copyTextToClipboard(text)) {
       setCopyNotice(`已复制帧 #${selected.frameNumber} 的 NTLM 材料`);
     } else {
@@ -134,7 +112,7 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
       filenameBase: "ntlm-session-materials",
       format,
       payload: rows,
-      renderText: renderMaterialsText,
+      renderText: renderNTLMSessionMaterialsText,
     });
   }
 
@@ -190,31 +168,4 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
       </CardContent>
     </Card>
   );
-}
-
-function renderMaterialText(item: NTLMSessionMaterial) {
-  return [
-    `Display: ${item.displayLabel}`,
-    `Protocol: ${item.protocol}`,
-    `Direction: ${item.direction || ""}`,
-    `Frame: ${item.frameNumber}`,
-    `Timestamp: ${item.timestamp || ""}`,
-    `Transport: ${item.transport || ""}`,
-    `Source: ${item.src || ""}${item.srcPort ? `:${item.srcPort}` : ""}`,
-    `Destination: ${item.dst || ""}${item.dstPort ? `:${item.dstPort}` : ""}`,
-    `User: ${item.userDisplay || item.username || ""}`,
-    `Domain: ${item.domain || ""}`,
-    `Challenge: ${item.challenge || ""}`,
-    `NTProofStr: ${item.ntProofStr || ""}`,
-    `EncryptedSessionKey: ${item.encryptedSessionKey || ""}`,
-    `SessionID: ${item.sessionId || ""}`,
-    `Authorization: ${item.authHeader || ""}`,
-    `WWW-Authenticate: ${item.wwwAuthenticate || ""}`,
-    `Info: ${item.info || ""}`,
-    `Complete: ${item.complete ? "true" : "false"}`,
-  ].join("\n");
-}
-
-function renderMaterialsText(rows: NTLMSessionMaterial[]) {
-  return rows.map(renderMaterialText).join("\n\n" + "-".repeat(80) + "\n\n");
 }
