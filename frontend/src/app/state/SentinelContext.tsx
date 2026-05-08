@@ -92,12 +92,12 @@ import {
   buildLoadingBinaryStream,
   buildLoadingHttpStream,
   buildSwitchStat,
-  isFastPathLoad,
   prettySize,
 } from "./streamState";
 import { canSchedulePrefetch, pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
+import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -681,7 +681,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     if (!backendConnected || !activeCapturePathRef.current || streamId < 0) return;
     const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     let cacheHit = false;
-
     const task = captureTaskScopeRef.current.beginTask(`${protocol.toLowerCase()}-stream`);
 
     const requestSeq = protocol === "HTTP"
@@ -712,6 +711,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       return true;
     };
 
+    const commitLoadedSwitch = <T extends HttpStream | BinaryStream>(
+      metricProtocol: "HTTP" | "TCP" | "UDP",
+      cache: Map<number, T>,
+      stream: T,
+      apply: (stream: T) => void,
+    ) => {
+      commitLoadedStreamSwitch({
+        protocol: metricProtocol,
+        requestedStreamId: streamId,
+        stream,
+        cache,
+        apply,
+        startedAt,
+        recordMetric: recordStreamSwitchMetric,
+        prefetchAdjacentStreams,
+      });
+    };
+
     try {
       if (protocol === "HTTP") {
         if (commitCachedSwitch("HTTP", httpStreamCacheRef.current, (next) => {
@@ -726,13 +743,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         });
         const http = await bridge.getHttpStream(streamId, task.signal);
         if (!isLatest()) return;
-        httpStreamCacheRef.current.set(http.id, http);
-        startTransition(() => {
-          setHttpStream(http);
-        });
-        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("HTTP", elapsed, isFastPathLoad(http.loadMeta));
-        prefetchAdjacentStreams("HTTP", streamId);
+        commitLoadedSwitch("HTTP", httpStreamCacheRef.current, http, (next) => startTransition(() => {
+          setHttpStream(next);
+        }));
         return;
       }
       if (protocol === "TCP") {
@@ -762,21 +775,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       const raw = await bridge.getRawStreamPage(protocol, streamId, 0, RAW_STREAM_PAGE_SIZE, task.signal);
       if (!isLatest()) return;
       if (protocol === "TCP") {
-        tcpStreamCacheRef.current.set(raw.id, raw);
-        startTransition(() => {
-          setTcpStream(raw);
-        });
-        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("TCP", elapsed, isFastPathLoad(raw.loadMeta));
-        prefetchAdjacentStreams("TCP", streamId);
+        commitLoadedSwitch("TCP", tcpStreamCacheRef.current, raw, (next) => startTransition(() => {
+          setTcpStream(next);
+        }));
       } else {
-        udpStreamCacheRef.current.set(raw.id, raw);
-        startTransition(() => {
-          setUdpStream(raw);
-        });
-        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric("UDP", elapsed, isFastPathLoad(raw.loadMeta));
-        prefetchAdjacentStreams("UDP", streamId);
+        commitLoadedSwitch("UDP", udpStreamCacheRef.current, raw, (next) => startTransition(() => {
+          setUdpStream(next);
+        }));
       }
     } catch (error) {
       if (!isLatest()) return;
