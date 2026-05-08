@@ -28,6 +28,7 @@ import { bridge } from "../integrations/wailsBridge";
 import { isAbortLikeError, isOperationTimeoutError, withTimeout } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
+import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
   EMPTY_THREAT_ANALYSIS_PROGRESS,
@@ -1075,59 +1076,27 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     };
   }, [selectedPacketDetail?.id, selectedPacketId]);
 
-  useEffect(() => {
-    if (!shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket)) {
-      setSelectedPacketRawHex("");
-      return;
-    }
+  useSelectedPacketArtifact<string>({
+    selectedPacketId,
+    selectedPacket,
+    shouldLoad: shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket),
+    taskKey: "packet-raw-hex",
+    captureTaskScopeRef,
+    loadArtifact: (packetId, signal) => bridge.getPacketRawHex(packetId, signal),
+    setValue: setSelectedPacketRawHex,
+    resetValue: "",
+  });
 
-    const task = captureTaskScopeRef.current.beginTask("packet-raw-hex");
-    void bridge.getPacketRawHex(selectedPacket.id, task.signal)
-      .then((raw) => {
-        if (task.isCurrent()) {
-          setSelectedPacketRawHex(raw);
-        }
-      })
-      .catch((error) => {
-        if (task.isCurrent() && !isAbortLikeError(error, task.signal)) {
-          setSelectedPacketRawHex("");
-        }
-      })
-      .finally(() => {
-        task.finish();
-      });
-
-    return () => {
-      task.abort();
-    };
-  }, [selectedPacketId, selectedPacket?.id]);
-
-  useEffect(() => {
-    if (!shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket)) {
-      setSelectedPacketLayers(null);
-      return;
-    }
-
-    const task = captureTaskScopeRef.current.beginTask("packet-layers");
-    void bridge.getPacketLayers(selectedPacket.id, task.signal)
-      .then((layers) => {
-        if (task.isCurrent()) {
-          setSelectedPacketLayers(layers);
-        }
-      })
-      .catch((error) => {
-        if (task.isCurrent() && !isAbortLikeError(error, task.signal)) {
-          setSelectedPacketLayers(null);
-        }
-      })
-      .finally(() => {
-        task.finish();
-      });
-
-    return () => {
-      task.abort();
-    };
-  }, [selectedPacketId, selectedPacket?.id]);
+  useSelectedPacketArtifact<Record<string, unknown> | null>({
+    selectedPacketId,
+    selectedPacket,
+    shouldLoad: shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket),
+    taskKey: "packet-layers",
+    captureTaskScopeRef,
+    loadArtifact: (packetId, signal) => bridge.getPacketLayers(packetId, signal),
+    setValue: setSelectedPacketLayers,
+    resetValue: null,
+  });
 
   const startCapture = useCallback(async (filePath?: string, filterOverride?: string) => {
     if (!backendConnected) {

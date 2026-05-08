@@ -12,7 +12,7 @@ const budgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1530,
+    maxLines: 1510,
     reason: "provider remains oversized and should not absorb new state domains",
   },
   {
