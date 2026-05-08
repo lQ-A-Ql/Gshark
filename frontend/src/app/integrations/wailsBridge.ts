@@ -52,15 +52,16 @@ import { createMediaClient } from "./clients/mediaClient";
 import { createPluginClient } from "./clients/pluginClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
+import { createToolRuntimeClient, type FFmpegStatus, type TSharkStatus } from "./clients/toolRuntimeClient";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 import { asPacket, asThreatHit } from "./mappers/packetStreamMapper";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 import { asObjectList } from "./mappers/objectMapper";
-import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
+export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -81,20 +82,6 @@ interface EventHandlers {
   packet?: (packet: Packet) => void;
   status?: (message: string) => void;
   error?: (message: string) => void;
-}
-
-export interface TSharkStatus {
-  available: boolean;
-  path: string;
-  message: string;
-  customPath: string;
-  usingCustomPath: boolean;
-}
-
-export interface FFmpegStatus {
-  available: boolean;
-  path: string;
-  message: string;
 }
 
 export interface HuntingRuntimeConfig {
@@ -288,6 +275,7 @@ const pluginClient = createPluginClient(request);
 const streamClient = createStreamClient(request);
 const toolClient = createToolClient(request, API_BASE, buildAuthorizedHeaders);
 const captureClient = createCaptureClient(request, getDesktopAppBinding);
+const toolRuntimeClient = createToolRuntimeClient(request);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -370,77 +358,12 @@ export const bridge: BackendBridge = {
     await desktopApp.InstallAppUpdate();
   },
 
-  async checkTShark() {
-    const payload = await request<any>("/api/tools/tshark");
-    return {
-      available: Boolean(payload.available),
-      path: String(payload.path ?? ""),
-      message: String(payload.message ?? ""),
-      customPath: String(payload.custom_path ?? ""),
-      usingCustomPath: Boolean(payload.using_custom_path),
-    };
-  },
-
-  async checkFFmpeg() {
-    const payload = await request<any>("/api/tools/ffmpeg");
-    return {
-      available: Boolean(payload.available),
-      path: String(payload.path ?? ""),
-      message: String(payload.message ?? ""),
-    };
-  },
-
-  async checkSpeechToText() {
-    const payload = await request<any>("/api/tools/speech-to-text");
-    return {
-      available: Boolean(payload.available),
-      engine: String(payload.engine ?? ""),
-      language: String(payload.language ?? ""),
-      pythonAvailable: Boolean(payload.python_available),
-      pythonCommand: String(payload.python_command ?? "") || undefined,
-      ffmpegAvailable: Boolean(payload.ffmpeg_available),
-      voskAvailable: Boolean(payload.vosk_available),
-      modelAvailable: Boolean(payload.model_available),
-      modelPath: String(payload.model_path ?? "") || undefined,
-      message: String(payload.message ?? ""),
-    };
-  },
-
-  async getToolRuntimeSnapshot() {
-    const payload = await request<any>("/api/tools/runtime-config");
-    return asToolRuntimeSnapshot(payload);
-  },
-
-  async updateToolRuntimeConfig(config: ToolRuntimeConfig) {
-    const payload = await request<any>("/api/tools/runtime-config", {
-      method: "POST",
-      body: JSON.stringify({
-        tshark_path: config.tsharkPath,
-        ffmpeg_path: config.ffmpegPath,
-        python_path: config.pythonPath,
-        vosk_model_path: config.voskModelPath,
-        yara_enabled: config.yaraEnabled,
-        yara_bin: config.yaraBin,
-        yara_rules: config.yaraRules,
-        yara_timeout_ms: config.yaraTimeoutMs,
-      }),
-    });
-    return asToolRuntimeSnapshot(payload);
-  },
-
-  async setTSharkPath(path: string) {
-    const payload = await request<any>("/api/tools/tshark", {
-      method: "POST",
-      body: JSON.stringify({ path }),
-    });
-    return {
-      available: Boolean(payload.available),
-      path: String(payload.path ?? ""),
-      message: String(payload.message ?? ""),
-      customPath: String(payload.custom_path ?? ""),
-      usingCustomPath: Boolean(payload.using_custom_path),
-    };
-  },
+  checkTShark: toolRuntimeClient.checkTShark,
+  checkFFmpeg: toolRuntimeClient.checkFFmpeg,
+  checkSpeechToText: toolRuntimeClient.checkSpeechToText,
+  getToolRuntimeSnapshot: toolRuntimeClient.getToolRuntimeSnapshot,
+  updateToolRuntimeConfig: toolRuntimeClient.updateToolRuntimeConfig,
+  setTSharkPath: toolRuntimeClient.setTSharkPath,
 
   openPcapFile: captureClient.openPcapFile,
   startStreamingPackets: captureClient.startStreamingPackets,
