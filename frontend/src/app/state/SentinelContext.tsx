@@ -97,6 +97,12 @@ import {
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
+import {
+  finishCaptureParseRuntime,
+  markCaptureParseFinished,
+  startCaptureParseRuntime,
+  stopCapturePreloading,
+} from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import {
   PAGE_SIZE,
@@ -527,11 +533,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const prepareForCaptureReplacement = useCallback(async () => {
     cancelAllFrontendCaptureTasks();
     wakeCaptureWaiters();
-    preloadingRef.current = false;
-    parseFinishedRef.current = true;
-    parseErrorRef.current = "";
+    finishCaptureParseRuntime({
+      parseFinishedRef,
+      parseErrorRef,
+      preloadingRef,
+      setIsPreloadingCapture,
+    });
     setIsFilterLoading(false);
-    setIsPreloadingCapture(false);
     setPreloadProcessed(0);
     setPreloadTotal(0);
     preloadProcessedRef.current = 0;
@@ -929,10 +937,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
             return;
           }
           if (shouldMarkParseFinishedFromStatus(msg)) {
-            parseFinishedRef.current = true;
-            if (shouldMarkParseErrorFromStatus(msg)) {
-              parseErrorRef.current = msg;
-            }
+            markCaptureParseFinished({
+              parseFinishedRef,
+              parseErrorRef,
+              errorMessage: shouldMarkParseErrorFromStatus(msg) ? msg : undefined,
+            });
           }
           if (shouldResetMediaAnalysisFromStatus(msg)) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
@@ -949,8 +958,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
             return;
           }
           if (preloadingRef.current) {
-            parseFinishedRef.current = true;
-            parseErrorRef.current = next;
+            markCaptureParseFinished({
+              parseFinishedRef,
+              parseErrorRef,
+              errorMessage: next,
+            });
           }
           if (shouldResetMediaAnalysisFromError(next)) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
@@ -1048,10 +1060,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           setPreloadProcessed,
           setPreloadTotal,
         });
-        setIsPreloadingCapture(true);
-        parseFinishedRef.current = false;
-        parseErrorRef.current = "";
-        preloadingRef.current = true;
+        startCaptureParseRuntime({
+          parseFinishedRef,
+          parseErrorRef,
+          preloadingRef,
+          setIsPreloadingCapture,
+        });
         resetStreamRuntimeRefs({
           httpCache: httpStreamCacheRef.current,
           tcpCache: tcpStreamCacheRef.current,
@@ -1148,8 +1162,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         }
       } finally {
         if (captureSeq === captureSeqRef.current) {
-          preloadingRef.current = false;
-          setIsPreloadingCapture(false);
+          stopCapturePreloading({
+            preloadingRef,
+            setIsPreloadingCapture,
+          });
           wakeCaptureWaiters();
         }
       }
@@ -1244,11 +1260,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const stopCapture = useCallback(async () => {
     captureSeqRef.current += 1;
     filterSeqRef.current += 1;
-    preloadingRef.current = false;
-    parseFinishedRef.current = true;
-    parseErrorRef.current = "";
+    finishCaptureParseRuntime({
+      parseFinishedRef,
+      parseErrorRef,
+      preloadingRef,
+      setIsPreloadingCapture,
+    });
     setIsFilterLoading(false);
-    setIsPreloadingCapture(false);
     cancelAllFrontendCaptureTasks();
     wakeCaptureWaiters();
     clearCaptureUiState();
