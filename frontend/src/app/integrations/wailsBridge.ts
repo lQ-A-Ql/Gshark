@@ -40,7 +40,6 @@ import type {
   SMB3RandomSessionKeyResult,
 } from "../core/types";
 import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
-import { downloadBlob } from "../utils/browserFile";
 import { createAnalysisClient } from "./clients/analysisClient";
 import {
   createCaptureClient,
@@ -48,20 +47,22 @@ import {
   type PacketLocateResult,
   type PacketsPageResult,
 } from "./clients/captureClient";
+import { createHuntingClient, type HuntingRuntimeConfig } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
+import { createObjectClient } from "./clients/objectClient";
 import { createPluginClient } from "./clients/pluginClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
 import { createToolRuntimeClient, type FFmpegStatus, type TSharkStatus } from "./clients/toolRuntimeClient";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
-import { asPacket, asThreatHit } from "./mappers/packetStreamMapper";
+import { asPacket } from "./mappers/packetStreamMapper";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
-import { asObjectList } from "./mappers/objectMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
+export type { HuntingRuntimeConfig } from "./clients/huntingClient";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -82,14 +83,6 @@ interface EventHandlers {
   packet?: (packet: Packet) => void;
   status?: (message: string) => void;
   error?: (message: string) => void;
-}
-
-export interface HuntingRuntimeConfig {
-  prefixes: string[];
-  yaraEnabled: boolean;
-  yaraBin: string;
-  yaraRules: string;
-  yaraTimeoutMs: number;
 }
 
 export interface BackendBridge {
@@ -276,6 +269,8 @@ const streamClient = createStreamClient(request);
 const toolClient = createToolClient(request, API_BASE, buildAuthorizedHeaders);
 const captureClient = createCaptureClient(request, getDesktopAppBinding);
 const toolRuntimeClient = createToolRuntimeClient(request);
+const objectClient = createObjectClient(request, requestBlob);
+const huntingClient = createHuntingClient(request);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -392,63 +387,12 @@ export const bridge: BackendBridge = {
   locatePacketPage: captureClient.locatePacketPage,
   getPacket: captureClient.getPacket,
 
-  async listThreatHits(prefixes = ["flag{", "ctf{"], signal?: AbortSignal) {
-    const query = prefixes.map((p) => `prefix=${encodeURIComponent(p)}`).join("&");
-    const rows = await request<any[]>(`/api/hunting?${query}`, { signal });
-    return rows.map(asThreatHit);
-  },
+  listThreatHits: huntingClient.listThreatHits,
+  getHuntingRuntimeConfig: huntingClient.getHuntingRuntimeConfig,
+  updateHuntingRuntimeConfig: huntingClient.updateHuntingRuntimeConfig,
 
-  async getHuntingRuntimeConfig() {
-    const payload = await request<any>("/api/hunting/config");
-    const prefixes = Array.isArray(payload.prefixes)
-      ? payload.prefixes.map((p: unknown) => String(p ?? "").trim()).filter(Boolean)
-      : [];
-    return {
-      prefixes,
-      yaraEnabled: Boolean(payload.yara_enabled ?? true),
-      yaraBin: String(payload.yara_bin ?? ""),
-      yaraRules: String(payload.yara_rules ?? ""),
-      yaraTimeoutMs: Number(payload.yara_timeout_ms ?? 25000),
-    };
-  },
-
-  async updateHuntingRuntimeConfig(config: HuntingRuntimeConfig) {
-    const payload = await request<any>("/api/hunting/config", {
-      method: "POST",
-      body: JSON.stringify({
-        prefixes: config.prefixes,
-        yara_enabled: config.yaraEnabled,
-        yara_bin: config.yaraBin,
-        yara_rules: config.yaraRules,
-        yara_timeout_ms: config.yaraTimeoutMs,
-      }),
-    });
-    const prefixes = Array.isArray(payload.prefixes)
-      ? payload.prefixes.map((p: unknown) => String(p ?? "").trim()).filter(Boolean)
-      : [];
-    return {
-      prefixes,
-      yaraEnabled: Boolean(payload.yara_enabled ?? true),
-      yaraBin: String(payload.yara_bin ?? ""),
-      yaraRules: String(payload.yara_rules ?? ""),
-      yaraTimeoutMs: Number(payload.yara_timeout_ms ?? 25000),
-    };
-  },
-
-  async listObjects(signal?: AbortSignal) {
-    const rows = await request<any[]>("/api/objects", { signal });
-    return asObjectList(rows);
-  },
-
-  async downloadObjectsZip(ids: number[]) {
-    const body = JSON.stringify({ ids });
-    const blob = await requestBlob("/api/objects/download", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    downloadBlob("exported_objects.zip", blob);
-  },
+  listObjects: objectClient.listObjects,
+  downloadObjectsZip: objectClient.downloadObjectsZip,
 
   getHttpStream: streamClient.getHttpStream,
   getRawStream: streamClient.getRawStream,
