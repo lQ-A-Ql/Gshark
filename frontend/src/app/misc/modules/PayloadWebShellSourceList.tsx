@@ -3,6 +3,17 @@ import { AnalysisBadge } from "../../components/analysis/AnalysisPrimitives";
 import type { StreamPayloadSource } from "../../core/types";
 import { EvidenceActions } from "../EvidenceActions";
 import { FilterActions } from "../FilterActions";
+import {
+  formatPayloadWebShellPacketList,
+  getPayloadWebShellLocationLabel,
+  getPayloadWebShellMethodLabel,
+  getPayloadWebShellPreviewText,
+  getPayloadWebShellRuleReasons,
+  getPayloadWebShellSignals,
+  getPayloadWebShellSourceBadges,
+  getPayloadWebShellSourceKey,
+  isPayloadWebShellSourceSelected,
+} from "./PayloadWebShellSourceUtils";
 
 interface PayloadWebShellSourceListProps {
   hasCapture: boolean;
@@ -60,43 +71,29 @@ export function PayloadWebShellSourceList({
       </div>
       <div className="max-h-72 divide-y divide-slate-100 overflow-auto">
         {sources.map((source) => {
-          const selected = selectedSource?.id === source.id && selectedSource.packetId === source.packetId;
+          const selected = isPayloadWebShellSourceSelected(source, selectedSource);
           return (
-            <div key={`${source.id}-${source.packetId}`} className={selected ? "bg-cyan-50/60 px-3 py-3" : "px-3 py-3"}>
+            <div
+              key={getPayloadWebShellSourceKey(source)}
+              className={selected ? "bg-cyan-50/60 px-3 py-3" : "px-3 py-3"}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <button type="button" onClick={() => onSelect(source)} className="min-w-0 flex-1 text-left">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-900">
-                    <span>{source.method || "HTTP"}</span>
-                    <span className="truncate font-mono text-cyan-700">
-                      {source.host}
-                      {source.uri}
-                    </span>
-                    <AnalysisBadge tone={confidenceTone(source.confidence)}>{source.confidence ?? 0}%</AnalysisBadge>
-                    {source.paramName ? (
-                      <AnalysisBadge tone="blue">
-                        {source.sourceType}:{source.paramName}
-                      </AnalysisBadge>
-                    ) : null}
-                    {source.familyHint ? <AnalysisBadge tone="cyan">{source.familyHint}</AnalysisBadge> : null}
-                    {source.sourceRole ? <AnalysisBadge tone="emerald">{source.sourceRole}</AnalysisBadge> : null}
-                    {decoderNameFromOptions(source.decoderOptionsHint) ? (
-                      <AnalysisBadge tone="amber">{decoderNameFromOptions(source.decoderOptionsHint)}</AnalysisBadge>
-                    ) : null}
-                    {(source.decoderHints ?? []).slice(0, 2).map((hint) => (
-                      <AnalysisBadge key={`${source.id}-${hint}`} tone="blue">
-                        {hint}
+                    <span>{getPayloadWebShellMethodLabel(source)}</span>
+                    <span className="truncate font-mono text-cyan-700">{getPayloadWebShellLocationLabel(source)}</span>
+                    {getPayloadWebShellSourceBadges(source).map((badge) => (
+                      <AnalysisBadge key={badge.key} tone={badge.tone}>
+                        {badge.label}
                       </AnalysisBadge>
                     ))}
-                    {source.occurrenceCount && source.occurrenceCount > 1 ? (
-                      <AnalysisBadge tone="amber">重复 {source.occurrenceCount} 次</AnalysisBadge>
-                    ) : null}
                   </div>
                   <div className="mt-1 line-clamp-2 font-mono text-[11px] leading-5 text-slate-500">
-                    {source.preview || source.payload}
+                    {getPayloadWebShellPreviewText(source)}
                   </div>
-                  {(source.ruleReasons ?? []).length > 0 ? (
+                  {getPayloadWebShellRuleReasons(source).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {(source.ruleReasons ?? []).slice(0, 3).map((reason) => (
+                      {getPayloadWebShellRuleReasons(source).map((reason) => (
                         <span
                           key={reason}
                           className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700"
@@ -107,7 +104,7 @@ export function PayloadWebShellSourceList({
                     </div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {(source.signals ?? []).slice(0, 6).map((signal) => (
+                    {getPayloadWebShellSignals(source).map((signal) => (
                       <span
                         key={signal}
                         className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600"
@@ -119,7 +116,7 @@ export function PayloadWebShellSourceList({
                   <div className="mt-2 grid gap-1 text-[10px] leading-4 text-slate-400 sm:grid-cols-3">
                     <span>first: {source.firstTime || "--"}</span>
                     <span>last: {source.lastTime || "--"}</span>
-                    <span>packets: {formatPacketList(source.relatedPackets, source.packetId)}</span>
+                    <span>packets: {formatPayloadWebShellPacketList(source.relatedPackets, source.packetId)}</span>
                   </div>
                 </button>
                 <div className="flex shrink-0 flex-col items-start gap-2">
@@ -137,25 +134,4 @@ export function PayloadWebShellSourceList({
       </div>
     </div>
   );
-}
-
-function confidenceTone(confidence?: number): "emerald" | "cyan" | "amber" {
-  const value = confidence ?? 0;
-  if (value >= 80) return "emerald";
-  if (value >= 55) return "cyan";
-  return "amber";
-}
-
-function formatPacketList(values?: number[], fallback?: number) {
-  const packets = (values && values.length > 0 ? values : fallback ? [fallback] : []).filter(Boolean);
-  if (packets.length === 0) {
-    return "--";
-  }
-  const shown = packets.slice(0, 5).join(", ");
-  return packets.length > 5 ? `${shown} +${packets.length - 5}` : shown;
-}
-
-function decoderNameFromOptions(options?: Record<string, unknown>) {
-  const decoder = String(options?.decoder ?? "").trim();
-  return decoder || "";
 }
