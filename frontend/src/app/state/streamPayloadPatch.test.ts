@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BinaryStream, HttpStream } from "../core/types";
-import { commitStreamPayloadPatches } from "./streamPayloadPatch";
+import { commitProtocolStreamPayloadPatches, commitStreamPayloadPatches } from "./streamPayloadPatch";
 
 function createHttpStream(id: number, body = "body"): HttpStream {
   return {
@@ -65,5 +65,40 @@ describe("streamPayloadPatch", () => {
 
     expect(active.chunks[0]?.body).toBe("still-original");
     expect(cache.size).toBe(0);
+  });
+
+  it("routes protocol payload patches to the matching stream and cache", () => {
+    const patches = [{ index: 0, body: "udp-patched" }];
+    let httpStream = createHttpStream(1, "http-original");
+    let tcpStream = createTcpStream(2, "tcp-original");
+    let udpStream: BinaryStream = { ...createTcpStream(3, "udp-original"), protocol: "UDP" };
+    const httpCache = new Map<number, HttpStream>([[1, createHttpStream(1, "http-cache")]]);
+    const tcpCache = new Map<number, BinaryStream>([[2, createTcpStream(2, "tcp-cache")]]);
+    const udpCache = new Map<number, BinaryStream>([[3, { ...createTcpStream(3, "udp-cache"), protocol: "UDP" }]]);
+
+    commitProtocolStreamPayloadPatches({
+      protocol: "UDP",
+      streamId: 3,
+      patches,
+      setHttpStream: (updater) => {
+        httpStream = updater(httpStream);
+      },
+      setTcpStream: (updater) => {
+        tcpStream = updater(tcpStream);
+      },
+      setUdpStream: (updater) => {
+        udpStream = updater(udpStream);
+      },
+      httpCache,
+      tcpCache,
+      udpCache,
+    });
+
+    expect(httpStream.chunks[0]?.body).toBe("http-original");
+    expect(tcpStream.chunks[0]?.body).toBe("tcp-original");
+    expect(udpStream.chunks[0]?.body).toBe("udp-patched");
+    expect(httpCache.get(1)?.chunks[0]?.body).toBe("http-cache");
+    expect(tcpCache.get(2)?.chunks[0]?.body).toBe("tcp-cache");
+    expect(udpCache.get(3)?.chunks[0]?.body).toBe("udp-patched");
   });
 });

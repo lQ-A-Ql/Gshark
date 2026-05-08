@@ -9,11 +9,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import {
-  buildHexDump,
-  buildProtocolTree,
-  buildProtocolTreeFromLayers,
-} from "../core/engine";
+import { buildHexDump, buildProtocolTree, buildProtocolTreeFromLayers } from "../core/engine";
 import type {
   BinaryStream,
   DecryptionConfig,
@@ -98,7 +94,7 @@ import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
-import { commitStreamPayloadPatches } from "./streamPayloadPatch";
+import { commitProtocolStreamPayloadPatches } from "./streamPayloadPatch";
 import {
   bumpAllStreamSwitchSequences,
   bumpStreamSwitchSequence,
@@ -106,7 +102,10 @@ import {
   isLatestStreamSwitchSequence,
   resetStreamSwitchSequences,
 } from "./streamSwitchSequence";
-import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
+import {
+  waitForCaptureSignal as waitForCaptureSignalUtil,
+  wakeCaptureWaiters as wakeCaptureWaitersUtil,
+} from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
@@ -131,19 +130,29 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [backendStatus, setBackendStatus] = useState("等待后端连接");
   const threatAnalysisSeqRef = useRef(0);
   const {
-    threatHits, setThreatHits,
-    isThreatAnalysisLoading, setIsThreatAnalysisLoading,
-    threatAnalysisProgress, setThreatAnalysisProgress,
-    extractedObjects, setExtractedObjects,
-    mediaAnalysisProgress, setMediaAnalysisProgress,
+    threatHits,
+    setThreatHits,
+    isThreatAnalysisLoading,
+    setIsThreatAnalysisLoading,
+    threatAnalysisProgress,
+    setThreatAnalysisProgress,
+    extractedObjects,
+    setExtractedObjects,
+    mediaAnalysisProgress,
+    setMediaAnalysisProgress,
     refreshAnalysisResult: refreshAnalysisResultImpl,
   } = useAnalysisProgress(threatAnalysisSeqRef);
   const {
-    tsharkStatus, setTsharkStatus,
-    isTSharkChecking, setIsTSharkChecking,
-    toolRuntimeSnapshot, setToolRuntimeSnapshot,
-    isToolRuntimeLoading, setIsToolRuntimeLoading,
-    toolRuntimeCheckDegraded, setToolRuntimeCheckDegraded,
+    tsharkStatus,
+    setTsharkStatus,
+    isTSharkChecking,
+    setIsTSharkChecking,
+    toolRuntimeSnapshot,
+    setToolRuntimeSnapshot,
+    isToolRuntimeLoading,
+    setIsToolRuntimeLoading,
+    toolRuntimeCheckDegraded,
+    setToolRuntimeCheckDegraded,
     setTSharkPath: setTSharkPathImpl,
     refreshToolRuntimeSnapshot: refreshToolRuntimeSnapshotImpl,
     saveToolRuntimeConfig: saveToolRuntimeConfigImpl,
@@ -257,25 +266,28 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsPageLoading(false);
   }, []);
 
-  const commitPacketPage = useCallback((safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
-    pageStartRef.current = safeCursor;
-    setPageStart(safeCursor);
-    setTotalPackets(page.total);
-    setPackets(page.items);
-    setSelectedPacketId((prev) => {
-      if (prev == null) return null;
-      return packetPageHasPacket(page.items, prev) ? prev : null;
-    });
-    setSelectedPacketDetail((prev) => {
-      if (!prev) return null;
-      return packetPageHasPacket(page.items, prev.id) ? prev : null;
-    });
-    setSelectedPacketRawHex("");
-    setSelectedPacketLayers(null);
-    setHasPrevPackets(safeCursor > 0);
-    hasMorePacketsRef.current = page.hasMore;
-    setHasMorePackets(page.hasMore);
-  }, []);
+  const commitPacketPage = useCallback(
+    (safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
+      pageStartRef.current = safeCursor;
+      setPageStart(safeCursor);
+      setTotalPackets(page.total);
+      setPackets(page.items);
+      setSelectedPacketId((prev) => {
+        if (prev == null) return null;
+        return packetPageHasPacket(page.items, prev) ? prev : null;
+      });
+      setSelectedPacketDetail((prev) => {
+        if (!prev) return null;
+        return packetPageHasPacket(page.items, prev.id) ? prev : null;
+      });
+      setSelectedPacketRawHex("");
+      setSelectedPacketLayers(null);
+      setHasPrevPackets(safeCursor > 0);
+      hasMorePacketsRef.current = page.hasMore;
+      setHasMorePackets(page.hasMore);
+    },
+    [],
+  );
 
   const resetPacketViewport = useCallback(() => {
     cancelPacketPageLoad();
@@ -345,40 +357,39 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setCaptureRevision((prev) => prev + 1);
   }, []);
 
-  const loadPacketPage = useCallback(async (
-    cursor: number,
-    filterOverride?: string,
-    options?: { finishFilterLoading?: boolean },
-  ) => {
-    if (!backendConnected || !activeCapturePathRef.current) return null;
-    const requestSeq = ++packetPageSeqRef.current;
-    const task = captureTaskScopeRef.current.beginTask("packet-page");
-    setIsPageLoading(true);
-    try {
-      const safeCursor = normalizePacketCursor(cursor);
-      const page = await bridge.listPacketsPage(safeCursor, PAGE_SIZE, filterOverride ?? displayFilter, task.signal);
-      if (!task.isCurrent() || requestSeq !== packetPageSeqRef.current) {
+  const loadPacketPage = useCallback(
+    async (cursor: number, filterOverride?: string, options?: { finishFilterLoading?: boolean }) => {
+      if (!backendConnected || !activeCapturePathRef.current) return null;
+      const requestSeq = ++packetPageSeqRef.current;
+      const task = captureTaskScopeRef.current.beginTask("packet-page");
+      setIsPageLoading(true);
+      try {
+        const safeCursor = normalizePacketCursor(cursor);
+        const page = await bridge.listPacketsPage(safeCursor, PAGE_SIZE, filterOverride ?? displayFilter, task.signal);
+        if (!task.isCurrent() || requestSeq !== packetPageSeqRef.current) {
+          return null;
+        }
+        commitPacketPage(safeCursor, page);
+        return page;
+      } catch (error) {
+        if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
+          return null;
+        }
+        setBackendStatus(error instanceof Error ? error.message : "数据包加载失败");
         return null;
-      }
-      commitPacketPage(safeCursor, page);
-      return page;
-    } catch (error) {
-      if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-        return null;
-      }
-      setBackendStatus(error instanceof Error ? error.message : "数据包加载失败");
-      return null;
-    } finally {
-      const isCurrent = task.isCurrent();
-      task.finish();
-      if (isCurrent && requestSeq === packetPageSeqRef.current) {
-        setIsPageLoading(false);
-        if (options?.finishFilterLoading) {
-          setIsFilterLoading(false);
+      } finally {
+        const isCurrent = task.isCurrent();
+        task.finish();
+        if (isCurrent && requestSeq === packetPageSeqRef.current) {
+          setIsPageLoading(false);
+          if (options?.finishFilterLoading) {
+            setIsFilterLoading(false);
+          }
         }
       }
-    }
-  }, [backendConnected, commitPacketPage, displayFilter]);
+    },
+    [backendConnected, commitPacketPage, displayFilter],
+  );
 
   const loadMorePackets = useCallback(async () => {
     const next = getNextPacketCursor(pageStartRef.current, PAGE_SIZE);
@@ -390,55 +401,64 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     await loadPacketPage(prev);
   }, [loadPacketPage]);
 
-  const jumpToPage = useCallback(async (page: number) => {
-    const cursor = getPacketPageCursor(page, totalPackets, PAGE_SIZE);
-    await loadPacketPage(cursor);
-  }, [loadPacketPage, totalPackets]);
+  const jumpToPage = useCallback(
+    async (page: number) => {
+      const cursor = getPacketPageCursor(page, totalPackets, PAGE_SIZE);
+      await loadPacketPage(cursor);
+    },
+    [loadPacketPage, totalPackets],
+  );
 
-  const locatePacketById = useCallback(async (packetId: number, filterOverride?: string) => {
-    const normalized = normalizePacketId(packetId);
-    if (normalized <= 0 || !activeCapturePathRef.current) return null;
-    const task = captureTaskScopeRef.current.beginTask("packet-locate");
-    try {
-      const effectiveFilter = filterOverride ?? displayFilter;
-      const located = await bridge.locatePacketPage(normalized, PAGE_SIZE, effectiveFilter, task.signal);
-      if (!task.isCurrent()) {
+  const locatePacketById = useCallback(
+    async (packetId: number, filterOverride?: string) => {
+      const normalized = normalizePacketId(packetId);
+      if (normalized <= 0 || !activeCapturePathRef.current) return null;
+      const task = captureTaskScopeRef.current.beginTask("packet-locate");
+      try {
+        const effectiveFilter = filterOverride ?? displayFilter;
+        const located = await bridge.locatePacketPage(normalized, PAGE_SIZE, effectiveFilter, task.signal);
+        if (!task.isCurrent()) {
+          return null;
+        }
+        if (!located.found) {
+          setBackendStatus(`未找到数据包 #${normalized}`);
+          return null;
+        }
+        if (filterOverride !== undefined) {
+          setDisplayFilter(effectiveFilter);
+        }
+        const page = await loadPacketPage(located.cursor, effectiveFilter);
+        if (!page) {
+          return null;
+        }
+        if (!task.isCurrent()) {
+          return null;
+        }
+        setSelectedPacketId(normalized);
+        return page.items.find((item) => item.id === normalized) ?? null;
+      } catch (error) {
+        if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
+          return null;
+        }
+        setBackendStatus(error instanceof Error ? error.message : "定位数据包失败");
         return null;
+      } finally {
+        task.finish();
       }
-      if (!located.found) {
-        setBackendStatus(`未找到数据包 #${normalized}`);
-        return null;
-      }
-      if (filterOverride !== undefined) {
-        setDisplayFilter(effectiveFilter);
-      }
-      const page = await loadPacketPage(located.cursor, effectiveFilter);
-      if (!page) {
-        return null;
-      }
-      if (!task.isCurrent()) {
-        return null;
-      }
-      setSelectedPacketId(normalized);
-      return page.items.find((item) => item.id === normalized) ?? null;
-    } catch (error) {
-      if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-        return null;
-      }
-      setBackendStatus(error instanceof Error ? error.message : "定位数据包失败");
-      return null;
-    } finally {
-      task.finish();
-    }
-  }, [displayFilter, loadPacketPage]);
+    },
+    [displayFilter, loadPacketPage],
+  );
 
-  const scheduleLoadMore = useCallback((delayMs = 120) => {
-    if (loadMoreScheduledRef.current != null) return;
-    loadMoreScheduledRef.current = window.setTimeout(() => {
-      loadMoreScheduledRef.current = null;
-      void loadPacketPage(pageStartRef.current);
-    }, delayMs);
-  }, [loadPacketPage]);
+  const scheduleLoadMore = useCallback(
+    (delayMs = 120) => {
+      if (loadMoreScheduledRef.current != null) return;
+      loadMoreScheduledRef.current = window.setTimeout(() => {
+        loadMoreScheduledRef.current = null;
+        void loadPacketPage(pageStartRef.current);
+      }, delayMs);
+    },
+    [loadPacketPage],
+  );
 
   const updateProgressFromStatus = useCallback((message: string): boolean => {
     const progress = parseProgressStatus(message);
@@ -525,7 +545,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     await bridge.prepareCaptureReplacement().catch(() => null);
   }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
 
-  const waitForCaptureSignal = useCallback((delayMs: number) => waitForCaptureSignalUtil(captureWaitersRef.current, delayMs), []);
+  const waitForCaptureSignal = useCallback(
+    (delayMs: number) => waitForCaptureSignalUtil(captureWaitersRef.current, delayMs),
+    [],
+  );
 
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;
@@ -533,26 +556,29 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const rememberRecentCapture = useCallback((entry: RecentCapture) => {
     setRecentCaptures((prev) => {
-      const next = [
-        entry,
-        ...prev.filter((item) => item.path !== entry.path),
-      ].slice(0, MAX_RECENT_CAPTURES);
+      const next = [entry, ...prev.filter((item) => item.path !== entry.path)].slice(0, MAX_RECENT_CAPTURES);
       writeRecentCaptures(next);
       return next;
     });
   }, []);
 
-  const setTSharkPath = useCallback(async (path: string) => {
-    await setTSharkPathImpl(path, backendConnected, setBackendStatus);
-  }, [setTSharkPathImpl, backendConnected]);
+  const setTSharkPath = useCallback(
+    async (path: string) => {
+      await setTSharkPathImpl(path, backendConnected, setBackendStatus);
+    },
+    [setTSharkPathImpl, backendConnected],
+  );
 
   const refreshToolRuntimeSnapshot = useCallback(async () => {
     return await refreshToolRuntimeSnapshotImpl(backendConnected);
   }, [refreshToolRuntimeSnapshotImpl, backendConnected]);
 
-  const saveToolRuntimeConfig = useCallback(async (patch: Partial<ToolRuntimeConfig>) => {
-    return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatus);
-  }, [saveToolRuntimeConfigImpl, backendConnected]);
+  const saveToolRuntimeConfig = useCallback(
+    async (patch: Partial<ToolRuntimeConfig>) => {
+      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatus);
+    },
+    [saveToolRuntimeConfigImpl, backendConnected],
+  );
 
   const filteredPackets = useMemo(() => packets, [packets]);
 
@@ -561,20 +587,18 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [filteredPackets, selectedPacketDetail, selectedPacketId],
   );
 
-  const refreshAnalysisResult = useCallback(async (
-    options?: {
-      capturePath?: string;
-      quietSuccess?: boolean;
+  const refreshAnalysisResult = useCallback(
+    async (options?: { capturePath?: string; quietSuccess?: boolean }) => {
+      await refreshAnalysisResultImpl({
+        ...options,
+        backendConnected,
+        activeCapturePath: activeCapturePathRef.current,
+        captureTaskScope: captureTaskScopeRef.current,
+        setBackendStatus,
+      });
     },
-  ) => {
-    await refreshAnalysisResultImpl({
-      ...options,
-      backendConnected,
-      activeCapturePath: activeCapturePathRef.current,
-      captureTaskScope: captureTaskScopeRef.current,
-      setBackendStatus,
-    });
-  }, [refreshAnalysisResultImpl, backendConnected]);
+    [refreshAnalysisResultImpl, backendConnected],
+  );
 
   const refreshStreamIndex = useCallback(async () => {
     if (!backendConnected) return;
@@ -601,180 +625,173 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     }
   }, [backendConnected]);
 
-  const prefetchAdjacentStreams = useCallback((protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {
-    if (!backendConnected || !activeCapturePathRef.current || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0) return;
+  const prefetchAdjacentStreams = useCallback(
+    (protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {
+      if (!backendConnected || !activeCapturePathRef.current || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0)
+        return;
 
-    const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
-    const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
-    for (const targetId of targets) {
-      const { taskKey, cache, inFlight, fetchStream } = resolveStreamPrefetchTask({
+      const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
+      const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
+      for (const targetId of targets) {
+        const { taskKey, cache, inFlight, fetchStream } = resolveStreamPrefetchTask({
+          protocol,
+          targetId,
+          httpCache: httpStreamCacheRef.current,
+          tcpCache: tcpStreamCacheRef.current,
+          udpCache: udpStreamCacheRef.current,
+          httpInFlight: httpPrefetchInFlightRef.current,
+          tcpInFlight: tcpPrefetchInFlightRef.current,
+          udpInFlight: udpPrefetchInFlightRef.current,
+          fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
+          fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+          fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+        });
+        scheduleStreamPrefetch({
+          targetId,
+          taskKey,
+          cache,
+          inFlight,
+          beginTask: captureTaskScopeRef.current.beginTask,
+          fetchStream,
+        });
+      }
+    },
+    [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp],
+  );
+
+  const setActiveStream = useCallback(
+    async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
+      if (!backendConnected || !activeCapturePathRef.current || streamId < 0) return;
+      const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+      let cacheHit = false;
+      const task = captureTaskScopeRef.current.beginTask(`${protocol.toLowerCase()}-stream`);
+
+      const requestSeq = bumpStreamSwitchSequence(streamSwitchSequencesRef.current, protocol);
+
+      const isLatest = () =>
+        isLatestStreamSwitchSequence(streamSwitchSequencesRef.current, protocol, requestSeq, task.isCurrent);
+
+      const commitCachedSwitch = <T extends HttpStream | BinaryStream>(
+        metricProtocol: "HTTP" | "TCP" | "UDP",
+        cache: Map<number, T>,
+        apply: (stream: T) => void,
+      ) => {
+        if (!applyCachedStreamSwitch({ cache, streamId, isLatest, apply })) {
+          return false;
+        }
+        cacheHit = true;
+        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+        recordStreamSwitchMetric(metricProtocol, elapsed, cacheHit);
+        prefetchAdjacentStreams(metricProtocol, streamId);
+        return true;
+      };
+
+      const commitLoadedSwitch = <T extends HttpStream | BinaryStream>(
+        metricProtocol: "HTTP" | "TCP" | "UDP",
+        cache: Map<number, T>,
+        stream: T,
+        apply: (stream: T) => void,
+      ) => {
+        commitLoadedStreamSwitch({
+          protocol: metricProtocol,
+          requestedStreamId: streamId,
+          stream,
+          cache,
+          apply,
+          startedAt,
+          recordMetric: recordStreamSwitchMetric,
+          prefetchAdjacentStreams,
+        });
+      };
+
+      const switchTask = resolveStreamSwitchTask({
         protocol,
-        targetId,
+        streamId,
         httpCache: httpStreamCacheRef.current,
         tcpCache: tcpStreamCacheRef.current,
         udpCache: udpStreamCacheRef.current,
-        httpInFlight: httpPrefetchInFlightRef.current,
-        tcpInFlight: tcpPrefetchInFlightRef.current,
-        udpInFlight: udpPrefetchInFlightRef.current,
+        applyHttpStream: (next) =>
+          startTransition(() => {
+            setHttpStream(next);
+          }),
+        applyTcpStream: (next) =>
+          startTransition(() => {
+            setTcpStream(next);
+          }),
+        applyUdpStream: (next) =>
+          startTransition(() => {
+            setUdpStream(next);
+          }),
         fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
         fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
         fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
       });
-      scheduleStreamPrefetch({
-        targetId,
-        taskKey,
-        cache,
-        inFlight,
-        beginTask: captureTaskScopeRef.current.beginTask,
-        fetchStream,
-      });
-    }
-  }, [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp]);
 
-  const setActiveStream = useCallback(async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
-    if (!backendConnected || !activeCapturePathRef.current || streamId < 0) return;
-    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-    let cacheHit = false;
-    const task = captureTaskScopeRef.current.beginTask(`${protocol.toLowerCase()}-stream`);
-
-    const requestSeq = bumpStreamSwitchSequence(streamSwitchSequencesRef.current, protocol);
-
-    const isLatest = () => isLatestStreamSwitchSequence(
-      streamSwitchSequencesRef.current,
-      protocol,
-      requestSeq,
-      task.isCurrent,
-    );
-
-    const commitCachedSwitch = <T extends HttpStream | BinaryStream>(
-      metricProtocol: "HTTP" | "TCP" | "UDP",
-      cache: Map<number, T>,
-      apply: (stream: T) => void,
-    ) => {
-      if (!applyCachedStreamSwitch({ cache, streamId, isLatest, apply })) {
-        return false;
+      try {
+        if (commitCachedSwitch(switchTask.protocol, switchTask.cache, switchTask.applyStream)) {
+          return;
+        }
+        switchTask.applyStream(switchTask.loadingStream);
+        const stream = await switchTask.fetchStream(streamId, task.signal);
+        if (!isLatest()) return;
+        commitLoadedSwitch(switchTask.protocol, switchTask.cache, stream, switchTask.applyStream);
+      } catch (error) {
+        if (!isLatest()) return;
+        if (isAbortLikeError(error, task.signal)) {
+          return;
+        }
+        setBackendStatus(error instanceof Error && error.message ? error.message : "流切换失败");
+      } finally {
+        task.finish();
       }
-      cacheHit = true;
-      const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-      recordStreamSwitchMetric(metricProtocol, elapsed, cacheHit);
-      prefetchAdjacentStreams(metricProtocol, streamId);
-      return true;
-    };
+    },
+    [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric],
+  );
 
-    const commitLoadedSwitch = <T extends HttpStream | BinaryStream>(
-      metricProtocol: "HTTP" | "TCP" | "UDP",
-      cache: Map<number, T>,
-      stream: T,
-      apply: (stream: T) => void,
-    ) => {
-      commitLoadedStreamSwitch({
-        protocol: metricProtocol,
-        requestedStreamId: streamId,
-        stream,
-        cache,
-        apply,
-        startedAt,
-        recordMetric: recordStreamSwitchMetric,
-        prefetchAdjacentStreams,
-      });
-    };
-
-    const switchTask = resolveStreamSwitchTask({
-      protocol,
-      streamId,
-      httpCache: httpStreamCacheRef.current,
-      tcpCache: tcpStreamCacheRef.current,
-      udpCache: udpStreamCacheRef.current,
-      applyHttpStream: (next) => startTransition(() => {
-        setHttpStream(next);
-      }),
-      applyTcpStream: (next) => startTransition(() => {
-        setTcpStream(next);
-      }),
-      applyUdpStream: (next) => startTransition(() => {
-        setUdpStream(next);
-      }),
-      fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
-      fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-      fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-    });
-
-    try {
-      if (commitCachedSwitch(switchTask.protocol, switchTask.cache, switchTask.applyStream)) {
-        return;
+  const preparePacketStream = useCallback(
+    async (
+      packetId: number,
+      preferredProtocol?: "HTTP" | "TCP" | "UDP",
+      filterOverride?: string,
+    ): Promise<PreparedPacketStream> => {
+      const packet = await locatePacketById(packetId, filterOverride);
+      if (!packet || packet.streamId == null || packet.streamId < 0) {
+        return { packet, protocol: null, streamId: null };
       }
-      switchTask.applyStream(switchTask.loadingStream);
-      const stream = await switchTask.fetchStream(streamId, task.signal);
-      if (!isLatest()) return;
-      commitLoadedSwitch(switchTask.protocol, switchTask.cache, stream, switchTask.applyStream);
-    } catch (error) {
-      if (!isLatest()) return;
-      if (isAbortLikeError(error, task.signal)) {
-        return;
-      }
-      setBackendStatus(error instanceof Error && error.message ? error.message : "流切换失败");
-    } finally {
-      task.finish();
-    }
-  }, [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric]);
 
-  const preparePacketStream = useCallback(async (
-    packetId: number,
-    preferredProtocol?: "HTTP" | "TCP" | "UDP",
-    filterOverride?: string,
-  ): Promise<PreparedPacketStream> => {
-    const packet = await locatePacketById(packetId, filterOverride);
-    if (!packet || packet.streamId == null || packet.streamId < 0) {
-      return { packet, protocol: null, streamId: null };
-    }
+      const protocol = resolvePacketStreamProtocol(packet.proto, preferredProtocol ?? null);
 
-    const protocol = resolvePacketStreamProtocol(packet.proto, preferredProtocol ?? null);
+      await setActiveStream(protocol, packet.streamId);
+      return {
+        packet,
+        protocol,
+        streamId: packet.streamId,
+      };
+    },
+    [locatePacketById, setActiveStream],
+  );
 
-    await setActiveStream(protocol, packet.streamId);
-    return {
-      packet,
-      protocol,
-      streamId: packet.streamId,
-    };
-  }, [locatePacketById, setActiveStream]);
+  const persistStreamPayloads = useCallback(
+    async (protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>) => {
+      if (!backendConnected || streamId < 0 || patches.length === 0) return;
+      await bridge.updateStreamPayloads(protocol, streamId, patches);
 
-  const persistStreamPayloads = useCallback(async (
-    protocol: "HTTP" | "TCP" | "UDP",
-    streamId: number,
-    patches: Array<{ index: number; body: string }>,
-  ) => {
-    if (!backendConnected || streamId < 0 || patches.length === 0) return;
-    await bridge.updateStreamPayloads(protocol, streamId, patches);
-
-    startTransition(() => {
-      if (protocol === "HTTP") {
-        commitStreamPayloadPatches({
+      startTransition(() => {
+        commitProtocolStreamPayloadPatches({
+          protocol,
           streamId,
           patches,
-          setStream: setHttpStream,
-          cache: httpStreamCacheRef.current,
+          setHttpStream,
+          setTcpStream,
+          setUdpStream,
+          httpCache: httpStreamCacheRef.current,
+          tcpCache: tcpStreamCacheRef.current,
+          udpCache: udpStreamCacheRef.current,
         });
-        return;
-      }
-
-      if (protocol === "TCP") {
-        commitStreamPayloadPatches({
-          streamId,
-          patches,
-          setStream: setTcpStream,
-          cache: tcpStreamCacheRef.current,
-        });
-        return;
-      }
-
-      commitStreamPayloadPatches({
-        streamId,
-        patches,
-        setStream: setUdpStream,
-        cache: udpStreamCacheRef.current,
       });
-    });
-  }, [backendConnected]);
+    },
+    [backendConnected],
+  );
 
   const scheduleLoadMoreRef = useRef(scheduleLoadMore);
   const refreshAnalysisResultRef = useRef(refreshAnalysisResult);
@@ -784,9 +801,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useSyncedRefValue(refreshAnalysisResultRef, refreshAnalysisResult);
   useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
 
-  useEffect(() => () => {
-    captureTaskScopeRef.current.invalidate();
-  }, []);
+  useEffect(
+    () => () => {
+      captureTaskScopeRef.current.invalidate();
+    },
+    [],
+  );
 
   useEffect(() => {
     let dispose: (() => void) | null = null;
@@ -823,54 +843,52 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         return;
       }
 
-        clearBackendRetryTimer();
-        setBackendConnected(true);
-        setBackendStatus("后端已连接，等待打开文件");
-        setIsTSharkChecking(true);
-        setIsToolRuntimeLoading(true);
-        setToolRuntimeCheckDegraded(false);
+      clearBackendRetryTimer();
+      setBackendConnected(true);
+      setBackendStatus("后端已连接，等待打开文件");
+      setIsTSharkChecking(true);
+      setIsToolRuntimeLoading(true);
+      setToolRuntimeCheckDegraded(false);
 
-        try {
-          const savedConfig = readToolRuntimeConfig();
-          const snapshot = await withTimeout(
-            bridge.updateToolRuntimeConfig(savedConfig),
-            STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
-            "startup tool runtime check timed out",
-          );
-          setToolRuntimeSnapshot(snapshot);
-          setTsharkStatus({
-            available: snapshot.tshark.available,
-            path: snapshot.tshark.path,
-            message: snapshot.tshark.message,
-            customPath: snapshot.tshark.customPath ?? "",
-            usingCustomPath: snapshot.tshark.usingCustomPath,
-          });
-          if (!cancelled) {
-            writeToolRuntimeConfig(snapshot.config);
-          }
-          if (!cancelled && snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
-            setBackendStatus(snapshot.tshark.message);
-          }
-          if (!cancelled && !snapshot.tshark.available) {
-            setBackendStatus(snapshot.tshark.message || "未检测到 tshark，请先配置路径");
-          }
-        } catch (error) {
-          if (!cancelled) {
-            setToolRuntimeCheckDegraded(true);
-            const prefix = isOperationTimeoutError(error)
-              ? "运行时组件检测超时"
-              : "运行时组件检测失败";
-            setBackendStatus(`${prefix}，已先进入主界面；可在设置侧栏刷新状态`);
-            setTsharkStatus((prev) => ({
-              ...prev,
-              message: `${prefix}，请稍后在设置侧栏刷新状态`,
-            }));
-          }
-        } finally {
-          if (!cancelled) {
-            setIsTSharkChecking(false);
-            setIsToolRuntimeLoading(false);
-          }
+      try {
+        const savedConfig = readToolRuntimeConfig();
+        const snapshot = await withTimeout(
+          bridge.updateToolRuntimeConfig(savedConfig),
+          STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
+          "startup tool runtime check timed out",
+        );
+        setToolRuntimeSnapshot(snapshot);
+        setTsharkStatus({
+          available: snapshot.tshark.available,
+          path: snapshot.tshark.path,
+          message: snapshot.tshark.message,
+          customPath: snapshot.tshark.customPath ?? "",
+          usingCustomPath: snapshot.tshark.usingCustomPath,
+        });
+        if (!cancelled) {
+          writeToolRuntimeConfig(snapshot.config);
+        }
+        if (!cancelled && snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
+          setBackendStatus(snapshot.tshark.message);
+        }
+        if (!cancelled && !snapshot.tshark.available) {
+          setBackendStatus(snapshot.tshark.message || "未检测到 tshark，请先配置路径");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setToolRuntimeCheckDegraded(true);
+          const prefix = isOperationTimeoutError(error) ? "运行时组件检测超时" : "运行时组件检测失败";
+          setBackendStatus(`${prefix}，已先进入主界面；可在设置侧栏刷新状态`);
+          setTsharkStatus((prev) => ({
+            ...prev,
+            message: `${prefix}，请稍后在设置侧栏刷新状态`,
+          }));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsTSharkChecking(false);
+          setIsToolRuntimeLoading(false);
+        }
       }
 
       try {
@@ -923,7 +941,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
           }
           if (shouldResetThreatAnalysisFromStatus(msg)) {
-            setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
+            setThreatAnalysisProgress((prev) => (prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS));
           }
           wakeCaptureWaiters();
           setBackendStatus(msg);
@@ -995,193 +1013,215 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     resetValue: null,
   });
 
-  const startCapture = useCallback(async (filePath?: string, filterOverride?: string) => {
-    if (!backendConnected) {
-      setBackendStatus("桌面后端未连接，无法打开文件");
-      return;
-    }
-
-    const captureSeq = ++captureSeqRef.current;
-    filterSeqRef.current += 1;
-    const effectiveFilter = filterOverride ?? displayFilter;
-
-    try {
-      const opened =
-        filePath && filePath.trim()
-          ? { filePath: filePath.trim(), fileSize: 0, fileName: filePath.trim().split(/[\\/]/).pop() ?? "capture.pcapng" }
-          : await bridge.openPcapFile();
-
-      await prepareForCaptureReplacement();
-      setIsFilterLoading(false);
-      setPackets([]);
-      setTotalPackets(0);
-      setPageStart(0);
-      setPreloadProcessed(0);
-      setPreloadTotal(0);
-      preloadProcessedRef.current = 0;
-      preloadTotalRef.current = 0;
-      setIsPreloadingCapture(true);
-      pageStartRef.current = 0;
-      setHasPrevPackets(false);
-      hasMorePacketsRef.current = true;
-      parseFinishedRef.current = false;
-      parseErrorRef.current = "";
-      preloadingRef.current = true;
-      setHasMorePackets(true);
-      setSelectedPacketId(null);
-      setSelectedPacketDetail(null);
-      setSelectedPacketRawHex("");
-      setSelectedPacketLayers(null);
-      httpStreamCacheRef.current.clear();
-      tcpStreamCacheRef.current.clear();
-      udpStreamCacheRef.current.clear();
-      httpPrefetchInFlightRef.current.clear();
-      tcpPrefetchInFlightRef.current.clear();
-      udpPrefetchInFlightRef.current.clear();
-      resetStreamSwitchSequences(streamSwitchSequencesRef.current);
-      streamSwitchDurationsRef.current = {
-        ALL: [],
-        HTTP: [],
-        TCP: [],
-        UDP: [],
-      };
-      streamSwitchHitsRef.current = {
-        ALL: 0,
-        HTTP: 0,
-        TCP: 0,
-        UDP: 0,
-      };
-      setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
-      setThreatHits([]);
-      setIsThreatAnalysisLoading(false);
-      setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
-      setExtractedObjects([]);
-      setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
-      setFileMeta({
-        name: opened.fileName,
-        sizeBytes: Number(opened.fileSize ?? 0),
-        path: opened.filePath,
-      });
-      setCaptureRevision((prev) => prev + 1);
-      activeCapturePathRef.current = opened.filePath;
-      rememberRecentCapture({
-        path: opened.filePath,
-        name: opened.fileName,
-        sizeBytes: Number(opened.fileSize ?? 0),
-        lastOpenedAt: new Date().toISOString(),
-      });
-
-      const startTask = captureTaskScopeRef.current.beginTask("capture-start");
-      try {
-        await bridge.startStreamingPackets(opened.filePath, "", startTask.signal);
-        if (!startTask.isCurrent()) return;
-      } finally {
-        startTask.finish();
+  const startCapture = useCallback(
+    async (filePath?: string, filterOverride?: string) => {
+      if (!backendConnected) {
+        setBackendStatus("桌面后端未连接，无法打开文件");
+        return;
       }
-      if (captureSeq !== captureSeqRef.current) return;
-      setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
 
-      const waitDeadline = Date.now() + 120000;
-      let firstPageLoaded = false;
-      while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
-        const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
-        const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
+      const captureSeq = ++captureSeqRef.current;
+      filterSeqRef.current += 1;
+      const effectiveFilter = filterOverride ?? displayFilter;
+
+      try {
+        const opened =
+          filePath && filePath.trim()
+            ? {
+                filePath: filePath.trim(),
+                fileSize: 0,
+                fileName: filePath.trim().split(/[\\/]/).pop() ?? "capture.pcapng",
+              }
+            : await bridge.openPcapFile();
+
+        await prepareForCaptureReplacement();
+        setIsFilterLoading(false);
+        setPackets([]);
+        setTotalPackets(0);
+        setPageStart(0);
+        setPreloadProcessed(0);
+        setPreloadTotal(0);
+        preloadProcessedRef.current = 0;
+        preloadTotalRef.current = 0;
+        setIsPreloadingCapture(true);
+        pageStartRef.current = 0;
+        setHasPrevPackets(false);
+        hasMorePacketsRef.current = true;
+        parseFinishedRef.current = false;
+        parseErrorRef.current = "";
+        preloadingRef.current = true;
+        setHasMorePackets(true);
+        setSelectedPacketId(null);
+        setSelectedPacketDetail(null);
+        setSelectedPacketRawHex("");
+        setSelectedPacketLayers(null);
+        httpStreamCacheRef.current.clear();
+        tcpStreamCacheRef.current.clear();
+        udpStreamCacheRef.current.clear();
+        httpPrefetchInFlightRef.current.clear();
+        tcpPrefetchInFlightRef.current.clear();
+        udpPrefetchInFlightRef.current.clear();
+        resetStreamSwitchSequences(streamSwitchSequencesRef.current);
+        streamSwitchDurationsRef.current = {
+          ALL: [],
+          HTTP: [],
+          TCP: [],
+          UDP: [],
+        };
+        streamSwitchHitsRef.current = {
+          ALL: 0,
+          HTTP: 0,
+          TCP: 0,
+          UDP: 0,
+        };
+        setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
+        setThreatHits([]);
+        setIsThreatAnalysisLoading(false);
+        setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
+        setExtractedObjects([]);
+        setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+        setFileMeta({
+          name: opened.fileName,
+          sizeBytes: Number(opened.fileSize ?? 0),
+          path: opened.filePath,
+        });
+        setCaptureRevision((prev) => prev + 1);
+        activeCapturePathRef.current = opened.filePath;
+        rememberRecentCapture({
+          path: opened.filePath,
+          name: opened.fileName,
+          sizeBytes: Number(opened.fileSize ?? 0),
+          lastOpenedAt: new Date().toISOString(),
+        });
+
+        const startTask = captureTaskScopeRef.current.beginTask("capture-start");
         try {
-          const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter, probeTask.signal);
-          if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
-          if (probePage.total > 0) {
-            setTotalPackets(probePage.total);
-            if (preloadTotalRef.current <= 0) {
-              setPreloadProcessed(probePage.total);
-              preloadProcessedRef.current = probePage.total;
+          await bridge.startStreamingPackets(opened.filePath, "", startTask.signal);
+          if (!startTask.isCurrent()) return;
+        } finally {
+          startTask.finish();
+        }
+        if (captureSeq !== captureSeqRef.current) return;
+        setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
+
+        const waitDeadline = Date.now() + 120000;
+        let firstPageLoaded = false;
+        while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
+          const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
+          const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
+          try {
+            const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter, probeTask.signal);
+            if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
+            if (probePage.total > 0) {
+              setTotalPackets(probePage.total);
+              if (preloadTotalRef.current <= 0) {
+                setPreloadProcessed(probePage.total);
+                preloadProcessedRef.current = probePage.total;
+              }
             }
+            if (!firstPageLoaded && probePage.total > 0) {
+              commitPacketPage(0, {
+                items: probePage.items,
+                total: probePage.total,
+                hasMore: probePage.hasMore,
+              });
+              firstPageLoaded = true;
+            }
+          } finally {
+            probeTask.finish();
           }
-          if (!firstPageLoaded && probePage.total > 0) {
-            commitPacketPage(0, {
-              items: probePage.items,
-              total: probePage.total,
-              hasMore: probePage.hasMore,
-            });
-            firstPageLoaded = true;
+
+          if (parseFinishedRef.current) {
+            break;
           }
+
+          await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
+        }
+
+        if (captureSeq !== captureSeqRef.current) return;
+        const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
+        let probePage: Awaited<ReturnType<typeof bridge.listPacketsPage>>;
+        try {
+          probePage = await bridge.listPacketsPage(0, 1, effectiveFilter, probeTask.signal);
+          if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
         } finally {
           probeTask.finish();
         }
-
-        if (parseFinishedRef.current) {
-          break;
+        if (probePage.total === 0 && parseFinishedRef.current) {
+          throw new Error(
+            parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility",
+          );
         }
-
-        await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
-      }
-
-      if (captureSeq !== captureSeqRef.current) return;
-      const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
-      let probePage: Awaited<ReturnType<typeof bridge.listPacketsPage>>;
-      try {
-        probePage = await bridge.listPacketsPage(0, 1, effectiveFilter, probeTask.signal);
-        if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
+        if (!parseFinishedRef.current && Date.now() >= waitDeadline) {
+          throw new Error("capture parsing timed out before preloading finished");
+        }
+        if (!firstPageLoaded && probePage.total > 0) {
+          await loadPacketPage(0, effectiveFilter);
+        }
+        await refreshStreamIndex();
+        if (captureSeq !== captureSeqRef.current) return;
+        setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
+        void refreshAnalysisResult({
+          capturePath: opened.filePath,
+          quietSuccess: true,
+        });
+      } catch (error) {
+        if (isAbortLikeError(error)) {
+          return;
+        }
+        if (captureSeq === captureSeqRef.current) {
+          setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
+        }
       } finally {
-        probeTask.finish();
-      }
-      if (probePage.total === 0 && parseFinishedRef.current) {
-        throw new Error(parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility");
-      }
-      if (!parseFinishedRef.current && Date.now() >= waitDeadline) {
-        throw new Error("capture parsing timed out before preloading finished");
-      }
-      if (!firstPageLoaded && probePage.total > 0) {
-        await loadPacketPage(0, effectiveFilter);
-      }
-      await refreshStreamIndex();
-      if (captureSeq !== captureSeqRef.current) return;
-      setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
-      void refreshAnalysisResult({
-        capturePath: opened.filePath,
-        quietSuccess: true,
-      });
-    } catch (error) {
-      if (isAbortLikeError(error)) {
-        return;
-      }
-      if (captureSeq === captureSeqRef.current) {
-        setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
-      }
-    } finally {
-      if (captureSeq === captureSeqRef.current) {
-        preloadingRef.current = false;
-        setIsPreloadingCapture(false);
-        wakeCaptureWaiters();
-      }
-    }
-  }, [backendConnected, commitPacketPage, displayFilter, prepareForCaptureReplacement, refreshAnalysisResult, refreshStreamIndex, rememberRecentCapture, waitForCaptureSignal, wakeCaptureWaiters]);
-
-  const applyFilter = useCallback((value?: string) => {
-    const nextFilter = value ?? displayFilter;
-    if (value !== undefined) {
-      setDisplayFilter(nextFilter);
-    }
-
-    if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
-      const filterSeq = ++filterSeqRef.current;
-      setIsFilterLoading(true);
-      resetPacketViewport();
-      setBackendStatus(nextFilter.trim() ? `正在应用过滤器: ${nextFilter}` : "正在重置过滤器");
-      void (async () => {
-        let page = await loadPacketPage(0, nextFilter);
-        const deadline = Date.now() + 10000;
-        while (filterSeq === filterSeqRef.current && page?.filtering && Date.now() < deadline) {
-          setBackendStatus(nextFilter.trim() ? `过滤器仍在后台扫描: ${nextFilter}` : "正在重置过滤器");
-          await new Promise((resolve) => window.setTimeout(resolve, 300));
-          page = await loadPacketPage(0, nextFilter);
+        if (captureSeq === captureSeqRef.current) {
+          preloadingRef.current = false;
+          setIsPreloadingCapture(false);
+          wakeCaptureWaiters();
         }
-        if (filterSeq === filterSeqRef.current) {
-          setIsFilterLoading(false);
-          setBackendStatus(nextFilter.trim() ? `过滤器已应用: ${nextFilter}` : "过滤器已清空");
-        }
-      })();
-    }
-  }, [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
+      }
+    },
+    [
+      backendConnected,
+      commitPacketPage,
+      displayFilter,
+      prepareForCaptureReplacement,
+      refreshAnalysisResult,
+      refreshStreamIndex,
+      rememberRecentCapture,
+      waitForCaptureSignal,
+      wakeCaptureWaiters,
+    ],
+  );
+
+  const applyFilter = useCallback(
+    (value?: string) => {
+      const nextFilter = value ?? displayFilter;
+      if (value !== undefined) {
+        setDisplayFilter(nextFilter);
+      }
+
+      if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
+        const filterSeq = ++filterSeqRef.current;
+        setIsFilterLoading(true);
+        resetPacketViewport();
+        setBackendStatus(nextFilter.trim() ? `正在应用过滤器: ${nextFilter}` : "正在重置过滤器");
+        void (async () => {
+          let page = await loadPacketPage(0, nextFilter);
+          const deadline = Date.now() + 10000;
+          while (filterSeq === filterSeqRef.current && page?.filtering && Date.now() < deadline) {
+            setBackendStatus(nextFilter.trim() ? `过滤器仍在后台扫描: ${nextFilter}` : "正在重置过滤器");
+            await new Promise((resolve) => window.setTimeout(resolve, 300));
+            page = await loadPacketPage(0, nextFilter);
+          }
+          if (filterSeq === filterSeqRef.current) {
+            setIsFilterLoading(false);
+            setBackendStatus(nextFilter.trim() ? `过滤器已应用: ${nextFilter}` : "过滤器已清空");
+          }
+        })();
+      }
+    },
+    [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, resetPacketViewport],
+  );
 
   const clearFilter = useCallback(() => {
     setDisplayFilter("");
@@ -1205,20 +1245,26 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketDetail((prev) => keepSelectedPacketDetailForId(prev, id));
   }, []);
 
-  const updateDecryptionConfig = useCallback((patch: Partial<DecryptionConfig>) => {
-    setDecryptionConfig((prev) => {
-      const next = { ...prev, ...patch };
-      if (backendConnected) {
-        void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
-      }
-      return next;
-    });
-  }, [backendConnected]);
+  const updateDecryptionConfig = useCallback(
+    (patch: Partial<DecryptionConfig>) => {
+      setDecryptionConfig((prev) => {
+        const next = { ...prev, ...patch };
+        if (backendConnected) {
+          void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
+        }
+        return next;
+      });
+    },
+    [backendConnected],
+  );
 
-  const openCapture = useCallback(async (filePath?: string) => {
-    setDisplayFilter("");
-    await startCapture(filePath, "");
-  }, [startCapture]);
+  const openCapture = useCallback(
+    async (filePath?: string) => {
+      setDisplayFilter("");
+      await startCapture(filePath, "");
+    },
+    [startCapture],
+  );
 
   const stopCapture = useCallback(async () => {
     captureSeqRef.current += 1;
@@ -1232,7 +1278,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     wakeCaptureWaiters();
     clearCaptureUiState();
     threatAnalysisSeqRef.current += 1;
-    setBackendStatus(backendConnected ? "当前抓包已从界面移除，正在请求后端清理线程" : "当前抓包已从界面移除；后端未连接");
+    setBackendStatus(
+      backendConnected ? "当前抓包已从界面移除，正在请求后端清理线程" : "当前抓包已从界面移除；后端未连接",
+    );
     if (!backendConnected) return;
 
     let closeError = "";
@@ -1242,11 +1290,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     } catch (error) {
       closeError = error instanceof Error ? error.message : "关闭抓包失败";
     }
-    setBackendStatus(closeError ? `当前抓包已从界面移除；后端清理返回: ${closeError}` : "当前抓包已关闭，临时数据库已清理");
+    setBackendStatus(
+      closeError ? `当前抓包已从界面移除；后端清理返回: ${closeError}` : "当前抓包已关闭，临时数据库已清理",
+    );
   }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, wakeCaptureWaiters]);
 
   const protocolTree = useMemo(
-    () => (selectedPacketLayers ? buildProtocolTreeFromLayers(selectedPacketLayers, selectedPacket) : buildProtocolTree(selectedPacket)),
+    () =>
+      selectedPacketLayers
+        ? buildProtocolTreeFromLayers(selectedPacketLayers, selectedPacket)
+        : buildProtocolTree(selectedPacket),
     [selectedPacketLayers, selectedPacket],
   );
   const hexDump = useMemo(() => buildHexDump(selectedPacket), [selectedPacket]);
@@ -1263,11 +1316,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       preloadProcessed,
       preloadTotal,
       filteredPackets,
-        hasMorePackets,
-        hasPrevPackets,
-        isPageLoading,
-        isFilterLoading,
-        loadMorePackets,
+      hasMorePackets,
+      hasPrevPackets,
+      isPageLoading,
+      isFilterLoading,
+      loadMorePackets,
       loadPrevPackets,
       jumpToPage,
       locatePacketById,
@@ -1321,11 +1374,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       preloadProcessed,
       preloadTotal,
       filteredPackets,
-        hasMorePackets,
-        hasPrevPackets,
-        isPageLoading,
-        isFilterLoading,
-        loadMorePackets,
+      hasMorePackets,
+      hasPrevPackets,
+      isPageLoading,
+      isFilterLoading,
+      loadMorePackets,
       loadPrevPackets,
       jumpToPage,
       locatePacketById,
