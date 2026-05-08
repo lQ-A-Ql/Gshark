@@ -16,6 +16,11 @@ const budgets = [
     reason: "provider remains oversized and should not absorb new state domains",
   },
   {
+    path: "src/app/components/StreamDecoderWorkbench.tsx",
+    maxLines: 1165,
+    reason: "decoder workbench should keep pure rules in StreamDecoderWorkbenchUtils",
+  },
+  {
     path: "src/app/pages/C2Analysis.tsx",
     maxLines: 1330,
     reason: "C2 page should move forms, tables, and result panels into feature components",
