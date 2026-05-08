@@ -88,7 +88,6 @@ import {
   EMPTY_HTTP_STREAM,
   EMPTY_SWITCH_METRICS,
   SWITCH_SAMPLE_LIMIT,
-  applyStreamChunkPatches,
   buildLoadingBinaryStream,
   buildLoadingHttpStream,
   buildSwitchStat,
@@ -99,6 +98,7 @@ import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
+import { commitStreamPayloadPatches } from "./streamPayloadPatch";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -786,28 +786,31 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
     startTransition(() => {
       if (protocol === "HTTP") {
-        setHttpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
-        const cached = httpStreamCacheRef.current.get(streamId);
-        if (cached) {
-          httpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
-        }
+        commitStreamPayloadPatches({
+          streamId,
+          patches,
+          setStream: setHttpStream,
+          cache: httpStreamCacheRef.current,
+        });
         return;
       }
 
       if (protocol === "TCP") {
-        setTcpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
-        const cached = tcpStreamCacheRef.current.get(streamId);
-        if (cached) {
-          tcpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
-        }
+        commitStreamPayloadPatches({
+          streamId,
+          patches,
+          setStream: setTcpStream,
+          cache: tcpStreamCacheRef.current,
+        });
         return;
       }
 
-      setUdpStream((prev) => (prev.id === streamId ? applyStreamChunkPatches(prev, patches) : prev));
-      const cached = udpStreamCacheRef.current.get(streamId);
-      if (cached) {
-        udpStreamCacheRef.current.set(streamId, applyStreamChunkPatches(cached, patches));
-      }
+      commitStreamPayloadPatches({
+        streamId,
+        patches,
+        setStream: setUdpStream,
+        cache: udpStreamCacheRef.current,
+      });
     });
   }, [backendConnected]);
 
