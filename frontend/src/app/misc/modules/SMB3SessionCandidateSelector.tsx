@@ -1,6 +1,7 @@
 import { Button } from "../../components/ui/button";
 import type { SMB3SessionCandidate } from "../../core/types";
 import { ErrorBlock, Field } from "../ui";
+import { getSMB3CandidateSessionLabel, getSMB3CandidateUserLabel } from "./SMB3SessionKeyUtils";
 
 interface SMB3SessionCandidateSelectorProps {
   candidates: SMB3SessionCandidate[];
@@ -96,10 +97,8 @@ function SMB3SessionCandidateCard({
   onSelectCandidate: (frameNumber: string) => void;
   selected: boolean;
 }) {
-  const sessionLabel = candidate.sessionId || "未知 SessionId";
-  const userLabel = candidate.domain
-    ? `${candidate.domain}\\${candidate.username || "未知用户"}`
-    : candidate.username || "未知用户";
+  const sessionLabel = getSMB3CandidateSessionLabel(candidate);
+  const userLabel = getSMB3CandidateUserLabel(candidate);
   return (
     <button
       type="button"

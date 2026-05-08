@@ -9,6 +9,7 @@ import { copyTextToClipboard } from "../../utils/browserFile";
 import { SMB3SessionCandidateSelector } from "./SMB3SessionCandidateSelector";
 import { SMB3SessionKeyInputForm } from "./SMB3SessionKeyInputForm";
 import { SMB3SessionKeyResultPanel } from "./SMB3SessionKeyResultPanel";
+import { buildSMB3CandidateSummary, createSMB3KeyRequest, findSMB3CandidateByFrame } from "./SMB3SessionKeyUtils";
 
 export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -27,14 +28,16 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
   const embedded = surfaceVariant === "embedded";
 
   const hasCapture = Boolean(fileMeta.path);
-  const smbCandidateSummary = useMemo(() => {
-    if (smbCandidatesLoading) return "正在扫描当前抓包中的 SMB3 Session 候选...";
-    if (!hasCapture) return "未加载抓包，请先在主工作区导入文件";
-    if (smbCandidatesError) return "";
-    if (smbCandidates.length === 0) return "未在当前抓包中发现可用的 SMB3 Session 候选";
-    const completeCount = smbCandidates.filter((candidate) => candidate.complete).length;
-    return `已发现 ${smbCandidates.length} 条候选，其中 ${completeCount} 条材料完整`;
-  }, [hasCapture, smbCandidates, smbCandidatesError, smbCandidatesLoading]);
+  const smbCandidateSummary = useMemo(
+    () =>
+      buildSMB3CandidateSummary({
+        candidates: smbCandidates,
+        error: smbCandidatesError,
+        hasCapture,
+        loading: smbCandidatesLoading,
+      }),
+    [hasCapture, smbCandidates, smbCandidatesError, smbCandidatesLoading],
+  );
 
   async function fetchSMB3Candidates() {
     if (!hasCapture) {
@@ -99,13 +102,15 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
     setSmbLoading(true);
     setSmbError("");
     try {
-      const result = await bridge.generateSMB3RandomSessionKey({
-        username: smbUser,
-        domain: smbDomain,
-        ntlmHash: smbHash,
-        ntProofStr: smbProof,
-        encryptedSessionKey: smbKey,
-      });
+      const result = await bridge.generateSMB3RandomSessionKey(
+        createSMB3KeyRequest({
+          domain: smbDomain,
+          encryptedSessionKey: smbKey,
+          ntlmHash: smbHash,
+          ntProofStr: smbProof,
+          username: smbUser,
+        }),
+      );
       setSmbResult(result);
     } catch (error) {
       setSmbError(error instanceof Error ? error.message : "SMB3 Session Key 生成失败");
@@ -131,7 +136,7 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
 
   function applySMB3Candidate(frameNumber: string) {
     setSmbSelectedCandidateFrame(frameNumber);
-    const candidate = smbCandidates.find((item) => item.frameNumber === frameNumber);
+    const candidate = findSMB3CandidateByFrame(smbCandidates, frameNumber);
     if (!candidate) return;
     setSmbUser(candidate.username);
     setSmbDomain(candidate.domain);
