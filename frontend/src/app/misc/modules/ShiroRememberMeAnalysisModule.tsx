@@ -1,4 +1,4 @@
-import { KeyRound, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { KeyRound, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ShiroRememberMeAnalysis, ShiroRememberMeCandidate } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
@@ -7,9 +7,10 @@ import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { EvidenceActions } from "../EvidenceActions";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, ExportButtons, Field, MetaChip, NotesList } from "../ui";
+import { ShiroRememberMeCandidateList } from "./ShiroRememberMeCandidateList";
+import { ShiroRememberMeKeyResultsPanel } from "./ShiroRememberMeKeyResultsPanel";
 
 const EMPTY_ANALYSIS: ShiroRememberMeAnalysis = {
   candidateCount: 0,
@@ -33,42 +34,54 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
   const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
   const keyLines = useMemo(
-    () => customKeys.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    () =>
+      customKeys
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
     [customKeys],
   );
 
-  const loadAnalysis = useCallback((keys: string[], preserveSelection = true) => {
-    if (!hasCapture) {
-      cancelAnalysisRequest();
-      setAnalysis(EMPTY_ANALYSIS);
-      setSelectedPacketId(0);
-      setError("");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    return runAnalysisRequest({
-      request: (signal) => bridge.getShiroRememberMeAnalysis(keys, signal),
-      onSuccess: (payload) => {
-        setAnalysis(payload);
-        setSelectedPacketId((current) => preserveSelection && current && payload.candidates.some((item) => item.packetId === current) ? current : payload.candidates[0]?.packetId ?? 0);
-      },
-      onError: (err) => {
+  const loadAnalysis = useCallback(
+    (keys: string[], preserveSelection = true) => {
+      if (!hasCapture) {
+        cancelAnalysisRequest();
         setAnalysis(EMPTY_ANALYSIS);
         setSelectedPacketId(0);
-        setError(err instanceof Error ? err.message : "加载 Shiro rememberMe 分析失败");
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [cancelAnalysisRequest, hasCapture, runAnalysisRequest]);
+        setError("");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      return runAnalysisRequest({
+        request: (signal) => bridge.getShiroRememberMeAnalysis(keys, signal),
+        onSuccess: (payload) => {
+          setAnalysis(payload);
+          setSelectedPacketId((current) =>
+            preserveSelection && current && payload.candidates.some((item) => item.packetId === current)
+              ? current
+              : (payload.candidates[0]?.packetId ?? 0),
+          );
+        },
+        onError: (err) => {
+          setAnalysis(EMPTY_ANALYSIS);
+          setSelectedPacketId(0);
+          setError(err instanceof Error ? err.message : "加载 Shiro rememberMe 分析失败");
+        },
+        onSettled: () => setLoading(false),
+      });
+    },
+    [cancelAnalysisRequest, hasCapture, runAnalysisRequest],
+  );
 
   useEffect(() => loadAnalysis([], false), [fileMeta.path, loadAnalysis]);
 
   const filteredCandidates = useMemo(() => {
     return analysis.candidates.filter((item) => {
       if (candidateFilter === "HIT") return (item.hitCount ?? 0) > 0;
-      if (candidateFilter === "DELETEME") return (item.notes ?? []).some((note) => note.toLowerCase().includes("deleteme"));
+      if (candidateFilter === "DELETEME")
+        return (item.notes ?? []).some((note) => note.toLowerCase().includes("deleteme"));
       return true;
     });
   }, [analysis.candidates, candidateFilter]);
@@ -88,7 +101,13 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
   }
 
   return (
-    <Card className={embedded ? "min-w-0 h-fit border-0 bg-transparent shadow-none" : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"}>
+    <Card
+      className={
+        embedded
+          ? "min-w-0 h-fit border-0 bg-transparent shadow-none"
+          : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"
+      }
+    >
       <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
@@ -116,7 +135,9 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
                   type="button"
                   onClick={() => setCandidateFilter(item)}
                   className={`flex flex-1 items-center justify-center rounded-md text-[12px] font-semibold transition-colors ${
-                    candidateFilter === item ? "bg-white text-amber-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    candidateFilter === item
+                      ? "bg-white text-amber-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
                   {item === "ALL" ? "全部" : item === "HIT" ? "命中" : "deleteMe"}
@@ -134,7 +155,13 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
             />
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="button" variant="outline" onClick={() => void loadAnalysis(keyLines, true)} disabled={!hasCapture || loading} className="gap-2 bg-white text-amber-700">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loadAnalysis(keyLines, true)}
+              disabled={!hasCapture || loading}
+              className="gap-2 bg-white text-amber-700"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               {loading ? "分析中..." : "刷新 / 测试 Key"}
             </Button>
@@ -149,112 +176,13 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
         {error && <ErrorBlock message={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)]">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-800">rememberMe 候选</div>
-              <div className="text-[11px] text-slate-500">{filteredCandidates.length} 条</div>
-            </div>
-            <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
-              {filteredCandidates.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-[13px] text-slate-500">
-                  {hasCapture ? "当前筛选下没有 Shiro rememberMe 线索" : "未加载抓包"}
-                </div>
-              ) : (
-                filteredCandidates.map((item) => {
-                  const selected = selectedCandidate?.packetId === item.packetId;
-                  return (
-                    <button
-                      key={`shiro-${item.packetId}-${item.cookieName}`}
-                      type="button"
-                      onClick={() => setSelectedPacketId(item.packetId)}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
-                        selected
-                          ? "border-amber-400 bg-amber-50 shadow-sm ring-2 ring-amber-100"
-                          : "border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/40"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-700">#{item.packetId}</span>
-                        {item.hitCount ? (
-                          <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">Key 命中</span>
-                        ) : null}
-                        {(item.notes ?? []).some((note) => note.toLowerCase().includes("deleteme")) ? (
-                          <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">deleteMe</span>
-                        ) : null}
-                        <span className="text-[11px] text-slate-500">{item.sourceHeader || "Cookie"}</span>
-                      </div>
-                      <div className="mt-2 break-all font-medium text-slate-800">{renderCandidateTitle(item)}</div>
-                      <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{item.cookiePreview || "--"}</div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-semibold text-slate-800">候选详情</div>
-                  <div className="text-[12px] text-slate-500">查看 Cookie 来源、长度特征、AES 模式判断与候选密钥结果。</div>
-                </div>
-              </div>
-              {!selectedCandidate ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[13px] text-slate-500">
-                  请选择左侧的一条 rememberMe 候选。
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    <MetaChip label="包号" value={selectedCandidate.packetId} color="slate" />
-                    <MetaChip label="流" value={selectedCandidate.streamId ?? "--"} color="slate" />
-                    <MetaChip label="Host" value={selectedCandidate.host || "--"} color="slate" />
-                    <MetaChip label="Path" value={selectedCandidate.path || "/"} color="slate" />
-                    <MetaChip label="长度" value={selectedCandidate.encryptedLength ?? "--"} color="slate" />
-                    <MetaChip label="CBC" value={selectedCandidate.possibleCBC ? "可能" : "否"} color={selectedCandidate.possibleCBC ? "sky" : "slate"} />
-                    <MetaChip label="GCM" value={selectedCandidate.possibleGCM ? "可能" : "否"} color={selectedCandidate.possibleGCM ? "sky" : "slate"} />
-                  </div>
-                  <EvidenceActions packetId={selectedCandidate.packetId} preferredProtocol="HTTP" />
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cookie Value</div>
-                    <div className="break-all font-mono text-xs text-slate-700">{selectedCandidate.cookiePreview || "--"}</div>
-                  </div>
-
-                  <NotesList notes={selectedCandidate.notes} itemClassName="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600" />
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-800">密钥测试结果</div>
-                <div className="text-[11px] text-slate-500">{selectedCandidate?.keyResults?.length ?? 0} 个 key</div>
-              </div>
-              <div className="space-y-2">
-                {(selectedCandidate?.keyResults?.length ?? 0) === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[13px] text-slate-500">
-                    暂无可展示的密钥测试结果。
-                  </div>
-                ) : (
-                  selectedCandidate!.keyResults!.map((item) => (
-                    <div key={`${item.label}-${item.base64}`} className={`rounded-xl border p-3 ${item.hit ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-slate-50/70"}`}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {item.hit ? <ShieldAlert className="h-4 w-4 text-rose-600" /> : <ShieldCheck className="h-4 w-4 text-slate-400" />}
-                        <span className="font-mono text-xs font-semibold text-slate-800">{item.label || "custom"}</span>
-                        {item.algorithm ? <span className="rounded bg-white px-2 py-0.5 text-[11px] text-slate-600">{item.algorithm}</span> : null}
-                        {item.hit ? <span className="rounded bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">命中 Java 序列化</span> : null}
-                      </div>
-                      {item.payloadClass ? <div className="mt-2 break-all text-xs text-slate-700">Payload: {item.payloadClass}</div> : null}
-                      {item.preview ? <div className="mt-2 break-all font-mono text-[11px] text-slate-600">{item.preview}</div> : null}
-                      {!item.hit && item.reason ? <div className="mt-2 break-all text-[11px] text-slate-500">{item.reason}</div> : null}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+          <ShiroRememberMeCandidateList
+            candidates={filteredCandidates}
+            hasCapture={hasCapture}
+            onSelectCandidate={setSelectedPacketId}
+            selectedCandidate={selectedCandidate}
+          />
+          <ShiroRememberMeKeyResultsPanel selectedCandidate={selectedCandidate} />
         </div>
       </CardContent>
     </Card>
@@ -276,12 +204,16 @@ function renderShiroAnalysisText(analysis: ShiroRememberMeAnalysis) {
   ];
   for (const candidate of analysis.candidates) {
     lines.push(`- #${candidate.packetId} ${renderCandidateTitle(candidate)}`);
-    lines.push(`  来源: ${candidate.sourceHeader || "Cookie"} / stream=${candidate.streamId ?? "--"} / hit=${candidate.hitCount ?? 0}`);
+    lines.push(
+      `  来源: ${candidate.sourceHeader || "Cookie"} / stream=${candidate.streamId ?? "--"} / hit=${candidate.hitCount ?? 0}`,
+    );
     if ((candidate.notes?.length ?? 0) > 0) {
       lines.push(`  备注: ${candidate.notes!.join("; ")}`);
     }
     for (const result of candidate.keyResults ?? []) {
-      lines.push(`  Key ${result.label}: ${result.hit ? "HIT" : "MISS"} ${result.algorithm || ""} ${result.payloadClass || result.reason || ""}`.trim());
+      lines.push(
+        `  Key ${result.label}: ${result.hit ? "HIT" : "MISS"} ${result.algorithm || ""} ${result.payloadClass || result.reason || ""}`.trim(),
+      );
     }
   }
   return lines.join("\n");
