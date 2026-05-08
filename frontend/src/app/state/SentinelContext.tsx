@@ -97,6 +97,7 @@ import {
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
+import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -297,35 +298,41 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const resetPacketViewport = useCallback(() => {
     cancelPacketPageLoad();
-    pageStartRef.current = 0;
-    setPageStart(0);
-    setPackets([]);
-    setTotalPackets(0);
-    setHasPrevPackets(false);
-    hasMorePacketsRef.current = false;
-    setHasMorePackets(false);
-    setSelectedPacketId(null);
-    setSelectedPacketDetail(null);
-    setSelectedPacketRawHex("");
-    setSelectedPacketLayers(null);
+    resetPacketViewportState({
+      pageStartRef,
+      hasMorePacketsRef,
+      setPackets,
+      setTotalPackets,
+      setPageStart,
+      setHasPrevPackets,
+      setHasMorePackets,
+      setSelectedPacketId,
+      setSelectedPacketDetail,
+      setSelectedPacketRawHex,
+      setSelectedPacketLayers,
+    });
   }, [cancelPacketPageLoad]);
 
   const clearCaptureUiState = useCallback(() => {
-    setPackets([]);
-    setTotalPackets(0);
-    setPageStart(0);
-    pageStartRef.current = 0;
-    setPreloadProcessed(0);
-    setPreloadTotal(0);
-    preloadProcessedRef.current = 0;
-    preloadTotalRef.current = 0;
-    setHasPrevPackets(false);
-    hasMorePacketsRef.current = false;
-    setHasMorePackets(false);
-    setSelectedPacketId(null);
-    setSelectedPacketDetail(null);
-    setSelectedPacketRawHex("");
-    setSelectedPacketLayers(null);
+    resetPacketViewportState({
+      pageStartRef,
+      hasMorePacketsRef,
+      setPackets,
+      setTotalPackets,
+      setPageStart,
+      setHasPrevPackets,
+      setHasMorePackets,
+      setSelectedPacketId,
+      setSelectedPacketDetail,
+      setSelectedPacketRawHex,
+      setSelectedPacketLayers,
+    });
+    resetPreloadCounterState({
+      preloadProcessedRef,
+      preloadTotalRef,
+      setPreloadProcessed,
+      setPreloadTotal,
+    });
     resetAnalysisState();
     setHttpStream(EMPTY_HTTP_STREAM);
     setTcpStream(EMPTY_BINARY_STREAM);
@@ -1021,25 +1028,30 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
         await prepareForCaptureReplacement();
         setIsFilterLoading(false);
-        setPackets([]);
-        setTotalPackets(0);
-        setPageStart(0);
-        setPreloadProcessed(0);
-        setPreloadTotal(0);
-        preloadProcessedRef.current = 0;
-        preloadTotalRef.current = 0;
+        resetPacketViewportState({
+          pageStartRef,
+          hasMorePacketsRef,
+          setPackets,
+          setTotalPackets,
+          setPageStart,
+          setHasPrevPackets,
+          setHasMorePackets,
+          setSelectedPacketId,
+          setSelectedPacketDetail,
+          setSelectedPacketRawHex,
+          setSelectedPacketLayers,
+          hasMorePackets: true,
+        });
+        resetPreloadCounterState({
+          preloadProcessedRef,
+          preloadTotalRef,
+          setPreloadProcessed,
+          setPreloadTotal,
+        });
         setIsPreloadingCapture(true);
-        pageStartRef.current = 0;
-        setHasPrevPackets(false);
-        hasMorePacketsRef.current = true;
         parseFinishedRef.current = false;
         parseErrorRef.current = "";
         preloadingRef.current = true;
-        setHasMorePackets(true);
-        setSelectedPacketId(null);
-        setSelectedPacketDetail(null);
-        setSelectedPacketRawHex("");
-        setSelectedPacketLayers(null);
         resetStreamRuntimeRefs({
           httpCache: httpStreamCacheRef.current,
           tcpCache: tcpStreamCacheRef.current,
