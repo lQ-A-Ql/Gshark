@@ -133,7 +133,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 - Windows 环境下开发体验最佳。
 - Go 1.22+（桌面壳）/ Go 1.25（后端模块，go.work 统一管理）。
 - Node.js 20+。
-- pnpm 或 npm。
+- pnpm。
 - Wireshark / tshark。
 
 说明：
@@ -180,21 +180,21 @@ go test ./...
 
 ```powershell
 cd frontend
-npm test
+pnpm run test:run
 ```
 
 前端生产构建：
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build
 ```
 
 桌面资源构建：
 
 ```powershell
 cd frontend
-npm run build:wails
+pnpm run build:wails
 ```
 
 ## 构建与发布
