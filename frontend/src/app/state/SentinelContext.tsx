@@ -96,6 +96,7 @@ import {
   prettySize,
 } from "./streamState";
 import { canSchedulePrefetch, pickAdjacentStreamTargets } from "./streamPrefetchPlan";
+import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -800,16 +801,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       return { packet, protocol: null, streamId: null };
     }
 
-    let protocol = preferredProtocol ?? null;
-    if (!protocol) {
-      if (packet.proto === "HTTP") {
-        protocol = "HTTP";
-      } else if (packet.proto === "UDP") {
-        protocol = "UDP";
-      } else {
-        protocol = "TCP";
-      }
-    }
+    const protocol = resolvePacketStreamProtocol(packet.proto, preferredProtocol ?? null);
 
     await setActiveStream(protocol, packet.streamId);
     return {
