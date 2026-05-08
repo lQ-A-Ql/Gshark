@@ -90,6 +90,7 @@ import {
   getCapturePreloadTimeoutError,
   getCapturePreloadWorkingStatus,
 } from "./capturePreloadStatus";
+import { buildCaptureFileMeta, buildOpenedCaptureFromPath, buildRecentCapture } from "./captureOpenState";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -1017,14 +1018,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       const effectiveFilter = filterOverride ?? displayFilter;
 
       try {
-        const opened =
-          filePath && filePath.trim()
-            ? {
-                filePath: filePath.trim(),
-                fileSize: 0,
-                fileName: filePath.trim().split(/[\\/]/).pop() ?? "capture.pcapng",
-              }
-            : await bridge.openPcapFile();
+        const opened = filePath
+          ? (buildOpenedCaptureFromPath(filePath) ?? (await bridge.openPcapFile()))
+          : await bridge.openPcapFile();
 
         await prepareForCaptureReplacement();
         setIsFilterLoading(false);
@@ -1064,19 +1060,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
         setExtractedObjects([]);
         setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
-        setFileMeta({
-          name: opened.fileName,
-          sizeBytes: Number(opened.fileSize ?? 0),
-          path: opened.filePath,
-        });
+        setFileMeta(buildCaptureFileMeta(opened));
         setCaptureRevision((prev) => prev + 1);
         activeCapturePathRef.current = opened.filePath;
-        rememberRecentCapture({
-          path: opened.filePath,
-          name: opened.fileName,
-          sizeBytes: Number(opened.fileSize ?? 0),
-          lastOpenedAt: new Date().toISOString(),
-        });
+        rememberRecentCapture(buildRecentCapture(opened, new Date().toISOString()));
 
         const startTask = captureTaskScopeRef.current.beginTask("capture-start");
         try {
