@@ -95,6 +95,7 @@ import {
   markCachedLoad,
   prettySize,
 } from "./streamState";
+import { canSchedulePrefetch, pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
@@ -598,16 +599,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     if (!backendConnected || !activeCapturePathRef.current || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0) return;
 
     const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
-    const idx = ids.findIndex((id) => id === currentStreamId);
-    if (idx < 0) return;
-
-    const neighbors = [ids[idx + 1], ids[idx - 1]]
-      .filter((id): id is number => Number.isFinite(id) && id > 0)
-      .slice(0, STREAM_PREFETCH_LIMIT);
-    for (const targetId of neighbors) {
+    const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
+    for (const targetId of targets) {
       if (protocol === "HTTP") {
-        if (httpStreamCacheRef.current.has(targetId) || httpPrefetchInFlightRef.current.has(targetId)) continue;
-        if (httpPrefetchInFlightRef.current.size >= 2) continue;
+        if (!canSchedulePrefetch({
+          hasCached: httpStreamCacheRef.current.has(targetId),
+          inFlight: httpPrefetchInFlightRef.current.has(targetId),
+          inFlightSize: httpPrefetchInFlightRef.current.size,
+        })) continue;
         const task = captureTaskScopeRef.current.beginTask(`prefetch-http-${targetId}`);
         httpPrefetchInFlightRef.current.add(targetId);
         void bridge
@@ -628,8 +627,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       }
 
       if (protocol === "TCP") {
-        if (tcpStreamCacheRef.current.has(targetId) || tcpPrefetchInFlightRef.current.has(targetId)) continue;
-        if (tcpPrefetchInFlightRef.current.size >= 2) continue;
+        if (!canSchedulePrefetch({
+          hasCached: tcpStreamCacheRef.current.has(targetId),
+          inFlight: tcpPrefetchInFlightRef.current.has(targetId),
+          inFlightSize: tcpPrefetchInFlightRef.current.size,
+        })) continue;
         const task = captureTaskScopeRef.current.beginTask(`prefetch-tcp-${targetId}`);
         tcpPrefetchInFlightRef.current.add(targetId);
         void bridge
@@ -649,8 +651,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         continue;
       }
 
-      if (udpStreamCacheRef.current.has(targetId) || udpPrefetchInFlightRef.current.has(targetId)) continue;
-      if (udpPrefetchInFlightRef.current.size >= 2) continue;
+      if (!canSchedulePrefetch({
+        hasCached: udpStreamCacheRef.current.has(targetId),
+        inFlight: udpPrefetchInFlightRef.current.has(targetId),
+        inFlightSize: udpPrefetchInFlightRef.current.size,
+      })) continue;
       const task = captureTaskScopeRef.current.beginTask(`prefetch-udp-${targetId}`);
       udpPrefetchInFlightRef.current.add(targetId);
       void bridge
