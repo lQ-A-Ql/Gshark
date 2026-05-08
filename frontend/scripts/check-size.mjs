@@ -17,8 +17,8 @@ const budgets = [
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 1165,
-    reason: "decoder workbench should keep pure rules in StreamDecoderWorkbenchUtils",
+    maxLines: 910,
+    reason: "decoder workbench should keep UI parts and pure rules in sibling modules",
   },
   {
     path: "src/app/pages/C2Analysis.tsx",
