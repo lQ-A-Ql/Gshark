@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const prettierTargets = [
+export const prettierTargets = [
   "eslint.config.js",
   "package.json",
   "scripts/**/*.mjs",
@@ -112,21 +112,59 @@ const prettierTargets = [
 ];
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const prettierCli = resolve(root, "node_modules", "prettier", "bin", "prettier.cjs");
-const batchSize = 24;
+export const formatBatchSize = 24;
 
-for (let index = 0; index < prettierTargets.length; index += batchSize) {
-  const batch = prettierTargets.slice(index, index + batchSize);
-  const result = spawnSync(process.execPath, [prettierCli, "--check", ...batch], {
-    stdio: "inherit",
-  });
+export function createPrettierBatches(targets = prettierTargets, batchSize = formatBatchSize) {
+  if (batchSize <= 0) {
+    throw new Error("batchSize must be greater than zero");
+  }
 
-  if (result.error) {
-    console.error(result.error.message);
-    process.exit(1);
+  const batches = [];
+  for (let index = 0; index < targets.length; index += batchSize) {
+    batches.push(targets.slice(index, index + batchSize));
+  }
+  return batches;
+}
+
+export function runPrettierFormatCheck({
+  frontendRoot = root,
+  targets = prettierTargets,
+  batchSize = formatBatchSize,
+  spawn = spawnSync,
+  nodePath = process.execPath,
+  stdio = "inherit",
+} = {}) {
+  const prettierCli = resolve(frontendRoot, "node_modules", "prettier", "bin", "prettier.cjs");
+
+  for (const batch of createPrettierBatches(targets, batchSize)) {
+    const result = spawn(nodePath, [prettierCli, "--check", ...batch], {
+      stdio,
+    });
+
+    if (result.error) {
+      return { status: 1, errorMessage: result.error.message };
+    }
+
+    if (result.status !== 0) {
+      return { status: result.status ?? 1 };
+    }
+  }
+
+  return { status: 0 };
+}
+
+function runCli() {
+  const result = runPrettierFormatCheck();
+
+  if (result.errorMessage) {
+    console.error(result.errorMessage);
   }
 
   if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+    process.exit(result.status);
   }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  runCli();
 }
