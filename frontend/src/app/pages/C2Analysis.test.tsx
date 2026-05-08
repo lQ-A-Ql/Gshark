@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { C2SampleAnalysis } from "../core/types";
+import { createAnalysis } from "./C2Analysis.testFixtures";
 
 const mocks = vi.hoisted(() => ({
   getC2SampleAnalysis: vi.fn(),
@@ -43,42 +43,6 @@ vi.mock("react-router", async (importOriginal) => {
 
 import { buildC2SampleAnalysisCacheKey } from "../features/c2/useC2Analysis";
 import C2Analysis from "./C2Analysis";
-
-function findAncestorWithClass(node: Element, className: string) {
-  let current: Element | null = node;
-  while (current) {
-    if (current.classList.contains(className)) return current;
-    current = current.parentElement;
-  }
-  return null;
-}
-
-function createAnalysis(overrides: Partial<C2SampleAnalysis> = {}): C2SampleAnalysis {
-  const family = {
-    candidateCount: 0,
-    matchedRuleCount: 0,
-    channels: [],
-    indicators: [],
-    conversations: [],
-    beaconPatterns: [],
-    hostUriAggregates: [],
-    dnsAggregates: [],
-    streamAggregates: [],
-    candidates: [],
-    notes: [],
-    relatedActors: [],
-    deliveryChains: [],
-  };
-  return {
-    totalMatchedPackets: 0,
-    families: [],
-    conversations: [],
-    cs: { ...family },
-    vshell: { ...family },
-    notes: [],
-    ...overrides,
-  };
-}
 
 describe("C2Analysis", () => {
   let seed = 0;
@@ -546,75 +510,6 @@ describe("C2Analysis", () => {
     await waitFor(() => {
       expect(mocks.clipboardWriteText).toHaveBeenCalledWith('http.host == "c2.example.test" && http.request.uri contains "/submit.php?id=42"');
     });
-  });
-
-  it("submits VShell decrypt request with vkey and salt", async () => {
-    render(<C2Analysis />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
-    const modeSelect = screen.getByRole("combobox", { name: "模式" });
-    expect(modeSelect).toHaveTextContent("auto：三 KDF + GCM/CBC 自动尝试");
-    expect(modeSelect).toHaveClass("rounded-xl", "border-slate-200", "shadow-sm");
-    fireEvent.change(screen.getByLabelText(/vkey/), { target: { value: "verify-me" } });
-    fireEvent.change(screen.getByLabelText(/salt/), { target: { value: "qwe123qwe" } });
-    fireEvent.click(screen.getByRole("button", { name: /批量解密候选流量/ }));
-
-    await waitFor(() => {
-      expect(mocks.decryptC2Traffic).toHaveBeenCalledWith(expect.objectContaining({
-        family: "vshell",
-        vshell: expect.objectContaining({ vkey: "verify-me", salt: "qwe123qwe", mode: "auto" }),
-      }));
-      expect(screen.getByText(/解密结果 · completed/)).toBeInTheDocument();
-      const preview = screen.getByText("{\"cmd\":\"whoami\"}");
-      expect(preview).toBeInTheDocument();
-      expect(preview.tagName.toLowerCase()).toBe("pre");
-      expect(preview).toHaveClass("max-h-72", "overflow-x-auto", "overflow-y-auto", "whitespace-pre-wrap", "break-words");
-      expect(preview).not.toHaveClass("max-h-32", "overflow-auto");
-      const boundedTable = findAncestorWithClass(preview, "max-h-[520px]");
-      expect(boundedTable).not.toBeNull();
-      expect(boundedTable).toHaveClass("overflow-auto");
-      expect(screen.getByText("raw:64B")).toBeInTheDocument();
-      expect(screen.getByText("dec:16B")).toBeInTheDocument();
-    });
-  });
-
-  it("keeps late VShell plaintext visible by default and discoverable with search", async () => {
-    const targetPlaintext = "hacked_by_fallsnow&paperplane(QAQ)";
-    mocks.decryptC2Traffic.mockResolvedValueOnce({
-      family: "vshell",
-      status: "completed",
-      totalCandidates: 90,
-      decryptedCount: 90,
-      failedCount: 0,
-      records: Array.from({ length: 90 }, (_, index) => ({
-        packetId: 6500 + index,
-        streamId: 23,
-        direction: index % 2 === 0 ? "client_to_server" : "server_to_client",
-        algorithm: "vshell-aes-gcm-md5-salt",
-        keyStatus: "verified",
-        confidence: 90,
-        plaintextPreview: index === 89 ? targetPlaintext : `noise-frame-${index}`,
-        rawLength: 64,
-        decryptedLength: index === 89 ? targetPlaintext.length : 16,
-      })),
-      notes: ["VShell decrypt note"],
-    });
-
-    render(<C2Analysis />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
-    fireEvent.change(screen.getByLabelText(/vkey/), { target: { value: "fallsnow" } });
-    fireEvent.change(screen.getByLabelText(/salt/), { target: { value: "paperplane" } });
-    fireEvent.click(screen.getByRole("button", { name: /批量解密候选流量/ }));
-
-    expect(await screen.findByText(targetPlaintext)).toBeInTheDocument();
-    expect(screen.getByText("展示 90 / 90 条")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "显示全部" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "仅显示前 80" })).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText("搜索明文、算法、stream、packet"), { target: { value: "hacked_by" } });
-    expect(await screen.findByText("展示 1 / 1 条")).toBeInTheDocument();
-    expect(screen.getByText(targetPlaintext)).toBeInTheDocument();
   });
 
   it("builds cache key from capture identity", () => {
