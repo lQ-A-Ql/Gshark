@@ -51,7 +51,7 @@ import {
   shouldResetThreatAnalysisFromError,
   shouldResetThreatAnalysisFromStatus,
 } from "./backendStatusMessage";
-import { MAX_RECENT_CAPTURES, readRecentCaptures, writeRecentCaptures } from "./recentCaptures";
+import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import {
   getCurrentPacketPage,
   getNextPacketCursor,
@@ -549,7 +549,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const rememberRecentCapture = useCallback((entry: RecentCapture) => {
     setRecentCaptures((prev) => {
-      const next = [entry, ...prev.filter((item) => item.path !== entry.path)].slice(0, MAX_RECENT_CAPTURES);
+      const next = updateRecentCaptures(prev, entry);
       writeRecentCaptures(next);
       return next;
     });
