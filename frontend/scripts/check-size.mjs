@@ -7,32 +7,32 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const budgets = [
   {
     path: "src/app/integrations/wailsBridge.ts",
-    maxLines: 430,
+    maxLines: 380,
     reason: "bridge facade should keep shrinking as domain clients move out",
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1465,
+    maxLines: 1450,
     reason: "provider remains oversized and should not absorb new state domains",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 910,
+    maxLines: 900,
     reason: "decoder workbench should keep UI parts and pure rules in sibling modules",
   },
   {
     path: "src/app/pages/C2Analysis.tsx",
-    maxLines: 1330,
+    maxLines: 410,
     reason: "C2 page should move forms, tables, and result panels into feature components",
   },
   {
     path: "src/app/pages/UsbAnalysis.tsx",
-    maxLines: 1060,
+    maxLines: 720,
     reason: "USB page is near the large-page threshold",
   },
   {
     path: "src/app/pages/MediaAnalysis.tsx",
-    maxLines: 990,
+    maxLines: 450,
     reason: "media page is near the large-page threshold",
   },
 ];
