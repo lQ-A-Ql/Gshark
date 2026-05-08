@@ -165,16 +165,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const threatAnalysisSeqRef = useRef(0);
   const {
     threatHits,
-    setThreatHits,
     isThreatAnalysisLoading,
     setIsThreatAnalysisLoading,
     threatAnalysisProgress,
     setThreatAnalysisProgress,
     extractedObjects,
-    setExtractedObjects,
     mediaAnalysisProgress,
     setMediaAnalysisProgress,
     refreshAnalysisResult: refreshAnalysisResultImpl,
+    resetAnalysisState,
   } = useAnalysisProgress(threatAnalysisSeqRef);
   const {
     tsharkStatus,
@@ -327,11 +326,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketDetail(null);
     setSelectedPacketRawHex("");
     setSelectedPacketLayers(null);
-    setThreatHits([]);
-    setIsThreatAnalysisLoading(false);
-    setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
-    setExtractedObjects([]);
-    setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+    resetAnalysisState();
     setHttpStream(EMPTY_HTTP_STREAM);
     setTcpStream(EMPTY_BINARY_STREAM);
     setUdpStream(createEmptyUdpStream());
@@ -350,7 +345,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setFileMeta(createClosedCaptureFileMeta());
     activeCapturePathRef.current = "";
     setCaptureRevision((prev) => prev + 1);
-  }, []);
+  }, [resetAnalysisState]);
 
   const loadPacketPage = useCallback(
     async (cursor: number, filterOverride?: string, options?: { finishFilterLoading?: boolean }) => {
@@ -1057,11 +1052,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           switchHitsRef: streamSwitchHitsRef,
         });
         setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
-        setThreatHits([]);
-        setIsThreatAnalysisLoading(false);
-        setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
-        setExtractedObjects([]);
-        setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
+        resetAnalysisState();
         setFileMeta(buildCaptureFileMeta(opened));
         setCaptureRevision((prev) => prev + 1);
         activeCapturePathRef.current = opened.filePath;
@@ -1156,6 +1147,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       commitPacketPage,
       displayFilter,
       prepareForCaptureReplacement,
+      resetAnalysisState,
       refreshAnalysisResult,
       refreshStreamIndex,
       rememberRecentCapture,
