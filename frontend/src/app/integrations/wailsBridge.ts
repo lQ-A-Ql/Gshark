@@ -43,13 +43,13 @@ import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema"
 import { downloadBlob } from "../utils/browserFile";
 import { createAnalysisClient } from "./clients/analysisClient";
 import { createMediaClient } from "./clients/mediaClient";
+import { createPluginClient } from "./clients/pluginClient";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 import { asPlainObject } from "./mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream, asPacket, asThreatHit } from "./mappers/packetStreamMapper";
-import { asPluginSource, toPluginSourceRequest } from "./mappers/pluginSourceMapper";
+import type { PluginSource } from "./mappers/pluginSourceMapper";
 import { asObjectList } from "./mappers/objectMapper";
-import { asDBCProfiles, asPluginItem, asPluginItems } from "./mappers/pluginMapper";
 import { asHTTPLoginAnalysis, asMySQLAnalysis, asShiroRememberMeAnalysis, asSMTPAnalysis } from "./mappers/protocolToolMapper";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import {
@@ -61,9 +61,9 @@ import {
   asSMB3SessionCandidates,
   asWinRMDecryptResult,
 } from "./mappers/toolMapper";
-import { asDecryptionConfig } from "./mappers/tlsMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
+export type { PluginSource } from "./mappers/pluginSourceMapper";
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 
@@ -117,15 +117,6 @@ export interface FFmpegStatus {
   available: boolean;
   path: string;
   message: string;
-}
-
-export interface PluginSource {
-  id: string;
-  configPath: string;
-  configContent: string;
-  logicPath: string;
-  logicContent: string;
-  entry: string;
 }
 
 export interface HuntingRuntimeConfig {
@@ -315,6 +306,7 @@ export async function getBackendAuthHeaders(path: string, headersInit?: HeadersI
 
 const mediaClient = createMediaClient(request, requestBlob);
 const analysisClient = createAnalysisClient(request);
+const pluginClient = createPluginClient(request);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -847,97 +839,18 @@ export const bridge: BackendBridge = {
   downloadMediaArtifact: mediaClient.downloadMediaArtifact,
   getMediaPlaybackBlob: mediaClient.getMediaPlaybackBlob,
 
-  async listVehicleDBCProfiles() {
-    const rows = await request<any[]>("/api/analysis/vehicle/dbc");
-    return asDBCProfiles(rows);
-  },
-
-  async addVehicleDBC(path: string) {
-    const rows = await request<any[]>("/api/analysis/vehicle/dbc", {
-      method: "POST",
-      body: JSON.stringify({ path }),
-    });
-    return asDBCProfiles(rows);
-  },
-
-  async removeVehicleDBC(path: string) {
-    const rows = await request<any[]>(`/api/analysis/vehicle/dbc?path=${encodeURIComponent(path)}`, {
-      method: "DELETE",
-    });
-    return asDBCProfiles(rows);
-  },
-
-  async listPlugins() {
-    const rows = await request<any[]>("/api/plugins");
-    return asPluginItems(rows);
-  },
-
-  async getPluginSource(id: string) {
-    const payload = await request<any>(`/api/plugins/source?id=${encodeURIComponent(id)}`);
-    return asPluginSource(payload, id);
-  },
-
-  async savePluginSource(source: PluginSource) {
-    const payload = await request<any>(`/api/plugins/source`, {
-      method: "POST",
-      body: JSON.stringify(toPluginSourceRequest(source)),
-    });
-    return asPluginSource(payload, source.id);
-  },
-
-  async addPlugin(plugin: PluginItem) {
-    const item = await request<any>(`/api/plugins/add`, {
-      method: "POST",
-      body: JSON.stringify({
-        id: String(plugin.id),
-        name: plugin.name,
-        version: plugin.version,
-        tag: plugin.tag,
-        author: plugin.author,
-        enabled: plugin.enabled,
-        entry: plugin.entry || "",
-        capabilities: Array.isArray(plugin.capabilities) ? plugin.capabilities : [],
-      }),
-    });
-    return asPluginItem(item);
-  },
-
-  async deletePlugin(id: string) {
-    await request(`/api/plugins/delete?id=${encodeURIComponent(id)}`, { method: "POST" });
-  },
-
-  async togglePlugin(id: string) {
-    const item = await request<any>(`/api/plugins/toggle?id=${encodeURIComponent(id)}`, { method: "POST" });
-    return asPluginItem(item);
-  },
-
-  async setPluginsEnabled(ids: string[], enabled: boolean) {
-    const rows = await request<any[]>(`/api/plugins/bulk`, {
-      method: "POST",
-      body: JSON.stringify({ ids, enabled }),
-    });
-    return asPluginItems(rows);
-  },
-
-  async getTLSConfig() {
-    try {
-      const cfg = await request<any>("/api/tls");
-      return asDecryptionConfig(cfg);
-    } catch {
-      return null;
-    }
-  },
-
-  async updateTLSConfig(cfg: DecryptionConfig) {
-    await request("/api/tls", {
-      method: "POST",
-      body: JSON.stringify({
-        ssl_key_log_file: cfg.sslKeyLogPath,
-        rsa_private_key: cfg.privateKeyPath,
-        target_ip_port: cfg.privateKeyIpPort,
-      }),
-    });
-  },
+  listVehicleDBCProfiles: pluginClient.listVehicleDBCProfiles,
+  addVehicleDBC: pluginClient.addVehicleDBC,
+  removeVehicleDBC: pluginClient.removeVehicleDBC,
+  listPlugins: pluginClient.listPlugins,
+  getPluginSource: pluginClient.getPluginSource,
+  savePluginSource: pluginClient.savePluginSource,
+  addPlugin: pluginClient.addPlugin,
+  deletePlugin: pluginClient.deletePlugin,
+  togglePlugin: pluginClient.togglePlugin,
+  setPluginsEnabled: pluginClient.setPluginsEnabled,
+  getTLSConfig: pluginClient.getTLSConfig,
+  updateTLSConfig: pluginClient.updateTLSConfig,
 
   async runWinRMDecrypt(req: WinRMDecryptRequest) {
     const payload = await request<any>("/api/tools/winrm-decrypt", {
