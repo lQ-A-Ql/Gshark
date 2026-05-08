@@ -90,7 +90,13 @@ import {
   getCapturePreloadTimeoutError,
   getCapturePreloadWorkingStatus,
 } from "./capturePreloadStatus";
-import { buildCaptureFileMeta, buildOpenedCaptureFromPath, buildRecentCapture } from "./captureOpenState";
+import {
+  buildCaptureFileMeta,
+  buildOpenedCaptureFromPath,
+  buildRecentCapture,
+  createClosedCaptureFileMeta,
+  createInitialCaptureFileMeta,
+} from "./captureOpenState";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -185,11 +191,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     tcp: [],
     udp: [],
   });
-  const [fileMeta, setFileMeta] = useState({
-    name: "",
-    sizeBytes: 0,
-    path: "",
-  });
+  const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
   const [captureRevision, setCaptureRevision] = useState(0);
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>(() => readRecentCaptures());
   const [decryptionConfig, setDecryptionConfig] = useState<DecryptionConfig>({
@@ -341,11 +343,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       switchHitsRef: streamSwitchHitsRef,
     });
     setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
-    setFileMeta({
-      name: "未打开文件",
-      sizeBytes: 0,
-      path: "",
-    });
+    setFileMeta(createClosedCaptureFileMeta());
     activeCapturePathRef.current = "";
     setCaptureRevision((prev) => prev + 1);
   }, []);

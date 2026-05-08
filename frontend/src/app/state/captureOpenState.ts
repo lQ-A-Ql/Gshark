@@ -12,6 +12,22 @@ export interface CaptureFileMeta {
   path: string;
 }
 
+export function createInitialCaptureFileMeta(): CaptureFileMeta {
+  return {
+    name: "",
+    sizeBytes: 0,
+    path: "",
+  };
+}
+
+export function createClosedCaptureFileMeta(): CaptureFileMeta {
+  return {
+    name: "未打开文件",
+    sizeBytes: 0,
+    path: "",
+  };
+}
+
 export function buildOpenedCaptureFromPath(filePath: string): OpenedCapture | null {
   const normalizedPath = filePath.trim();
   if (!normalizedPath) return null;

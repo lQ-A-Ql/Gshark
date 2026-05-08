@@ -1,7 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { buildCaptureFileMeta, buildOpenedCaptureFromPath, buildRecentCapture } from "./captureOpenState";
+import {
+  buildCaptureFileMeta,
+  buildOpenedCaptureFromPath,
+  buildRecentCapture,
+  createClosedCaptureFileMeta,
+  createInitialCaptureFileMeta,
+} from "./captureOpenState";
 
 describe("captureOpenState helpers", () => {
+  it("builds initial and closed capture file meta without sharing objects", () => {
+    expect(createInitialCaptureFileMeta()).toEqual({
+      name: "",
+      sizeBytes: 0,
+      path: "",
+    });
+    expect(createClosedCaptureFileMeta()).toEqual({
+      name: "未打开文件",
+      sizeBytes: 0,
+      path: "",
+    });
+    expect(createInitialCaptureFileMeta()).not.toBe(createInitialCaptureFileMeta());
+    expect(createClosedCaptureFileMeta()).not.toBe(createClosedCaptureFileMeta());
+  });
+
   it("builds opened capture metadata from a provided path", () => {
     expect(buildOpenedCaptureFromPath(" C:\\captures\\sample.pcapng ")).toEqual({
       filePath: "C:\\captures\\sample.pcapng",
