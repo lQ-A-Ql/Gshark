@@ -1,4 +1,4 @@
-import type { MediaAnalysis } from "../../core/types";
+import type { MediaAnalysis, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
 import { asBucket, asStringList } from "./mapperPrimitives";
 
 export function asMediaAnalysis(payload: any): MediaAnalysis {
@@ -40,5 +40,55 @@ export function asMediaAnalysis(payload: any): MediaAnalysis {
         }))
       : [],
     notes: asStringList(payload?.notes),
+  };
+}
+
+export function asMediaTranscription(payload: any): MediaTranscription {
+  return {
+    token: String(payload?.token ?? ""),
+    sessionId: String(payload?.session_id ?? ""),
+    title: String(payload?.title ?? ""),
+    text: String(payload?.text ?? ""),
+    language: String(payload?.language ?? ""),
+    engine: String(payload?.engine ?? ""),
+    status: String(payload?.status ?? ""),
+    error: String(payload?.error ?? "") || undefined,
+    cached: Boolean(payload?.cached),
+    durationSeconds: Number(payload?.duration_seconds ?? 0),
+    segments: Array.isArray(payload?.segments)
+      ? payload.segments.map((item: any) => ({
+          startSeconds: Number(item.start_seconds ?? 0),
+          endSeconds: Number(item.end_seconds ?? 0),
+          text: String(item.text ?? ""),
+        }))
+      : [],
+  };
+}
+
+export function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {
+  return {
+    taskId: String(input?.task_id ?? ""),
+    total: Number(input?.total ?? 0),
+    queued: Number(input?.queued ?? 0),
+    running: Number(input?.running ?? 0),
+    completed: Number(input?.completed ?? 0),
+    failed: Number(input?.failed ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+    currentToken: String(input?.current_token ?? "") || undefined,
+    currentLabel: String(input?.current_label ?? "") || undefined,
+    done: Boolean(input?.done),
+    cancelled: Boolean(input?.cancelled),
+    items: Array.isArray(input?.items)
+      ? input.items.map((item: any) => ({
+          token: String(item.token ?? ""),
+          sessionId: String(item.session_id ?? ""),
+          mediaLabel: String(item.media_label ?? ""),
+          title: String(item.title ?? ""),
+          status: String(item.status ?? "queued") as SpeechBatchTaskStatus["items"][number]["status"],
+          error: String(item.error ?? "") || undefined,
+          cached: Boolean(item.cached),
+          text: String(item.text ?? "") || undefined,
+        }))
+      : [],
   };
 }

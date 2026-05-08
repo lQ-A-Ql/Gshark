@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asMediaAnalysis } from "./mediaMapper";
+import { asMediaAnalysis, asMediaTranscription, asSpeechBatchTaskStatus } from "./mediaMapper";
 
 describe("mediaMapper", () => {
   it("maps media sessions and artifacts", () => {
@@ -64,5 +64,84 @@ describe("mediaMapper", () => {
     expect(result.sessions).toEqual([]);
     expect(result.protocols).toEqual([]);
     expect(result.notes).toEqual([]);
+  });
+
+  it("maps transcription payloads", () => {
+    const result = asMediaTranscription({
+      token: "tok",
+      session_id: "sip-1",
+      title: "Call",
+      text: "hello",
+      language: "zh",
+      engine: "vosk",
+      status: "completed",
+      error: "",
+      cached: true,
+      duration_seconds: 3.5,
+      segments: [{ start_seconds: 0.1, end_seconds: 1.2, text: "hello" }],
+    });
+
+    expect(result).toMatchObject({
+      token: "tok",
+      sessionId: "sip-1",
+      title: "Call",
+      text: "hello",
+      language: "zh",
+      engine: "vosk",
+      status: "completed",
+      cached: true,
+      durationSeconds: 3.5,
+      segments: [{ startSeconds: 0.1, endSeconds: 1.2, text: "hello" }],
+    });
+    expect(result.error).toBeUndefined();
+  });
+
+  it("maps batch transcription status", () => {
+    const result = asSpeechBatchTaskStatus({
+      task_id: "task-1",
+      total: 3,
+      queued: 1,
+      running: 1,
+      completed: 1,
+      failed: 0,
+      skipped: 0,
+      current_token: "tok",
+      current_label: "Call",
+      done: false,
+      cancelled: false,
+      items: [
+        {
+          token: "tok",
+          session_id: "sip-1",
+          media_label: "call.wav",
+          title: "Call",
+          status: "running",
+          error: "",
+          cached: false,
+          text: "",
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      taskId: "task-1",
+      total: 3,
+      queued: 1,
+      running: 1,
+      completed: 1,
+      currentToken: "tok",
+      currentLabel: "Call",
+      done: false,
+      cancelled: false,
+    });
+    expect(result.items[0]).toMatchObject({
+      token: "tok",
+      sessionId: "sip-1",
+      mediaLabel: "call.wav",
+      status: "running",
+      cached: false,
+    });
+    expect(result.items[0]?.error).toBeUndefined();
+    expect(result.items[0]?.text).toBeUndefined();
   });
 });

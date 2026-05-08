@@ -41,6 +41,7 @@ import type {
 } from "../core/types";
 import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
 import { downloadBlob } from "../utils/browserFile";
+import { createMediaClient } from "./clients/mediaClient";
 import { asAPTAnalysis } from "./mappers/aptMapper";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
@@ -50,7 +51,6 @@ import { asIndustrialAnalysis } from "./mappers/industrialMapper";
 import { asPlainObject } from "./mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream, asPacket, asThreatHit } from "./mappers/packetStreamMapper";
 import { asPluginSource, toPluginSourceRequest } from "./mappers/pluginSourceMapper";
-import { asMediaAnalysis } from "./mappers/mediaMapper";
 import { asObjectList } from "./mappers/objectMapper";
 import { asDBCProfiles, asPluginItem, asPluginItems } from "./mappers/pluginMapper";
 import { asHTTPLoginAnalysis, asMySQLAnalysis, asShiroRememberMeAnalysis, asSMTPAnalysis } from "./mappers/protocolToolMapper";
@@ -318,6 +318,8 @@ async function buildAuthorizedHeaders(path: string, headersInit?: HeadersInit, b
 export async function getBackendAuthHeaders(path: string, headersInit?: HeadersInit, body?: BodyInit | null): Promise<Headers> {
   return buildAuthorizedHeaders(path, headersInit, body);
 }
+
+const mediaClient = createMediaClient(request, requestBlob);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -799,62 +801,12 @@ export const bridge: BackendBridge = {
     return asVehicleAnalysis(payload);
   },
 
-  async getMediaAnalysis(forceRefresh = false, signal?: AbortSignal) {
-    const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media", { signal });
-    return asMediaAnalysis(payload);
-  },
-
-  async transcribeMediaArtifact(token: string, force = false) {
-    const payload = await request<any>("/api/analysis/media/transcribe", {
-      method: "POST",
-      body: JSON.stringify({ token, force }),
-    });
-    return {
-      token: String(payload.token ?? ""),
-      sessionId: String(payload.session_id ?? ""),
-      title: String(payload.title ?? ""),
-      text: String(payload.text ?? ""),
-      language: String(payload.language ?? ""),
-      engine: String(payload.engine ?? ""),
-      status: String(payload.status ?? ""),
-      error: String(payload.error ?? "") || undefined,
-      cached: Boolean(payload.cached),
-      durationSeconds: Number(payload.duration_seconds ?? 0),
-      segments: Array.isArray(payload.segments)
-        ? payload.segments.map((item: any) => ({
-            startSeconds: Number(item.start_seconds ?? 0),
-            endSeconds: Number(item.end_seconds ?? 0),
-            text: String(item.text ?? ""),
-          }))
-        : [],
-    };
-  },
-
-  async startMediaBatchTranscription(force = false) {
-    const payload = await request<any>("/api/analysis/media/transcribe/batch", {
-      method: "POST",
-      body: JSON.stringify({ force }),
-    });
-    return asSpeechBatchTaskStatus(payload);
-  },
-
-  async getMediaBatchTranscriptionStatus() {
-    const payload = await request<any>("/api/analysis/media/transcribe/batch");
-    return asSpeechBatchTaskStatus(payload);
-  },
-
-  async cancelMediaBatchTranscription() {
-    const payload = await request<any>("/api/analysis/media/transcribe/batch/cancel", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    return asSpeechBatchTaskStatus(payload);
-  },
-
-  async exportMediaBatchTranscription(format: "txt" | "json") {
-    const blob = await requestBlob(`/api/analysis/media/transcribe/batch/export?format=${encodeURIComponent(format)}`);
-    downloadBlob(`media-transcription.${format}`, blob);
-  },
+  getMediaAnalysis: mediaClient.getMediaAnalysis,
+  transcribeMediaArtifact: mediaClient.transcribeMediaArtifact,
+  startMediaBatchTranscription: mediaClient.startMediaBatchTranscription,
+  getMediaBatchTranscriptionStatus: mediaClient.getMediaBatchTranscriptionStatus,
+  cancelMediaBatchTranscription: mediaClient.cancelMediaBatchTranscription,
+  exportMediaBatchTranscription: mediaClient.exportMediaBatchTranscription,
 
   async getUSBAnalysis(signal?: AbortSignal) {
     const payload = await request<any>("/api/analysis/usb", { signal });
@@ -932,14 +884,8 @@ export const bridge: BackendBridge = {
     return parseEvidenceRecords(payload);
   },
 
-  async downloadMediaArtifact(token: string, filename: string) {
-    const blob = await requestBlob(`/api/analysis/media/export?token=${encodeURIComponent(token)}`);
-    downloadBlob(filename, blob);
-  },
-
-  async getMediaPlaybackBlob(token: string) {
-    return await requestBlob(`/api/analysis/media/play?token=${encodeURIComponent(token)}`);
-  },
+  downloadMediaArtifact: mediaClient.downloadMediaArtifact,
+  getMediaPlaybackBlob: mediaClient.getMediaPlaybackBlob,
 
   async listVehicleDBCProfiles() {
     const rows = await request<any[]>("/api/analysis/vehicle/dbc");
@@ -1232,34 +1178,6 @@ export const bridge: BackendBridge = {
     };
   },
 };
-
-function asSpeechBatchTaskStatus(input: any): SpeechBatchTaskStatus {
-  return {
-    taskId: String(input.task_id ?? ""),
-    total: Number(input.total ?? 0),
-    queued: Number(input.queued ?? 0),
-    running: Number(input.running ?? 0),
-    completed: Number(input.completed ?? 0),
-    failed: Number(input.failed ?? 0),
-    skipped: Number(input.skipped ?? 0),
-    currentToken: String(input.current_token ?? "") || undefined,
-    currentLabel: String(input.current_label ?? "") || undefined,
-    done: Boolean(input.done),
-    cancelled: Boolean(input.cancelled),
-    items: Array.isArray(input.items)
-      ? input.items.map((item: any) => ({
-          token: String(item.token ?? ""),
-          sessionId: String(item.session_id ?? ""),
-          mediaLabel: String(item.media_label ?? ""),
-          title: String(item.title ?? ""),
-          status: String(item.status ?? "queued") as SpeechBatchTaskStatus["items"][number]["status"],
-          error: String(item.error ?? "") || undefined,
-          cached: Boolean(item.cached),
-          text: String(item.text ?? "") || undefined,
-        }))
-      : [],
-  };
-}
 
 async function selectLocalFile(): Promise<File> {
   if (typeof document === "undefined") {
