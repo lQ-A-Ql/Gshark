@@ -42,6 +42,17 @@ import {
   computeThreatProgressPercent,
 } from "./progressHelpers";
 import { parseProgressStatus, pushRecentLabel } from "./progressStatus";
+import {
+  isProgressStatusMessage,
+  shouldIgnoreCaptureErrorWithoutActiveCapture,
+  shouldIgnoreCaptureStatusWithoutActiveCapture,
+  shouldMarkParseErrorFromStatus,
+  shouldMarkParseFinishedFromStatus,
+  shouldResetMediaAnalysisFromError,
+  shouldResetMediaAnalysisFromStatus,
+  shouldResetThreatAnalysisFromError,
+  shouldResetThreatAnalysisFromStatus,
+} from "./backendStatusMessage";
 import { MAX_RECENT_CAPTURES, readRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import {
   getCurrentPacketPage,
@@ -973,31 +984,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         },
         status: (message) => {
           const msg = message || "后端运行中";
-          const hasActiveCapture = Boolean(activeCapturePathRef.current);
-          const isProgressMessage = msg.startsWith("__progress__:");
-          const isCaptureStatus = isProgressMessage
-            || msg.includes("解析")
-            || msg.includes("预加载")
-            || msg.includes("威胁分析")
-            || msg.includes("媒体流");
-          if (!hasActiveCapture && isCaptureStatus) {
+          if (shouldIgnoreCaptureStatusWithoutActiveCapture(msg, Boolean(activeCapturePathRef.current))) {
             return;
           }
-          if (isProgressMessage) {
+          if (isProgressStatusMessage(msg)) {
             updateProgressFromStatusRef.current(msg);
             wakeCaptureWaiters();
             return;
           }
-          if (msg.includes("解析完成") || msg.includes("解析失败") || msg.includes("解析被取消")) {
+          if (shouldMarkParseFinishedFromStatus(msg)) {
             parseFinishedRef.current = true;
-            if (msg.includes("解析失败")) {
+            if (shouldMarkParseErrorFromStatus(msg)) {
               parseErrorRef.current = msg;
             }
           }
-          if (msg.includes("媒体流分析完成") || msg.includes("媒体流分析失败")) {
+          if (shouldResetMediaAnalysisFromStatus(msg)) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
           }
-          if (msg.includes("威胁分析完成") || msg.includes("威胁分析失败")) {
+          if (shouldResetThreatAnalysisFromStatus(msg)) {
             setThreatAnalysisProgress((prev) => prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS);
           }
           wakeCaptureWaiters();
@@ -1005,22 +1009,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         },
         error: (message) => {
           const next = message || "后端事件异常";
-          const hasActiveCapture = Boolean(activeCapturePathRef.current);
-          const isCaptureError = next.includes("解析")
-            || next.includes("预加载")
-            || next.includes("威胁分析")
-            || next.includes("媒体流");
-          if (!hasActiveCapture && isCaptureError) {
+          if (shouldIgnoreCaptureErrorWithoutActiveCapture(next, Boolean(activeCapturePathRef.current))) {
             return;
           }
           if (preloadingRef.current) {
             parseFinishedRef.current = true;
             parseErrorRef.current = next;
           }
-          if (next.includes("媒体流")) {
+          if (shouldResetMediaAnalysisFromError(next)) {
             setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
           }
-          if (next.includes("威胁分析")) {
+          if (shouldResetThreatAnalysisFromError(next)) {
             setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
             setIsThreatAnalysisLoading(false);
           }
