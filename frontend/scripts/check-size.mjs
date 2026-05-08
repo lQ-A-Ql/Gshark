@@ -35,6 +35,56 @@ const budgets = [
     maxLines: 450,
     reason: "media page is near the large-page threshold",
   },
+  {
+    path: "src/app/components/ui/sidebar.tsx",
+    maxLines: 750,
+    reason: "shared sidebar primitive should stay stable and avoid feature-specific logic",
+  },
+  {
+    path: "src/app/pages/VehicleAnalysis.tsx",
+    maxLines: 650,
+    reason: "vehicle page should move larger protocol panels into feature components",
+  },
+  {
+    path: "src/app/core/engine.ts",
+    maxLines: 600,
+    reason: "core engine registry should avoid absorbing page-specific behavior",
+  },
+  {
+    path: "src/app/pages/AptAnalysis.tsx",
+    maxLines: 580,
+    reason: "APT page should keep heavy actor views and tables in feature modules",
+  },
+  {
+    path: "src/app/layouts/MainLayout.tsx",
+    maxLines: 570,
+    reason: "main layout should not grow into page or workflow orchestration",
+  },
+  {
+    path: "src/app/components/CaptureMissionControl.tsx",
+    maxLines: 520,
+    reason: "capture mission control should keep larger panels in sibling components",
+  },
+  {
+    path: "src/app/components/PacketVirtualTable.tsx",
+    maxLines: 520,
+    reason: "packet table should keep virtualization and row helpers separated",
+  },
+  {
+    path: "src/app/pages/ThreatHunting.tsx",
+    maxLines: 510,
+    reason: "threat hunting page should move complex result views into feature components",
+  },
+  {
+    path: "src/app/pages/Workspace.tsx",
+    maxLines: 510,
+    reason: "workspace page should avoid taking on capture lifecycle internals",
+  },
+  {
+    path: "src/app/pages/IndustrialAnalysis.tsx",
+    maxLines: 490,
+    reason: "industrial page should keep decoded protocol panels in feature components",
+  },
 ];
 
 function countLines(text) {
