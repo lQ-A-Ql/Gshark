@@ -41,13 +41,10 @@ import type {
 } from "../core/types";
 import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
 import { downloadBlob } from "../utils/browserFile";
+import { createAnalysisClient } from "./clients/analysisClient";
 import { createMediaClient } from "./clients/mediaClient";
-import { asAPTAnalysis } from "./mappers/aptMapper";
 import { asC2DecryptedRecord } from "./mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
-import { asC2SampleAnalysis } from "./mappers/c2SampleMapper";
-import { parseEvidenceRecords } from "./mappers/evidenceMapper";
-import { asIndustrialAnalysis } from "./mappers/industrialMapper";
 import { asPlainObject } from "./mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream, asPacket, asThreatHit } from "./mappers/packetStreamMapper";
 import { asPluginSource, toPluginSourceRequest } from "./mappers/pluginSourceMapper";
@@ -65,9 +62,6 @@ import {
   asWinRMDecryptResult,
 } from "./mappers/toolMapper";
 import { asDecryptionConfig } from "./mappers/tlsMapper";
-import { asGlobalTrafficStats } from "./mappers/trafficMapper";
-import { asUSBAnalysis } from "./mappers/usbMapper";
-import { asVehicleAnalysis } from "./mappers/vehicleMapper";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 
@@ -320,6 +314,7 @@ export async function getBackendAuthHeaders(path: string, headersInit?: HeadersI
 }
 
 const mediaClient = createMediaClient(request, requestBlob);
+const analysisClient = createAnalysisClient(request);
 
 export const bridge: BackendBridge = {
   async isAvailable() {
@@ -786,20 +781,9 @@ export const bridge: BackendBridge = {
     return null;
   },
 
-  async getGlobalTrafficStats(signal?: AbortSignal) {
-    const payload = await request<any>("/api/stats/traffic/global", { signal });
-    return asGlobalTrafficStats(payload);
-  },
-
-  async getIndustrialAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/analysis/industrial", { signal });
-    return asIndustrialAnalysis(payload);
-  },
-
-  async getVehicleAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/analysis/vehicle", { signal });
-    return asVehicleAnalysis(payload);
-  },
+  getGlobalTrafficStats: analysisClient.getGlobalTrafficStats,
+  getIndustrialAnalysis: analysisClient.getIndustrialAnalysis,
+  getVehicleAnalysis: analysisClient.getVehicleAnalysis,
 
   getMediaAnalysis: mediaClient.getMediaAnalysis,
   transcribeMediaArtifact: mediaClient.transcribeMediaArtifact,
@@ -808,15 +792,8 @@ export const bridge: BackendBridge = {
   cancelMediaBatchTranscription: mediaClient.cancelMediaBatchTranscription,
   exportMediaBatchTranscription: mediaClient.exportMediaBatchTranscription,
 
-  async getUSBAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/analysis/usb", { signal });
-    return asUSBAnalysis(payload);
-  },
-
-  async getC2SampleAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/c2-analysis", { signal });
-    return asC2SampleAnalysis(payload);
-  },
+  getUSBAnalysis: analysisClient.getUSBAnalysis,
+  getC2SampleAnalysis: analysisClient.getC2SampleAnalysis,
 
   async decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal) {
     const payload = await request<any>("/api/c2-analysis/decrypt", {
@@ -863,26 +840,9 @@ export const bridge: BackendBridge = {
     return normalizeC2DecryptResultForDisplay(result);
   },
 
-  async getAPTAnalysis(signal?: AbortSignal) {
-    const payload = await request<any>("/api/apt-analysis", { signal });
-    return asAPTAnalysis(payload);
-  },
-
-  async getEvidence(signal?: AbortSignal) {
-    const payload = await request<any>("/api/evidence", { signal });
-    return parseEvidenceRecords(payload);
-  },
-
-  async getEvidenceWithFilter(modules?: string[], signal?: AbortSignal) {
-    const params = new URLSearchParams();
-    if (modules && modules.length > 0) {
-      params.set("modules", modules.join(","));
-    }
-    const qs = params.toString();
-    const path = qs ? `/api/evidence?${qs}` : "/api/evidence";
-    const payload = await request<any>(path, { signal });
-    return parseEvidenceRecords(payload);
-  },
+  getAPTAnalysis: analysisClient.getAPTAnalysis,
+  getEvidence: analysisClient.getEvidence,
+  getEvidenceWithFilter: analysisClient.getEvidenceWithFilter,
 
   downloadMediaArtifact: mediaClient.downloadMediaArtifact,
   getMediaPlaybackBlob: mediaClient.getMediaPlaybackBlob,
