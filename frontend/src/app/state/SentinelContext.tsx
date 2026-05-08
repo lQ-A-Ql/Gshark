@@ -88,8 +88,6 @@ import {
   EMPTY_HTTP_STREAM,
   EMPTY_SWITCH_METRICS,
   SWITCH_SAMPLE_LIMIT,
-  buildLoadingBinaryStream,
-  buildLoadingHttpStream,
   buildSwitchStat,
   prettySize,
 } from "./streamState";
@@ -98,6 +96,7 @@ import { resolveStreamPrefetchTask } from "./streamPrefetchTask";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
+import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { commitStreamPayloadPatches } from "./streamPayloadPatch";
 import {
@@ -680,60 +679,34 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       });
     };
 
+    const switchTask = resolveStreamSwitchTask({
+      protocol,
+      streamId,
+      httpCache: httpStreamCacheRef.current,
+      tcpCache: tcpStreamCacheRef.current,
+      udpCache: udpStreamCacheRef.current,
+      applyHttpStream: (next) => startTransition(() => {
+        setHttpStream(next);
+      }),
+      applyTcpStream: (next) => startTransition(() => {
+        setTcpStream(next);
+      }),
+      applyUdpStream: (next) => startTransition(() => {
+        setUdpStream(next);
+      }),
+      fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
+      fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+      fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+    });
+
     try {
-      if (protocol === "HTTP") {
-        if (commitCachedSwitch("HTTP", httpStreamCacheRef.current, (next) => {
-          startTransition(() => {
-            setHttpStream(next);
-          });
-        })) {
-          return;
-        }
-        startTransition(() => {
-          setHttpStream(buildLoadingHttpStream(streamId));
-        });
-        const http = await bridge.getHttpStream(streamId, task.signal);
-        if (!isLatest()) return;
-        commitLoadedSwitch("HTTP", httpStreamCacheRef.current, http, (next) => startTransition(() => {
-          setHttpStream(next);
-        }));
+      if (commitCachedSwitch(switchTask.protocol, switchTask.cache, switchTask.applyStream)) {
         return;
       }
-      if (protocol === "TCP") {
-        if (commitCachedSwitch("TCP", tcpStreamCacheRef.current, (next) => {
-          startTransition(() => {
-            setTcpStream(next);
-          });
-        })) {
-          return;
-        }
-        startTransition(() => {
-          setTcpStream(buildLoadingBinaryStream("TCP", streamId));
-        });
-      }
-      if (protocol === "UDP") {
-        if (commitCachedSwitch("UDP", udpStreamCacheRef.current, (next) => {
-          startTransition(() => {
-            setUdpStream(next);
-          });
-        })) {
-          return;
-        }
-        startTransition(() => {
-          setUdpStream(buildLoadingBinaryStream("UDP", streamId));
-        });
-      }
-      const raw = await bridge.getRawStreamPage(protocol, streamId, 0, RAW_STREAM_PAGE_SIZE, task.signal);
+      switchTask.applyStream(switchTask.loadingStream);
+      const stream = await switchTask.fetchStream(streamId, task.signal);
       if (!isLatest()) return;
-      if (protocol === "TCP") {
-        commitLoadedSwitch("TCP", tcpStreamCacheRef.current, raw, (next) => startTransition(() => {
-          setTcpStream(next);
-        }));
-      } else {
-        commitLoadedSwitch("UDP", udpStreamCacheRef.current, raw, (next) => startTransition(() => {
-          setUdpStream(next);
-        }));
-      }
+      commitLoadedSwitch(switchTask.protocol, switchTask.cache, stream, switchTask.applyStream);
     } catch (error) {
       if (!isLatest()) return;
       if (isAbortLikeError(error, task.signal)) {
