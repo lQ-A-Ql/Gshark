@@ -1,19 +1,15 @@
-import { KeyRound, RefreshCw } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { NTLMSessionMaterial } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
-import { ErrorBlock, Field, MetaChip } from "../ui";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { NTLMSessionMaterialDetails } from "./NTLMSessionMaterialDetails";
 import { NTLMSessionMaterialList } from "./NTLMSessionMaterialList";
-
-type ProtocolFilter = "ALL" | "HTTP" | "WinRM" | "SMB3" | "NTLM";
+import { NTLMSessionMaterialsToolbar, type NTLMSessionProtocolFilter } from "./NTLMSessionMaterialsToolbar";
 
 export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -21,7 +17,7 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
   const [materials, setMaterials] = useState<NTLMSessionMaterial[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>("ALL");
+  const [protocolFilter, setProtocolFilter] = useState<NTLMSessionProtocolFilter>("ALL");
   const [query, setQuery] = useState("");
   const [selectedFrame, setSelectedFrame] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
@@ -160,69 +156,21 @@ export function NTLMSessionMaterialsModule({ module, surfaceVariant = "card" }: 
         <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
       </CardHeader>
       <CardContent className={embedded ? "space-y-5 px-0 pt-0" : "space-y-5 pt-6"}>
-        <div className="flex flex-wrap gap-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4 text-[11px] shadow-sm">
-          <MetaChip label="抓包" value={hasCapture ? fileMeta.name : "未加载"} color={hasCapture ? "sky" : "slate"} />
-          <MetaChip label="总材料" value={materials.length} color="slate" />
-          <MetaChip label="完整" value={completeCount} color="emerald" />
-          <MetaChip
-            label="缺字段"
-            value={Math.max(0, materials.length - completeCount)}
-            color={completeCount === materials.length ? "slate" : "rose"}
-          />
-          {module.protocolDomain && <MetaChip label="域" value={module.protocolDomain} color="slate" />}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto]">
-          <Field label="协议筛选">
-            <div className="relative isolate flex h-10 w-full rounded-md bg-slate-100/90 p-1 ring-1 ring-inset ring-slate-200/50">
-              {(["ALL", "HTTP", "WinRM", "SMB3", "NTLM"] as ProtocolFilter[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setProtocolFilter(item)}
-                  className={`flex flex-1 items-center justify-center rounded-md text-[12px] font-semibold transition-colors ${
-                    protocolFilter === item
-                      ? "bg-white text-violet-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {item === "ALL" ? "全部" : item}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="检索材料">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="font-mono text-sm shadow-sm"
-              placeholder="用户名 / challenge / NTProofStr / IP / session id"
-            />
-          </Field>
-          <div className="flex items-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void loadMaterials()}
-              disabled={!hasCapture || loading}
-              className="gap-2 border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "扫描中..." : "刷新"}
-            </Button>
-          </div>
-        </div>
-
-        {!error && (
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
-            {hasCapture
-              ? loading
-                ? "正在从当前抓包提取 NTLM 会话材料..."
-                : `当前筛选命中 ${filtered.length} 条材料，可统一查看 HTTP / WinRM / SMB3 的 NTLM challenge 与 session key。`
-              : "未加载抓包，请先在主工作区导入文件"}
-          </div>
-        )}
-        {error && <ErrorBlock message={error} />}
+        <NTLMSessionMaterialsToolbar
+          captureName={fileMeta.name}
+          completeCount={completeCount}
+          error={error}
+          filteredCount={filtered.length}
+          hasCapture={hasCapture}
+          loading={loading}
+          materialCount={materials.length}
+          onProtocolFilterChange={setProtocolFilter}
+          onQueryChange={setQuery}
+          onRefresh={() => void loadMaterials()}
+          protocolDomain={module.protocolDomain}
+          protocolFilter={protocolFilter}
+          query={query}
+        />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)]">
           <NTLMSessionMaterialList
