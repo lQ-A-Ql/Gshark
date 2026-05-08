@@ -5,10 +5,9 @@ import { useSentinel } from "../../state/SentinelContext";
 import type { SMB3RandomSessionKeyResult, SMB3SessionCandidate } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
-import { Field } from "../ui";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { SMB3SessionCandidateSelector } from "./SMB3SessionCandidateSelector";
+import { SMB3SessionKeyInputForm } from "./SMB3SessionKeyInputForm";
 import { SMB3SessionKeyResultPanel } from "./SMB3SessionKeyResultPanel";
 
 export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
@@ -171,48 +170,18 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
             selectedFrame={smbSelectedCandidateFrame}
             summary={smbCandidateSummary}
           />
-          <Field label="Username (用户名)">
-            <Input
-              value={smbUser}
-              onChange={(event) => setSmbUser(event.target.value)}
-              className="font-mono text-sm shadow-sm"
-              placeholder="Administrator"
-            />
-          </Field>
-          <Field label="Domain (域名/可留空)">
-            <Input
-              value={smbDomain}
-              onChange={(event) => setSmbDomain(event.target.value)}
-              className="font-mono text-sm shadow-sm"
-              placeholder="WORKGROUP 或留空"
-            />
-          </Field>
-          <Field label="NTLM Hash (十六进制)">
-            <Input
-              value={smbHash}
-              onChange={(event) => setSmbHash(event.target.value)}
-              className="font-mono text-sm shadow-sm"
-              placeholder="例如: 31d...89c0"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="NTProofStr">
-              <Input
-                value={smbProof}
-                onChange={(event) => setSmbProof(event.target.value)}
-                className="font-mono text-sm shadow-sm"
-                placeholder="..."
-              />
-            </Field>
-            <Field label="Encrypted Session Key">
-              <Input
-                value={smbKey}
-                onChange={(event) => setSmbKey(event.target.value)}
-                className="font-mono text-sm shadow-sm"
-                placeholder="..."
-              />
-            </Field>
-          </div>
+          <SMB3SessionKeyInputForm
+            domain={smbDomain}
+            encryptedSessionKey={smbKey}
+            ntProofStr={smbProof}
+            ntlmHash={smbHash}
+            onDomainChange={setSmbDomain}
+            onEncryptedSessionKeyChange={setSmbKey}
+            onNtProofStrChange={setSmbProof}
+            onNtlmHashChange={setSmbHash}
+            onUsernameChange={setSmbUser}
+            username={smbUser}
+          />
         </div>
 
         <SMB3SessionKeyResultPanel
