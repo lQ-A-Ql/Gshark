@@ -13,6 +13,8 @@ import type {
 } from "../core/types";
 import type { TSharkStatus } from "../integrations/wailsBridge";
 import type { MediaAnalysisProgress, ThreatAnalysisProgress } from "./hooks/useAnalysisProgress";
+import type { CaptureFileMeta } from "./captureOpenState";
+import type { StreamIds } from "./streamState";
 
 export interface PreparedPacketStream {
   packet: Packet | null;
@@ -54,7 +56,7 @@ export interface SentinelContextValue {
   httpStream: HttpStream;
   tcpStream: BinaryStream;
   udpStream: BinaryStream;
-  streamIds: { http: number[]; tcp: number[]; udp: number[] };
+  streamIds: StreamIds;
   setActiveStream: (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => Promise<void>;
   persistStreamPayloads: (
     protocol: "HTTP" | "TCP" | "UDP",
@@ -64,7 +66,7 @@ export interface SentinelContextValue {
   streamSwitchMetrics: StreamSwitchMetrics;
   decryptionConfig: DecryptionConfig;
   updateDecryptionConfig: (patch: Partial<DecryptionConfig>) => void;
-  fileMeta: { name: string; sizeBytes: number; path: string };
+  fileMeta: CaptureFileMeta;
   captureRevision: number;
   recentCaptures: RecentCapture[];
   openCapture: (filePath?: string) => Promise<void>;

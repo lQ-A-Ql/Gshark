@@ -1,5 +1,11 @@
 import type { BinaryStream, HttpStream, StreamLoadMeta, StreamSwitchMetrics, StreamSwitchStat } from "../core/types";
 
+export interface StreamIds {
+  http: number[];
+  tcp: number[];
+  udp: number[];
+}
+
 export const EMPTY_HTTP_STREAM: HttpStream = {
   id: -1,
   client: "",
@@ -19,6 +25,20 @@ export const EMPTY_BINARY_STREAM: BinaryStream = {
   totalChunks: 0,
   hasMore: false,
 };
+
+export function createEmptyUdpStream(): BinaryStream {
+  return { ...EMPTY_BINARY_STREAM, protocol: "UDP" };
+}
+
+export function createEmptyStreamIds(): StreamIds {
+  return { http: [], tcp: [], udp: [] };
+}
+
+export function getStreamIdsForProtocol(streamIds: StreamIds, protocol: "HTTP" | "TCP" | "UDP"): number[] {
+  if (protocol === "HTTP") return streamIds.http;
+  if (protocol === "TCP") return streamIds.tcp;
+  return streamIds.udp;
+}
 
 export const EMPTY_SWITCH_STAT: StreamSwitchStat = {
   count: 0,

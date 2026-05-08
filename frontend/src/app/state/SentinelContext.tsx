@@ -106,7 +106,15 @@ import {
   STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
   STREAM_PREFETCH_LIMIT,
 } from "./captureConstants";
-import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, EMPTY_SWITCH_METRICS, prettySize } from "./streamState";
+import {
+  EMPTY_BINARY_STREAM,
+  EMPTY_HTTP_STREAM,
+  EMPTY_SWITCH_METRICS,
+  createEmptyStreamIds,
+  createEmptyUdpStream,
+  getStreamIdsForProtocol,
+  prettySize,
+} from "./streamState";
 import { pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolveStreamPrefetchTask } from "./streamPrefetchTask";
 import { resolvePacketStreamProtocol } from "./streamProtocol";
@@ -185,12 +193,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   } = useToolRuntime();
   const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
   const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
-  const [udpStream, setUdpStream] = useState<BinaryStream>({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
-  const [streamIds, setStreamIds] = useState<{ http: number[]; tcp: number[]; udp: number[] }>({
-    http: [],
-    tcp: [],
-    udp: [],
-  });
+  const [udpStream, setUdpStream] = useState<BinaryStream>(createEmptyUdpStream);
+  const [streamIds, setStreamIds] = useState(createEmptyStreamIds);
   const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
   const [captureRevision, setCaptureRevision] = useState(0);
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>(() => readRecentCaptures());
@@ -330,8 +334,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
     setHttpStream(EMPTY_HTTP_STREAM);
     setTcpStream(EMPTY_BINARY_STREAM);
-    setUdpStream({ ...EMPTY_BINARY_STREAM, protocol: "UDP" });
-    setStreamIds({ http: [], tcp: [], udp: [] });
+    setUdpStream(createEmptyUdpStream());
+    setStreamIds(createEmptyStreamIds());
     resetStreamRuntimeRefs({
       httpCache: httpStreamCacheRef.current,
       tcpCache: tcpStreamCacheRef.current,
@@ -621,7 +625,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (!backendConnected || !activeCapturePathRef.current || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0)
         return;
 
-      const ids = protocol === "HTTP" ? streamIds.http : protocol === "TCP" ? streamIds.tcp : streamIds.udp;
+      const ids = getStreamIdsForProtocol(streamIds, protocol);
       const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
       for (const targetId of targets) {
         const { taskKey, cache, inFlight, fetchStream } = resolveStreamPrefetchTask({

@@ -4,6 +4,9 @@ import {
   buildLoadingBinaryStream,
   buildLoadingHttpStream,
   buildSwitchStat,
+  createEmptyStreamIds,
+  createEmptyUdpStream,
+  getStreamIdsForProtocol,
   isFastPathLoad,
   markCachedLoad,
   prettySize,
@@ -11,6 +14,29 @@ import {
 import type { HttpStream } from "../core/types";
 
 describe("streamState helpers", () => {
+  it("builds empty UDP stream and stream id state", () => {
+    expect(createEmptyUdpStream()).toMatchObject({
+      id: -1,
+      protocol: "UDP",
+      chunks: [],
+      nextCursor: 0,
+      totalChunks: 0,
+      hasMore: false,
+    });
+
+    const ids = createEmptyStreamIds();
+    expect(ids).toEqual({ http: [], tcp: [], udp: [] });
+    expect(createEmptyStreamIds()).not.toBe(ids);
+    expect(createEmptyStreamIds().http).not.toBe(ids.http);
+  });
+
+  it("selects stream ids by protocol", () => {
+    const streamIds = { http: [1], tcp: [2], udp: [3] };
+    expect(getStreamIdsForProtocol(streamIds, "HTTP")).toEqual([1]);
+    expect(getStreamIdsForProtocol(streamIds, "TCP")).toEqual([2]);
+    expect(getStreamIdsForProtocol(streamIds, "UDP")).toEqual([3]);
+  });
+
   it("builds stable loading placeholders", () => {
     expect(buildLoadingHttpStream(5)).toMatchObject({ id: 5, loadMeta: { source: "loading", loading: true } });
     expect(buildLoadingBinaryStream("TCP", 7)).toMatchObject({
