@@ -29,6 +29,7 @@ import { isAbortLikeError, isOperationTimeoutError, withTimeout } from "../utils
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
 import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
+import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
   EMPTY_THREAT_ANALYSIS_PROGRESS,
@@ -1045,36 +1046,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  useEffect(() => {
-    if (selectedPacketId == null) {
-      setSelectedPacketDetail(null);
-      return;
-    }
-
-    if (!shouldLoadSelectedPacketDetail(selectedPacketId, selectedPacketDetail)) {
-      return;
-    }
-
-    const task = captureTaskScopeRef.current.beginTask("packet-detail");
-    void bridge.getPacket(selectedPacketId, task.signal)
-      .then((packet) => {
-        if (task.isCurrent()) {
-          setSelectedPacketDetail(packet);
-        }
-      })
-      .catch((error) => {
-        if (task.isCurrent() && !isAbortLikeError(error, task.signal)) {
-          setSelectedPacketDetail(null);
-        }
-      })
-      .finally(() => {
-        task.finish();
-      });
-
-    return () => {
-      task.abort();
-    };
-  }, [selectedPacketDetail?.id, selectedPacketId]);
+  useSelectedPacketDetail({
+    selectedPacketId,
+    shouldLoad: shouldLoadSelectedPacketDetail(selectedPacketId, selectedPacketDetail),
+    captureTaskScopeRef,
+    loadPacket: (packetId, signal) => bridge.getPacket(packetId, signal),
+    setSelectedPacketDetail,
+  });
 
   useSelectedPacketArtifact<string>({
     selectedPacketId,
