@@ -41,6 +41,7 @@ import {
   computeMediaProgressPercent,
   computeThreatProgressPercent,
 } from "./progressHelpers";
+import { parseProgressStatus, pushRecentLabel } from "./progressStatus";
 import { MAX_RECENT_CAPTURES, readRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import {
   getCurrentPacketPage,
@@ -81,6 +82,7 @@ import {
   markCachedLoad,
   prettySize,
 } from "./streamState";
+import { waitForCaptureSignal as waitForCaptureSignalUtil, wakeCaptureWaiters as wakeCaptureWaitersUtil } from "./captureSignal";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
@@ -419,20 +421,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [loadPacketPage]);
 
   const updateProgressFromStatus = useCallback((message: string): boolean => {
-    if (!message.startsWith("__progress__:")) return false;
-    const parts = message.split(":");
-    if (parts.length < 3) return true;
-    const phase = parts[1];
-    if (phase === "media") {
-      const current = Number(parts[2]) || 0;
-      const total = Number(parts[3]) || 0;
-      const label = parts.slice(4).join(":").trim();
+    const progress = parseProgressStatus(message);
+    if (!progress.consumed) {
+      return false;
+    }
+    if (progress.kind === "malformed") {
+      return true;
+    }
+    if (progress.kind === "media") {
+      const { current, total, label } = progress;
       const progressPhase = classifyMediaProgressPhase(label);
       const percent = computeMediaProgressPercent(progressPhase, current, total);
       setMediaAnalysisProgress((prev) => {
-        const nextRecent = label && label !== prev.label
-          ? [label, ...prev.recent.filter((item) => item !== label)].slice(0, 4)
-          : prev.recent;
+        const nextRecent = label !== prev.label ? pushRecentLabel(prev.recent, label, 4) : prev.recent;
         return {
           active: progressPhase !== "complete" && (total <= 0 || current < total),
           current,
@@ -446,16 +447,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       });
       return true;
     }
-    if (phase === "threat") {
-      const current = Number(parts[2]) || 0;
-      const total = Number(parts[3]) || 0;
-      const label = parts.slice(4).join(":").trim();
+    if (progress.kind === "threat") {
+      const { current, total, label } = progress;
       const progressPhase = classifyThreatProgressPhase(label);
       const percent = computeThreatProgressPercent(progressPhase, current, total);
       setThreatAnalysisProgress((prev) => {
-        const nextRecent = label && label !== prev.label
-          ? [label, ...prev.recent.filter((item) => item !== label)].slice(0, 5)
-          : prev.recent;
+        const nextRecent = label !== prev.label ? pushRecentLabel(prev.recent, label, 5) : prev.recent;
         return {
           active: progressPhase !== "complete" && (total <= 0 || current < total),
           current,
@@ -469,9 +466,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       });
       return true;
     }
-    if (parts.length < 4) return true;
-    const processed = Number(parts[2]) || 0;
-    const total = Number(parts[3]) || 0;
+    const { phase, processed, total } = progress;
     if (total > 0) {
       setPreloadTotal(total);
       preloadTotalRef.current = total;
@@ -489,12 +484,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, []);
 
   const wakeCaptureWaiters = useCallback(() => {
-    if (captureWaitersRef.current.size === 0) return;
-    const waiters = Array.from(captureWaitersRef.current);
-    captureWaitersRef.current.clear();
-    for (const waiter of waiters) {
-      waiter();
-    }
+    wakeCaptureWaitersUtil(captureWaitersRef.current);
   }, []);
 
   const prepareForCaptureReplacement = useCallback(async () => {
@@ -515,23 +505,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     await bridge.prepareCaptureReplacement().catch(() => null);
   }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
 
-  const waitForCaptureSignal = useCallback((delayMs: number) => (
-    new Promise<void>((resolve) => {
-      let settled = false;
-      let timer = 0;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        if (timer) {
-          window.clearTimeout(timer);
-        }
-        captureWaitersRef.current.delete(finish);
-        resolve();
-      };
-      timer = window.setTimeout(finish, delayMs);
-      captureWaitersRef.current.add(finish);
-    })
-  ), []);
+  const waitForCaptureSignal = useCallback((delayMs: number) => waitForCaptureSignalUtil(captureWaitersRef.current, delayMs), []);
 
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;
