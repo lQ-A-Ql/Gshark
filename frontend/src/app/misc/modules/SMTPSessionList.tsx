@@ -1,4 +1,5 @@
 import type { SMTPSession } from "../../core/types";
+import { renderSMTPSessionTitle } from "./SMTPSessionAnalysisUtils";
 
 interface SMTPSessionListProps {
   hasCapture: boolean;
@@ -76,14 +77,4 @@ export function SMTPSessionList({
       </div>
     </div>
   );
-}
-
-export function renderSMTPSessionTitle(session: SMTPSession) {
-  const left = session.client
-    ? `${session.client}${session.clientPort ? `:${session.clientPort}` : ""}`
-    : `stream #${session.streamId}`;
-  const right = session.server
-    ? `${session.server}${session.serverPort ? `:${session.serverPort}` : ""}`
-    : "SMTP server";
-  return `${left} → ${right}`;
 }
