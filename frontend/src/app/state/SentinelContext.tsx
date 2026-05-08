@@ -82,6 +82,15 @@ import {
   getCaptureStopRequestStatus,
 } from "./captureStopStatus";
 import {
+  CAPTURE_PRELOAD_TIMEOUT_MS,
+  getCaptureEmptyParseError,
+  getCaptureOpenDisconnectedStatus,
+  getCaptureOpenErrorMessage,
+  getCapturePreloadDoneStatus,
+  getCapturePreloadTimeoutError,
+  getCapturePreloadWorkingStatus,
+} from "./capturePreloadStatus";
+import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
   PRELOAD_SIGNAL_WAIT_MS,
@@ -999,7 +1008,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const startCapture = useCallback(
     async (filePath?: string, filterOverride?: string) => {
       if (!backendConnected) {
-        setBackendStatus("桌面后端未连接，无法打开文件");
+        setBackendStatus(getCaptureOpenDisconnectedStatus());
         return;
       }
 
@@ -1077,9 +1086,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           startTask.finish();
         }
         if (captureSeq !== captureSeqRef.current) return;
-        setBackendStatus(`正在预加载全部数据: ${opened.fileName}`);
+        setBackendStatus(getCapturePreloadWorkingStatus(opened.fileName));
 
-        const waitDeadline = Date.now() + 120000;
+        const waitDeadline = Date.now() + CAPTURE_PRELOAD_TIMEOUT_MS;
         let firstPageLoaded = false;
         while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
           const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
@@ -1123,19 +1132,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           probeTask.finish();
         }
         if (probePage.total === 0 && parseFinishedRef.current) {
-          throw new Error(
-            parseErrorRef.current || "capture parsing finished without any packets; please verify tshark compatibility",
-          );
+          throw new Error(getCaptureEmptyParseError(parseErrorRef.current));
         }
         if (!parseFinishedRef.current && Date.now() >= waitDeadline) {
-          throw new Error("capture parsing timed out before preloading finished");
+          throw new Error(getCapturePreloadTimeoutError());
         }
         if (!firstPageLoaded && probePage.total > 0) {
           await loadPacketPage(0, effectiveFilter);
         }
         await refreshStreamIndex();
         if (captureSeq !== captureSeqRef.current) return;
-        setBackendStatus(`预加载完成，可浏览全部流量: ${opened.fileName}`);
+        setBackendStatus(getCapturePreloadDoneStatus(opened.fileName));
         void refreshAnalysisResult({
           capturePath: opened.filePath,
           quietSuccess: true,
@@ -1145,7 +1152,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           return;
         }
         if (captureSeq === captureSeqRef.current) {
-          setBackendStatus(error instanceof Error ? error.message : "打开文件失败");
+          setBackendStatus(getCaptureOpenErrorMessage(error));
         }
       } finally {
         if (captureSeq === captureSeqRef.current) {
