@@ -10,25 +10,15 @@ import {
   type PropsWithChildren,
 } from "react";
 import { buildHexDump, buildProtocolTree, buildProtocolTreeFromLayers } from "../core/engine";
-import type {
-  BinaryStream,
-  DecryptionConfig,
-  HttpStream,
-  Packet,
-  RecentCapture,
-  ToolRuntimeConfig,
-  StreamSwitchMetrics,
-} from "../core/types";
+import type { BinaryStream, HttpStream, Packet, RecentCapture, StreamSwitchMetrics } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
-import { isAbortLikeError, isOperationTimeoutError, withTimeout } from "../utils/asyncControl";
+import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
-import { useToolRuntime, readToolRuntimeConfig, writeToolRuntimeConfig } from "./hooks/useToolRuntime";
+import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
 import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import {
-  EMPTY_MEDIA_ANALYSIS_PROGRESS,
-  EMPTY_THREAT_ANALYSIS_PROGRESS,
   phaseLabelForMediaProgress,
   phaseLabelForThreatProgress,
   useAnalysisProgress,
@@ -40,17 +30,6 @@ import {
   computeThreatProgressPercent,
 } from "./progressHelpers";
 import { parseProgressStatus, pushRecentLabel } from "./progressStatus";
-import {
-  isProgressStatusMessage,
-  shouldIgnoreCaptureErrorWithoutActiveCapture,
-  shouldIgnoreCaptureStatusWithoutActiveCapture,
-  shouldMarkParseErrorFromStatus,
-  shouldMarkParseFinishedFromStatus,
-  shouldResetMediaAnalysisFromError,
-  shouldResetMediaAnalysisFromStatus,
-  shouldResetThreatAnalysisFromError,
-  shouldResetThreatAnalysisFromStatus,
-} from "./backendStatusMessage";
 import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import {
   getCurrentPacketPage,
@@ -64,7 +43,6 @@ import {
 } from "./packetPagination";
 import {
   keepSelectedPacketDetailForId,
-  preserveSelectedPacketId,
   resolveSelectedPacket,
   shouldLoadSelectedPacketArtifacts,
   shouldLoadSelectedPacketDetail,
@@ -97,20 +75,13 @@ import {
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
-import {
-  finishCaptureParseRuntime,
-  markCaptureParseFinished,
-  startCaptureParseRuntime,
-  stopCapturePreloading,
-} from "./captureParseRuntimeState";
+import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
   PRELOAD_SIGNAL_WAIT_MS,
   RAW_STREAM_PAGE_SIZE,
-  STARTUP_TLS_CONFIG_TIMEOUT_MS,
-  STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
   STREAM_PREFETCH_LIMIT,
 } from "./captureConstants";
 import {
@@ -167,8 +138,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
   const [selectedPacketRawHex, setSelectedPacketRawHex] = useState("");
   const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
-  const [backendConnected, setBackendConnected] = useState(false);
-  const [backendStatus, setBackendStatus] = useState("等待后端连接");
   const threatAnalysisSeqRef = useRef(0);
   const {
     threatHits,
@@ -182,21 +151,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     refreshAnalysisResult: refreshAnalysisResultImpl,
     resetAnalysisState,
   } = useAnalysisProgress(threatAnalysisSeqRef);
-  const {
-    tsharkStatus,
-    setTsharkStatus,
-    isTSharkChecking,
-    setIsTSharkChecking,
-    toolRuntimeSnapshot,
-    setToolRuntimeSnapshot,
-    isToolRuntimeLoading,
-    setIsToolRuntimeLoading,
-    toolRuntimeCheckDegraded,
-    setToolRuntimeCheckDegraded,
-    setTSharkPath: setTSharkPathImpl,
-    refreshToolRuntimeSnapshot: refreshToolRuntimeSnapshotImpl,
-    saveToolRuntimeConfig: saveToolRuntimeConfigImpl,
-  } = useToolRuntime();
   const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
   const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
   const [udpStream, setUdpStream] = useState<BinaryStream>(createEmptyUdpStream);
@@ -204,19 +158,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
   const [captureRevision, setCaptureRevision] = useState(0);
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>(() => readRecentCaptures());
-  const [decryptionConfig, setDecryptionConfig] = useState<DecryptionConfig>({
-    sslKeyLogPath: "",
-    privateKeyPath: "",
-    privateKeyIpPort: "",
-  });
 
-  const refreshTimer = useRef<number | null>(null);
   const pageStartRef = useRef(0);
   const captureTaskScopeRef = useRef(createCaptureTaskScope());
   const packetPageSeqRef = useRef(0);
   const hasMorePacketsRef = useRef(false);
   const loadMoreScheduledRef = useRef<number | null>(null);
-  const backendRetryTimerRef = useRef<number | null>(null);
   const parseFinishedRef = useRef(false);
   const parseErrorRef = useRef("");
   const preloadingRef = useRef(false);
@@ -229,6 +176,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
   const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
   const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
+  const scheduleLoadMoreRef = useRef<() => void>(() => undefined);
+  const refreshAnalysisResultRef = useRef<
+    (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>
+  >(async () => {});
+  const updateProgressFromStatusRef = useRef<(message: string) => boolean>(() => false);
   const httpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
@@ -236,6 +188,34 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
   const streamSwitchDurationsRef = useRef(createEmptyStreamSwitchDurations());
   const streamSwitchHitsRef = useRef(createEmptyStreamSwitchHits());
+  const {
+    backendConnected,
+    backendStatus,
+    setBackendStatus,
+    decryptionConfig,
+    updateDecryptionConfig,
+    tsharkStatus,
+    isTSharkChecking,
+    toolRuntimeCheckDegraded,
+    setTSharkPath,
+    toolRuntimeSnapshot,
+    isToolRuntimeLoading,
+    refreshToolRuntimeSnapshot,
+    saveToolRuntimeConfig,
+  } = useBackendLifecycle({
+    activeCapturePathRef,
+    captureWaitersRef,
+    parseFinishedRef,
+    parseErrorRef,
+    preloadingRef,
+    scheduleLoadMoreRef,
+    refreshAnalysisResultRef,
+    updateProgressFromStatusRef,
+    setSelectedPacketId,
+    setMediaAnalysisProgress,
+    setThreatAnalysisProgress,
+    setIsThreatAnalysisLoading,
+  });
 
   const recordStreamSwitchMetric = useCallback(
     (protocol: "HTTP" | "TCP" | "UDP", elapsedMs: number, cacheHit: boolean) => {
@@ -265,10 +245,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     if (loadMoreScheduledRef.current != null) {
       window.clearTimeout(loadMoreScheduledRef.current);
       loadMoreScheduledRef.current = null;
-    }
-    if (refreshTimer.current != null) {
-      window.clearTimeout(refreshTimer.current);
-      refreshTimer.current = null;
     }
     setIsPageLoading(false);
   }, []);
@@ -567,24 +543,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const setTSharkPath = useCallback(
-    async (path: string) => {
-      await setTSharkPathImpl(path, backendConnected, setBackendStatus);
-    },
-    [setTSharkPathImpl, backendConnected],
-  );
-
-  const refreshToolRuntimeSnapshot = useCallback(async () => {
-    return await refreshToolRuntimeSnapshotImpl(backendConnected);
-  }, [refreshToolRuntimeSnapshotImpl, backendConnected]);
-
-  const saveToolRuntimeConfig = useCallback(
-    async (patch: Partial<ToolRuntimeConfig>) => {
-      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatus);
-    },
-    [saveToolRuntimeConfigImpl, backendConnected],
-  );
-
   const filteredPackets = useMemo(() => packets, [packets]);
 
   const selectedPacket = useMemo(
@@ -798,10 +756,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [backendConnected],
   );
 
-  const scheduleLoadMoreRef = useRef(scheduleLoadMore);
-  const refreshAnalysisResultRef = useRef(refreshAnalysisResult);
-  const updateProgressFromStatusRef = useRef(updateProgressFromStatus);
-
   useSyncedRefValue(scheduleLoadMoreRef, scheduleLoadMore);
   useSyncedRefValue(refreshAnalysisResultRef, refreshAnalysisResult);
   useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
@@ -812,185 +766,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     },
     [],
   );
-
-  useEffect(() => {
-    let dispose: (() => void) | null = null;
-    let cancelled = false;
-
-    const clearBackendRetryTimer = () => {
-      if (backendRetryTimerRef.current != null) {
-        window.clearTimeout(backendRetryTimerRef.current);
-        backendRetryTimerRef.current = null;
-      }
-    };
-
-    const scheduleBackendRetry = (delayMs = 2000) => {
-      clearBackendRetryTimer();
-      backendRetryTimerRef.current = window.setTimeout(() => {
-        void setup();
-      }, delayMs);
-    };
-
-    const setup = async () => {
-      if (cancelled) return;
-      const available = await bridge.isAvailable();
-      if (cancelled) return;
-      if (!available) {
-        setBackendConnected(false);
-        const desktopStatus = await bridge.getDesktopBackendStatus().catch(() => "");
-        const detail = desktopStatus.trim();
-        if (detail && detail !== "not-started" && detail !== "starting") {
-          setBackendStatus(detail);
-        } else {
-          setBackendStatus("桌面后端未连接，请启动或重启桌面应用");
-        }
-        scheduleBackendRetry();
-        return;
-      }
-
-      clearBackendRetryTimer();
-      setBackendConnected(true);
-      setBackendStatus("后端已连接，等待打开文件");
-      setIsTSharkChecking(true);
-      setIsToolRuntimeLoading(true);
-      setToolRuntimeCheckDegraded(false);
-
-      try {
-        const savedConfig = readToolRuntimeConfig();
-        const snapshot = await withTimeout(
-          bridge.updateToolRuntimeConfig(savedConfig),
-          STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
-          "startup tool runtime check timed out",
-        );
-        setToolRuntimeSnapshot(snapshot);
-        setTsharkStatus({
-          available: snapshot.tshark.available,
-          path: snapshot.tshark.path,
-          message: snapshot.tshark.message,
-          customPath: snapshot.tshark.customPath ?? "",
-          usingCustomPath: snapshot.tshark.usingCustomPath,
-        });
-        if (!cancelled) {
-          writeToolRuntimeConfig(snapshot.config);
-        }
-        if (!cancelled && snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
-          setBackendStatus(snapshot.tshark.message);
-        }
-        if (!cancelled && !snapshot.tshark.available) {
-          setBackendStatus(snapshot.tshark.message || "未检测到 tshark，请先配置路径");
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setToolRuntimeCheckDegraded(true);
-          const prefix = isOperationTimeoutError(error) ? "运行时组件检测超时" : "运行时组件检测失败";
-          setBackendStatus(`${prefix}，已先进入主界面；可在设置侧栏刷新状态`);
-          setTsharkStatus((prev) => ({
-            ...prev,
-            message: `${prefix}，请稍后在设置侧栏刷新状态`,
-          }));
-        }
-      } finally {
-        if (!cancelled) {
-          setIsTSharkChecking(false);
-          setIsToolRuntimeLoading(false);
-        }
-      }
-
-      try {
-        const tls = await withTimeout(
-          bridge.getTLSConfig(),
-          STARTUP_TLS_CONFIG_TIMEOUT_MS,
-          "startup TLS config check timed out",
-        );
-        if (tls) {
-          setDecryptionConfig(tls);
-        }
-      } catch (error) {
-        if (!isOperationTimeoutError(error)) {
-          setBackendStatus("后端初始化失败");
-        }
-      }
-
-      dispose = bridge.subscribeEvents({
-        packet: (packet) => {
-          setSelectedPacketId((prev) => preserveSelectedPacketId(prev, packet.id));
-          if (preloadingRef.current) {
-            return;
-          }
-          scheduleLoadMoreRef.current();
-
-          if (refreshTimer.current) {
-            window.clearTimeout(refreshTimer.current);
-          }
-          refreshTimer.current = window.setTimeout(() => {
-            void refreshAnalysisResultRef.current();
-          }, 500);
-        },
-        status: (message) => {
-          const msg = message || "后端运行中";
-          if (shouldIgnoreCaptureStatusWithoutActiveCapture(msg, Boolean(activeCapturePathRef.current))) {
-            return;
-          }
-          if (isProgressStatusMessage(msg)) {
-            updateProgressFromStatusRef.current(msg);
-            wakeCaptureWaiters();
-            return;
-          }
-          if (shouldMarkParseFinishedFromStatus(msg)) {
-            markCaptureParseFinished({
-              parseFinishedRef,
-              parseErrorRef,
-              errorMessage: shouldMarkParseErrorFromStatus(msg) ? msg : undefined,
-            });
-          }
-          if (shouldResetMediaAnalysisFromStatus(msg)) {
-            setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
-          }
-          if (shouldResetThreatAnalysisFromStatus(msg)) {
-            setThreatAnalysisProgress((prev) => (prev.phase === "complete" ? prev : EMPTY_THREAT_ANALYSIS_PROGRESS));
-          }
-          wakeCaptureWaiters();
-          setBackendStatus(msg);
-        },
-        error: (message) => {
-          const next = message || "后端事件异常";
-          if (shouldIgnoreCaptureErrorWithoutActiveCapture(next, Boolean(activeCapturePathRef.current))) {
-            return;
-          }
-          if (preloadingRef.current) {
-            markCaptureParseFinished({
-              parseFinishedRef,
-              parseErrorRef,
-              errorMessage: next,
-            });
-          }
-          if (shouldResetMediaAnalysisFromError(next)) {
-            setMediaAnalysisProgress(EMPTY_MEDIA_ANALYSIS_PROGRESS);
-          }
-          if (shouldResetThreatAnalysisFromError(next)) {
-            setThreatAnalysisProgress(EMPTY_THREAT_ANALYSIS_PROGRESS);
-            setIsThreatAnalysisLoading(false);
-          }
-          wakeCaptureWaiters();
-          setBackendStatus(next);
-        },
-      });
-    };
-
-    void setup();
-
-    return () => {
-      cancelled = true;
-      clearBackendRetryTimer();
-      if (dispose) dispose();
-      if (loadMoreScheduledRef.current != null) {
-        window.clearTimeout(loadMoreScheduledRef.current);
-      }
-      if (refreshTimer.current) {
-        window.clearTimeout(refreshTimer.current);
-      }
-    };
-  }, []);
 
   useSelectedPacketDetail({
     selectedPacketId,
@@ -1235,19 +1010,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketId(id);
     setSelectedPacketDetail((prev) => keepSelectedPacketDetailForId(prev, id));
   }, []);
-
-  const updateDecryptionConfig = useCallback(
-    (patch: Partial<DecryptionConfig>) => {
-      setDecryptionConfig((prev) => {
-        const next = { ...prev, ...patch };
-        if (backendConnected) {
-          void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
-        }
-        return next;
-      });
-    },
-    [backendConnected],
-  );
 
   const openCapture = useCallback(
     async (filePath?: string) => {

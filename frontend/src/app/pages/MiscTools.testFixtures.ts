@@ -1,3 +1,5 @@
+import { fireEvent, screen } from "@testing-library/react";
+
 export function resetMiscToolsMocks(mocks: any) {
   window.localStorage.clear();
   mocks.sentinelState.fileMeta.path = "C:/captures/capture.pcapng";
@@ -428,4 +430,9 @@ export function resetMiscToolsMocks(mocks: any) {
       displayLabel: "0x1122334455667788 | Guest | 10.0.0.10 -> 10.0.0.20 | 帧 #102",
     },
   ]);
+}
+
+export async function expandModule(moduleID: string) {
+  const toggle = await screen.findByTestId(`misc-module-toggle-${moduleID}`);
+  fireEvent.click(toggle);
 }
