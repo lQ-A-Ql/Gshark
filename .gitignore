@@ -35,6 +35,7 @@ coverage.out
 build/
 
 # Local captures / analysis artifacts
+/samples/
 *.pcap
 *.pcapng
 *.cap
@@ -45,4 +46,5 @@ build/
 *.sqlite
 *.sqlite3
 
-docs/audit*
+# Local development reports
+/docs/audit*
