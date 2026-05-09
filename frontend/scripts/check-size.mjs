@@ -369,6 +369,21 @@ export const sourceSizeBudgets = [
     reason: "HTTP stream page should keep formatting helpers and payload transforms in sibling modules",
   },
   {
+    path: "src/app/pages/TcpStream.tsx",
+    maxLines: 370,
+    reason: "TCP stream page should keep payload formatting helpers in RawStreamUtils",
+  },
+  {
+    path: "src/app/pages/UdpStream.tsx",
+    maxLines: 355,
+    reason: "UDP stream page should keep payload formatting helpers in RawStreamUtils",
+  },
+  {
+    path: "src/app/pages/RawStreamUtils.ts",
+    maxLines: 140,
+    reason: "raw TCP/UDP stream helpers should stay pure and own shared chunk search/export/dialog helpers",
+  },
+  {
     path: "src/app/pages/HttpStreamUtils.ts",
     maxLines: 165,
     reason: "HTTP stream formatting helpers should stay pure and avoid page orchestration",
