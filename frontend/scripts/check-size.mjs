@@ -297,8 +297,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/RuntimeSettingsSidebar.tsx",
-    maxLines: 350,
+    maxLines: 130,
     reason: "runtime settings sidebar should keep state wiring separate from presentational controls",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSections.tsx",
+    maxLines: 240,
+    reason: "runtime settings domain sections should stay presentational and avoid save or refresh orchestration",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsShell.tsx",
+    maxLines: 105,
+    reason: "runtime settings shell should stay focused on header, actions, and footer chrome",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.tsx",
