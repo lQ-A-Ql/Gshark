@@ -157,8 +157,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/Workspace.tsx",
-    maxLines: 510,
-    reason: "workspace page should avoid taking on capture lifecycle internals",
+    maxLines: 350,
+    reason: "workspace page should stay focused on state wiring, navigation, and selection orchestration",
+  },
+  {
+    path: "src/app/components/workspace/WorkspacePanels.tsx",
+    maxLines: 190,
+    reason: "workspace panels should stay presentational and avoid capture/filter state ownership",
+  },
+  {
+    path: "src/app/components/workspace/useWorkspaceFilterHistory.ts",
+    maxLines: 105,
+    reason: "workspace filter history should only own local suggestions and persistence",
+  },
+  {
+    path: "src/app/components/workspace/workspaceSelection.ts",
+    maxLines: 60,
+    reason: "workspace selection helpers should stay pure and small",
   },
   {
     path: "src/app/pages/IndustrialAnalysis.tsx",

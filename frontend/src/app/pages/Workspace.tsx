@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Network } from "lucide-react";
 import { useNavigate } from "react-router";
-import { PacketVirtualTable } from "../components/PacketVirtualTable";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { WorkbenchTitleBar } from "../components/DesignSystem";
-import { Progress } from "../components/ui/progress";
 import { DisplayFilterBar } from "../components/workspace/DisplayFilterBar";
-import { HexAsciiPanel } from "../components/workspace/HexAsciiPanel";
-import { ProtocolTreePanel } from "../components/workspace/ProtocolTreePanel";
+import { WorkspacePanels, WorkspacePreloadProgress } from "../components/workspace/WorkspacePanels";
 import { CaptureFileControls, PacketLocatorControls, PacketPagingControls } from "../components/workspace/WorkspaceTopControls";
+import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
+import { buildFrameBytes, findClosestNodeByOffset } from "../components/workspace/workspaceSelection";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet, ProtocolTreeNode } from "../core/types";
-
-const FILTER_HISTORY_KEY = "gshark.filter-history.v1";
-const MAX_FILTER_HISTORY = 12;
 
 export default function Workspace() {
   const {
@@ -56,65 +51,12 @@ export default function Workspace() {
   const [capturePath, setCapturePath] = useState(fileMeta.name);
   const [pageInput, setPageInput] = useState("1");
   const [packetIdInput, setPacketIdInput] = useState("");
-  const [recentFilters, setRecentFilters] = useState<string[]>([]);
   const [filterLoadingProgress, setFilterLoadingProgress] = useState(18);
   const filterInputRef = useRef<HTMLInputElement | null>(null);
   const treeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const hexPanelRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-
-  const defaultFilterSuggestions = [
-    "http",
-    "tcp",
-    "udp",
-    "dns",
-    "tls",
-    "arp",
-    "icmp",
-    "ip",
-    "ipv6",
-    "tcp contains \"GET\"",
-    "http.request",
-    "http.response",
-    "http.host contains \"bing\"",
-    "http.request.uri contains \"login\"",
-    "http.content_type contains \"json\"",
-    "tcp.stream == 39",
-    "udp.stream == 1",
-    "tcp.flags.syn == 1 and tcp.flags.ack == 0",
-    "frame.len > 1000",
-    "frame.number >= 100 and frame.number <= 500",
-    "ip.addr == 192.168.204.146",
-    "ip.src == 192.168.1.10",
-    "ip.dst == 10.0.0.5",
-    "tcp.port == 80",
-    "udp.port == 53",
-    "http.request.method == POST",
-    "http.response.code == 200",
-    "http and http.request.method == POST",
-  ];
-
-  const filterSuggestions = useMemo(() => {
-    const merged = [...recentFilters, ...defaultFilterSuggestions];
-    return Array.from(new Set(merged.map((item) => item.trim()).filter(Boolean)));
-  }, [recentFilters]);
-
-  const persistRecentFilters = (items: string[]) => {
-    setRecentFilters(items);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(items));
-    } catch {
-      // ignore persistence errors
-    }
-  };
-
-  const rememberFilter = (rawValue: string) => {
-    const value = rawValue.trim();
-    if (!value) return;
-    const next = [value, ...recentFilters.filter((item) => item !== value)].slice(0, MAX_FILTER_HISTORY);
-    persistRecentFilters(next);
-  };
+  const { filterSuggestions, rememberFilter, clearFilterHistory } = useWorkspaceFilterHistory();
 
   const applyFilterWithHistory = (value?: string) => {
     const next = (value ?? displayFilter).trim();
@@ -136,23 +78,6 @@ export default function Workspace() {
   useEffect(() => {
     setPageInput(String(currentPage));
   }, [currentPage]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(FILTER_HISTORY_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      const cleaned = parsed
-        .map((item) => String(item ?? "").trim())
-        .filter(Boolean)
-        .slice(0, MAX_FILTER_HISTORY);
-      setRecentFilters(cleaned);
-    } catch {
-      // ignore malformed history
-    }
-  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -348,7 +273,7 @@ export default function Workspace() {
           onChange={setDisplayFilter}
           onApply={() => applyFilterWithHistory()}
           onClear={clearFilter}
-          onClearHistory={() => persistRecentFilters([])}
+          onClearHistory={clearFilterHistory}
         />
         <div className="px-3 pb-2 text-[11px] text-slate-500">
           {'过滤器已切换为 tshark display filter 原生语法，支持 "http.request"、"tcp.stream eq 3"、"frame.number >= 100"、"ip.addr == 192.168.1.10" 等表达式。'}
@@ -361,123 +286,44 @@ export default function Workspace() {
       )}
 
       {isPreloadingCapture && (
-        <div className="border-b border-blue-100 bg-white/78 px-3 py-2 backdrop-blur-xl">
-          <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>正在预加载全部流量</span>
-            <span>
-              {hasDeterministicPreloadProgress
-                ? `${preloadProcessed.toLocaleString()} / ${Math.max(preloadTotal, totalPackets).toLocaleString()} (${preloadPercent}%)`
-                : `已入库 ${Math.max(preloadProcessed, totalPackets).toLocaleString()} 包，正在继续解析...`}
-            </span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded bg-muted">
-            {hasDeterministicPreloadProgress ? (
-              <div className="h-full bg-blue-600 transition-all" style={{ width: `${preloadPercent}%` }} />
-            ) : (
-              <div className="h-full w-1/3 animate-pulse rounded bg-blue-600/80" />
-            )}
-          </div>
-        </div>
+        <WorkspacePreloadProgress
+          preloadProcessed={preloadProcessed}
+          preloadTotal={preloadTotal}
+          totalPackets={totalPackets}
+          preloadPercent={preloadPercent}
+          hasDeterministicPreloadProgress={hasDeterministicPreloadProgress}
+        />
       )}
 
-      <PanelGroup direction="vertical" className="flex min-h-0 flex-1 flex-col">
-        <Panel defaultSize={50} minSize={20} className="bg-white/82 backdrop-blur-xl">
-          {showFilterLoadingBlankState ? (
-            <div className="flex h-full min-h-0 items-center justify-center bg-white/70 px-6">
-              <div className="w-full max-w-xl rounded-[24px] border border-white/80 bg-white/88 p-6 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl">
-                <div className="mb-3 text-sm font-semibold text-foreground">{filterLoadingTitle}</div>
-                <div className="mb-4 text-xs text-muted-foreground">{filterLoadingDetail}</div>
-                <Progress value={filterLoadingProgress} className="h-2.5" />
-                <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>正在读取首屏匹配结果</span>
-                  <span>{filterLoadingProgress}%</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <PacketVirtualTable
-              packets={filteredPackets}
-              selectedPacketId={selectedPacketId}
-              onSelect={selectPacket}
-              onDoubleClickHttp={() => navigate("/http-stream")}
-              onFollowStream={handleFollowStream}
-              hasMorePackets={hasMorePackets}
-              onLoadMorePackets={() => void loadMorePackets()}
-            />
-          )}
-        </Panel>
-
-        <PanelResizeHandle className="z-20 h-1 cursor-row-resize bg-border transition-colors hover:bg-blue-300 active:bg-blue-500" />
-
-        <Panel defaultSize={50} className="flex">
-          <PanelGroup direction="horizontal">
-            <ProtocolTreePanel
-              nodes={protocolTree}
-              selectedId={selectedTreeNode}
-              onSelect={handleSelectTreeNode}
-              registerNodeRef={(id, el) => {
-                if (el) {
-                  treeRefs.current.set(id, el);
-                } else {
-                  treeRefs.current.delete(id);
-                }
-              }}
-            />
-
-            <PanelResizeHandle className="z-20 w-1 cursor-col-resize bg-border transition-colors hover:bg-blue-300 active:bg-blue-500" />
-
-            <HexAsciiPanel
-              packet={selectedPacket}
-              frameBytes={frameBytes}
-              selectedByteRange={selectedByteRange}
-              selectedByteOffset={selectedByteOffset}
-              panelRef={hexPanelRef}
-              onSelectByte={handleSelectByte}
-            />
-          </PanelGroup>
-        </Panel>
-      </PanelGroup>
+      <WorkspacePanels
+        showFilterLoadingBlankState={showFilterLoadingBlankState}
+        filterLoadingTitle={filterLoadingTitle}
+        filterLoadingDetail={filterLoadingDetail}
+        filterLoadingProgress={filterLoadingProgress}
+        packets={filteredPackets}
+        selectedPacketId={selectedPacketId}
+        hasMorePackets={hasMorePackets}
+        protocolTree={protocolTree}
+        selectedTreeNode={selectedTreeNode}
+        selectedPacket={selectedPacket}
+        frameBytes={frameBytes}
+        selectedByteRange={selectedByteRange}
+        selectedByteOffset={selectedByteOffset}
+        hexPanelRef={hexPanelRef}
+        onSelectPacket={selectPacket}
+        onDoubleClickHttp={() => navigate("/http-stream")}
+        onFollowStream={handleFollowStream}
+        onLoadMorePackets={() => void loadMorePackets()}
+        onSelectTreeNode={handleSelectTreeNode}
+        onSelectByte={handleSelectByte}
+        registerNodeRef={(id, el) => {
+          if (el) {
+            treeRefs.current.set(id, el);
+          } else {
+            treeRefs.current.delete(id);
+          }
+        }}
+      />
     </div>
   );
-}
-
-function buildFrameBytes(packet: Packet | null, selectedRawHex?: string): number[] {
-  if (!packet) return [];
-
-  const rawHex = selectedRawHex && selectedRawHex.trim() ? selectedRawHex : packet.rawHex;
-  if (rawHex && rawHex.trim()) {
-    const cleaned = rawHex.replace(/[^0-9a-fA-F]/g, "");
-    if (cleaned.length >= 2) {
-      const evenHex = cleaned.length % 2 === 0 ? cleaned : cleaned.slice(0, -1);
-      const out: number[] = [];
-      for (let i = 0; i < evenHex.length; i += 2) {
-        const byte = Number.parseInt(evenHex.slice(i, i + 2), 16);
-        if (Number.isFinite(byte)) {
-          out.push(byte);
-        }
-      }
-      if (out.length > 0) {
-        return out;
-      }
-    }
-  }
-
-  // Never synthesize bytes with zero padding; only render true frame bytes.
-  return [];
-}
-
-function findClosestNodeByOffset(offset: number, nodes: ProtocolTreeNode[]): string | null {
-  const matches: { id: string; span: number }[] = [];
-
-  const walk = (node: ProtocolTreeNode) => {
-    if (node.byteRange && offset >= node.byteRange[0] && offset <= node.byteRange[1]) {
-      matches.push({ id: node.id, span: node.byteRange[1] - node.byteRange[0] });
-    }
-    node.children?.forEach(walk);
-  };
-
-  nodes.forEach(walk);
-  if (matches.length === 0) return null;
-  matches.sort((a, b) => a.span - b.span);
-  return matches[0].id;
 }
