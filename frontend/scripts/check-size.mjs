@@ -102,8 +102,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/AptAnalysis.tsx",
-    maxLines: 580,
+    maxLines: 435,
     reason: "APT page should keep heavy actor views and tables in feature modules",
+  },
+  {
+    path: "src/app/features/apt/APTEvidencePanel.tsx",
+    maxLines: 230,
+    reason: "APT evidence panel should stay focused on source tabs, table rendering, and tab matching rules",
   },
   {
     path: "src/app/layouts/MainLayout.tsx",
