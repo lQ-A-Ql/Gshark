@@ -82,8 +82,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/core/engine.ts",
-    maxLines: 600,
-    reason: "core engine registry should avoid absorbing page-specific behavior",
+    maxLines: 520,
+    reason: "core engine should keep protocol tree and hex layout logic separate from display registries",
+  },
+  {
+    path: "src/app/core/protocolDisplay.ts",
+    maxLines: 95,
+    reason: "protocol display registries should stay static and avoid taking on parsing behavior",
   },
   {
     path: "src/app/pages/AptAnalysis.tsx",

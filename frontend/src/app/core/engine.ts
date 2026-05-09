@@ -1,80 +1,7 @@
 import type { Packet, ProtocolTreeNode } from "./types";
+import { HIDDEN_LAYER_KEYS, LAYER_TITLES, TOKEN_LABELS } from "./protocolDisplay";
 
-const LAYER_TITLES: Record<string, string> = {
-  frame: "Frame",
-  eth: "Ethernet II",
-  sll: "Linux cooked capture",
-  sll2: "Linux cooked capture v2",
-  ip: "Internet Protocol Version 4",
-  ipv4: "Internet Protocol Version 4",
-  ipv6: "Internet Protocol Version 6",
-  tcp: "Transmission Control Protocol",
-  udp: "User Datagram Protocol",
-  http: "Hypertext Transfer Protocol",
-  tls: "Transport Layer Security",
-  ssl: "Secure Sockets Layer",
-  dns: "Domain Name System",
-  arp: "Address Resolution Protocol",
-  icmp: "Internet Control Message Protocol",
-  icmpv6: "Internet Control Message Protocol v6",
-  igmp: "Internet Group Management Protocol",
-  smb: "Server Message Block",
-  smb2: "Server Message Block v2",
-  quic: "Quick UDP Internet Connections",
-  ssh: "Secure Shell",
-  ftp: "File Transfer Protocol",
-  data: "Data",
-};
-
-const TOKEN_LABELS: Record<string, string> = {
-  addr: "Address",
-  ack: "ACK",
-  ascii: "ASCII",
-  cap: "Captured",
-  checksum: "Checksum",
-  crc: "CRC",
-  df: "DF",
-  dns: "DNS",
-  dst: "Dst",
-  ecn: "ECN",
-  eth: "Ethernet",
-  frame: "Frame",
-  hdr: "Header",
-  host: "Host",
-  http: "HTTP",
-  icmp: "ICMP",
-  icmpv6: "ICMPv6",
-  id: "ID",
-  igmp: "IGMP",
-  ip: "IP",
-  ipv6: "IPv6",
-  len: "Length",
-  lg: "LG",
-  mac: "MAC",
-  mf: "MF",
-  oui: "OUI",
-  port: "Port",
-  proto: "Protocol",
-  raw: "Raw",
-  rb: "RB",
-  seq: "Seq",
-  smb: "SMB",
-  smb2: "SMB2",
-  src: "Src",
-  ssl: "SSL",
-  stream: "Stream",
-  tcp: "TCP",
-  tls: "TLS",
-  ttl: "TTL",
-  udp: "UDP",
-  uri: "URI",
-  utc: "UTC",
-  ver: "Version",
-};
-
-const HIDDEN_LAYER_KEYS = new Set([
-  "_ws_lua__ws_lua_fake",
-]);
+export { DEFAULT_PLUGIN_LOGS } from "./protocolDisplay";
 
 export function buildProtocolTree(packet: Packet | null): ProtocolTreeNode[] {
   if (!packet) return [];
@@ -571,9 +498,3 @@ function toInteger(value: string): number {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
-
-export const DEFAULT_PLUGIN_LOGS = [
-  "[INFO] 插件引擎启动完成",
-  "[INFO] 规则加载: 131 条",
-  "[DEBUG] 等待数据流输入",
-];
