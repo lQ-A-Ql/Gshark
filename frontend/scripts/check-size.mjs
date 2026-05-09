@@ -127,8 +127,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureMissionControl.tsx",
-    maxLines: 520,
-    reason: "capture mission control should keep larger panels in sibling components",
+    maxLines: 300,
+    reason: "capture mission control should stay focused on overview loading and navigation orchestration",
+  },
+  {
+    path: "src/app/components/CaptureMissionPanels.tsx",
+    maxLines: 320,
+    reason: "capture mission display panels should stay presentational and avoid data loading logic",
   },
   {
     path: "src/app/components/PacketVirtualTable.tsx",
