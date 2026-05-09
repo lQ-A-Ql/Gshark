@@ -192,8 +192,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/HttpStream.tsx",
-    maxLines: 485,
-    reason: "HTTP stream page should avoid absorbing decoder or evidence workflows",
+    maxLines: 350,
+    reason: "HTTP stream page should keep formatting helpers and payload transforms in sibling modules",
+  },
+  {
+    path: "src/app/pages/HttpStreamUtils.ts",
+    maxLines: 165,
+    reason: "HTTP stream formatting helpers should stay pure and avoid page orchestration",
   },
   {
     path: "src/app/features/media/MediaSessionTable.tsx",
@@ -287,6 +292,11 @@ export const testSizeBudgets = [
     path: "src/app/pages/C2Analysis.candidates.test.tsx",
     maxLines: 190,
     reason: "C2 candidate tests should keep row navigation and detail assertions scoped",
+  },
+  {
+    path: "src/app/pages/HttpStreamUtils.test.ts",
+    maxLines: 100,
+    reason: "HTTP stream helper tests should stay focused on formatting and binary-body parsing",
   },
 ];
 

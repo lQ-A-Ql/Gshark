@@ -1,15 +1,27 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeftRight,
-  Download,
-} from "lucide-react";
+import { ArrowLeftRight, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { ungzip } from "pako";
 import { cn } from "../components/ui/utils";
-import { StreamChunkCard, StreamCurrentChunkPanel, StreamNavigator, StreamPayloadDialog, StreamSearchBar, ViewModeToggle, WorkbenchChip, WorkbenchTitleBar } from "../components/stream/StreamWorkbench";
+import {
+  StreamChunkCard,
+  StreamCurrentChunkPanel,
+  StreamNavigator,
+  StreamPayloadDialog,
+  StreamSearchBar,
+  ViewModeToggle,
+  WorkbenchChip,
+  WorkbenchTitleBar,
+} from "../components/stream/StreamWorkbench";
 import { useSentinel } from "../state/SentinelContext";
-import type { StreamLoadMeta } from "../core/types";
 import { downloadText } from "../utils/browserFile";
+import {
+  estimateTextBytes,
+  formatLoadMeta,
+  isHTTPChunkTruncated,
+  MAX_HTTP_PREVIEW_CHARS,
+  renderHTTPChunk,
+  type HTTPViewMode,
+} from "./HttpStreamUtils";
 
 type HTTPChunk = {
   key: string;
@@ -19,21 +31,12 @@ type HTTPChunk = {
   body: string;
 };
 
-type HTTPViewMode = "formatted" | "raw" | "hex";
-
 const INITIAL_RENDER_LIMIT = 72;
-const MAX_HTTP_PREVIEW_CHARS = 6000;
 
 export default function HttpStream() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    httpStream,
-    selectedPacket,
-    streamIds,
-    setActiveStream,
-    streamSwitchMetrics,
-  } = useSentinel();
+  const { httpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
   const [viewMode, setViewMode] = useState<HTTPViewMode>("formatted");
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -43,7 +46,8 @@ export default function HttpStream() {
   const consumedRouteStreamIdRef = useRef<number | null>(null);
   const deferredSearch = useDeferredValue(search);
   const currentIndex = streamIds.http.findIndex((id) => id === httpStream.id);
-  const ordinalLabel = currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.http.length || 1}` : `-- / ${streamIds.http.length || 0}`;
+  const ordinalLabel =
+    currentIndex >= 0 ? `${currentIndex + 1} / ${streamIds.http.length || 1}` : `-- / ${streamIds.http.length || 0}`;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < streamIds.http.length - 1;
 
@@ -147,7 +151,10 @@ export default function HttpStream() {
 
   const exportAll = () => {
     const content = allChunks
-      .map((chunk) => `--- ${chunk.direction === "client" ? "REQUEST" : "RESPONSE"} [packet:${chunk.packetId}] ---\n${chunk.body}`)
+      .map(
+        (chunk) =>
+          `--- ${chunk.direction === "client" ? "REQUEST" : "RESPONSE"} [packet:${chunk.packetId}] ---\n${chunk.body}`,
+      )
       .join("\n\n");
     downloadText(`http-stream-${httpStream.id}.txt`, content);
   };
@@ -157,19 +164,21 @@ export default function HttpStream() {
       <WorkbenchTitleBar
         onBack={() => navigate(-1)}
         title={`HTTP 会话追踪 (stream eq ${httpStream.id})`}
-        subtitle={(
+        subtitle={
           <span className="flex min-w-0 items-center gap-1 font-mono">
             <span className="truncate">{httpStream.client}</span>
             <ArrowLeftRight className="h-3 w-3 shrink-0" />
             <span className="truncate">{httpStream.server}</span>
           </span>
-        )}
-        meta={(
+        }
+        meta={
           <WorkbenchChip className="max-w-[300px] truncate">
-            切流 last {streamSwitchMetrics.byProtocol.HTTP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.HTTP.p50Ms}ms / p95 {streamSwitchMetrics.byProtocol.HTTP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.HTTP.cacheHitRate}%
+            切流 last {streamSwitchMetrics.byProtocol.HTTP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.HTTP.p50Ms}ms
+            / p95 {streamSwitchMetrics.byProtocol.HTTP.p95Ms}ms / fast-path{" "}
+            {streamSwitchMetrics.byProtocol.HTTP.cacheHitRate}%
           </WorkbenchChip>
-        )}
-        actions={(
+        }
+        actions={
           <>
             <StreamNavigator
               protocolLabel="HTTP"
@@ -203,7 +212,7 @@ export default function HttpStream() {
               className="py-1"
             />
           </>
-        )}
+        }
       />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -248,7 +257,11 @@ export default function HttpStream() {
                     packetId={chunk.packetId}
                     rendered={renderHTTPChunk(chunk.body, viewMode, false)}
                     highlight={deferredSearch}
-                    tone={chunk.direction === "client" ? "border-rose-500/30 bg-rose-500/10 text-rose-700" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"}
+                    tone={
+                      chunk.direction === "client"
+                        ? "border-rose-500/30 bg-rose-500/10 text-rose-700"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                    }
                     selected={index === deferredSelectedIndex}
                     onSelect={() => setCursor(index)}
                     onOpen={() => setExpandedChunk(chunk)}
@@ -268,21 +281,29 @@ export default function HttpStream() {
               <div className="space-y-4 xl:sticky xl:top-0">
                 <StreamCurrentChunkPanel
                   description="按当前视图模式同步预览选中的 HTTP 请求/响应"
-                  badge={selectedChunk ? (
-                    <span className={cn(
-                      "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-                      selectedChunk.direction === "client"
-                        ? "border-rose-200 bg-rose-50 text-rose-700"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700",
-                    )}>
-                      {selectedChunk.direction === "client" ? "请求" : "响应"}
-                    </span>
-                  ) : undefined}
-                  chips={selectedChunk ? [
-                    `packet #${selectedChunk.packetId}`,
-                    `stream-index ${selectedChunk.streamIndex}`,
-                    `${estimateTextBytes(selectedChunk.body)} bytes`,
-                  ] : []}
+                  badge={
+                    selectedChunk ? (
+                      <span
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+                          selectedChunk.direction === "client"
+                            ? "border-rose-200 bg-rose-50 text-rose-700"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                        )}
+                      >
+                        {selectedChunk.direction === "client" ? "请求" : "响应"}
+                      </span>
+                    ) : undefined
+                  }
+                  chips={
+                    selectedChunk
+                      ? [
+                          `packet #${selectedChunk.packetId}`,
+                          `stream-index ${selectedChunk.streamIndex}`,
+                          `${estimateTextBytes(selectedChunk.body)} bytes`,
+                        ]
+                      : []
+                  }
                   content={selectedChunk ? selectedChunkRendered || "(empty)" : null}
                   highlight={deferredSearch}
                   showOpenButton={selectedChunk ? isHTTPChunkTruncated(selectedChunk.body, viewMode) : false}
@@ -307,7 +328,7 @@ export default function HttpStream() {
             { label: "原始字节", value: `${estimateTextBytes(expandedChunk.body)} bytes` },
             { label: "预览阈值", value: `${MAX_HTTP_PREVIEW_CHARS} chars` },
           ]}
-          extraActions={(
+          extraActions={
             <button
               type="button"
               onClick={() => navigate("/misc")}
@@ -315,7 +336,7 @@ export default function HttpStream() {
             >
               打开 MISC 解码工作台
             </button>
-          )}
+          }
           content={renderHTTPChunk(expandedChunk.body, viewMode, true)}
           highlight={deferredSearch}
           filename={`http-stream-${httpStream.id}-packet-${expandedChunk.packetId}.txt`}
@@ -324,139 +345,4 @@ export default function HttpStream() {
       )}
     </div>
   );
-}
-
-function formatLoadMeta(meta?: StreamLoadMeta): string {
-  if (!meta) return "来源 unknown";
-  if (meta.loading) return "正在解析当前 HTTP 流...";
-  const source = meta.source || "unknown";
-  const tshark = meta.tsharkMs && meta.tsharkMs > 0 ? `${meta.tsharkMs}ms` : "0ms";
-  const overrides = meta.overrideCount && meta.overrideCount > 0 ? ` / overrides ${meta.overrideCount}` : "";
-  return `来源 ${source} / cache ${meta.cacheHit ? "yes" : "no"} / index ${meta.indexHit ? "yes" : "no"} / fallback ${meta.fileFallback ? "yes" : "no"} / tshark ${tshark}${overrides}`;
-}
-
-function renderHTTPChunk(body: string, viewMode: HTTPViewMode, expanded = false): string {
-  let rendered = body;
-  if (viewMode === "hex") {
-    rendered = toHexDump(body);
-  } else if (viewMode === "formatted") {
-    rendered = formatHTTPForDisplay(body);
-  }
-  if (expanded || rendered.length <= MAX_HTTP_PREVIEW_CHARS) {
-    return rendered;
-  }
-  return `${rendered.slice(0, MAX_HTTP_PREVIEW_CHARS)}\n\n... 已截断，点击查看完整 payload`;
-}
-
-function isHTTPChunkTruncated(body: string, viewMode: HTTPViewMode): boolean {
-  return renderHTTPChunk(body, viewMode, true).length > MAX_HTTP_PREVIEW_CHARS;
-}
-
-function toHexDump(text: string): string {
-  if (!text) return "(empty)";
-  const bytes = Array.from(new TextEncoder().encode(text));
-  const lines: string[] = [];
-  for (let i = 0; i < bytes.length; i += 16) {
-    const chunk = bytes.slice(i, i + 16);
-    const hex = chunk.map((b) => b.toString(16).padStart(2, "0")).join(" ");
-    const ascii = chunk.map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : ".")).join("");
-    lines.push(`${i.toString(16).padStart(4, "0")}  ${hex.padEnd(47, " ")}  ${ascii}`);
-  }
-  return lines.join("\n");
-}
-
-function estimateTextBytes(text: string): number {
-  return new TextEncoder().encode(text || "").length;
-}
-
-function formatHTTPForDisplay(text: string): string {
-  if (!text) return "";
-  const normalized = text.replace(/\r\n/g, "\n");
-  const splitAt = normalized.indexOf("\n\n");
-  if (splitAt < 0) return tryFormatBody(normalized.trim(), "");
-
-  const headers = normalized.slice(0, splitAt).trim();
-  const body = normalized.slice(splitAt + 2).trim();
-  const formattedBody = tryFormatBody(body, headers);
-  return `${headers}\n\n${formattedBody}`;
-}
-
-function tryFormatBody(body: string, headers: string): string {
-  if (!body) return body;
-
-  const gunzipped = tryGunzipBody(body, headers);
-  const effectiveBody = gunzipped ?? body;
-
-  const maybeJSON = effectiveBody.trim();
-  if ((maybeJSON.startsWith("{") && maybeJSON.endsWith("}")) || (maybeJSON.startsWith("[") && maybeJSON.endsWith("]"))) {
-    try {
-      return JSON.stringify(JSON.parse(maybeJSON), null, 2);
-    } catch {
-      // keep original text when JSON parse fails
-    }
-  }
-
-  const maybeHTML = maybeJSON.toLowerCase();
-  if (maybeHTML.includes("<html") || maybeHTML.includes("<!doctype html") || maybeHTML.includes("<body")) {
-    return prettyHtml(maybeJSON);
-  }
-
-  return effectiveBody;
-}
-
-function tryGunzipBody(body: string, headers: string): string | null {
-  const looksGzip = /content-encoding\s*:\s*gzip/i.test(headers);
-  const bytes = parsePossibleBinaryBody(body);
-  if (bytes.length < 3) return null;
-  const hasMagic = bytes[0] === 0x1f && bytes[1] === 0x8b;
-  if (!looksGzip && !hasMagic) return null;
-
-  try {
-    const decoded = ungzip(Uint8Array.from(bytes), { to: "string" });
-    return typeof decoded === "string" ? decoded : String(decoded);
-  } catch {
-    return null;
-  }
-}
-
-function parsePossibleBinaryBody(body: string): number[] {
-  const raw = body.trim();
-  if (!raw) return [];
-
-  if (/^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})+$/.test(raw)) {
-    return raw
-      .split(":")
-      .map((part) => Number.parseInt(part, 16))
-      .filter((v) => Number.isFinite(v));
-  }
-
-  if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
-    const out: number[] = [];
-    for (let i = 0; i < raw.length; i += 2) {
-      out.push(Number.parseInt(raw.slice(i, i + 2), 16));
-    }
-    return out;
-  }
-
-  return Array.from(new TextEncoder().encode(raw));
-}
-
-function prettyHtml(html: string): string {
-  const lines = html
-    .replace(/>\s+</g, ">\n<")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  let depth = 0;
-  const out: string[] = [];
-  for (const line of lines) {
-    const closing = /^<\//.test(line);
-    const selfClosing = /\/>$/.test(line) || /^<!/.test(line) || /^<\?/.test(line);
-    if (closing) depth = Math.max(0, depth - 1);
-    out.push(`${"  ".repeat(depth)}${line}`);
-    const opening = /^<[^!/][^>]*>$/.test(line) && !closing && !selfClosing && !/<\/[^>]+>$/.test(line);
-    if (opening) depth += 1;
-  }
-  return out.join("\n");
 }
