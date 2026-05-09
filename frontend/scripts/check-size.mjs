@@ -112,8 +112,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/layouts/MainLayout.tsx",
-    maxLines: 570,
+    maxLines: 450,
     reason: "main layout should not grow into page or workflow orchestration",
+  },
+  {
+    path: "src/app/layouts/mainLayoutConfig.ts",
+    maxLines: 130,
+    reason: "main layout route and theme registries should stay static and avoid workflow code",
+  },
+  {
+    path: "src/app/layouts/dragGuard.ts",
+    maxLines: 45,
+    reason: "browser drag guard should stay as a small DOM safety helper",
   },
   {
     path: "src/app/components/CaptureMissionControl.tsx",
