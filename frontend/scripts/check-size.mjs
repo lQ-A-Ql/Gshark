@@ -57,8 +57,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/ui/sidebar.tsx",
-    maxLines: 750,
-    reason: "shared sidebar primitive should stay stable and avoid feature-specific logic",
+    maxLines: 630,
+    reason: "shared sidebar primitive should keep provider state in sidebarContext and avoid feature-specific logic",
+  },
+  {
+    path: "src/app/components/ui/sidebarContext.tsx",
+    maxLines: 160,
+    reason: "sidebar context should stay focused on provider state, cookie persistence, and keyboard toggle behavior",
   },
   {
     path: "src/app/pages/VehicleAnalysis.tsx",
