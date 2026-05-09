@@ -170,8 +170,14 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/MediaAnalysis.tsx",
-    maxLines: 390,
-    reason: "media page should keep overview panels and table display in feature components",
+    maxLines: 145,
+    reason: "media page should only compose analysis state, workflow hook, and display panels",
+  },
+  {
+    path: "src/app/features/media/useMediaTranscriptionWorkflow.ts",
+    maxLines: 310,
+    reason:
+      "media transcription workflow should own playback, batch polling, dependency dialogs, and copy/export effects",
   },
   {
     path: "src/app/features/media/MediaOverviewPanels.tsx",
@@ -555,6 +561,11 @@ export const testSizeBudgets = [
     path: "src/app/features/media/MediaSessionCells.test.tsx",
     maxLines: 150,
     reason: "media session cell tests should stay focused on transcription and artifact actions",
+  },
+  {
+    path: "src/app/features/media/useMediaTranscriptionWorkflow.test.ts",
+    maxLines: 120,
+    reason: "media workflow helper tests should stay focused on merge and dependency classification rules",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
