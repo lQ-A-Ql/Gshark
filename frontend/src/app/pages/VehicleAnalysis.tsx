@@ -1,98 +1,35 @@
-import { Car, FolderOpen, Route, ShieldAlert, Trash2 } from "lucide-react";
+import { Car, Route, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
 import {
-  AnalysisBadge,
   AnalysisBucketChart as BucketChart,
   AnalysisDataTable as DataTable,
   AnalysisList as ConversationList,
   AnalysisMiniStat as MiniStat,
   AnalysisPanel as Panel,
   AnalysisStatCard as StatCard,
-  type AnalysisTone,
 } from "../components/analysis/AnalysisPrimitives";
-import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../core/types";
+import type { DBCProfile } from "../core/types";
+import { CanIdDataBoard, buildCanIdDataGroups } from "../features/vehicle/VehicleCanDataBoard";
+import { VehicleDbcPanel } from "../features/vehicle/VehicleDbcPanel";
+import { VehicleUdsTransactionsPanel } from "../features/vehicle/VehicleUdsTransactionsPanel";
 import { useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
-import { EvidenceActions } from "../misc/EvidenceActions";
-import { cn } from "../components/ui/utils";
-const MAX_CAN_DATA_LINES_PER_ID = 12;
 const VEHICLE_PROTOCOL_TAGS = ["CAN", "J1939", "DoIP", "UDS"];
-
-const UDS_NEGATIVE_RESPONSE_CN: Record<string, string> = {
-  "0x10": "一般拒绝",
-  "0x11": "服务不支持",
-  "0x12": "子功能不支持",
-  "0x13": "消息长度错误",
-  "0x14": "响应过长",
-  "0x22": "条件不满足",
-  "0x24": "请求序列错误",
-  "0x25": "拒绝-无子网",
-  "0x31": "请求超出范围",
-  "0x33": "安全访问被拒",
-  "0x35": "密钥无效",
-  "0x36": "尝试次数超限",
-  "0x37": "延时未到",
-  "0x70": "上传下载不接受",
-  "0x71": "传输数据暂停",
-  "0x72": "一般编程失败",
-  "0x73": "错误的区块序列",
-  "0x74": "响应挂起",
-  "0x75": "不支持的地址",
-  "0x76": "不支持的长度",
-  "0x77": "响应未发送",
-  "0x78": "不支持的模式",
-  "0x7e": "会话不支持子功能",
-  "0x7f": "会话不支持服务",
-};
-
-function udsNegativeResponseCN(code: string): string {
-  const lower = (code || "").toLowerCase();
-  return UDS_NEGATIVE_RESPONSE_CN[lower] || code || "";
-}
-
-const UDS_STATUS_OPTIONS = [
-  { value: "all", label: "全部" },
-  { value: "positive", label: "正常响应" },
-  { value: "negative", label: "负响应" },
-  { value: "orphan-response", label: "孤立响应" },
-  { value: "request-only", label: "仅请求" },
-];
-
-function udsStatusTone(status: string): AnalysisTone {
-  switch (status) {
-    case "positive": return "emerald";
-    case "negative": return "rose";
-    case "orphan-response": return "amber";
-    case "request-only": return "slate";
-    default: return "slate";
-  }
-}
-
-interface CanIdDataLine {
-  packetId: number;
-  label: string;
-  value: string;
-  meta: string;
-}
-
-interface CanIdDataGroup {
-  identifier: string;
-  busId: string;
-  total: number;
-  observedCount: number;
-  hiddenCount: number;
-  items: CanIdDataLine[];
-}
 
 export default function VehicleAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
   const [dbcProfiles, setDBCProfiles] = useState<DBCProfile[]>([]);
   const [dbcPathInput, setDBCPathInput] = useState("");
-  const { analysis, loading, error: analysisError, refreshAnalysis } = useVehicleAnalysis({
+  const {
+    analysis,
+    loading,
+    error: analysisError,
+    refreshAnalysis,
+  } = useVehicleAnalysis({
     backendConnected,
     isPreloadingCapture,
     filePath: fileMeta.path,
@@ -120,30 +57,36 @@ export default function VehicleAnalysis() {
       .catch(() => setDBCProfiles([]));
   }, [backendConnected]);
 
-  const addDBC = useCallback(async (path: string) => {
-    const normalized = path.trim();
-    if (!normalized) return;
-    try {
-      const profiles = await bridge.addVehicleDBC(normalized);
-      setDBCProfiles(profiles);
-      setDBCPathInput("");
-      setPageError("");
-      refreshAnalysis(true);
-    } catch (err) {
-      setPageError(err instanceof Error ? err.message : "DBC 导入失败");
-    }
-  }, [refreshAnalysis]);
+  const addDBC = useCallback(
+    async (path: string) => {
+      const normalized = path.trim();
+      if (!normalized) return;
+      try {
+        const profiles = await bridge.addVehicleDBC(normalized);
+        setDBCProfiles(profiles);
+        setDBCPathInput("");
+        setPageError("");
+        refreshAnalysis(true);
+      } catch (err) {
+        setPageError(err instanceof Error ? err.message : "DBC 导入失败");
+      }
+    },
+    [refreshAnalysis],
+  );
 
-  const removeDBC = useCallback(async (path: string) => {
-    try {
-      const profiles = await bridge.removeVehicleDBC(path);
-      setDBCProfiles(profiles);
-      setPageError("");
-      refreshAnalysis(true);
-    } catch (err) {
-      setPageError(err instanceof Error ? err.message : "DBC 移除失败");
-    }
-  }, [refreshAnalysis]);
+  const removeDBC = useCallback(
+    async (path: string) => {
+      try {
+        const profiles = await bridge.removeVehicleDBC(path);
+        setDBCProfiles(profiles);
+        setPageError("");
+        refreshAnalysis(true);
+      } catch (err) {
+        setPageError(err instanceof Error ? err.message : "DBC 移除失败");
+      }
+    },
+    [refreshAnalysis],
+  );
 
   const importDBC = useCallback(() => {
     void bridge
@@ -175,59 +118,26 @@ export default function VehicleAnalysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && <StatusHint tone="slate" className="mb-3">正在调用 tshark 生成车机分析结果...</StatusHint>}
+      {loading && (
+        <StatusHint tone="slate" className="mb-3">
+          正在调用 tshark 生成车机分析结果...
+        </StatusHint>
+      )}
 
-      {!loading && error && <StatusHint tone="amber" className="mb-3">{error}</StatusHint>}
+      {!loading && error && (
+        <StatusHint tone="amber" className="mb-3">
+          {error}
+        </StatusHint>
+      )}
 
-      <Panel title="DBC 映射" className="mb-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="inline-flex items-center gap-1 rounded border border-border bg-background px-3 py-2 text-xs hover:bg-accent"
-              onClick={importDBC}
-            >
-              <FolderOpen className="h-4 w-4" />
-              导入 DBC
-            </button>
-            <input
-              value={dbcPathInput}
-              onChange={(event) => setDBCPathInput(event.target.value)}
-              placeholder="或直接输入 DBC 文件路径"
-              className="min-w-[320px] flex-1 rounded border border-border bg-background px-3 py-2 text-xs outline-none focus:border-blue-400"
-            />
-            <button
-              className="rounded border border-border bg-background px-3 py-2 text-xs hover:bg-accent"
-              onClick={() => void addDBC(dbcPathInput)}
-            >
-              添加路径
-            </button>
-          </div>
-          {dbcProfiles.length === 0 ? (
-            <div className="rounded border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
-              当前未加载 DBC。导入后，CAN 报文会尝试直接映射为报文名和信号值。
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-              {dbcProfiles.map((profile) => (
-                <div key={profile.path} className="flex items-start justify-between rounded border border-border bg-background px-3 py-3 text-xs">
-                  <div className="min-w-0">
-                    <div className="font-medium text-foreground">{profile.name}</div>
-                    <div className="truncate text-muted-foreground" title={profile.path}>{profile.path}</div>
-                    <div className="mt-1 text-muted-foreground">报文 {profile.messageCount} / 信号 {profile.signalCount}</div>
-                  </div>
-                  <button
-                    className="ml-3 rounded border border-border p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    onClick={() => void removeDBC(profile.path)}
-                    title="移除 DBC"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Panel>
+      <VehicleDbcPanel
+        profiles={dbcProfiles}
+        pathInput={dbcPathInput}
+        onPathInputChange={setDBCPathInput}
+        onImport={importDBC}
+        onAddPath={() => void addDBC(dbcPathInput)}
+        onRemove={(path) => void removeDBC(path)}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <StatCard title="车载相关包" value={analysis.totalVehiclePackets.toLocaleString()} />
@@ -258,11 +168,15 @@ export default function VehicleAnalysis() {
           </div>
           <div className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
             <Route className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-            <span>第二层做诊断链路：围绕 DoIP 寻址、UDS 会话切换、安全访问、刷写和例程调用，确认是否存在高风险诊断行为。</span>
+            <span>
+              第二层做诊断链路：围绕 DoIP 寻址、UDS 会话切换、安全访问、刷写和例程调用，确认是否存在高风险诊断行为。
+            </span>
           </div>
           <div className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
             <Route className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-            <span>第三层做安全专项：重点审计 SID 0x27、0x31、0x34、0x36、0x37 和负响应码，判断鉴权绕过、固件下发和诊断滥用。</span>
+            <span>
+              第三层做安全专项：重点审计 SID 0x27、0x31、0x34、0x36、0x37 和负响应码，判断鉴权绕过、固件下发和诊断滥用。
+            </span>
           </div>
         </div>
       </Panel>
@@ -277,7 +191,11 @@ export default function VehicleAnalysis() {
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <BucketChart data={analysis.can.busIds} barClassName="bg-cyan-500" maxHeightClassName="max-h-[320px]" />
-            <BucketChart data={analysis.can.messageIds} barClassName="bg-indigo-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart
+              data={analysis.can.messageIds}
+              barClassName="bg-indigo-500"
+              maxHeightClassName="max-h-[320px]"
+            />
           </div>
         </Panel>
         <Panel title="J1939">
@@ -289,7 +207,11 @@ export default function VehicleAnalysis() {
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <BucketChart data={analysis.j1939.pgns} barClassName="bg-emerald-500" maxHeightClassName="max-h-[320px]" />
-            <BucketChart data={analysis.j1939.sourceAddrs} barClassName="bg-violet-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart
+              data={analysis.j1939.sourceAddrs}
+              barClassName="bg-violet-500"
+              maxHeightClassName="max-h-[320px]"
+            />
           </div>
         </Panel>
       </div>
@@ -303,7 +225,11 @@ export default function VehicleAnalysis() {
             <MiniStat title="逻辑地址" value={analysis.doip.endpoints.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.doip.messageTypes} barClassName="bg-sky-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart
+              data={analysis.doip.messageTypes}
+              barClassName="bg-sky-500"
+              maxHeightClassName="max-h-[320px]"
+            />
             <BucketChart data={analysis.doip.vins} barClassName="bg-fuchsia-500" maxHeightClassName="max-h-[320px]" />
           </div>
         </Panel>
@@ -315,8 +241,16 @@ export default function VehicleAnalysis() {
             <MiniStat title="DTC 数" value={analysis.uds.dtcs.length} />
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.uds.serviceIDs} barClassName="bg-orange-500" maxHeightClassName="max-h-[320px]" />
-            <BucketChart data={analysis.uds.negativeCodes} barClassName="bg-rose-500" maxHeightClassName="max-h-[320px]" />
+            <BucketChart
+              data={analysis.uds.serviceIDs}
+              barClassName="bg-orange-500"
+              maxHeightClassName="max-h-[320px]"
+            />
+            <BucketChart
+              data={analysis.uds.negativeCodes}
+              barClassName="bg-rose-500"
+              maxHeightClassName="max-h-[320px]"
+            />
           </div>
         </Panel>
       </div>
@@ -324,10 +258,15 @@ export default function VehicleAnalysis() {
       <Panel title="安全提示" className="mt-4">
         <div className="space-y-2 text-sm">
           {analysis.recommendations.length === 0 ? (
-            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">当前抓包未识别到车载协议。</div>
+            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">
+              当前抓包未识别到车载协议。
+            </div>
           ) : (
             analysis.recommendations.map((note, index) => (
-              <div key={`${note}-${index}`} className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
+              <div
+                key={`${note}-${index}`}
+                className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2"
+              >
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                 <span>{note}</span>
               </div>
@@ -345,7 +284,9 @@ export default function VehicleAnalysis() {
             item.busId || "--",
             item.identifier || "--",
             item.length || 0,
-            [item.isExtended ? "XTD" : "", item.isRTR ? "RTR" : "", item.isError ? item.errorFlags || "ERR" : ""].filter(Boolean).join(" / ") || "--",
+            [item.isExtended ? "XTD" : "", item.isRTR ? "RTR" : "", item.isError ? item.errorFlags || "ERR" : ""]
+              .filter(Boolean)
+              .join(" / ") || "--",
             item.summary || "--",
           ])}
         />
@@ -353,7 +294,11 @@ export default function VehicleAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="CAN Payload 协议分布">
-          <BucketChart data={analysis.can.payloadProtocols} barClassName="bg-amber-500" maxHeightClassName="max-h-[320px]" />
+          <BucketChart
+            data={analysis.can.payloadProtocols}
+            barClassName="bg-amber-500"
+            maxHeightClassName="max-h-[320px]"
+          />
         </Panel>
         <Panel title={`CAN Payload 明细预览 (${analysis.can.payloadRecords.length})`}>
           <DataTable
@@ -381,10 +326,18 @@ export default function VehicleAnalysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel title="DBC 报文分布">
-          <BucketChart data={analysis.can.decodedMessageDist} barClassName="bg-emerald-500" maxHeightClassName="max-h-[320px]" />
+          <BucketChart
+            data={analysis.can.decodedMessageDist}
+            barClassName="bg-emerald-500"
+            maxHeightClassName="max-h-[320px]"
+          />
         </Panel>
         <Panel title="DBC 信号分布">
-          <BucketChart data={analysis.can.decodedSignals} barClassName="bg-violet-500" maxHeightClassName="max-h-[320px]" />
+          <BucketChart
+            data={analysis.can.decodedSignals}
+            barClassName="bg-violet-500"
+            maxHeightClassName="max-h-[320px]"
+          />
         </Panel>
       </div>
 
@@ -399,7 +352,9 @@ export default function VehicleAnalysis() {
             item.database || "--",
             item.messageName || "--",
             item.sender || "--",
-            item.signals.map((signal) => `${signal.name}=${signal.value}${signal.unit ? ` ${signal.unit}` : ""}`).join(" ; ") || "--",
+            item.signals
+              .map((signal) => `${signal.name}=${signal.value}${signal.unit ? ` ${signal.unit}` : ""}`)
+              .join(" ; ") || "--",
             item.summary || "--",
           ])}
         />
@@ -459,170 +414,12 @@ export default function VehicleAnalysis() {
         </Panel>
       </div>
 
-      <Panel title={`UDS 配对事务预览 (${filteredUdsTransactions.length})`} className="mt-4">
-        <div className="mb-3 flex flex-wrap gap-2">
-          {UDS_STATUS_OPTIONS.map((opt) => {
-            const active = udsStatusFilter === opt.value;
-            const count = opt.value === "all"
-              ? analysis.uds.transactions.length
-              : analysis.uds.transactions.filter((t) => t.status === opt.value).length;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setUdsStatusFilter(opt.value)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-[11px] font-medium transition-all",
-                  active
-                    ? "border-emerald-200 bg-emerald-100 text-emerald-700 shadow-sm"
-                    : "border-slate-200 bg-white/80 text-slate-500 hover:border-emerald-200 hover:text-emerald-700",
-                )}
-              >
-                {opt.label} · {count}
-              </button>
-            );
-          })}
-        </div>
-        <DataTable
-          columns={[
-            { key: "req", header: "请求包", widthClassName: "w-16", cellClassName: "font-mono text-slate-500", render: (item) => item.requestPacketId || "--" },
-            { key: "resp", header: "响应包", widthClassName: "w-16", cellClassName: "font-mono text-slate-500", render: (item) => item.responsePacketId || "--" },
-            { key: "time", header: "时间", widthClassName: "w-36", cellClassName: "font-mono text-[11px]", render: (item) => [item.requestTime, item.responseTime].filter(Boolean).join(" → ") || "--" },
-            { key: "addr", header: "地址", widthClassName: "w-28", cellClassName: "font-mono", render: (item) => [item.sourceAddress, item.targetAddress].filter(Boolean).join(" → ") || "--" },
-            { key: "service", header: "服务", widthClassName: "w-28", render: (item) => <span className="font-mono text-[12px]">{[item.serviceId, item.serviceName].filter(Boolean).join(" ") || "--"}</span> },
-            { key: "object", header: "对象", widthClassName: "w-24", cellClassName: "font-mono text-[11px]", render: (item) => item.dataIdentifier || item.dtc || item.subFunction || "--" },
-            {
-              key: "status",
-              header: "状态",
-              widthClassName: "w-32",
-              render: (item) => {
-                const tone = udsStatusTone(item.status);
-                const label = item.negativeCode
-                  ? `${item.status} / ${udsNegativeResponseCN(item.negativeCode)}`
-                  : item.status || "--";
-                return <AnalysisBadge tone={tone}>{label}</AnalysisBadge>;
-              },
-            },
-            { key: "latency", header: "耗时(ms)", widthClassName: "w-20", cellClassName: "font-mono", render: (item) => item.latencyMs != null ? item.latencyMs.toFixed(1) : "--" },
-            { key: "summary", header: "摘要", render: (item) => <span className="text-[12px]">{item.responseSummary || item.requestSummary || "--"}</span> },
-            {
-              key: "actions",
-              header: "定位",
-              widthClassName: "w-16",
-              render: (item) => item.requestPacketId ? <EvidenceActions packetId={item.requestPacketId} preferredProtocol="TCP" /> : "--",
-            },
-          ]}
-          data={filteredUdsTransactions}
-          rowKey={(item, idx) => `${item.requestPacketId}-${item.responsePacketId}-${idx}`}
-          maxHeightClassName="max-h-[520px]"
-          tableClassName="min-w-[1100px]"
-          emptyText="暂无 UDS 配对事务"
-        />
-      </Panel>
+      <VehicleUdsTransactionsPanel
+        transactions={analysis.uds.transactions}
+        filteredTransactions={filteredUdsTransactions}
+        statusFilter={udsStatusFilter}
+        onStatusFilterChange={setUdsStatusFilter}
+      />
     </PageShell>
   );
 }
-
-function CanIdDataBoard({ groups }: { groups: CanIdDataGroup[] }) {
-  if (groups.length === 0) {
-    return <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无可展示的 CAN ID 数据</div>;
-  }
-
-  return (
-    <div className="max-h-[520px] overflow-auto pr-1">
-      <div className="space-y-3">
-        {groups.map((group) => (
-          <div key={`${group.identifier}-${group.busId}`} className="overflow-hidden rounded-lg border border-border bg-background">
-            <div className="grid grid-cols-[156px_1fr]">
-              <div className="border-r border-border bg-accent/20 px-3 py-3">
-                <div className="text-[11px] text-muted-foreground">CAN ID</div>
-                <div className="mt-1 font-mono text-sm font-semibold text-foreground">{group.identifier}</div>
-                <div className="mt-2 text-[11px] text-muted-foreground">Bus {group.busId || "--"}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">唯一 DATA {group.total} 条</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">原始帧 {group.observedCount} 条</div>
-              </div>
-              <div className="divide-y divide-border/70">
-                {group.items.map((item) => (
-                  <div key={`${group.identifier}-${item.packetId}-${item.label}`} className="px-3 py-2">
-                    <div className="text-[11px] text-muted-foreground">{item.label} · {item.meta}</div>
-                    <div className="mt-1 break-all font-mono text-xs text-foreground">{item.value}</div>
-                  </div>
-                ))}
-                {group.hiddenCount > 0 && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    还有 {group.hiddenCount} 条数据未展开，保留在原始 CAN Payload / DBC 区域中查看。
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function buildCanIdDataGroups(analysis: VehicleAnalysisData): CanIdDataGroup[] {
-  const grouped = new Map<string, {
-    identifier: string;
-    busId: string;
-    observedCount: number;
-    items: CanIdDataLine[];
-    seenValues: Set<string>;
-  }>();
-  const orderedKeys: string[] = [];
-
-  for (const frame of analysis.can.frames) {
-    const identifier = frame.identifier?.trim() || "--";
-    const busId = frame.busId?.trim() || "--";
-    const rawData = frame.rawData?.trim() || "";
-    if (!rawData) {
-      continue;
-    }
-    const key = `${identifier}@@${busId}`;
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        identifier,
-        busId,
-        observedCount: 0,
-        items: [],
-        seenValues: new Set<string>(),
-      });
-      orderedKeys.push(key);
-    }
-
-    const group = grouped.get(key)!;
-    group.observedCount += 1;
-    if (group.seenValues.has(rawData)) {
-      continue;
-    }
-    group.seenValues.add(rawData);
-
-    const meta = [
-      frame.time?.trim(),
-      frame.length > 0 ? `len=${frame.length}` : "",
-      frame.packetId ? `#${frame.packetId}` : "",
-    ].filter(Boolean).join(" · ");
-
-    group.items.push({
-      packetId: frame.packetId,
-      label: `DATA${group.items.length + 1}`,
-      value: rawData,
-      meta: meta || "--",
-    });
-  }
-
-  return orderedKeys.map((key) => {
-    const group = grouped.get(key)!;
-    const total = group.items.length;
-    return {
-      identifier: group.identifier,
-      busId: group.busId,
-      total,
-      observedCount: group.observedCount,
-      hiddenCount: Math.max(0, total - MAX_CAN_DATA_LINES_PER_ID),
-      items: group.items.slice(0, MAX_CAN_DATA_LINES_PER_ID),
-    };
-  });
-}
-

@@ -47,8 +47,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/VehicleAnalysis.tsx",
-    maxLines: 650,
+    maxLines: 460,
     reason: "vehicle page should move larger protocol panels into feature components",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleCanDataBoard.tsx",
+    maxLines: 160,
+    reason: "vehicle CAN data board should stay focused on grouping and rendering raw CAN payload values",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleDbcPanel.tsx",
+    maxLines: 110,
+    reason: "vehicle DBC panel should stay focused on profile import and removal UI",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleUdsTransactionsPanel.tsx",
+    maxLines: 220,
+    reason: "vehicle UDS transaction panel should keep filtering and table rendering local",
   },
   {
     path: "src/app/core/engine.ts",

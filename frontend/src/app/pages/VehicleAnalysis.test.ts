@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VehicleAnalysis as VehicleAnalysisData } from "../core/types";
-import { buildCanIdDataGroups } from "./VehicleAnalysis";
+import { buildCanIdDataGroups } from "../features/vehicle/VehicleCanDataBoard";
 
 function createAnalysis(frames: VehicleAnalysisData["can"]["frames"]): VehicleAnalysisData {
   return {
