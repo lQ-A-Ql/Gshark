@@ -68,8 +68,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderSettingsPanel.tsx",
-    maxLines: 260,
-    reason: "decoder settings panels should stay focused on webshell decoder options",
+    maxLines: 45,
+    reason: "decoder settings panel should stay focused on selecting the active settings section",
+  },
+  {
+    path: "src/app/components/StreamDecoderSettingsSections.tsx",
+    maxLines: 240,
+    reason: "decoder settings sections should keep webshell-specific form fields and update rules local",
   },
   {
     path: "src/app/components/StreamDecoderWorkbenchParts.tsx",
