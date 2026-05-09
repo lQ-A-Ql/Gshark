@@ -57,8 +57,14 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderCandidatePanel.tsx",
-    maxLines: 250,
-    reason: "decoder candidate panel should stay focused on inspection results and candidate selection UI",
+    maxLines: 145,
+    reason:
+      "decoder candidate panel should stay focused on inspection summary, apply mode, and candidate grid orchestration",
+  },
+  {
+    path: "src/app/components/StreamDecoderCandidateCard.tsx",
+    maxLines: 115,
+    reason: "decoder candidate cards should keep badge, preview, and decoder hint rendering local",
   },
   {
     path: "src/app/components/StreamDecoderSettingsPanel.tsx",
