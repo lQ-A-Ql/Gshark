@@ -118,6 +118,16 @@ export const sourceSizeBudgets = [
     reason: "stream payload panels should keep current chunk, card, highlight, and dialog rendering local",
   },
   {
+    path: "src/app/components/analysis/AnalysisPrimitives.tsx",
+    maxLines: 310,
+    reason: "analysis primitives should stay focused on small shared cards, badges, charts, and lists",
+  },
+  {
+    path: "src/app/components/analysis/AnalysisDataTable.tsx",
+    maxLines: 190,
+    reason: "analysis data table should keep generic table rendering separate from primitive cards and charts",
+  },
+  {
     path: "src/app/pages/C2Analysis.tsx",
     maxLines: 410,
     reason: "C2 page should move forms, tables, and result panels into feature components",

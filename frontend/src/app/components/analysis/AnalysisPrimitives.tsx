@@ -1,5 +1,6 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "../ui/utils";
+export { AnalysisDataTable, type AnalysisTableColumn } from "./AnalysisDataTable";
 
 export type AnalysisTone = "amber" | "blue" | "cyan" | "emerald" | "rose" | "slate" | "violet";
 type AnalysisBucket = {
@@ -146,7 +147,13 @@ export function AnalysisBadge({
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", toneBadge[tone], className)}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+        toneBadge[tone],
+        className,
+      )}
+    >
       {children}
     </span>
   );
@@ -154,7 +161,12 @@ export function AnalysisBadge({
 
 export function AnalysisEmptyState({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-8 text-center text-xs leading-6 text-slate-500", className)}>
+    <div
+      className={cn(
+        "rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-8 text-center text-xs leading-6 text-slate-500",
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -172,7 +184,13 @@ export function AnalysisCallout({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs shadow-sm", toneCallout[tone], className)}>
+    <div
+      className={cn(
+        "flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs shadow-sm",
+        toneCallout[tone],
+        className,
+      )}
+    >
       {icon ? <span className="mt-0.5 shrink-0">{icon}</span> : null}
       <span>{children}</span>
     </div>
@@ -204,9 +222,14 @@ export function AnalysisBucketChart({
         {data.map((row) => {
           const rowContent = (
             <>
-              <div className="truncate font-medium text-slate-500" title={row.label}>{row.label}</div>
+              <div className="truncate font-medium text-slate-500" title={row.label}>
+                {row.label}
+              </div>
               <div className="h-2 rounded-full bg-slate-100">
-                <div className={cn("h-2 rounded-full", barClassName)} style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }} />
+                <div
+                  className={cn("h-2 rounded-full", barClassName)}
+                  style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }}
+                />
               </div>
               <div className="text-right font-mono font-semibold text-slate-700">{row.count.toLocaleString()}</div>
             </>
@@ -216,7 +239,10 @@ export function AnalysisBucketChart({
               <button
                 key={row.label}
                 type="button"
-                className={cn("grid w-full items-center gap-3 rounded-2xl px-2 py-2 text-left text-xs transition-colors hover:bg-slate-50/80", labelWidthClassName)}
+                className={cn(
+                  "grid w-full items-center gap-3 rounded-2xl px-2 py-2 text-left text-xs transition-colors hover:bg-slate-50/80",
+                  labelWidthClassName,
+                )}
                 onClick={() => onSelect(row)}
               >
                 {rowContent}
@@ -224,7 +250,10 @@ export function AnalysisBucketChart({
             );
           }
           return (
-            <div key={row.label} className={cn("grid items-center gap-3 rounded-2xl px-2 py-2 text-xs", labelWidthClassName)}>
+            <div
+              key={row.label}
+              className={cn("grid items-center gap-3 rounded-2xl px-2 py-2 text-xs", labelWidthClassName)}
+            >
               {rowContent}
             </div>
           );
@@ -249,139 +278,16 @@ export function AnalysisList({
   return (
     <div className={cn("space-y-2 overflow-auto pr-1", maxHeightClassName)}>
       {items.map((item) => (
-        <div key={`${item.label}-${item.count}`} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs shadow-sm">
-          <span className="truncate font-medium text-slate-500" title={item.label}>{item.label}</span>
+        <div
+          key={`${item.label}-${item.count}`}
+          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs shadow-sm"
+        >
+          <span className="truncate font-medium text-slate-500" title={item.label}>
+            {item.label}
+          </span>
           <span className="ml-3 font-mono font-semibold text-slate-700">{item.count.toLocaleString()}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-export type AnalysisTableColumn<T> = {
-  key: string;
-  header: ReactNode;
-  render: (row: T, rowIndex: number) => ReactNode;
-  className?: string;
-  headerClassName?: string;
-  cellClassName?: string | ((row: T, rowIndex: number) => string);
-  widthClassName?: string;
-};
-
-export function AnalysisDataTable<T = ReactNode[]>({
-  headers,
-  rows,
-  columns,
-  data,
-  rowKey,
-  rowClassName,
-  onRowClick,
-  renderExpandedRow,
-  expandedRowClassName,
-  expandedCellClassName,
-  maxHeightClassName = "max-h-[420px]",
-  emptyText = "暂无数据",
-  wrapperClassName,
-  tableClassName,
-  headerClassName,
-  headerCellClassName,
-  cellClassName,
-}: {
-  headers?: ReactNode[];
-  rows?: ReactNode[][];
-  columns?: AnalysisTableColumn<T>[];
-  data?: T[];
-  rowKey?: (row: T, rowIndex: number) => string | number;
-  rowClassName?: string | ((row: T, rowIndex: number) => string);
-  onRowClick?: (row: T, rowIndex: number) => void;
-  renderExpandedRow?: (row: T, rowIndex: number) => ReactNode;
-  expandedRowClassName?: string | ((row: T, rowIndex: number) => string);
-  expandedCellClassName?: string | ((row: T, rowIndex: number) => string);
-  maxHeightClassName?: string;
-  emptyText?: ReactNode;
-  wrapperClassName?: string;
-  tableClassName?: string;
-  headerClassName?: string;
-  headerCellClassName?: string;
-  cellClassName?: string;
-}) {
-  const effectiveHeaders = columns ? columns.map((column) => column.header) : (headers ?? []);
-  const hasStructuredRows = Boolean(columns && data);
-
-  return (
-    <div className={cn("overflow-auto rounded-2xl border border-slate-100 bg-white/70", maxHeightClassName, wrapperClassName)}>
-      <table className={cn("w-full table-fixed border-collapse text-left text-xs", tableClassName)}>
-        <thead className={cn("sticky top-0 bg-slate-50/95 text-slate-500 shadow-[0_1px_0_0_rgba(226,232,240,0.9)]", headerClassName)}>
-          <tr>
-            {effectiveHeaders.map((header, index) => (
-              <th
-                key={columns?.[index]?.key ?? `${String(header)}-${index}`}
-                className={cn("px-3 py-2 font-medium", columns?.[index]?.widthClassName, columns?.[index]?.headerClassName, headerCellClassName)}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {hasStructuredRows ? (
-            (data ?? []).length === 0 ? (
-              <tr>
-                <td colSpan={effectiveHeaders.length} className="px-3 py-6 text-center text-slate-500">{emptyText}</td>
-              </tr>
-            ) : (
-              (data ?? []).map((row, rowIndex) => {
-                const resolvedRowClassName = typeof rowClassName === "function" ? rowClassName(row, rowIndex) : rowClassName;
-                const resolvedExpandedRowClassName = typeof expandedRowClassName === "function" ? expandedRowClassName(row, rowIndex) : expandedRowClassName;
-                const resolvedExpandedCellClassName = typeof expandedCellClassName === "function" ? expandedCellClassName(row, rowIndex) : expandedCellClassName;
-                const resolvedRowKey = rowKey ? rowKey(row, rowIndex) : rowIndex;
-                const expandedContent = renderExpandedRow?.(row, rowIndex);
-                const hasExpandedContent = expandedContent !== undefined && expandedContent !== null && expandedContent !== false;
-                return (
-                  <Fragment key={resolvedRowKey}>
-                    <tr
-                      className={cn(
-                        "border-b border-slate-100 align-top transition-colors hover:bg-slate-50/70",
-                        onRowClick && "cursor-pointer",
-                        resolvedRowClassName,
-                      )}
-                      onClick={() => onRowClick?.(row, rowIndex)}
-                    >
-                      {(columns ?? []).map((column) => {
-                        const resolvedCellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row, rowIndex) : column.cellClassName;
-                        return (
-                          <td key={column.key} className={cn("break-words px-3 py-2", column.className, resolvedCellClassName, cellClassName)}>
-                            {column.render(row, rowIndex)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    {hasExpandedContent && (
-                      <tr key={`${resolvedRowKey}-expanded`} className={cn("border-b border-slate-100 bg-slate-50/50", resolvedExpandedRowClassName)}>
-                        <td colSpan={effectiveHeaders.length} className={cn("px-3 pb-4 pt-0", resolvedExpandedCellClassName)}>
-                          {expandedContent}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })
-            )
-          ) : (rows ?? []).length === 0 ? (
-            <tr>
-              <td colSpan={effectiveHeaders.length} className="px-3 py-6 text-center text-slate-500">{emptyText}</td>
-            </tr>
-          ) : (
-            (rows ?? []).map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-slate-100 align-top transition-colors hover:bg-slate-50/70">
-                {row.map((value, cellIndex) => (
-                  <td key={`${rowIndex}-${cellIndex}`} className={cn("break-words px-3 py-2", cellClassName)}>{value}</td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }
