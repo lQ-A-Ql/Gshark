@@ -120,8 +120,23 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/pages/MiscTools.mockData.ts",
-    maxLines: 430,
-    reason: "MISC mock data should split again when new protocol fixtures are added",
+    maxLines: 20,
+    reason: "MISC mock data barrel should only re-export domain fixture files",
+  },
+  {
+    path: "src/app/pages/MiscTools.sessionMockData.ts",
+    maxLines: 230,
+    reason: "MISC session mock data should split by protocol if new session fixtures are added",
+  },
+  {
+    path: "src/app/pages/MiscTools.moduleMockData.ts",
+    maxLines: 140,
+    reason: "MISC module registry mock data should stay separate from result payloads",
+  },
+  {
+    path: "src/app/pages/MiscTools.payloadMockData.ts",
+    maxLines: 90,
+    reason: "MISC payload mock data should stay focused on inspector and decoder fixtures",
   },
   {
     path: "src/app/pages/MiscTools.test.tsx",
