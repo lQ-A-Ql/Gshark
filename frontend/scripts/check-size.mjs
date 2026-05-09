@@ -41,6 +41,21 @@ export const sourceSizeBudgets = [
     reason: "decoder settings panels should stay focused on webshell decoder options",
   },
   {
+    path: "src/app/components/stream/StreamWorkbench.tsx",
+    maxLines: 20,
+    reason: "stream workbench should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/stream/StreamNavigationControls.tsx",
+    maxLines: 210,
+    reason: "stream navigation controls should stay focused on stream switching, view mode, and search UI",
+  },
+  {
+    path: "src/app/components/stream/StreamPayloadPanels.tsx",
+    maxLines: 285,
+    reason: "stream payload panels should keep current chunk, card, highlight, and dialog rendering local",
+  },
+  {
     path: "src/app/pages/C2Analysis.tsx",
     maxLines: 410,
     reason: "C2 page should move forms, tables, and result panels into feature components",
@@ -387,6 +402,16 @@ export const testSizeBudgets = [
     path: "src/app/components/StreamDecoderToolbar.test.tsx",
     maxLines: 70,
     reason: "decoder toolbar tests should stay focused on action wiring and running state",
+  },
+  {
+    path: "src/app/components/stream/StreamNavigationControls.test.tsx",
+    maxLines: 90,
+    reason: "stream navigation control tests should stay focused on input, search, and view toggles",
+  },
+  {
+    path: "src/app/components/stream/StreamPayloadPanels.test.tsx",
+    maxLines: 90,
+    reason: "stream payload panel tests should stay focused on highlight, card actions, and dialog metadata",
   },
   {
     path: "src/app/features/c2/CSHostURIAggregates.test.tsx",

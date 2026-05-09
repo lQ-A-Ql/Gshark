@@ -14,6 +14,7 @@ export const prettierTargets = [
   "src/app/components/StreamDecoderWorkbenchParts.tsx",
   "src/app/components/StreamDecoderWorkbenchUtils.ts",
   "src/app/components/StreamDecoderWorkbenchUtils.test.ts",
+  "src/app/components/stream/**/*.{ts,tsx}",
   "src/app/components/RuntimeSettingsSidebar.tsx",
   "src/app/components/RuntimeSettingsSidebarParts.tsx",
   "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
