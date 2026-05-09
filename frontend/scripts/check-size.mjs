@@ -115,8 +115,13 @@ export const sourceSizeBudgets = [
 export const testSizeBudgets = [
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
-    maxLines: 470,
-    reason: "MISC shared test fixtures should keep heavy scenario data split by domain",
+    maxLines: 120,
+    reason: "MISC shared test fixtures should only reset mocks and coordinate module expansion",
+  },
+  {
+    path: "src/app/pages/MiscTools.mockData.ts",
+    maxLines: 430,
+    reason: "MISC mock data should split again when new protocol fixtures are added",
   },
   {
     path: "src/app/pages/MiscTools.test.tsx",
