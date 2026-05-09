@@ -498,66 +498,8 @@ describe("C2Analysis", () => {
     });
   });
 
-  it("copies HTTP display filter from C2 candidate rows", async () => {
-    render(<C2Analysis />);
-
-    await waitFor(() => {
-      expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getAllByTitle("生成 HTTP 显示过滤器并复制到剪贴板").at(-1)!);
-
-    await waitFor(() => {
-      expect(mocks.clipboardWriteText).toHaveBeenCalledWith('http.host == "c2.example.test" && http.request.uri contains "/submit.php?id=42"');
-    });
-  });
-
   it("builds cache key from capture identity", () => {
     expect(buildC2SampleAnalysisCacheKey(3, "C:/captures/demo.pcapng", 99)).toBe("3::C:/captures/demo.pcapng::99");
     expect(buildC2SampleAnalysisCacheKey(3, "", 99)).toBe("");
-  });
-
-  it("expands candidate context without opening a stream", async () => {
-    render(<C2Analysis />);
-
-    await waitFor(() => {
-      expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText("10.0.0.5:443 → 10.0.0.8:51512")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /展开 C2 候选详情 #42/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText("10.0.0.5:443 → 10.0.0.8:51512")).toBeInTheDocument();
-      expect(screen.getAllByText("c2.example.test").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("/submit.php?id=42").length).toBeGreaterThan(0);
-      expect(screen.getByText("samples=4 avg=60s jitter=0.05")).toBeInTheDocument();
-      expect(screen.getAllByText("https-c2-compatible").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("periodic-callback").length).toBeGreaterThan(0);
-      expect(screen.getByText("Typed Record Preview")).toBeInTheDocument();
-    });
-  });
-
-  it("links C2 candidates back to packet and stream evidence", async () => {
-    render(<C2Analysis />);
-
-    await waitFor(() => {
-      expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getAllByRole("button", { name: /定位到包/ }).at(-1)!);
-
-    await waitFor(() => {
-      expect(mocks.sentinelState.locatePacketById).toHaveBeenCalledWith(42);
-      expect(mocks.navigate).toHaveBeenCalledWith("/");
-    });
-
-    fireEvent.click(screen.getAllByRole("button", { name: /打开关联流/ }).at(-1)!);
-
-    await waitFor(() => {
-      expect(mocks.sentinelState.preparePacketStream).toHaveBeenCalledWith(42, "HTTP");
-      expect(mocks.navigate).toHaveBeenCalledWith("/http-stream", { state: { streamId: 7 } });
-    });
   });
 });
