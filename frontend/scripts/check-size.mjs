@@ -205,8 +205,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/core/engine.ts",
-    maxLines: 520,
+    maxLines: 445,
     reason: "core engine should keep protocol tree and hex layout logic separate from display registries",
+  },
+  {
+    path: "src/app/core/packetByteLayout.ts",
+    maxLines: 95,
+    reason: "packet byte layout and hex dump helpers should stay pure and separate from protocol tree rendering",
   },
   {
     path: "src/app/core/protocolDisplay.ts",

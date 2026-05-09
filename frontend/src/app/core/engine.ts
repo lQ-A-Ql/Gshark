@@ -1,7 +1,9 @@
 import type { Packet, ProtocolTreeNode } from "./types";
 import { HIDDEN_LAYER_KEYS, LAYER_TITLES, TOKEN_LABELS } from "./protocolDisplay";
+import { computePacketByteLayout, parsePayloadBytes, type PacketByteLayout } from "./packetByteLayout";
 
 export { DEFAULT_PLUGIN_LOGS } from "./protocolDisplay";
+export { buildHexDump } from "./packetByteLayout";
 
 export function buildProtocolTree(packet: Packet | null): ProtocolTreeNode[] {
   if (!packet) return [];
@@ -49,9 +51,7 @@ export function buildProtocolTree(packet: Packet | null): ProtocolTreeNode[] {
       id: "app",
       label: `${packet.displayProtocol || "Application Data"} (${payloadBytes.length} bytes)`,
       byteRange: payloadBytes.length > 0 ? layout.payloadRange : undefined,
-      children: [
-        { id: "payload-preview", label: `Payload Preview: ${payloadPreview || "(empty)"}` },
-      ],
+      children: [{ id: "payload-preview", label: `Payload Preview: ${payloadPreview || "(empty)"}` }],
     },
   ];
 }
@@ -89,34 +89,6 @@ export function buildProtocolTreeFromLayers(layers: unknown, packet: Packet | nu
   ];
 }
 
-export function buildHexDump(packet: Packet | null): string {
-  if (!packet) return "";
-
-  const headerText =
-    `Frame ${packet.id} ${packet.proto} Len=${packet.length}\n` +
-    `Time=${packet.time} ${packet.src}:${packet.srcPort} -> ${packet.dst}:${packet.dstPort}\n` +
-    `Info=${packet.info || "N/A"}\n`;
-
-  const headerBytes = Array.from(new TextEncoder().encode(headerText));
-  const payloadBytes = parsePayloadBytes(packet.payload);
-  const bytes = [...headerBytes, ...payloadBytes];
-
-  if (bytes.length === 0) return "暂无 hex 数据";
-
-  const lines: string[] = [];
-
-  for (let i = 0; i < bytes.length; i += 16) {
-    const chunk = bytes.slice(i, i + 16);
-    const hex = chunk.map((b) => b.toString(16).padStart(2, "0")).join(" ");
-    const ascii = chunk
-      .map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : "."))
-      .join("");
-    lines.push(`${i.toString(16).padStart(4, "0")}  ${hex.padEnd(47, " ")}  ${ascii}`);
-  }
-
-  return lines.join("\n");
-}
-
 function buildLayerTreeNode(
   layerName: string,
   value: unknown,
@@ -139,7 +111,13 @@ function buildLayerTreeNode(
     label: summarizeLayer(normalizedLayer, value, packet),
     byteRange,
     children: fields.map(([fieldKey, fieldValue], index) =>
-      toFieldTreeNode(normalizedLayer, String(fieldKey), fieldValue, `${id}-${index}`, resolveChildByteRange(String(fieldKey), byteRange)),
+      toFieldTreeNode(
+        normalizedLayer,
+        String(fieldKey),
+        fieldValue,
+        `${id}-${index}`,
+        resolveChildByteRange(String(fieldKey), byteRange),
+      ),
     ),
   };
 }
@@ -315,10 +293,10 @@ function summarizeFieldValue(value: unknown): string {
 }
 
 function extractLayerOrder(layers: Record<string, unknown>): string[] {
-  const frame = Object.entries(layers).find(([key, value]) => normalizeLayerName(key) === "frame" && isRecord(value))?.[1];
-  const protocols = frame && isRecord(frame)
-    ? pickLayerValue(frame, ["frame_frame_protocols", "frame.protocols"])
-    : "";
+  const frame = Object.entries(layers).find(
+    ([key, value]) => normalizeLayerName(key) === "frame" && isRecord(value),
+  )?.[1];
+  const protocols = frame && isRecord(frame) ? pickLayerValue(frame, ["frame_frame_protocols", "frame.protocols"]) : "";
 
   const seen = new Set<string>();
   const ordered: string[] = [];
@@ -395,68 +373,15 @@ function transportLayerTitle(proto: string): string {
   return LAYER_TITLES[normalized] ?? proto;
 }
 
-function parsePayloadBytes(payload: string): number[] {
-  const raw = (payload ?? "").trim();
-  if (!raw) return [];
-
-  const hexLike = /^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2})*$/.test(raw);
-  if (hexLike) {
-    return raw
-      .split(":")
-      .map((part) => Number.parseInt(part, 16))
-      .filter((v) => Number.isFinite(v));
-  }
-
-  return Array.from(new TextEncoder().encode(raw));
-}
-
-function computePacketByteLayout(packet: Packet) {
-  const totalEnd = Math.max(packet.length - 1, 0);
-  const frameRange: [number, number] = [0, totalEnd];
-  const ethernetEnd = Math.min(13, totalEnd);
-  const isIPv6 = packet.src.includes(":") || packet.dst.includes(":");
-  const ipHeaderLen = packet.ipHeaderLen && packet.ipHeaderLen > 0 ? packet.ipHeaderLen : isIPv6 ? 40 : 20;
-  const ipStart = Math.min(ethernetEnd + 1, totalEnd);
-  const ipEnd = Math.min(ipStart + Math.max(ipHeaderLen - 1, 0), totalEnd);
-  const l4HeaderLen =
-    packet.l4HeaderLen && packet.l4HeaderLen > 0
-      ? packet.l4HeaderLen
-      : packet.proto === "UDP"
-        ? 8
-        : packet.proto === "TCP"
-          ? 20
-          : packet.proto === "ICMP" || packet.proto === "ICMPV6"
-            ? 8
-            : 0;
-  const transportStart = Math.min(ipEnd + 1, totalEnd);
-  const transportEnd =
-    l4HeaderLen > 0
-      ? Math.min(transportStart + Math.max(l4HeaderLen - 1, 0), totalEnd)
-      : transportStart;
-  const payloadStart = Math.min(transportEnd + 1, totalEnd);
-  const payloadRange: [number, number] = [payloadStart, totalEnd];
-
-  return {
-    isIPv6,
-    frameRange,
-    ethernetRange: [0, ethernetEnd] as [number, number],
-    ipRange: [ipStart, ipEnd] as [number, number],
-    transportRange: [transportStart, transportEnd] as [number, number],
-    payloadRange,
-  };
-}
-
-function resolveLayerByteRange(
-  layerName: string,
-  layout: ReturnType<typeof computePacketByteLayout> | null,
-): [number, number] | undefined {
+function resolveLayerByteRange(layerName: string, layout: PacketByteLayout | null): [number, number] | undefined {
   if (!layout) return undefined;
   const name = layerName.toLowerCase();
 
   if (name === "frame") return layout.frameRange;
   if (name === "eth" || name === "sll" || name === "sll2") return layout.ethernetRange;
   if (name === "ip" || name === "ipv4" || name === "ipv6") return layout.ipRange;
-  if (name === "tcp" || name === "udp" || name === "icmp" || name === "icmpv6" || name === "igmp") return layout.transportRange;
+  if (name === "tcp" || name === "udp" || name === "icmp" || name === "icmpv6" || name === "igmp")
+    return layout.transportRange;
   if (
     name === "http" ||
     name === "tls" ||
@@ -489,7 +414,11 @@ function formatLeafValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "True" : "False";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
-  if (Array.isArray(value)) return value.map((item) => formatLeafValue(item)).filter(Boolean).join(", ");
+  if (Array.isArray(value))
+    return value
+      .map((item) => formatLeafValue(item))
+      .filter(Boolean)
+      .join(", ");
   if (isRecord(value)) return "{...}";
   return String(value);
 }
