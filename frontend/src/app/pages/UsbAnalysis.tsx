@@ -1,12 +1,8 @@
-import { HardDrive, Keyboard, Usb } from "lucide-react";
+import { Usb } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
-import {
-  AnalysisBucketChart as BucketChart,
-  AnalysisPanel as Panel,
-  AnalysisStatCard as StatCard,
-} from "../components/analysis/AnalysisPrimitives";
+import { AnalysisPanel as Panel, AnalysisStatCard as StatCard } from "../components/analysis/AnalysisPrimitives";
 import type { USBAnalysis as USBAnalysisData, USBMassStorageOperation } from "../core/types";
 import {
   KeyboardReplay,
@@ -15,26 +11,15 @@ import {
   MouseTrajectory,
   keyboardReplayToken,
 } from "../features/usb/UsbHidPanels";
-import {
-  Banner,
-  DeviceChips,
-  NotesList,
-  PrimaryTabButton,
-  SecondaryTabButton,
-} from "../features/usb/UsbAnalysisControls";
+import { Banner, DeviceChips, NotesList, SecondaryTabButton } from "../features/usb/UsbAnalysisControls";
 import { UsbMassStoragePanel, type MassStorageSubTab } from "../features/usb/UsbMassStoragePanel";
 import { UsbOtherPanel, type OtherSubTab } from "../features/usb/UsbOtherPanel";
-import {
-  KeyboardEventTable,
-  MouseEventTable,
-} from "../features/usb/UsbTables";
+import { UsbOverviewPanel, USB_PROTOCOL_TAGS, type UsbPrimaryTab } from "../features/usb/UsbOverviewPanel";
+import { KeyboardEventTable, MouseEventTable } from "../features/usb/UsbTables";
 import { useUsbAnalysis } from "../features/usb/useUsbAnalysis";
 import { useSentinel } from "../state/SentinelContext";
 
-type UsbPrimaryTab = "hid" | "mass-storage" | "other";
 type HidSubTab = "keyboard" | "mouse";
-
-const USB_PROTOCOL_TAGS = ["HID", "Mass Storage", "其他"];
 
 export default function UsbAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
@@ -253,48 +238,11 @@ export default function UsbAnalysis() {
       {loading && <Banner tone="muted">正在解析 USB / HID / Mass Storage 数据...</Banner>}
       {!loading && error && <Banner tone="warning">{error}</Banner>}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <StatCard title="USB 包总数" value={analysis.totalUSBPackets.toLocaleString()} />
-        <StatCard title="HID" value={String(analysis.hidPackets || analysis.keyboardPackets + analysis.mousePackets)} />
-        <StatCard title="Mass Storage" value={String(analysis.massStoragePackets)} />
-        <StatCard title="其他" value={analysis.otherUSBPackets.toLocaleString()} />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Panel title="协议分布">
-          <BucketChart data={analysis.protocols} barClassName="bg-blue-500" />
-        </Panel>
-        <Panel title="传输类型">
-          <BucketChart data={analysis.transferTypes} barClassName="bg-emerald-500" />
-        </Panel>
-        <Panel title="分析提示">
-          <NotesList notes={analysis.notes} emptyLabel="当前抓包未识别到可展示的 USB 行为。" />
-        </Panel>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <PrimaryTabButton
-          active={activePrimaryTab === "hid"}
-          onClick={() => setActivePrimaryTab("hid")}
-          icon={<Keyboard className="h-4 w-4" />}
-        >
-          HID
-        </PrimaryTabButton>
-        <PrimaryTabButton
-          active={activePrimaryTab === "mass-storage"}
-          onClick={() => setActivePrimaryTab("mass-storage")}
-          icon={<HardDrive className="h-4 w-4" />}
-        >
-          Mass Storage
-        </PrimaryTabButton>
-        <PrimaryTabButton
-          active={activePrimaryTab === "other"}
-          onClick={() => setActivePrimaryTab("other")}
-          icon={<Usb className="h-4 w-4" />}
-        >
-          其他
-        </PrimaryTabButton>
-      </div>
+      <UsbOverviewPanel
+        analysis={analysis}
+        activePrimaryTab={activePrimaryTab}
+        onPrimaryTabChange={setActivePrimaryTab}
+      />
 
       {activePrimaryTab === "hid" && (
         <div className="mt-4 space-y-4">

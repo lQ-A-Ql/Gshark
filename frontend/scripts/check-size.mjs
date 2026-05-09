@@ -145,8 +145,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/UsbAnalysis.tsx",
-    maxLines: 510,
+    maxLines: 430,
     reason: "USB page should keep domain panels and shared controls in feature components",
+  },
+  {
+    path: "src/app/features/usb/UsbOverviewPanel.tsx",
+    maxLines: 85,
+    reason: "USB overview panel should stay limited to summary cards and primary domain navigation",
   },
   {
     path: "src/app/features/usb/UsbAnalysisControls.tsx",
