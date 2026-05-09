@@ -202,8 +202,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureMissionPanels.tsx",
-    maxLines: 320,
-    reason: "capture mission display panels should stay presentational and avoid data loading logic",
+    maxLines: 20,
+    reason: "capture mission panel compatibility layer should stay as exports only",
+  },
+  {
+    path: "src/app/components/CaptureMissionQuickFilters.tsx",
+    maxLines: 60,
+    reason: "capture quick filters should stay focused on filter chip presentation",
+  },
+  {
+    path: "src/app/components/CaptureMissionRecommendationPanels.tsx",
+    maxLines: 125,
+    reason: "capture recommendations should stay focused on recommendation card presentation",
+  },
+  {
+    path: "src/app/components/CaptureMissionThreatPanels.tsx",
+    maxLines: 115,
+    reason: "capture threat hits should stay focused on hit list presentation and action wiring",
+  },
+  {
+    path: "src/app/components/CaptureMissionPayloadPanel.tsx",
+    maxLines: 130,
+    reason: "capture payload shortcut panel should stay focused on selected packet context and MISC handoff",
   },
   {
     path: "src/app/components/PacketVirtualTable.tsx",
