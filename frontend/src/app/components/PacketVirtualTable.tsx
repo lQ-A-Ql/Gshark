@@ -6,6 +6,15 @@ import { twMerge } from "tailwind-merge";
 import { Settings2 } from "lucide-react";
 import { FloatingSurface } from "./ui/FloatingSurface";
 import { useViewportSafePosition } from "../hooks/useViewportSafePosition";
+import {
+  DEFAULT_COLUMNS,
+  getCommunicationFailureLevel,
+  loadSavedColumns,
+  renderPacketCell,
+  saveColumns,
+  type ColumnId,
+  type ColumnSpec,
+} from "./PacketVirtualTableColumns";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -21,112 +30,10 @@ interface PacketVirtualTableProps {
   onLoadMorePackets?: () => void;
 }
 
-type CommFailureLevel = "critical" | "major" | "warn" | null;
-
-function getCommunicationFailureLevel(packet: Packet): CommFailureLevel {
-  const info = `${packet.info ?? ""} ${packet.payload ?? ""}`.toLowerCase();
-  const tlsLike = packet.proto === "TLS" || packet.proto === "HTTPS" || info.includes("tls") || info.includes("ssl");
-  const tlsFail = tlsLike && (
-    info.includes("handshake failure") ||
-    info.includes("fatal alert") ||
-    info.includes("decrypt error") ||
-    info.includes("bad certificate") ||
-    info.includes("unknown ca") ||
-    info.includes("certificate unknown") ||
-    info.includes("protocol version")
-  );
-  if (tlsFail) return "critical";
-
-  const tcpFail =
-    info.includes("tcp reset") ||
-    info.includes("[rst") ||
-    info.includes("retransmission") ||
-    info.includes("duplicate ack") ||
-    info.includes("out-of-order") ||
-    info.includes("previous segment not captured") ||
-    info.includes("connection refused") ||
-    info.includes("timeout");
-  if (tcpFail) return "major";
-
-  const dnsFail =
-    info.includes("nxdomain") ||
-    info.includes("servfail") ||
-    info.includes("refused") ||
-    info.includes("format error") ||
-    info.includes("no such name");
-  if (dnsFail) return "warn";
-
-  const httpFail =
-    /http\/\d\.\d\s+5\d\d/.test(info) ||
-    /http\/\d\.\d\s+4\d\d/.test(info) ||
-    info.includes("bad gateway") ||
-    info.includes("gateway timeout") ||
-    info.includes("service unavailable");
-  if (httpFail) return "major";
-
-  const icmpFail = info.includes("destination unreachable") || info.includes("time-to-live exceeded") || info.includes("ttl exceeded");
-  if (icmpFail) return "warn";
-
-  return null;
-}
-
-type ColumnId = "id" | "time" | "src" | "dst" | "proto" | "length" | "info";
-
-interface ColumnSpec {
-  id: ColumnId;
-  label: string;
-  width: number;
-  visible: boolean;
-}
-
-const COLUMN_STORAGE_KEY = "gshark.packet-table.columns.v1";
-
-const DEFAULT_COLUMNS: ColumnSpec[] = [
-  { id: "id", label: "No.", width: 72, visible: true },
-  { id: "time", label: "Time", width: 170, visible: true },
-  { id: "src", label: "Source", width: 220, visible: true },
-  { id: "dst", label: "Destination", width: 220, visible: true },
-  { id: "proto", label: "Protocol", width: 100, visible: true },
-  { id: "length", label: "Length", width: 90, visible: true },
-  { id: "info", label: "Info", width: 420, visible: true },
-];
-
-function loadSavedColumns(): ColumnSpec[] {
-  if (typeof window === "undefined") return DEFAULT_COLUMNS;
-
-  try {
-    const raw = window.localStorage.getItem(COLUMN_STORAGE_KEY);
-    if (!raw) return DEFAULT_COLUMNS;
-
-    const parsed = JSON.parse(raw) as Partial<ColumnSpec>[];
-    if (!Array.isArray(parsed)) return DEFAULT_COLUMNS;
-
-    const merged = DEFAULT_COLUMNS.map((defaults) => {
-      const saved = parsed.find((item) => item.id === defaults.id);
-      if (!saved) return defaults;
-      return {
-        ...defaults,
-        label: typeof saved.label === "string" && saved.label.trim() ? saved.label : defaults.label,
-        width: typeof saved.width === "number" && Number.isFinite(saved.width) ? Math.max(64, saved.width) : defaults.width,
-        visible: typeof saved.visible === "boolean" ? saved.visible : defaults.visible,
-      };
-    });
-
-    if (merged.every((col) => !col.visible)) {
-      return DEFAULT_COLUMNS;
-    }
-    return merged;
-  } catch {
-    return DEFAULT_COLUMNS;
-  }
-}
-
 const ROW_HEIGHT = 30;
 const BUFFER = 10;
-const CONTEXT_MENU_WIDTH = 192;
-const CONTEXT_MENU_HEIGHT = 118;
 const CONTEXT_MENU_MARGIN = 12;
-const CONTEXT_MENU_SIZE = { width: CONTEXT_MENU_WIDTH, height: CONTEXT_MENU_HEIGHT };
+const CONTEXT_MENU_SIZE = { width: 192, height: 118 };
 
 export function PacketVirtualTable({
   packets,
@@ -206,8 +113,7 @@ export function PacketVirtualTable({
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(columns));
+    saveColumns(columns);
   }, [columns]);
 
   useEffect(() => {
@@ -262,46 +168,6 @@ export function PacketVirtualTable({
 
   const resetColumns = () => {
     setColumns(DEFAULT_COLUMNS);
-  };
-
-  const renderCell = (packet: Packet, colId: ColumnId) => {
-    const protocolLabel = packet.displayProtocol?.trim() || packet.proto;
-    switch (colId) {
-      case "id":
-        return (
-          <div className="px-3 py-1.5 tabular-nums">
-            <span className="inline-flex items-center gap-1">
-              {getCommunicationFailureLevel(packet) && (
-                <span
-                  className={cn(
-                    "inline-block h-2 w-2 rounded-full",
-                    getCommunicationFailureLevel(packet) === "critical"
-                      ? "bg-rose-600"
-                      : getCommunicationFailureLevel(packet) === "major"
-                        ? "bg-orange-500"
-                        : "bg-amber-500",
-                  )}
-                  title="通讯异常"
-                />
-              )}
-              <span>{packet.id}</span>
-            </span>
-          </div>
-        );
-      case "time":
-        return <div className="px-3 py-1.5 whitespace-nowrap font-mono font-normal">{packet.time}</div>;
-      case "src":
-        return <div className="px-3 py-1.5 truncate">{packet.src}:{packet.srcPort}</div>;
-      case "dst":
-        return <div className="px-3 py-1.5 truncate">{packet.dst}:{packet.dstPort}</div>;
-      case "proto":
-        return <div className="px-3 py-1.5">{protocolLabel}</div>;
-      case "length":
-        return <div className="px-3 py-1.5 tabular-nums">{packet.length}</div>;
-      case "info":
-      default:
-        return <div className="px-3 py-1.5 truncate">{packet.info}</div>;
-    }
   };
 
   return (
@@ -430,7 +296,7 @@ export function PacketVirtualTable({
               >
                 {visibleColumns.map((col) => (
                   <div key={col.id} className="border-r border-border/60 last:border-r-0">
-                    {renderCell(packet, col.id)}
+                    {renderPacketCell(packet, col.id)}
                   </div>
                 ))}
               </div>

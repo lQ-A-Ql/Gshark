@@ -137,8 +137,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/PacketVirtualTable.tsx",
-    maxLines: 520,
-    reason: "packet table should keep virtualization and row helpers separated",
+    maxLines: 360,
+    reason: "packet table should stay focused on virtualization, scrolling, resizing, and context menus",
+  },
+  {
+    path: "src/app/components/PacketVirtualTableColumns.tsx",
+    maxLines: 160,
+    reason: "packet table column config, persistence, and cell rules should stay separate from virtualization",
   },
   {
     path: "src/app/pages/ThreatHunting.tsx",
