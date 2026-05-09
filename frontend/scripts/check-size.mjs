@@ -177,8 +177,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/IndustrialAnalysis.tsx",
-    maxLines: 490,
-    reason: "industrial page should keep decoded protocol panels in feature components",
+    maxLines: 310,
+    reason: "industrial page should stay focused on analysis loading and high-level protocol orchestration",
+  },
+  {
+    path: "src/app/features/industrial/IndustrialModbusPanels.tsx",
+    maxLines: 310,
+    reason: "industrial Modbus panels should keep write, decoded-input, and transaction tables local",
   },
   {
     path: "src/app/features/c2/C2AggregateTables.tsx",
