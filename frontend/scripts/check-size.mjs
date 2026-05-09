@@ -21,6 +21,31 @@ export const sourceSizeBudgets = [
     reason: "decoder workbench should keep toolbar, batch controls, settings panels, and pure rules in sibling modules",
   },
   {
+    path: "src/app/components/StreamDecoderWorkbenchUtils.ts",
+    maxLines: 40,
+    reason: "decoder utility compatibility layer should stay as exports only",
+  },
+  {
+    path: "src/app/components/StreamDecoderTypes.ts",
+    maxLines: 95,
+    reason: "decoder settings and shared types should stay declarative",
+  },
+  {
+    path: "src/app/components/StreamDecoderHintUtils.ts",
+    maxLines: 205,
+    reason: "decoder hint merging should remain pure and separate from payload or storage helpers",
+  },
+  {
+    path: "src/app/components/StreamDecoderPayloadUtils.ts",
+    maxLines: 75,
+    reason: "decoder payload normalization should remain pure and small",
+  },
+  {
+    path: "src/app/components/StreamDecoderSettingsStorage.ts",
+    maxLines: 45,
+    reason: "decoder settings persistence should stay isolated from hint and payload logic",
+  },
+  {
     path: "src/app/components/StreamDecoderToolbar.tsx",
     maxLines: 80,
     reason: "decoder toolbar should stay focused on decoder actions and settings entry points",
