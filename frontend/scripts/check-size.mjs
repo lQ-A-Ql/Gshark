@@ -207,8 +207,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/media/MediaSessionTable.tsx",
-    maxLines: 470,
-    reason: "media session table should keep playback panels and row helpers split",
+    maxLines: 365,
+    reason: "media session table should keep playback panels and row helper logic in sibling modules",
+  },
+  {
+    path: "src/app/features/media/MediaSessionTableUtils.ts",
+    maxLines: 115,
+    reason: "media session table helpers should remain pure and small",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebar.tsx",
@@ -307,6 +312,11 @@ export const testSizeBudgets = [
     path: "src/app/features/media/MediaOverviewPanels.test.tsx",
     maxLines: 130,
     reason: "media overview panel tests should stay focused on stats, notes, and batch action wiring",
+  },
+  {
+    path: "src/app/features/media/MediaSessionTableUtils.test.ts",
+    maxLines: 145,
+    reason: "media session table helper tests should stay focused on playback and transcription state rules",
   },
 ];
 

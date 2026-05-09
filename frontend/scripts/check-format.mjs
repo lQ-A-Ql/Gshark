@@ -15,6 +15,8 @@ export const prettierTargets = [
   "src/app/features/media/MediaOverviewPanels.tsx",
   "src/app/features/media/MediaOverviewPanels.test.tsx",
   "src/app/features/media/MediaSessionTable.tsx",
+  "src/app/features/media/MediaSessionTableUtils.ts",
+  "src/app/features/media/MediaSessionTableUtils.test.ts",
   "src/app/features/media/MediaTranscriptionSummaryPanel.tsx",
   "src/app/features/usb/UsbHidPanels.tsx",
   "src/app/features/usb/UsbTables.tsx",
