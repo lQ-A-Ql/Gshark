@@ -240,6 +240,26 @@ export const sourceSizeBudgets = [
     reason: "APT page should keep actor orchestration only and leave attribution views in feature modules",
   },
   {
+    path: "src/app/pages/UpdateCenter.tsx",
+    maxLines: 130,
+    reason: "update center page should only orchestrate update status loading and actions",
+  },
+  {
+    path: "src/app/features/update/UpdateCenterPanels.tsx",
+    maxLines: 260,
+    reason: "update center panels should keep status, diagnostics, release, and step presentation scoped",
+  },
+  {
+    path: "src/app/features/update/UpdateReleaseMarkdown.tsx",
+    maxLines: 85,
+    reason: "update release markdown renderers should stay declarative and separate from update state",
+  },
+  {
+    path: "src/app/features/update/updateCenterUtils.ts",
+    maxLines: 15,
+    reason: "update center utilities should remain tiny and pure",
+  },
+  {
     path: "src/app/features/apt/APTAttributionPanel.tsx",
     maxLines: 250,
     reason: "APT attribution panel should keep explanation and missing-evidence helpers scoped",
@@ -566,6 +586,11 @@ export const testSizeBudgets = [
     path: "src/app/features/media/useMediaTranscriptionWorkflow.test.ts",
     maxLines: 120,
     reason: "media workflow helper tests should stay focused on merge and dependency classification rules",
+  },
+  {
+    path: "src/app/features/update/updateCenterUtils.test.ts",
+    maxLines: 30,
+    reason: "update center utility tests should only cover formatting fallbacks",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
