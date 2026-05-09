@@ -230,8 +230,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/AptAnalysis.tsx",
-    maxLines: 435,
-    reason: "APT page should keep heavy actor views and tables in feature modules",
+    maxLines: 230,
+    reason: "APT page should keep actor orchestration only and leave attribution views in feature modules",
+  },
+  {
+    path: "src/app/features/apt/APTAttributionPanel.tsx",
+    maxLines: 250,
+    reason: "APT attribution panel should keep explanation and missing-evidence helpers scoped",
+  },
+  {
+    path: "src/app/features/apt/APTEvidenceTimeline.tsx",
+    maxLines: 80,
+    reason: "APT evidence timeline should stay focused on ordering and compact evidence rendering",
   },
   {
     path: "src/app/features/apt/APTEvidencePanel.tsx",
