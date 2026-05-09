@@ -11,6 +11,17 @@ export const sourceSizeBudgets = [
     reason: "bridge facade should keep shrinking as domain clients move out",
   },
   {
+    path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",
+    maxLines: 110,
+    reason: "C2 decrypt display mapper should stay focused on result-level record filtering and notes",
+  },
+  {
+    path: "src/app/integrations/mappers/vshellDecryptDisplayRules.ts",
+    maxLines: 305,
+    reason:
+      "VShell decrypt display rules should keep preview decoding, ANSI cleanup, timestamp hiding, and low-info frame checks isolated",
+  },
+  {
     path: "src/app/state/SentinelContext.tsx",
     maxLines: 1450,
     reason: "provider remains oversized and should not absorb new state domains",
