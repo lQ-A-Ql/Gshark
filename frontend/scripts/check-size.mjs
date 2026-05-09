@@ -192,8 +192,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/c2/C2AggregateTables.tsx",
-    maxLines: 485,
-    reason: "C2 aggregate tables should keep row helpers and detail panels separated",
+    maxLines: 340,
+    reason: "C2 aggregate table barrel should keep large table sections in sibling files",
+  },
+  {
+    path: "src/app/features/c2/CSHostURIAggregates.tsx",
+    maxLines: 180,
+    reason: "CS Host/URI aggregate table should stay focused on one table section",
+  },
+  {
+    path: "src/app/features/c2/C2AggregateTableStyles.ts",
+    maxLines: 20,
+    reason: "C2 aggregate table style constants should stay static and tiny",
   },
   {
     path: "src/app/pages/HttpStream.tsx",
@@ -327,6 +337,11 @@ export const testSizeBudgets = [
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
     maxLines: 110,
     reason: "runtime settings helper tests should stay focused on normalization and dependency status rules",
+  },
+  {
+    path: "src/app/features/c2/CSHostURIAggregates.test.tsx",
+    maxLines: 85,
+    reason: "CS Host/URI aggregate tests should stay focused on empty state and table wiring",
   },
 ];
 
