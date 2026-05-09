@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 
 export function resetMiscToolsMocks(mocks: any) {
   window.localStorage.clear();
@@ -434,5 +434,12 @@ export function resetMiscToolsMocks(mocks: any) {
 
 export async function expandModule(moduleID: string) {
   const toggle = await screen.findByTestId(`misc-module-toggle-${moduleID}`);
-  fireEvent.click(toggle);
+  if (toggle.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(toggle);
+  }
+  await waitFor(() => {
+    if (toggle.getAttribute("aria-expanded") !== "true") {
+      throw new Error(`MISC module ${moduleID} did not expand`);
+    }
+  });
 }
