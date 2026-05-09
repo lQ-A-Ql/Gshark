@@ -237,8 +237,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/usb/UsbTables.tsx",
-    maxLines: 460,
-    reason: "USB tables should keep HID and mass-storage sections modular",
+    maxLines: 210,
+    reason: "USB tables barrel should keep HID and mass-storage table sections in sibling files",
+  },
+  {
+    path: "src/app/features/usb/UsbHidTables.tsx",
+    maxLines: 175,
+    reason: "USB HID tables should stay focused on keyboard and mouse event presentation",
+  },
+  {
+    path: "src/app/features/usb/UsbMassStorageTables.tsx",
+    maxLines: 175,
+    reason: "USB mass-storage tables should keep filters and operation rows scoped",
+  },
+  {
+    path: "src/app/features/usb/UsbTableStyles.ts",
+    maxLines: 20,
+    reason: "USB table style constants should stay static and tiny",
+  },
+  {
+    path: "src/app/features/usb/UsbTableUtils.ts",
+    maxLines: 20,
+    reason: "USB table helpers should stay pure and tiny",
   },
 ];
 
@@ -342,6 +362,11 @@ export const testSizeBudgets = [
     path: "src/app/features/c2/CSHostURIAggregates.test.tsx",
     maxLines: 85,
     reason: "CS Host/URI aggregate tests should stay focused on empty state and table wiring",
+  },
+  {
+    path: "src/app/features/usb/UsbTablesSplit.test.tsx",
+    maxLines: 115,
+    reason: "USB split table tests should stay focused on barrel compatibility and row wiring",
   },
 ];
 
