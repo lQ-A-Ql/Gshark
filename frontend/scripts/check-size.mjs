@@ -17,8 +17,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 520,
-    reason: "decoder workbench should keep settings panels and pure rules in sibling modules",
+    maxLines: 405,
+    reason: "decoder workbench should keep toolbar, batch controls, settings panels, and pure rules in sibling modules",
+  },
+  {
+    path: "src/app/components/StreamDecoderToolbar.tsx",
+    maxLines: 80,
+    reason: "decoder toolbar should stay focused on decoder actions and settings entry points",
+  },
+  {
+    path: "src/app/components/StreamDecoderBatchPanel.tsx",
+    maxLines: 115,
+    reason: "decoder batch panel should stay focused on range, progress, and failure display",
   },
   {
     path: "src/app/components/StreamDecoderCandidatePanel.tsx",
@@ -367,6 +377,16 @@ export const testSizeBudgets = [
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
     maxLines: 110,
     reason: "runtime settings helper tests should stay focused on normalization and dependency status rules",
+  },
+  {
+    path: "src/app/components/StreamDecoderBatchPanel.test.tsx",
+    maxLines: 70,
+    reason: "decoder batch panel tests should stay focused on clamping, progress, and failures",
+  },
+  {
+    path: "src/app/components/StreamDecoderToolbar.test.tsx",
+    maxLines: 70,
+    reason: "decoder toolbar tests should stay focused on action wiring and running state",
   },
   {
     path: "src/app/features/c2/CSHostURIAggregates.test.tsx",

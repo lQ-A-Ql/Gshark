@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Binary, Bug, Search, ShieldAlert, Wand2 } from "lucide-react";
 import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
+import { StreamDecoderBatchPanel } from "./StreamDecoderBatchPanel";
 import { StreamDecoderCandidatePanel } from "./StreamDecoderCandidatePanel";
-import { DecoderButton, LabeledInput, PayloadPane, SettingsButton } from "./StreamDecoderWorkbenchParts";
+import { StreamDecoderToolbar } from "./StreamDecoderToolbar";
+import { PayloadPane } from "./StreamDecoderWorkbenchParts";
 import { StreamDecoderSettingsPanel, type DecoderSettingsKind } from "./StreamDecoderSettingsPanel";
 import {
   buildDecoderOptions,
@@ -315,55 +316,13 @@ export function StreamDecoderWorkbench({
           <div className="text-sm font-semibold text-foreground">Payload 解码工作台</div>
           <div className="text-xs text-muted-foreground">{chunkLabel}</div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DecoderButton
-            icon={Search}
-            label="自动检测"
-            active={runningDecoder === "auto"}
-            disabled={!hasPayload && !hasBatchMode}
-            onClick={() => void runDecoder("auto")}
-          />
-          <DecoderButton
-            icon={Binary}
-            label="Base64"
-            active={runningDecoder === "base64"}
-            disabled={!hasPayload && !hasBatchMode}
-            onClick={() => void runDecoder("base64")}
-          />
-          <DecoderButton
-            icon={ShieldAlert}
-            label="Behinder"
-            active={runningDecoder === "behinder"}
-            disabled={!hasPayload && !hasBatchMode}
-            onClick={() => void runDecoder("behinder")}
-          />
-          <SettingsButton onClick={() => setActiveSettings("behinder")} />
-          <DecoderButton
-            icon={Bug}
-            label="AntSword"
-            active={runningDecoder === "antsword"}
-            disabled={!hasPayload && !hasBatchMode}
-            onClick={() => void runDecoder("antsword")}
-          />
-          <SettingsButton onClick={() => setActiveSettings("antsword")} />
-          <DecoderButton
-            icon={Wand2}
-            label="Godzilla"
-            active={runningDecoder === "godzilla"}
-            disabled={!hasPayload && !hasBatchMode}
-            onClick={() => void runDecoder("godzilla")}
-          />
-          <SettingsButton onClick={() => setActiveSettings("godzilla")} />
-          {runningDecoder && (
-            <button
-              type="button"
-              onClick={cancelDecode}
-              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition-colors hover:bg-rose-100"
-            >
-              取消
-            </button>
-          )}
-        </div>
+        <StreamDecoderToolbar
+          runningDecoder={runningDecoder}
+          disabled={!hasPayload && !hasBatchMode}
+          onRunDecoder={(decoder) => void runDecoder(decoder)}
+          onOpenSettings={setActiveSettings}
+          onCancel={cancelDecode}
+        />
       </div>
 
       <StreamDecoderCandidatePanel
@@ -379,77 +338,17 @@ export function StreamDecoderWorkbench({
       />
 
       {hasBatchMode && (
-        <div className="mt-4 rounded-lg border border-border bg-background/80 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-foreground">批量解码区间</div>
-              <div className="text-xs text-muted-foreground">
-                选中任一解码器后，会对指定区间内的 payload 逐条解码，并覆盖原 payload 后持久化。
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-              当前片段位于第 {selectedBatchOrdinal} / {batchCount} 条
-            </div>
-          </div>
-          <div className="grid gap-3 md:grid-cols-[120px_120px_minmax(0,1fr)]">
-            <LabeledInput label="起始序号" value={rangeStart} onChange={setRangeStart} placeholder="1" />
-            <LabeledInput label="结束序号" value={rangeEnd} onChange={setRangeEnd} placeholder={String(batchCount)} />
-            <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-              将按当前列表顺序处理第 {clampBatchOrdinal(rangeStart, batchCount)} 到{" "}
-              {clampBatchOrdinal(rangeEnd, batchCount)} 条。
-              {batchItems && batchItems.length > 0 && (
-                <div
-                  className="mt-1 truncate text-foreground"
-                  title={
-                    batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]
-                      ?.label
-                  }
-                >
-                  起点:{" "}
-                  {batchItems[Math.min(batchCount - 1, Math.max(0, clampBatchOrdinal(rangeStart, batchCount) - 1))]
-                    ?.label ?? "--"}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {batchProgress && (
-            <div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  进度：{batchProgress.done}/{batchProgress.total}
-                </span>
-                <span>
-                  成功：{batchProgress.success} · 失败：{batchProgress.failed}
-                </span>
-              </div>
-              {batchProgress.total > 0 && (
-                <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
-                  <div
-                    className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${Math.min(100, Math.round((batchProgress.done / batchProgress.total) * 100))}%` }}
-                  />
-                </div>
-              )}
-              {batchProgress.currentLabel && (
-                <div className="mt-2 truncate text-foreground" title={batchProgress.currentLabel}>
-                  当前：{batchProgress.currentLabel}
-                </div>
-              )}
-            </div>
-          )}
-
-          {batchFailureDetails.length > 0 && (
-            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-              <div className="font-semibold">批量失败明细（最多显示 {MAX_BATCH_FAILURE_DETAILS} 条）</div>
-              <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-auto pl-4">
-                {batchFailureDetails.map((item, idx) => (
-                  <li key={`${idx}-${item}`}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <StreamDecoderBatchPanel
+          batchItems={batchItems}
+          batchCount={batchCount}
+          selectedBatchOrdinal={selectedBatchOrdinal}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          batchProgress={batchProgress}
+          batchFailureDetails={batchFailureDetails}
+          onRangeStartChange={setRangeStart}
+          onRangeEndChange={setRangeEnd}
+        />
       )}
 
       {activeSettings && (
