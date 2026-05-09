@@ -432,14 +432,18 @@ export function resetMiscToolsMocks(mocks: any) {
   ]);
 }
 
-export async function expandModule(moduleID: string) {
+export async function expandModule(moduleID: string, waitForContent?: () => unknown) {
   const toggle = await screen.findByTestId(`misc-module-toggle-${moduleID}`);
   if (toggle.getAttribute("aria-expanded") !== "true") {
     fireEvent.click(toggle);
   }
   await waitFor(() => {
-    if (toggle.getAttribute("aria-expanded") !== "true") {
+    const currentToggle = screen.getByTestId(`misc-module-toggle-${moduleID}`);
+    if (currentToggle.getAttribute("aria-expanded") !== "true") {
       throw new Error(`MISC module ${moduleID} did not expand`);
     }
-  });
+  }, { timeout: 10000 });
+  if (waitForContent) {
+    await waitFor(waitForContent, { timeout: 10000 });
+  }
 }

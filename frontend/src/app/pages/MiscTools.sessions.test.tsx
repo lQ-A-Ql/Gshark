@@ -70,71 +70,77 @@ vi.mock("react-router", async (importOriginal) => {
 
 import MiscTools from "./MiscTools";
 
+async function renderAndExpand(moduleID: string, waitForContent: () => unknown) {
+  render(<MiscTools />);
+  await expandModule(moduleID, waitForContent);
+}
+
 describe("MiscTools session candidate modules", () => {
   beforeEach(() => {
     resetMiscToolsMocks(mocks);
   });
 
-  it(
-    "loads candidates and renders detailed selector options",
-    async () => {
-      render(<MiscTools />);
-
-      await waitFor(() => {
-        expect(mocks.listMiscModules).toHaveBeenCalledTimes(1);
-        expect(mocks.getHTTPLoginAnalysis).toHaveBeenCalledTimes(1);
-      });
-      expect(mocks.getMySQLAnalysis).not.toHaveBeenCalled();
-      expect(mocks.getSMTPAnalysis).not.toHaveBeenCalled();
-      expect(mocks.getShiroRememberMeAnalysis).not.toHaveBeenCalled();
-      expect(mocks.listNTLMSessionMaterials).not.toHaveBeenCalled();
-      expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
-
-      await expandModule("ntlm-session-materials");
-      await waitFor(() => {
-        expect(mocks.listNTLMSessionMaterials).toHaveBeenCalledTimes(1);
-      });
-
-      await expandModule("mysql-session-analysis");
-      await waitFor(() => {
-        expect(mocks.getMySQLAnalysis).toHaveBeenCalledTimes(1);
-      });
-
-      await expandModule("smtp-session-analysis");
-      await waitFor(() => {
-        expect(mocks.getSMTPAnalysis).toHaveBeenCalledTimes(1);
-      });
-
-      await expandModule("shiro-rememberme-analysis");
-      await waitFor(() => {
-        expect(mocks.getShiroRememberMeAnalysis).toHaveBeenCalledTimes(1);
-      });
-
-      await expandModule("smb3-session-key");
-      await waitFor(() => {
-        expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
-      });
-
-      expect(await screen.findByText("已发现 2 条候选，其中 1 条材料完整")).toBeInTheDocument();
-      expect(screen.getByTestId("smb-session-candidate-101")).toBeInTheDocument();
-      expect(screen.getByTestId("smb-session-candidate-102")).toBeInTheDocument();
-      expect(screen.getAllByText("LAB\\Administrator").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Guest").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("MySQL 会话重建").length).toBeGreaterThan(0);
-      expect(screen.getByText("DELETE FROM audit_logs")).toBeInTheDocument();
-      expect(screen.getAllByText("SMTP 会话重建").length).toBeGreaterThan(0);
-      expect(screen.getByText("Quarterly Report")).toBeInTheDocument();
-      expect(screen.getAllByText("Shiro rememberMe 分析").length).toBeGreaterThan(0);
-      expect(screen.getByText("org.apache.shiro.subject.SimplePrincipalCollection")).toBeInTheDocument();
-    },
-    10000,
-  );
-
-  it("links Shiro rememberMe candidates back to packet and stream evidence", async () => {
+  it("defers session candidate loading until modules are expanded", async () => {
     render(<MiscTools />);
 
-    await expandModule("shiro-rememberme-analysis");
-    expect(await screen.findByText("org.apache.shiro.subject.SimplePrincipalCollection")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.listMiscModules).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("misc-module-toggle-http-login-analysis")).toBeInTheDocument();
+    });
+    expect(mocks.getMySQLAnalysis).not.toHaveBeenCalled();
+    expect(mocks.getSMTPAnalysis).not.toHaveBeenCalled();
+    expect(mocks.getShiroRememberMeAnalysis).not.toHaveBeenCalled();
+    expect(mocks.listNTLMSessionMaterials).not.toHaveBeenCalled();
+    expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
+  });
+
+  it("loads NTLM session materials after expansion", async () => {
+    await renderAndExpand("ntlm-session-materials", () =>
+      expect(screen.getByText(/当前筛选命中 2 条材料/)).toBeInTheDocument(),
+    );
+    expect(mocks.listNTLMSessionMaterials).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText("LAB\\Administrator").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Guest").length).toBeGreaterThan(0);
+  });
+
+  it("loads MySQL session details after expansion", async () => {
+    await renderAndExpand("mysql-session-analysis", () =>
+      expect(screen.getByText("DELETE FROM audit_logs")).toBeInTheDocument(),
+    );
+    expect(mocks.getMySQLAnalysis).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText("MySQL 会话重建").length).toBeGreaterThan(0);
+  });
+
+  it("loads SMTP session details after expansion", async () => {
+    await renderAndExpand("smtp-session-analysis", () =>
+      expect(screen.getByText("Quarterly Report")).toBeInTheDocument(),
+    );
+    expect(mocks.getSMTPAnalysis).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText("SMTP 会话重建").length).toBeGreaterThan(0);
+  });
+
+  it("loads Shiro rememberMe details after expansion", async () => {
+    await renderAndExpand("shiro-rememberme-analysis", () =>
+      expect(screen.getByText("org.apache.shiro.subject.SimplePrincipalCollection")).toBeInTheDocument(),
+    );
+    expect(mocks.getShiroRememberMeAnalysis).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText("Shiro rememberMe 分析").length).toBeGreaterThan(0);
+  });
+
+  it("loads SMB3 candidate selectors after expansion", async () => {
+    await renderAndExpand("smb3-session-key", () =>
+      expect(screen.getByTestId("smb-session-candidate-select")).toBeInTheDocument(),
+    );
+    expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("已发现 2 条候选，其中 1 条材料完整")).toBeInTheDocument();
+    expect(screen.getByTestId("smb-session-candidate-101")).toBeInTheDocument();
+    expect(screen.getByTestId("smb-session-candidate-102")).toBeInTheDocument();
+  });
+
+  it("links Shiro rememberMe candidates back to packet and stream evidence", async () => {
+    await renderAndExpand("shiro-rememberme-analysis", () =>
+      expect(screen.getByText("org.apache.shiro.subject.SimplePrincipalCollection")).toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "定位到包" }));
     await waitFor(() => {
@@ -157,7 +163,9 @@ describe("MiscTools session candidate modules", () => {
     });
     expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
 
-    await expandModule("smb3-session-key");
+    await expandModule("smb3-session-key", () => {
+      expect(screen.getByTestId("smb-session-candidate-select")).toBeInTheDocument();
+    });
     await waitFor(() => {
       expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
     });
@@ -177,24 +185,25 @@ describe("MiscTools session candidate modules", () => {
     expect((screen.getByLabelText("Username (用户名)") as HTMLInputElement).value).toBe("Admin2");
   });
 
-  it("does not load candidates when no capture is active", () => {
+  it("does not load candidates when no capture is active", async () => {
     mocks.sentinelState.fileMeta.path = "";
 
     render(<MiscTools />);
 
-    return waitFor(() => {
+    await waitFor(() => {
       expect(mocks.listMiscModules).toHaveBeenCalled();
       expect(mocks.getHTTPLoginAnalysis).not.toHaveBeenCalled();
       expect(mocks.getMySQLAnalysis).not.toHaveBeenCalled();
       expect(mocks.getSMTPAnalysis).not.toHaveBeenCalled();
       expect(mocks.getShiroRememberMeAnalysis).not.toHaveBeenCalled();
       expect(mocks.listSMB3SessionCandidates).not.toHaveBeenCalled();
-    }).then(async () => {
-      await expandModule("smb3-session-key");
-      const selector = screen.getByTestId("smb-session-candidate-select");
-      expect(selector).toHaveAttribute("aria-disabled", "true");
-      expect(selector).toHaveTextContent("未加载抓包，请先在主工作区导入文件");
     });
+    await expandModule("smb3-session-key", () => {
+      expect(screen.getByTestId("smb-session-candidate-select")).toBeInTheDocument();
+    });
+    const selector = screen.getByTestId("smb-session-candidate-select");
+    expect(selector).toHaveAttribute("aria-disabled", "true");
+    expect(selector).toHaveTextContent("未加载抓包，请先在主工作区导入文件");
   });
 
   it("shows a concise error when candidate loading fails", async () => {
@@ -202,7 +211,9 @@ describe("MiscTools session candidate modules", () => {
 
     render(<MiscTools />);
 
-    await expandModule("smb3-session-key");
+    await expandModule("smb3-session-key", () => {
+      expect(screen.getByTestId("smb-session-candidate-select")).toBeInTheDocument();
+    });
     expect(await screen.findByText("扫描 SMB3 Session 候选失败")).toBeInTheDocument();
   });
 });

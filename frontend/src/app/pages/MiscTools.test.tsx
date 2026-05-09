@@ -78,7 +78,9 @@ describe("MiscTools payload and session analysis", () => {
   it("renders the MISC payload decoder workbench and decodes a Base64 candidate", async () => {
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByRole("button", { name: "识别候选" })).toBeInTheDocument();
+    });
 
     fireEvent.click(await screen.findByRole("button", { name: "示例" }, { timeout: 10000 }));
     fireEvent.click(await screen.findByRole("button", { name: "识别候选" }, { timeout: 5000 }));
@@ -137,7 +139,9 @@ describe("MiscTools payload and session analysis", () => {
     ]);
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
+    });
 
     expect(await screen.findByText("可疑 URI / 参数来源")).toBeInTheDocument();
     const sourceText = await screen.findByText(/web\.test\/shell\.php/);
@@ -169,100 +173,14 @@ describe("MiscTools payload and session analysis", () => {
     });
   });
 
-  it("keeps Godzilla source hints when payload re-inspection is weaker", async () => {
-    mocks.listStreamPayloadSources.mockResolvedValueOnce([
-      {
-        id: "pkt-82-form-7f0e6f",
-        method: "POST",
-        host: "web.test",
-        uri: "/index.jsp",
-        packetId: 82,
-        streamId: 10,
-        sourceType: "form",
-        paramName: "7f0e6f",
-        payload: "AAECAwQFBgcICQoLDA0ODw==",
-        preview: "AAECAwQFBgcICQoLDA0ODw==",
-        confidence: 96,
-        signals: ["godzilla_like", "encrypted_blob", "godzilla-random-param"],
-        decoderHints: ["godzilla", "auto"],
-        familyHint: "godzilla_like",
-        sourceRole: "encrypted_blob",
-        decoderOptionsHint: {
-          decoder: "godzilla",
-          pass: "7f0e6f",
-          extractParam: true,
-          urlDecodeRounds: 1,
-          inputEncoding: "base64",
-          cipher: "aes_ecb",
-          stripMarkers: true,
-        },
-      },
-    ]);
-    mocks.inspectStreamPayload.mockResolvedValueOnce({
-      normalizedPayload: "AAECAwQFBgcICQoLDA0ODw==",
-      candidates: [
-        {
-          id: "payload-0",
-          label: "当前 payload",
-          kind: "payload",
-          value: "AAECAwQFBgcICQoLDA0ODw==",
-          preview: "AAECAwQFBgcICQoLDA0ODw==",
-          confidence: 78,
-          decoderHints: ["behinder", "godzilla", "auto"],
-          fingerprints: ["base64-aes-block"],
-          familyHint: "aes_webshell_like",
-          sourceRole: "encrypted_blob",
-          decoderOptionsHint: {
-            decoder: "behinder",
-            extractParam: false,
-            urlDecodeRounds: 1,
-            inputEncoding: "base64",
-            deriveKeyFromPass: true,
-          },
-        },
-      ],
-      suggestedCandidateId: "payload-0",
-      suggestedDecoder: "behinder",
-      suggestedFamily: "aes_webshell_like",
-      confidence: 78,
-      reasons: ["候选值 Base64 解码后长度符合 AES 分组且可打印率低。"],
-    });
-
-    render(<MiscTools />);
-
-    await expandModule("payload-webshell-decoder");
-
-    const sourceText = await screen.findByText(/web\.test\/index\.jsp/);
-    const sourceButton = sourceText.closest("button");
-    expect(sourceButton).toBeTruthy();
-    fireEvent.click(sourceButton!);
-
-    await waitFor(() => {
-      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("AAECAwQFBgcICQoLDA0ODw==", expect.any(AbortSignal));
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Godzilla" }));
-
-    await waitFor(() => {
-      expect(mocks.decodeStreamPayload).toHaveBeenCalled();
-    });
-    const [, , options] = mocks.decodeStreamPayload.mock.calls.at(-1)!;
-    expect(options).toMatchObject({
-      pass: "7f0e6f",
-      extractParam: true,
-      urlDecodeRounds: 1,
-      inputEncoding: "base64",
-      cipher: "aes_ecb",
-      stripMarkers: true,
-    });
-    expect((options as Record<string, unknown>).key ?? "").toBe("");
-  });
-
   it("keeps manual payload workflow available when no capture is loaded", async () => {
     mocks.sentinelState.fileMeta.path = "";
     mocks.sentinelState.fileMeta.name = "";
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
+    });
 
     expect(await screen.findByText(/可先手动粘贴 payload/)).toBeInTheDocument();
     expect(mocks.listStreamPayloadSources).not.toHaveBeenCalled();
@@ -292,7 +210,9 @@ describe("MiscTools payload and session analysis", () => {
 
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
+    });
 
     fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), { target: { value: "just-random-text" } });
     fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
@@ -306,7 +226,9 @@ describe("MiscTools payload and session analysis", () => {
   it("re-runs payload inspection when the same input is submitted again", async () => {
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
+    });
 
     fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), {
       target: { value: "pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==" },
@@ -328,7 +250,9 @@ describe("MiscTools payload and session analysis", () => {
   it("shows an immediate hint and skips inspect for empty payload input", async () => {
     render(<MiscTools />);
 
-    await expandModule("payload-webshell-decoder");
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByRole("button", { name: "识别候选" })).toBeInTheDocument();
+    });
 
     fireEvent.click(await screen.findByRole("button", { name: "识别候选" }));
 

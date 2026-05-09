@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-export const sizeBudgets = [
+export const sourceSizeBudgets = [
   {
     path: "src/app/integrations/wailsBridge.ts",
     maxLines: 380,
@@ -111,6 +111,61 @@ export const sizeBudgets = [
     reason: "USB tables should keep HID and mass-storage sections modular",
   },
 ];
+
+export const testSizeBudgets = [
+  {
+    path: "src/app/pages/MiscTools.testFixtures.ts",
+    maxLines: 470,
+    reason: "MISC shared test fixtures should keep heavy scenario data split by domain",
+  },
+  {
+    path: "src/app/pages/MiscTools.test.tsx",
+    maxLines: 330,
+    reason: "MISC base page tests should not absorb session or custom module workflows",
+  },
+  {
+    path: "src/app/pages/MiscTools.payloadHints.test.tsx",
+    maxLines: 180,
+    reason: "MISC payload hint precedence tests should stay focused on source-vs-inspection behavior",
+  },
+  {
+    path: "src/app/pages/C2Analysis.vshell.test.tsx",
+    maxLines: 330,
+    reason: "VShell workflow tests should split again if new decrypt or table flows are added",
+  },
+  {
+    path: "src/app/pages/C2Analysis.test.tsx",
+    maxLines: 320,
+    reason: "C2 base page tests should keep decrypt and candidate flows in sibling test files",
+  },
+  {
+    path: "src/app/pages/UsbAnalysis.testFixtures.ts",
+    maxLines: 240,
+    reason: "USB fixtures should stay reusable and avoid mixing page assertions",
+  },
+  {
+    path: "src/app/pages/MiscTools.sessions.test.tsx",
+    maxLines: 220,
+    reason: "MISC session tests should remain focused on candidate loading and selection",
+  },
+  {
+    path: "src/app/pages/C2Analysis.decrypt.test.tsx",
+    maxLines: 220,
+    reason: "C2 decrypt tests should stay focused on request and result-table behavior",
+  },
+  {
+    path: "src/app/pages/UsbAnalysis.test.tsx",
+    maxLines: 160,
+    reason: "USB page tests should use fixtures instead of inline protocol records",
+  },
+  {
+    path: "src/app/pages/C2Analysis.candidates.test.tsx",
+    maxLines: 190,
+    reason: "C2 candidate tests should keep row navigation and detail assertions scoped",
+  },
+];
+
+export const sizeBudgets = [...sourceSizeBudgets, ...testSizeBudgets];
 
 export function countLines(text) {
   if (text.length === 0) {
