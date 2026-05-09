@@ -217,8 +217,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/RuntimeSettingsSidebar.tsx",
-    maxLines: 470,
-    reason: "runtime settings sidebar should not grow into workflow-specific settings",
+    maxLines: 350,
+    reason: "runtime settings sidebar should keep state wiring separate from presentational controls",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSidebarParts.tsx",
+    maxLines: 145,
+    reason: "runtime settings presentational controls and helpers should stay small",
   },
   {
     path: "src/app/features/usb/UsbTables.tsx",
@@ -317,6 +322,11 @@ export const testSizeBudgets = [
     path: "src/app/features/media/MediaSessionTableUtils.test.ts",
     maxLines: 145,
     reason: "media session table helper tests should stay focused on playback and transcription state rules",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
+    maxLines: 110,
+    reason: "runtime settings helper tests should stay focused on normalization and dependency status rules",
   },
 ];
 

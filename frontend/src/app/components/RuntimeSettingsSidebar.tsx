@@ -14,132 +14,15 @@ import {
 
 import type { ToolRuntimeConfig } from "../core/types";
 import { useSentinel } from "../state/SentinelContext";
+import {
+  buildSpeechIssues,
+  Field,
+  MiniStatus,
+  normalizeConfig,
+  RuntimeDependencyCard,
+  StatusLine,
+} from "./RuntimeSettingsSidebarParts";
 import { useSidebar } from "./ui/sidebar";
-
-function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeConfig {
-  return {
-    tsharkPath: config?.tsharkPath ?? "",
-    ffmpegPath: config?.ffmpegPath ?? "",
-    pythonPath: config?.pythonPath ?? "",
-    voskModelPath: config?.voskModelPath ?? "",
-    yaraEnabled: config?.yaraEnabled ?? true,
-    yaraBin: config?.yaraBin ?? "",
-    yaraRules: config?.yaraRules ?? "",
-    yaraTimeoutMs: config?.yaraTimeoutMs && config.yaraTimeoutMs > 0 ? config.yaraTimeoutMs : 25000,
-  };
-}
-
-function statusTone(available: boolean, enabled = true) {
-  if (!enabled) {
-    return "border-slate-200 bg-slate-50 text-slate-500";
-  }
-  return available
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-rose-200 bg-rose-50 text-rose-700";
-}
-
-function Field({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-slate-700">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition focus:border-blue-400"
-      />
-      {hint ? <span className="text-[11px] leading-5 text-slate-500">{hint}</span> : null}
-    </label>
-  );
-}
-
-function StatusLine({
-  label,
-  available,
-  message,
-  path,
-  enabled = true,
-  preferMessageWhenUnavailable = false,
-}: {
-  label: string;
-  available: boolean;
-  message: string;
-  path?: string;
-  enabled?: boolean;
-  preferMessageWhenUnavailable?: boolean;
-}) {
-  const resolvedText = !enabled
-    ? message || "当前组件已关闭"
-    : (!available && preferMessageWhenUnavailable)
-      ? (message || "等待检测")
-      : (path?.trim() ? path : message || "等待检测");
-  return (
-    <div className={`rounded-xl border px-3 py-2 ${statusTone(available, enabled)}`}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[11px]">{!enabled ? "已关闭" : available ? "已就绪" : "未就绪"}</span>
-      </div>
-      <div className="mt-1 break-all text-[11px] leading-5">
-        {resolvedText}
-      </div>
-    </div>
-  );
-}
-
-function MiniStatus({
-  label,
-  available,
-  enabled = true,
-}: {
-  label: string;
-  available: boolean;
-  enabled?: boolean;
-}) {
-  const tone = !enabled
-    ? "border-slate-200 bg-slate-50 text-slate-500"
-    : available
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : "border-rose-200 bg-rose-50 text-rose-700";
-  return (
-    <div className={`rounded-2xl border px-3 py-2 ${tone}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</div>
-      <div className="mt-1 text-sm font-semibold">{!enabled ? "已关闭" : available ? "就绪" : "缺失"}</div>
-    </div>
-  );
-}
-
-function buildSpeechIssues(snapshot: ReturnType<typeof useSentinel>["toolRuntimeSnapshot"]) {
-  const speech = snapshot?.speech;
-  if (!speech) {
-    return [];
-  }
-  const issues: string[] = [];
-  if (!speech.pythonAvailable) {
-    issues.push("Python 不可用");
-  }
-  if (!speech.voskAvailable) {
-    issues.push("vosk 模块缺失");
-  }
-  if (!speech.modelAvailable) {
-    issues.push("Vosk 模型目录缺失");
-  }
-  if (!speech.ffmpegAvailable) {
-    issues.push("ffmpeg 不可用");
-  }
-  return issues;
-}
 
 export function RuntimeSettingsSidebar() {
   const { toggleSidebar } = useSidebar();
@@ -295,7 +178,9 @@ export function RuntimeSettingsSidebar() {
             <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div>
                 <div className="text-xs font-semibold text-slate-800">启用 YARA 狩猎</div>
-                <div className="mt-0.5 text-[11px] text-slate-500">关闭后会保留路径配置，只是不再参与对象与重组流内容的狩猎扫描。</div>
+                <div className="mt-0.5 text-[11px] text-slate-500">
+                  关闭后会保留路径配置，只是不再参与对象与重组流内容的狩猎扫描。
+                </div>
               </div>
               <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
                 <input
@@ -326,7 +211,9 @@ export function RuntimeSettingsSidebar() {
                   min={1000}
                   step={1000}
                   value={form.yaraTimeoutMs}
-                  onChange={(event) => setForm((prev) => ({ ...prev, yaraTimeoutMs: Number(event.target.value) || 25000 }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, yaraTimeoutMs: Number(event.target.value) || 25000 }))
+                  }
                   className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition focus:border-blue-400"
                 />
               </label>
@@ -417,18 +304,18 @@ export function RuntimeSettingsSidebar() {
               </div>
             ) : null}
             <div className="grid grid-cols-2 gap-2">
-              <div className={`rounded-xl border px-3 py-2 ${statusTone(toolRuntimeSnapshot?.speech.pythonAvailable ?? false)}`}>
-                <div className="flex items-center gap-1 text-xs font-semibold"><FolderCog className="h-3.5 w-3.5" /> Python</div>
-                <div className="mt-1 break-all text-[11px] leading-5">
-                  {toolRuntimeSnapshot?.speech.pythonCommand || "等待检测"}
-                </div>
-              </div>
-              <div className={`rounded-xl border px-3 py-2 ${statusTone(toolRuntimeSnapshot?.speech.modelAvailable ?? false)}`}>
-                <div className="flex items-center gap-1 text-xs font-semibold"><MicVocal className="h-3.5 w-3.5" /> Vosk 模型</div>
-                <div className="mt-1 break-all text-[11px] leading-5">
-                  {toolRuntimeSnapshot?.speech.modelPath || form.voskModelPath || "等待检测"}
-                </div>
-              </div>
+              <RuntimeDependencyCard
+                label="Python"
+                Icon={FolderCog}
+                available={toolRuntimeSnapshot?.speech.pythonAvailable ?? false}
+                value={toolRuntimeSnapshot?.speech.pythonCommand || "等待检测"}
+              />
+              <RuntimeDependencyCard
+                label="Vosk 模型"
+                Icon={MicVocal}
+                available={toolRuntimeSnapshot?.speech.modelAvailable ?? false}
+                value={toolRuntimeSnapshot?.speech.modelPath || form.voskModelPath || "等待检测"}
+              />
             </div>
           </section>
         </div>
@@ -438,7 +325,10 @@ export function RuntimeSettingsSidebar() {
         <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-500">
           <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
           <div>
-            {notice || (backendConnected ? "路径修改后会立即应用到当前桌面端运行时，重启后也会自动重新加载这些设置。" : "后端暂时未连接，不过可以先填写路径，待后端连上后会自动重新应用。")}
+            {notice ||
+              (backendConnected
+                ? "路径修改后会立即应用到当前桌面端运行时，重启后也会自动重新加载这些设置。"
+                : "后端暂时未连接，不过可以先填写路径，待后端连上后会自动重新应用。")}
           </div>
         </div>
       </div>
