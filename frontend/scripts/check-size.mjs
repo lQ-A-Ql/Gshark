@@ -147,8 +147,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/ThreatHunting.tsx",
-    maxLines: 510,
-    reason: "threat hunting page should move complex result views into feature components",
+    maxLines: 280,
+    reason: "threat hunting page should stay focused on runtime config, data loading, and navigation orchestration",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingPanels.tsx",
+    maxLines: 380,
+    reason: "threat hunting display panels should stay presentational and avoid backend or route orchestration",
   },
   {
     path: "src/app/pages/Workspace.tsx",
