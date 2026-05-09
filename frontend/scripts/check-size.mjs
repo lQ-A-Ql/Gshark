@@ -190,8 +190,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/VehicleAnalysis.tsx",
-    maxLines: 460,
+    maxLines: 385,
     reason: "vehicle page should move larger protocol panels into feature components",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleOverviewPanel.tsx",
+    maxLines: 80,
+    reason: "vehicle overview panel should stay limited to summary cards, conversations, and plan hints",
   },
   {
     path: "src/app/features/vehicle/VehicleCanDataBoard.tsx",
