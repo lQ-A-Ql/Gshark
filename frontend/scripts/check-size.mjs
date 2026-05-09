@@ -227,13 +227,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/PacketVirtualTable.tsx",
-    maxLines: 360,
-    reason: "packet table should stay focused on virtualization, scrolling, resizing, and context menus",
+    maxLines: 240,
+    reason: "packet table should stay focused on virtualization, scrolling, resizing, and state orchestration",
   },
   {
     path: "src/app/components/PacketVirtualTableColumns.tsx",
     maxLines: 160,
     reason: "packet table column config, persistence, and cell rules should stay separate from virtualization",
+  },
+  {
+    path: "src/app/components/PacketVirtualTableHeader.tsx",
+    maxLines: 90,
+    reason: "packet table header should stay focused on column settings and resize handles",
+  },
+  {
+    path: "src/app/components/PacketVirtualTableRows.tsx",
+    maxLines: 115,
+    reason: "packet table rows should stay focused on row coloring and cell rendering",
+  },
+  {
+    path: "src/app/components/PacketVirtualTableMenu.tsx",
+    maxLines: 75,
+    reason: "packet table context menu should stay focused on follow-stream actions",
   },
   {
     path: "src/app/pages/ThreatHunting.tsx",

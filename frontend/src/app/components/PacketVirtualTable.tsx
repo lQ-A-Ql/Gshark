@@ -1,24 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { Packet } from "../core/types";
-import { getPacketColorStyle } from "../core/packetColoring";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import { Settings2 } from "lucide-react";
-import { FloatingSurface } from "./ui/FloatingSurface";
 import { useViewportSafePosition } from "../hooks/useViewportSafePosition";
 import {
   DEFAULT_COLUMNS,
-  getCommunicationFailureLevel,
   loadSavedColumns,
-  renderPacketCell,
   saveColumns,
   type ColumnId,
   type ColumnSpec,
 } from "./PacketVirtualTableColumns";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
+import { PacketVirtualTableHeader } from "./PacketVirtualTableHeader";
+import { PacketVirtualTableMenu } from "./PacketVirtualTableMenu";
+import { PacketVirtualTableRows } from "./PacketVirtualTableRows";
 
 interface PacketVirtualTableProps {
   packets: Packet[];
@@ -68,10 +60,7 @@ export function PacketVirtualTable({
 
   const rows = useMemo(() => packets.slice(startIndex, endIndex + 1), [packets, startIndex, endIndex]);
   const visibleColumns = useMemo(() => columns.filter((col) => col.visible), [columns]);
-  const gridTemplateColumns = useMemo(
-    () => visibleColumns.map((col) => `${col.width}px`).join(" "),
-    [visibleColumns],
-  );
+  const gridTemplateColumns = useMemo(() => visibleColumns.map((col) => `${col.width}px`).join(" "), [visibleColumns]);
 
   useEffect(() => {
     const handleMove = (event: MouseEvent) => {
@@ -80,9 +69,7 @@ export function PacketVirtualTable({
 
       const diff = event.clientX - resizing.startX;
       const nextWidth = Math.max(64, resizing.startWidth + diff);
-      setColumns((prev) =>
-        prev.map((col) => (col.id === resizing.id ? { ...col, width: nextWidth } : col)),
-      );
+      setColumns((prev) => prev.map((col) => (col.id === resizing.id ? { ...col, width: nextWidth } : col)));
     };
 
     const handleUp = () => {
@@ -170,6 +157,13 @@ export function PacketVirtualTable({
     setColumns(DEFAULT_COLUMNS);
   };
 
+  const openPacketContextMenu = (event: ReactMouseEvent<HTMLDivElement>, packet: Packet) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(packet.id);
+    openMenuAtEvent(event, packet);
+  };
+
   return (
     <div
       className="flex h-full flex-col overflow-hidden"
@@ -179,52 +173,17 @@ export function PacketVirtualTable({
         closeMenu();
       }}
     >
-      <div className="sticky top-0 z-10 bg-accent text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-        <div className="flex items-center justify-end border-b border-border px-2 py-1">
-          <button
-            className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
-            onClick={() => setShowColumnPanel((v) => !v)}
-          >
-            <Settings2 className="h-3.5 w-3.5" /> 列设置
-          </button>
-        </div>
-        {showColumnPanel && (
-          <div className="grid grid-cols-2 gap-2 border-b border-border bg-card p-2 text-[11px]">
-            {columns.map((col) => (
-              <label key={col.id} className="flex items-center gap-2 rounded border border-border px-2 py-1">
-                <input
-                  type="checkbox"
-                  checked={col.visible}
-                  onChange={() => toggleColumnVisible(col.id)}
-                  className="accent-blue-600"
-                />
-                <input
-                  value={col.label}
-                  onChange={(event) => updateLabel(col.id, event.target.value)}
-                  className="w-full border-none bg-transparent text-[11px] outline-none"
-                />
-              </label>
-            ))}
-            <button
-              className="col-span-2 rounded border border-border bg-accent px-2 py-1 text-muted-foreground hover:bg-accent/80"
-              onClick={resetColumns}
-            >
-              恢复默认列配置
-            </button>
-          </div>
-        )}
-        <div className="grid text-xs font-medium" style={{ gridTemplateColumns }}>
-          {visibleColumns.map((col) => (
-            <div key={col.id} className="relative border-r border-border px-3 py-2 last:border-r-0">
-              {col.label}
-              <div
-                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize"
-                onMouseDown={(event) => startResize(col.id, event)}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      <PacketVirtualTableHeader
+        columns={columns}
+        visibleColumns={visibleColumns}
+        gridTemplateColumns={gridTemplateColumns}
+        showColumnPanel={showColumnPanel}
+        onToggleColumnPanel={() => setShowColumnPanel((value) => !value)}
+        onToggleColumnVisible={toggleColumnVisible}
+        onUpdateLabel={updateLabel}
+        onResetColumns={resetColumns}
+        onStartResize={startResize}
+      />
 
       <div
         ref={viewportRef}
@@ -243,117 +202,26 @@ export function PacketVirtualTable({
         }}
       >
         <div style={{ height: totalHeight, position: "relative" }}>
-          {rows.map((packet, index) => {
-            const absoluteIndex = startIndex + index;
-            const top = absoluteIndex * ROW_HEIGHT;
-            const selected = selectedPacketId === packet.id;
-            const failureLevel = getCommunicationFailureLevel(packet);
-            const packetColor = getPacketColorStyle(packet);
-
-            return (
-              <div
-                key={`${packet.id}-${absoluteIndex}`}
-                onClick={() => onSelect(packet.id)}
-                onDoubleClick={() => packet.proto === "HTTP" && onDoubleClickHttp()}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onSelect(packet.id);
-                  openMenuAtEvent(event, packet);
-                }}
-                className={cn(
-                  "grid border-b border-border/60 text-xs transition-colors",
-                  selected
-                    ? "bg-blue-600 text-white"
-                    : packetColor
-                      ? ""
-                      : failureLevel === "critical"
-                      ? "bg-rose-50 text-rose-900 hover:bg-rose-100"
-                      : failureLevel === "major"
-                        ? "bg-orange-50 text-orange-900 hover:bg-orange-100"
-                        : failureLevel === "warn"
-                          ? "bg-amber-50 text-amber-900 hover:bg-amber-100"
-                          : "hover:bg-accent text-foreground",
-                )}
-                style={{
-                  position: "absolute",
-                  top,
-                  left: 0,
-                  right: 0,
-                  height: ROW_HEIGHT,
-                  gridTemplateColumns,
-                  ...(selected
-                    ? null
-                    : packetColor
-                      ? {
-                        backgroundImage: packetColor.backgroundGradient,
-                        backgroundColor: "transparent",
-                        color: packetColor.color,
-                      }
-                      : null),
-                }}
-                title={selected ? undefined : packetColor?.ruleName}
-              >
-                {visibleColumns.map((col) => (
-                  <div key={col.id} className="border-r border-border/60 last:border-r-0">
-                    {renderPacketCell(packet, col.id)}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+          <PacketVirtualTableRows
+            rows={rows}
+            rowHeight={ROW_HEIGHT}
+            startIndex={startIndex}
+            selectedPacketId={selectedPacketId}
+            visibleColumns={visibleColumns}
+            gridTemplateColumns={gridTemplateColumns}
+            onSelect={onSelect}
+            onDoubleClickHttp={onDoubleClickHttp}
+            onOpenContextMenu={openPacketContextMenu}
+          />
         </div>
       </div>
 
-      {menuPosition ? (
-        <FloatingSurface
-          floatingRef={menuRef}
-          role="menu"
-          className="w-48 py-1.5"
-          x={menuPosition.x}
-          y={menuPosition.y}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
-            onClick={() => {
-              onFollowStream(menuPosition.context, "tcp");
-              closeMenu();
-            }}
-          >
-            追踪 TCP 流
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
-            onClick={() => {
-              onFollowStream(menuPosition.context, "udp");
-              closeMenu();
-            }}
-          >
-            追踪 UDP 流
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="w-full px-3 py-2 text-left font-medium text-slate-700 transition hover:bg-cyan-50 hover:text-cyan-700"
-            onClick={() => {
-              onFollowStream(menuPosition.context, "http");
-              closeMenu();
-            }}
-          >
-            追踪 HTTP 会话
-          </button>
-        </FloatingSurface>
-      ) : null}
+      <PacketVirtualTableMenu
+        menuRef={menuRef}
+        menuPosition={menuPosition}
+        onFollowStream={onFollowStream}
+        onClose={closeMenu}
+      />
     </div>
   );
 }
