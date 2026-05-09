@@ -217,8 +217,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/media/MediaSessionTable.tsx",
-    maxLines: 365,
-    reason: "media session table should keep playback panels and row helper logic in sibling modules",
+    maxLines: 240,
+    reason: "media session table should keep row cell rendering in sibling modules",
+  },
+  {
+    path: "src/app/features/media/MediaSessionCells.tsx",
+    maxLines: 220,
+    reason: "media session cells should stay scoped to type, transcription, and export actions",
   },
   {
     path: "src/app/features/media/MediaSessionTableUtils.ts",
@@ -352,6 +357,11 @@ export const testSizeBudgets = [
     path: "src/app/features/media/MediaSessionTableUtils.test.ts",
     maxLines: 145,
     reason: "media session table helper tests should stay focused on playback and transcription state rules",
+  },
+  {
+    path: "src/app/features/media/MediaSessionCells.test.tsx",
+    maxLines: 150,
+    reason: "media session cell tests should stay focused on transcription and artifact actions",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
