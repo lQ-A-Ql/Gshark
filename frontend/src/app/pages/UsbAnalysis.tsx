@@ -1,5 +1,5 @@
-import { HardDrive, Keyboard, Usb, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { HardDrive, Keyboard, Usb } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -16,20 +16,23 @@ import {
   keyboardReplayToken,
 } from "../features/usb/UsbHidPanels";
 import {
-  ControlRequestTable,
+  Banner,
+  DeviceChips,
+  NotesList,
+  PrimaryTabButton,
+  SecondaryTabButton,
+} from "../features/usb/UsbAnalysisControls";
+import { UsbMassStoragePanel, type MassStorageSubTab } from "../features/usb/UsbMassStoragePanel";
+import { UsbOtherPanel, type OtherSubTab } from "../features/usb/UsbOtherPanel";
+import {
   KeyboardEventTable,
-  MassStorageFilters,
-  MassStorageOperationTable,
   MouseEventTable,
-  USBRecordTable,
 } from "../features/usb/UsbTables";
 import { useUsbAnalysis } from "../features/usb/useUsbAnalysis";
 import { useSentinel } from "../state/SentinelContext";
 
 type UsbPrimaryTab = "hid" | "mass-storage" | "other";
 type HidSubTab = "keyboard" | "mouse";
-type MassStorageSubTab = "overview" | "read" | "write";
-type OtherSubTab = "overview" | "control" | "raw";
 
 const USB_PROTOCOL_TAGS = ["HID", "Mass Storage", "其他"];
 
@@ -398,139 +401,31 @@ export default function UsbAnalysis() {
       )}
 
       {activePrimaryTab === "mass-storage" && (
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <SecondaryTabButton
-              active={activeMassStorageSubTab === "overview"}
-              onClick={() => setActiveMassStorageSubTab("overview")}
-            >
-              概览
-            </SecondaryTabButton>
-            <SecondaryTabButton
-              active={activeMassStorageSubTab === "read"}
-              onClick={() => setActiveMassStorageSubTab("read")}
-            >
-              读请求
-            </SecondaryTabButton>
-            <SecondaryTabButton
-              active={activeMassStorageSubTab === "write"}
-              onClick={() => setActiveMassStorageSubTab("write")}
-            >
-              写请求
-            </SecondaryTabButton>
-          </div>
-
-          {activeMassStorageSubTab === "overview" && (
-            <>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-                <StatCard title="总存储包" value={analysis.massStorage.totalPackets.toLocaleString()} />
-                <StatCard title="读请求数" value={analysis.massStorage.readPackets.toLocaleString()} />
-                <StatCard title="写请求数" value={analysis.massStorage.writePackets.toLocaleString()} />
-                <StatCard title="LUN 数" value={String(analysis.massStorage.luns.length)} />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <Panel title="命令分布">
-                  <BucketChart data={analysis.massStorage.commands} barClassName="bg-cyan-500" />
-                </Panel>
-                <Panel title="设备分布">
-                  <BucketChart data={analysis.massStorage.devices} barClassName="bg-violet-500" />
-                </Panel>
-                <Panel title="分析提示">
-                  <NotesList notes={massStorageNotes} emptyLabel="暂无存储域提示" />
-                </Panel>
-              </div>
-            </>
-          )}
-
-          {(activeMassStorageSubTab === "read" || activeMassStorageSubTab === "write") && (
-            <>
-              <MassStorageFilters
-                devices={massStorageDevices}
-                luns={massStorageLUNs}
-                activeDevice={activeMassStorageDevice}
-                activeLun={activeMassStorageLUN}
-                onDeviceChange={setActiveMassStorageDevice}
-                onLunChange={setActiveMassStorageLUN}
-              />
-              <Panel
-                title={
-                  activeMassStorageSubTab === "read"
-                    ? `读请求 (${filteredReadOperations.length})`
-                    : `写请求 (${filteredWriteOperations.length})`
-                }
-              >
-                <MassStorageOperationTable
-                  rows={activeMassStorageSubTab === "read" ? filteredReadOperations : filteredWriteOperations}
-                />
-              </Panel>
-            </>
-          )}
-        </div>
+        <UsbMassStoragePanel
+          analysis={analysis.massStorage}
+          notes={massStorageNotes}
+          activeSubTab={activeMassStorageSubTab}
+          devices={massStorageDevices}
+          luns={massStorageLUNs}
+          activeDevice={activeMassStorageDevice}
+          activeLun={activeMassStorageLUN}
+          filteredReadOperations={filteredReadOperations}
+          filteredWriteOperations={filteredWriteOperations}
+          onSubTabChange={setActiveMassStorageSubTab}
+          onDeviceChange={setActiveMassStorageDevice}
+          onLunChange={setActiveMassStorageLUN}
+        />
       )}
 
       {activePrimaryTab === "other" && (
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <SecondaryTabButton
-              active={activeOtherSubTab === "overview"}
-              onClick={() => setActiveOtherSubTab("overview")}
-            >
-              概览
-            </SecondaryTabButton>
-            <SecondaryTabButton
-              active={activeOtherSubTab === "control"}
-              onClick={() => setActiveOtherSubTab("control")}
-            >
-              控制请求
-            </SecondaryTabButton>
-            <SecondaryTabButton active={activeOtherSubTab === "raw"} onClick={() => setActiveOtherSubTab("raw")}>
-              原始记录
-            </SecondaryTabButton>
-          </div>
-
-          {activeOtherSubTab === "overview" && (
-            <>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-                <StatCard title="其他 USB 包" value={analysis.other.totalPackets.toLocaleString()} />
-                <StatCard title="设备数" value={String(analysis.other.devices.length)} />
-                <StatCard title="端点数" value={String(analysis.other.endpoints.length)} />
-                <StatCard
-                  title="Setup 请求数"
-                  value={String(analysis.other.setupRequests.reduce((sum, item) => sum + item.count, 0))}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <Panel title="设备分布">
-                  <BucketChart data={analysis.other.devices} barClassName="bg-amber-500" />
-                </Panel>
-                <Panel title="端点分布">
-                  <BucketChart data={analysis.other.endpoints} barClassName="bg-slate-500" />
-                </Panel>
-                <Panel title="Setup 请求分布">
-                  <BucketChart data={analysis.other.setupRequests} barClassName="bg-rose-500" />
-                </Panel>
-              </div>
-
-              <Panel title="其他域提示">
-                <NotesList notes={otherNotes} emptyLabel="暂无其他域提示" />
-              </Panel>
-            </>
-          )}
-
-          {activeOtherSubTab === "control" && (
-            <Panel title={`控制请求 (${controlRecords.length})`}>
-              <ControlRequestTable rows={controlRecords} />
-            </Panel>
-          )}
-
-          {activeOtherSubTab === "raw" && (
-            <Panel title={`原始记录 (${otherRecords.length})`}>
-              <USBRecordTable rows={otherRecords} />
-            </Panel>
-          )}
-        </div>
+        <UsbOtherPanel
+          analysis={analysis.other}
+          records={otherRecords}
+          controlRecords={controlRecords}
+          notes={otherNotes}
+          activeSubTab={activeOtherSubTab}
+          onSubTabChange={setActiveOtherSubTab}
+        />
       )}
     </PageShell>
   );
@@ -578,117 +473,6 @@ function pickDefaultPrimaryTab(analysis: USBAnalysisData): UsbPrimaryTab {
   return "other";
 }
 
-function PrimaryTabButton({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors ${active ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"}`}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-function SecondaryTabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${active ? "border-cyan-500 bg-cyan-50 text-cyan-700" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function DeviceChips({
-  devices,
-  activeDevice,
-  emptyLabel,
-  onSelect,
-}: {
-  devices: string[];
-  activeDevice: string;
-  emptyLabel: string;
-  onSelect: (device: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {devices.length === 0 ? (
-        <span className="rounded border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
-          {emptyLabel}
-        </span>
-      ) : (
-        devices.map((device) => (
-          <button
-            key={device}
-            type="button"
-            onClick={() => onSelect(device)}
-            className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${activeDevice === device ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"}`}
-          >
-            {device}
-          </button>
-        ))
-      )}
-    </div>
-  );
-}
-
-function NotesList({ notes, emptyLabel }: { notes: string[]; emptyLabel: string }) {
-  if (notes.length === 0) {
-    return <EmptyState>{emptyLabel}</EmptyState>;
-  }
-  return (
-    <div className="space-y-2 text-sm">
-      {notes.map((note, index) => (
-        <div
-          key={`${note}-${index}`}
-          className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2"
-        >
-          <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-          <span>{note}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values));
-}
-
-function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
-function Banner({ children, tone }: { children: ReactNode; tone: "muted" | "warning" }) {
-  const className =
-    tone === "warning"
-      ? "mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"
-      : "mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground";
-  return <div className={className}>{children}</div>;
 }

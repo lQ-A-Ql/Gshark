@@ -32,8 +32,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/UsbAnalysis.tsx",
-    maxLines: 720,
-    reason: "USB page is near the large-page threshold",
+    maxLines: 510,
+    reason: "USB page should keep domain panels and shared controls in feature components",
+  },
+  {
+    path: "src/app/features/usb/UsbAnalysisControls.tsx",
+    maxLines: 130,
+    reason: "USB shared controls should stay generic and avoid domain-specific analysis logic",
+  },
+  {
+    path: "src/app/features/usb/UsbMassStoragePanel.tsx",
+    maxLines: 120,
+    reason: "USB mass-storage panel should keep overview and read/write table wiring scoped",
+  },
+  {
+    path: "src/app/features/usb/UsbOtherPanel.tsx",
+    maxLines: 105,
+    reason: "USB other-domain panel should stay focused on control/raw record presentation",
   },
   {
     path: "src/app/pages/MediaAnalysis.tsx",
