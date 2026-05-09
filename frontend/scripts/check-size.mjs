@@ -245,6 +245,21 @@ export const sourceSizeBudgets = [
     reason: "update center page should only orchestrate update status loading and actions",
   },
   {
+    path: "src/app/pages/ObjectExport.tsx",
+    maxLines: 90,
+    reason: "object export page should only orchestrate filtering, selection, and download actions",
+  },
+  {
+    path: "src/app/features/object/ObjectExportPanels.tsx",
+    maxLines: 250,
+    reason: "object export panels should stay focused on hero, filters, grouped grid, and footer presentation",
+  },
+  {
+    path: "src/app/features/object/objectExportRules.ts",
+    maxLines: 135,
+    reason: "object export rules should keep classification, labels, filtering, and grouping pure",
+  },
+  {
     path: "src/app/features/update/UpdateCenterPanels.tsx",
     maxLines: 260,
     reason: "update center panels should keep status, diagnostics, release, and step presentation scoped",
@@ -591,6 +606,11 @@ export const testSizeBudgets = [
     path: "src/app/features/update/updateCenterUtils.test.ts",
     maxLines: 30,
     reason: "update center utility tests should only cover formatting fallbacks",
+  },
+  {
+    path: "src/app/features/object/objectExportRules.test.ts",
+    maxLines: 55,
+    reason: "object export rule tests should stay focused on classification, filtering, and grouping",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
