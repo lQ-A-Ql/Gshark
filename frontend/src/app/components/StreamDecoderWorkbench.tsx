@@ -3,8 +3,8 @@ import type { StreamDecodeResult, StreamDecoderKind, StreamPayloadInspection } f
 import { bridge } from "../integrations/wailsBridge";
 import { StreamDecoderBatchPanel } from "./StreamDecoderBatchPanel";
 import { StreamDecoderCandidatePanel } from "./StreamDecoderCandidatePanel";
-import { StreamDecoderToolbar } from "./StreamDecoderToolbar";
-import { PayloadPane } from "./StreamDecoderWorkbenchParts";
+import { StreamDecoderPayloadGrid } from "./StreamDecoderPayloadGrid";
+import { StreamDecoderWorkbenchHeader } from "./StreamDecoderWorkbenchHeader";
 import { StreamDecoderSettingsPanel, type DecoderSettingsKind } from "./StreamDecoderSettingsPanel";
 import {
   buildDecoderOptions,
@@ -311,19 +311,14 @@ export function StreamDecoderWorkbench({
 
   return (
     <div className={`min-w-0 rounded-xl border ${toneClass} p-4`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-foreground">Payload 解码工作台</div>
-          <div className="text-xs text-muted-foreground">{chunkLabel}</div>
-        </div>
-        <StreamDecoderToolbar
-          runningDecoder={runningDecoder}
-          disabled={!hasPayload && !hasBatchMode}
-          onRunDecoder={(decoder) => void runDecoder(decoder)}
-          onOpenSettings={setActiveSettings}
-          onCancel={cancelDecode}
-        />
-      </div>
+      <StreamDecoderWorkbenchHeader
+        chunkLabel={chunkLabel}
+        runningDecoder={runningDecoder}
+        disabled={!hasPayload && !hasBatchMode}
+        onRunDecoder={(decoder) => void runDecoder(decoder)}
+        onOpenSettings={setActiveSettings}
+        onCancel={cancelDecode}
+      />
 
       <StreamDecoderCandidatePanel
         inspection={inspection}
@@ -360,37 +355,16 @@ export function StreamDecoderWorkbench({
         />
       )}
 
-      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <PayloadPane
-          title={
-            selectedCandidate
-              ? `候选 payload / ${selectedCandidate.label}`
-              : preparedPayload === payload
-                ? "原始 payload"
-                : "原始 payload（已自动提取）"
-          }
-          content={effectivePayload || "(empty payload)"}
-          footer={
-            selectedCandidate
-              ? `原文长度 ${payload.length}，当前候选来源 ${selectedCandidate.kind}${selectedCandidate.paramName ? ` / ${selectedCandidate.paramName}` : ""}`
-              : preparedPayload !== payload
-                ? "前端仅做轻量预处理；实际提取与解码以服务端规则为准"
-                : undefined
-          }
-        />
-        <PayloadPane
-          title={result ? `${result.summary} / ${result.encoding}` : "解码结果"}
-          content={decodeError ? decodeError : result?.text || "点击上方解码器开始分析"}
-          error={Boolean(decodeError)}
-          loading={Boolean(runningDecoder)}
-          bytesHex={result?.bytesHex}
-          confidence={result?.confidence}
-          warnings={result?.warnings}
-          signals={result?.signals}
-          attemptErrors={result?.attemptErrors}
-          footer={applyMessage || undefined}
-        />
-      </div>
+      <StreamDecoderPayloadGrid
+        rawPayload={payload}
+        preparedPayload={preparedPayload}
+        effectivePayload={effectivePayload}
+        selectedCandidate={selectedCandidate}
+        result={result}
+        decodeError={decodeError}
+        runningDecoder={runningDecoder}
+        applyMessage={applyMessage}
+      />
     </div>
   );
 }

@@ -17,8 +17,9 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 405,
-    reason: "decoder workbench should keep toolbar, batch controls, settings panels, and pure rules in sibling modules",
+    maxLines: 375,
+    reason:
+      "decoder workbench should keep rendering panes, toolbar, batch controls, settings panels, and pure rules in sibling modules",
   },
   {
     path: "src/app/components/StreamDecoderWorkbenchUtils.ts",
@@ -90,6 +91,16 @@ export const sourceSizeBudgets = [
     path: "src/app/components/StreamDecoderPayloadPane.tsx",
     maxLines: 130,
     reason: "decoder payload pane should stay focused on result display and export actions",
+  },
+  {
+    path: "src/app/components/StreamDecoderPayloadGrid.tsx",
+    maxLines: 65,
+    reason: "decoder payload grid should stay focused on raw/candidate/result pane composition",
+  },
+  {
+    path: "src/app/components/StreamDecoderWorkbenchHeader.tsx",
+    maxLines: 45,
+    reason: "decoder workbench header should stay focused on title and toolbar wiring",
   },
   {
     path: "src/app/components/stream/StreamWorkbench.tsx",
