@@ -66,6 +66,21 @@ export const sourceSizeBudgets = [
     reason: "decoder settings panels should stay focused on webshell decoder options",
   },
   {
+    path: "src/app/components/StreamDecoderWorkbenchParts.tsx",
+    maxLines: 20,
+    reason: "decoder parts compatibility layer should stay as exports only",
+  },
+  {
+    path: "src/app/components/StreamDecoderControls.tsx",
+    maxLines: 185,
+    reason: "decoder controls should keep buttons and small form primitives separate from payload rendering",
+  },
+  {
+    path: "src/app/components/StreamDecoderPayloadPane.tsx",
+    maxLines: 130,
+    reason: "decoder payload pane should stay focused on result display and export actions",
+  },
+  {
     path: "src/app/components/stream/StreamWorkbench.tsx",
     maxLines: 20,
     reason: "stream workbench should stay as a compatibility export layer",
