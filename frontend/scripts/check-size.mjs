@@ -140,7 +140,7 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/pages/MiscTools.test.tsx",
-    maxLines: 330,
+    maxLines: 270,
     reason: "MISC base page tests should not absorb session or custom module workflows",
   },
   {
@@ -165,8 +165,13 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/pages/MiscTools.sessions.test.tsx",
-    maxLines: 220,
+    maxLines: 165,
     reason: "MISC session tests should remain focused on candidate loading and selection",
+  },
+  {
+    path: "src/app/pages/MiscTools.smb3.test.tsx",
+    maxLines: 170,
+    reason: "MISC SMB3 tests should stay isolated from other session candidate workflows",
   },
   {
     path: "src/app/pages/C2Analysis.decrypt.test.tsx",
