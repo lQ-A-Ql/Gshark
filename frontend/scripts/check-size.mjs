@@ -57,8 +57,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/MediaAnalysis.tsx",
-    maxLines: 450,
-    reason: "media page is near the large-page threshold",
+    maxLines: 390,
+    reason: "media page should keep overview panels and table display in feature components",
+  },
+  {
+    path: "src/app/features/media/MediaOverviewPanels.tsx",
+    maxLines: 165,
+    reason: "media overview panels should stay presentational and avoid playback or transcription side effects",
   },
   {
     path: "src/app/components/ui/sidebar.tsx",
@@ -297,6 +302,11 @@ export const testSizeBudgets = [
     path: "src/app/pages/HttpStreamUtils.test.ts",
     maxLines: 100,
     reason: "HTTP stream helper tests should stay focused on formatting and binary-body parsing",
+  },
+  {
+    path: "src/app/features/media/MediaOverviewPanels.test.tsx",
+    maxLines: 130,
+    reason: "media overview panel tests should stay focused on stats, notes, and batch action wiring",
   },
 ];
 

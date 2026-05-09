@@ -12,6 +12,8 @@ export const prettierTargets = [
   "src/app/components/StreamDecoderWorkbenchUtils.test.ts",
   "src/app/features/c2/**/*.{ts,tsx}",
   "src/app/features/media/MediaDisplayPanels.tsx",
+  "src/app/features/media/MediaOverviewPanels.tsx",
+  "src/app/features/media/MediaOverviewPanels.test.tsx",
   "src/app/features/media/MediaSessionTable.tsx",
   "src/app/features/media/MediaTranscriptionSummaryPanel.tsx",
   "src/app/features/usb/UsbHidPanels.tsx",

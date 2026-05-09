@@ -81,7 +81,9 @@ describe("MiscTools SMB3 session key module", () => {
     await expandModule("smb3-session-key", () =>
       expect(screen.getByTestId("smb-session-candidate-select")).toBeInTheDocument(),
     );
-    expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mocks.listSMB3SessionCandidates).toHaveBeenCalledTimes(1);
+    });
     expect(await screen.findByText("已发现 2 条候选，其中 1 条材料完整")).toBeInTheDocument();
     expect(screen.getByTestId("smb-session-candidate-101")).toBeInTheDocument();
     expect(screen.getByTestId("smb-session-candidate-102")).toBeInTheDocument();
