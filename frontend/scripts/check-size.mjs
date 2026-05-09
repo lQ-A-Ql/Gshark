@@ -17,8 +17,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 900,
-    reason: "decoder workbench should keep UI parts and pure rules in sibling modules",
+    maxLines: 720,
+    reason: "decoder workbench should keep settings panels and pure rules in sibling modules",
+  },
+  {
+    path: "src/app/components/StreamDecoderSettingsPanel.tsx",
+    maxLines: 260,
+    reason: "decoder settings panels should stay focused on webshell decoder options",
   },
   {
     path: "src/app/pages/C2Analysis.tsx",
