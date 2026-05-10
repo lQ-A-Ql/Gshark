@@ -26,7 +26,6 @@ import {
   getPacketPageCursor,
   getPrevPacketCursor,
   getTotalPacketPages,
-  packetPageHasPacket,
 } from "./packetPagination";
 import {
   keepSelectedPacketDetailForId,
@@ -55,6 +54,7 @@ import { initializeCaptureStartState } from "./captureStartState";
 import { commitValidatedCaptureState } from "./captureCommitState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
+import { commitPacketPageState } from "./packetPageCommit";
 import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { preparePacketStreamState } from "./packetStreamPrepare";
@@ -232,24 +232,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const commitPacketPage = useCallback(
     (safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
-      pageStartRef.current = safeCursor;
-      setPageStart(safeCursor);
-      setTotalPackets(page.total);
-      setPackets(page.items);
-      setSelectedPacketId((prev) => {
-        if (prev == null) return null;
-        return packetPageHasPacket(page.items, prev) ? prev : null;
+      commitPacketPageState({
+        safeCursor,
+        page,
+        pageStartRef,
+        hasMorePacketsRef,
+        setPageStart,
+        setTotalPackets,
+        setPackets,
+        setSelectedPacketId,
+        setSelectedPacketDetail,
+        setSelectedPacketRawHex,
+        setSelectedPacketLayers,
+        setHasPrevPackets,
+        setPacketPageError,
+        setHasMorePackets,
       });
-      setSelectedPacketDetail((prev) => {
-        if (!prev) return null;
-        return packetPageHasPacket(page.items, prev.id) ? prev : null;
-      });
-      setSelectedPacketRawHex("");
-      setSelectedPacketLayers(null);
-      setHasPrevPackets(safeCursor > 0);
-      setPacketPageError("");
-      hasMorePacketsRef.current = page.hasMore;
-      setHasMorePackets(page.hasMore);
     },
     [],
   );

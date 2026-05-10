@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1040,
+    maxLines: 1038,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -59,6 +59,11 @@ export const sourceSizeBudgets = [
     maxLines: 85,
     reason:
       "packet page loading helper should keep request lifecycle, stale guards, and error mapping outside the provider",
+  },
+  {
+    path: "src/app/state/packetPageCommit.ts",
+    maxLines: 75,
+    reason: "packet page commit helper should stay focused on cursor, page, selected packet, and page flags",
   },
   {
     path: "src/app/state/packetFilterWorkflow.ts",
@@ -888,6 +893,11 @@ export const testSizeBudgets = [
     maxLines: 115,
     reason:
       "packet page load tests should stay focused on success, disconnected, failure, abort, and stale result behavior",
+  },
+  {
+    path: "src/app/state/packetPageCommit.test.ts",
+    maxLines: 130,
+    reason: "packet page commit tests should stay focused on page commit and selected packet retention or clearing",
   },
   {
     path: "src/app/state/packetFilterWorkflow.test.ts",
