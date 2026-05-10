@@ -46,17 +46,13 @@ import {
 import {
   buildCaptureFileMeta,
   buildOpenedCaptureFromPath,
-  buildRecentCapture,
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
-import {
-  buildFailedCaptureTransactionStatus,
-  createIdleCaptureTransactionStatus,
-  createPendingCaptureTransactionStatus,
-} from "./captureTransactionStatus";
-import { startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
+import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
+import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
+import { initializeCaptureStartState } from "./captureStartState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
@@ -634,24 +630,23 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         pendingCapture = opened;
 
         await prepareForCaptureReplacement();
-        setIsFilterLoading(false);
-        setPacketPageError("");
-        resetPreloadCounterState({
+        initializeCaptureStartState({
+          opened,
+          openedAt: new Date().toISOString(),
+          hadActiveCapture,
           preloadProcessedRef,
           preloadTotalRef,
-          setPreloadProcessed,
-          setPreloadTotal,
-        });
-        startCaptureParseRuntime({
           parseFinishedRef,
           parseErrorRef,
           preloadingRef,
+          setIsFilterLoading,
+          setPacketPageError,
+          setPreloadProcessed,
+          setPreloadTotal,
           setIsPreloadingCapture,
+          setCaptureTransaction,
+          rememberRecentCapture,
         });
-        setCaptureTransaction(
-          createPendingCaptureTransactionStatus(opened.fileName, opened.filePath, hadActiveCapture),
-        );
-        rememberRecentCapture(buildRecentCapture(opened, new Date().toISOString()));
 
         const startTask = captureTaskScopeRef.current.beginTask("capture-start");
         try {
