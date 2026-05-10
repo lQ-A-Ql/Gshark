@@ -55,6 +55,7 @@ import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
 import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
 import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
+import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -319,16 +320,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [displayFilter, loadPacketPage],
   );
 
-  const scheduleLoadMore = useCallback(
-    (delayMs = 120) => {
-      if (loadMoreScheduledRef.current != null) return;
-      loadMoreScheduledRef.current = window.setTimeout(() => {
-        loadMoreScheduledRef.current = null;
-        void loadPacketPage(pageStartRef.current);
-      }, delayMs);
-    },
-    [loadPacketPage],
-  );
+  const scheduleLoadMore = useScheduledPacketPageLoad({ loadMoreScheduledRef, pageStartRef, loadPacketPage });
 
   const updateProgressFromStatus = useProgressStatusUpdater({
     preloadProcessedRef,

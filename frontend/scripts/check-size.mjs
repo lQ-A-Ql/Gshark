@@ -257,6 +257,11 @@ export const sourceSizeBudgets = [
     reason: "progress status updater hook should only bind provider refs and setters to pure status workflow",
   },
   {
+    path: "src/app/state/hooks/useScheduledPacketPageLoad.ts",
+    maxLines: 35,
+    reason: "scheduled packet page load hook should only own timer dedupe and page-start load scheduling",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1349,6 +1354,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useProgressStatusUpdater.test.tsx",
     maxLines: 60,
     reason: "progress status updater tests should stay focused on hook wiring over pure progress workflow",
+  },
+  {
+    path: "src/app/state/hooks/useScheduledPacketPageLoad.test.tsx",
+    maxLines: 50,
+    reason: "scheduled packet page load tests should stay focused on timer dedupe and cursor handoff",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
