@@ -1278,8 +1278,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/RawStreamSections.tsx",
-    maxLines: 285,
-    reason: "raw stream sections should keep shared TCP/UDP title, payload grid, and selected panel rendering scoped",
+    maxLines: 80,
+    reason: "raw stream sections should stay a title bar and compatibility export surface",
+  },
+  {
+    path: "src/app/pages/RawStreamPayloadPanels.tsx",
+    maxLines: 215,
+    reason: "raw stream payload panels should own shared TCP/UDP chunk grid, tone, and selected chunk rendering",
   },
   {
     path: "src/app/pages/RawStreamControlBar.tsx",
