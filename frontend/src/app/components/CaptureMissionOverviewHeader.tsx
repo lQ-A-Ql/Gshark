@@ -1,7 +1,7 @@
 import { Activity, FileWarning, Network, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CaptureOverviewSnapshot } from "../core/captureOverview";
-import { formatBytes } from "../state/SentinelContext";
+import { formatBytes } from "../state/formatBytes";
 import { MetricCard } from "./DesignSystem";
 
 type CaptureMetricCard = {
@@ -94,7 +94,14 @@ export function CaptureMissionOverviewHeader({
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((item) => (
-          <MetricCard key={item.label} label={item.label} value={item.value} hint={item.detail} icon={item.icon} tone={item.tone} />
+          <MetricCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            hint={item.detail}
+            icon={item.icon}
+            tone={item.tone}
+          />
         ))}
       </div>
     </>

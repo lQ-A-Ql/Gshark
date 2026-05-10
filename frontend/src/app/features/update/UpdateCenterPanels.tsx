@@ -4,7 +4,7 @@ import { LazyMarkdown } from "../../components/LazyMarkdown";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
-import { formatBytes } from "../../state/SentinelContext";
+import { formatBytes } from "../../state/formatBytes";
 import { releaseMarkdownComponents } from "./UpdateReleaseMarkdown";
 import { formatReleaseTime } from "./updateCenterUtils";
 

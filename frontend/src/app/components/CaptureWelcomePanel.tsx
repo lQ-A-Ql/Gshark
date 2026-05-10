@@ -1,6 +1,7 @@
 import { Binary, BookOpenText, FolderOpen, History, Radar, ShieldAlert } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { formatBytes, useSentinel } from "../state/SentinelContext";
+import { useSentinel } from "../state/SentinelContext";
+import { formatBytes } from "../state/formatBytes";
 import logoImg from "../../assets/logo.png";
 
 function formatRecentTime(value: string) {

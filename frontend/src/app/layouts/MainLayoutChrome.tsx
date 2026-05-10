@@ -6,7 +6,7 @@ import { RuntimeSettingsSidebar } from "../components/RuntimeSettingsSidebar";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarRail, useSidebar } from "../components/ui/sidebar";
 import { cn } from "../components/ui/utils";
 import type { Packet } from "../core/types";
-import { formatBytes } from "../state/SentinelContext";
+import { formatBytes } from "../state/formatBytes";
 import { NAV_ITEMS, type PageTheme } from "./mainLayoutConfig";
 
 export interface MainLayoutChromeProps {

@@ -1,6 +1,6 @@
 import { Copy, Download, FileText, Headphones, Loader2, Play, Video } from "lucide-react";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
-import { formatBytes } from "../../state/SentinelContext";
+import { formatBytes } from "../../state/formatBytes";
 import {
   canPlayArtifact,
   estimateTranscriptionProgress,

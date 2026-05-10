@@ -1,7 +1,7 @@
 import { Archive, Download, FileDown, Filter, Search } from "lucide-react";
 import { cn } from "../../components/ui/utils";
 import type { ExtractedObject } from "../../core/types";
-import { formatBytes } from "../../state/SentinelContext";
+import { formatBytes } from "../../state/formatBytes";
 import { classifyObject, type ObjectGroup, type ObjectKind } from "./objectExportRules";
 
 interface ObjectExportHeroProps {

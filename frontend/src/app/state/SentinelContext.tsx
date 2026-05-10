@@ -27,13 +27,13 @@ import {
   shouldLoadSelectedPacketArtifacts,
   shouldLoadSelectedPacketDetail,
 } from "./selectedPacketState";
-import { getCaptureOpenDisconnectedStatus, getCapturePreloadDoneStatus } from "./capturePreloadStatus";
+import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
 import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
 import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState } from "./captureResetState";
-import { commitValidatedCaptureState } from "./captureCommitState";
+import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
@@ -54,7 +54,6 @@ import {
   EMPTY_SWITCH_METRICS,
   createEmptyStreamIds,
   createEmptyUdpStream,
-  prettySize,
 } from "./streamState";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
@@ -411,11 +410,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const filteredPackets = useMemo(() => packets, [packets]);
-
   const selectedPacket = useMemo(
-    () => resolveSelectedPacket(filteredPackets, selectedPacketId, selectedPacketDetail),
-    [filteredPackets, selectedPacketDetail, selectedPacketId],
+    () => resolveSelectedPacket(packets, selectedPacketId, selectedPacketDetail),
+    [packets, selectedPacketDetail, selectedPacketId],
   );
 
   const refreshAnalysisResult = useCallback(
@@ -641,9 +638,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           setPreloadProcessed,
         });
         if (!validatedFirstPage) return false;
-        commitValidatedCaptureState({
+        const finalized = await finalizeOpenedCapture({
           opened,
           validatedFirstPage,
+          captureSeq,
+          captureSeqRef,
           pageStartRef,
           hasMorePacketsRef,
           activeCapturePathRef,
@@ -670,16 +669,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           setFileMeta,
           setCaptureRevision,
           commitPacketPage,
+          refreshStreamIndex,
+          setCaptureTransaction,
+          setBackendStatus,
+          refreshAnalysisResult,
         });
-        await refreshStreamIndex();
-        if (captureSeq !== captureSeqRef.current) return false;
-        setCaptureTransaction(createIdleCaptureTransactionStatus(true));
-        setBackendStatus(getCapturePreloadDoneStatus(opened.fileName));
-        void refreshAnalysisResult({
-          capturePath: opened.filePath,
-          quietSuccess: true,
-        });
-        return true;
+        return finalized;
       } catch (error) {
         if (isAbortLikeError(error)) {
           return false;
@@ -800,19 +795,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [selectedPacketLayers, selectedPacket],
   );
   const hexDump = useMemo(() => buildHexDump(selectedPacket), [selectedPacket]);
-  const currentPage = useMemo(() => getCurrentPacketPage(pageStart, PAGE_SIZE), [pageStart]);
-  const totalPages = useMemo(() => getTotalPacketPages(totalPackets, PAGE_SIZE), [totalPackets]);
-
   const value = useMemo<SentinelContextValue>(
     () => ({
       packets,
       totalPackets,
-      currentPage,
-      totalPages,
+      currentPage: getCurrentPacketPage(pageStart, PAGE_SIZE),
+      totalPages: getTotalPacketPages(totalPackets, PAGE_SIZE),
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
-      filteredPackets,
+      filteredPackets: packets,
       hasMorePackets,
       hasPrevPackets,
       isPageLoading,
@@ -868,12 +860,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [
       packets,
       totalPackets,
-      currentPage,
-      totalPages,
+      pageStart,
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
-      filteredPackets,
       hasMorePackets,
       hasPrevPackets,
       isPageLoading,
@@ -936,10 +926,4 @@ export function useSentinel() {
     throw new Error("useSentinel must be used inside SentinelProvider");
   }
   return ctx;
-}
-
-export function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return prettySize(bytes);
 }

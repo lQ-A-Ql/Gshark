@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1035,
+    maxLines: 930,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -54,6 +54,16 @@ export const sourceSizeBudgets = [
     maxLines: 125,
     reason:
       "capture commit state helper should stay focused on packet, stream, file meta, and first page commit effects",
+  },
+  {
+    path: "src/app/state/captureFinalizeWorkflow.ts",
+    maxLines: 140,
+    reason: "capture finalize workflow should keep validated commit, stream refresh, and done status outside provider",
+  },
+  {
+    path: "src/app/state/formatBytes.ts",
+    maxLines: 10,
+    reason: "byte formatting helper should remain a tiny shared compatibility utility",
   },
   {
     path: "src/app/state/captureReplacementPrepare.ts",
@@ -920,6 +930,11 @@ export const testSizeBudgets = [
     maxLines: 170,
     reason:
       "capture commit state tests should stay focused on packet reset, stream runtime reset, metadata, and first page commit",
+  },
+  {
+    path: "src/app/state/captureFinalizeWorkflow.test.ts",
+    maxLines: 95,
+    reason: "capture finalize workflow tests should cover success and stale finalization behavior",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
