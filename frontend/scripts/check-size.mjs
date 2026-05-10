@@ -187,8 +187,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/vehicleCanMapper.ts",
-    maxLines: 105,
-    reason: "vehicle CAN mapper should keep CAN frames, payload records, DBC messages, and signal timelines local",
+    maxLines: 35,
+    reason: "vehicle CAN mapper should stay as a composition layer over CAN record and DBC mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleCanRecordMapper.ts",
+    maxLines: 45,
+    reason: "vehicle CAN record mapper should keep payload and frame summary conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleCanDbcMapper.ts",
+    maxLines: 55,
+    reason: "vehicle CAN DBC mapper should keep DBC profile, decoded message, and signal timeline conversion local",
   },
   {
     path: "src/app/integrations/mappers/vehicleDiagnosticMapper.ts",
