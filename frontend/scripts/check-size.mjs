@@ -159,6 +159,26 @@ export const sourceSizeBudgets = [
     reason: "C2 beacon pattern list should remain a small display component",
   },
   {
+    path: "src/app/features/c2/C2CandidateTable.tsx",
+    maxLines: 160,
+    reason: "C2 candidate table should keep table orchestration separate from detail, action, and pure rules modules",
+  },
+  {
+    path: "src/app/features/c2/C2CandidateTableDetails.tsx",
+    maxLines: 80,
+    reason: "C2 candidate detail panel should stay focused on expanded record presentation",
+  },
+  {
+    path: "src/app/features/c2/C2CandidateTableRules.ts",
+    maxLines: 85,
+    reason: "C2 candidate pure rules should stay separate from rendering and action components",
+  },
+  {
+    path: "src/app/features/c2/C2CandidateActions.tsx",
+    maxLines: 45,
+    reason: "C2 candidate filter actions should stay focused on protocol-specific display filter wiring",
+  },
+  {
     path: "src/app/pages/UsbAnalysis.tsx",
     maxLines: 205,
     reason: "USB page should only compose analysis loading, primary tabs, and domain panels",
