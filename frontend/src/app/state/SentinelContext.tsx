@@ -18,18 +18,7 @@ import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
 import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
-import {
-  phaseLabelForMediaProgress,
-  phaseLabelForThreatProgress,
-  useAnalysisProgress,
-} from "./hooks/useAnalysisProgress";
-import {
-  classifyMediaProgressPhase,
-  classifyThreatProgressPhase,
-  computeMediaProgressPercent,
-  computeThreatProgressPercent,
-} from "./progressHelpers";
-import { parseProgressStatus, pushRecentLabel } from "./progressStatus";
+import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
 import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import {
   getCurrentPacketPage,
@@ -103,6 +92,7 @@ import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
+import { updateProgressFromStatusState } from "./progressStatusWorkflow";
 import {
   bumpStreamSwitchSequence,
   createStreamSwitchSequences,
@@ -417,66 +407,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const updateProgressFromStatus = useCallback((message: string): boolean => {
-    const progress = parseProgressStatus(message);
-    if (!progress.consumed) {
-      return false;
-    }
-    if (progress.kind === "malformed") {
-      return true;
-    }
-    if (progress.kind === "media") {
-      const { current, total, label } = progress;
-      const progressPhase = classifyMediaProgressPhase(label);
-      const percent = computeMediaProgressPercent(progressPhase, current, total);
-      setMediaAnalysisProgress((prev) => {
-        const nextRecent = label !== prev.label ? pushRecentLabel(prev.recent, label, 4) : prev.recent;
-        return {
-          active: progressPhase !== "complete" && (total <= 0 || current < total),
-          current,
-          total,
-          label,
-          phase: progressPhase,
-          phaseLabel: phaseLabelForMediaProgress(progressPhase),
-          percent,
-          recent: nextRecent,
-        };
-      });
-      return true;
-    }
-    if (progress.kind === "threat") {
-      const { current, total, label } = progress;
-      const progressPhase = classifyThreatProgressPhase(label);
-      const percent = computeThreatProgressPercent(progressPhase, current, total);
-      setThreatAnalysisProgress((prev) => {
-        const nextRecent = label !== prev.label ? pushRecentLabel(prev.recent, label, 5) : prev.recent;
-        return {
-          active: progressPhase !== "complete" && (total <= 0 || current < total),
-          current,
-          total,
-          label,
-          phase: progressPhase,
-          phaseLabel: phaseLabelForThreatProgress(progressPhase),
-          percent,
-          recent: nextRecent,
-        };
-      });
-      return true;
-    }
-    const { phase, processed, total } = progress;
-    if (total > 0) {
-      setPreloadTotal(total);
-      preloadTotalRef.current = total;
-      setTotalPackets(total);
-    }
-    if (phase === "counting") {
-      setPreloadProcessed(0);
-      preloadProcessedRef.current = 0;
-      return true;
-    }
-    const normalized = Math.max(0, processed);
-    setPreloadProcessed(normalized);
-    preloadProcessedRef.current = normalized;
-    return true;
+    return updateProgressFromStatusState({
+      message,
+      preloadProcessedRef,
+      preloadTotalRef,
+      setPreloadProcessed,
+      setPreloadTotal,
+      setTotalPackets,
+      setMediaAnalysisProgress,
+      setThreatAnalysisProgress,
+    });
   }, []);
 
   const wakeCaptureWaiters = useCallback(() => {

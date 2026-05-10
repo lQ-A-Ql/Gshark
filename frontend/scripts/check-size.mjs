@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1210,
+    maxLines: 1185,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -65,6 +65,12 @@ export const sourceSizeBudgets = [
     path: "src/app/state/packetStreamPrepare.ts",
     maxLines: 45,
     reason: "packet stream prepare should keep packet location to active stream resolution outside the provider",
+  },
+  {
+    path: "src/app/state/progressStatusWorkflow.ts",
+    maxLines: 85,
+    reason:
+      "progress status workflow should keep media, threat, and capture preload progress updates outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -847,6 +853,12 @@ export const testSizeBudgets = [
     path: "src/app/state/packetStreamPrepare.test.ts",
     maxLines: 70,
     reason: "packet stream prepare tests should stay focused on locate, preferred protocol, and missing stream guards",
+  },
+  {
+    path: "src/app/state/progressStatusWorkflow.test.ts",
+    maxLines: 125,
+    reason:
+      "progress workflow tests should stay focused on non-progress, malformed, media, threat, and capture progress",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
