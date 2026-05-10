@@ -1207,8 +1207,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/IndustrialAnalysis.tsx",
-    maxLines: 310,
+    maxLines: 170,
     reason: "industrial page should stay focused on analysis loading and high-level protocol orchestration",
+  },
+  {
+    path: "src/app/features/industrial/IndustrialAuxiliaryPanels.tsx",
+    maxLines: 180,
+    reason: "industrial auxiliary panels should own rule, control-command, and protocol-detail table rendering",
   },
   {
     path: "src/app/features/industrial/IndustrialModbusPanels.tsx",
