@@ -247,6 +247,11 @@ export const sourceSizeBudgets = [
     reason: "selected packet action hook should only own id selection and stale detail pruning",
   },
   {
+    path: "src/app/state/hooks/usePreparePacketStream.ts",
+    maxLines: 45,
+    reason: "packet stream prepare hook should only bind locate and stream activation callbacks to pure workflow",
+  },
+  {
     path: "src/app/state/hooks/usePacketPageCancellation.ts",
     maxLines: 30,
     reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
@@ -1365,6 +1370,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketAction.test.tsx",
     maxLines: 35,
     reason: "selected packet action tests should stay focused on id selection and stale detail pruning",
+  },
+  {
+    path: "src/app/state/hooks/usePreparePacketStream.test.tsx",
+    maxLines: 60,
+    reason: "packet stream prepare hook tests should verify callback binding without duplicating workflow coverage",
   },
   {
     path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",

@@ -35,7 +35,6 @@ import {
 } from "./packetPageNavigation";
 import { runPacketFilterAction } from "./packetFilterAction";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
-import { preparePacketStreamState } from "./packetStreamPrepare";
 import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
@@ -45,7 +44,7 @@ import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import { stopCaptureWorkflow } from "./captureStopWorkflow";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import { buildSentinelDerivedView } from "./sentinelDerivedView";
-import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
+import type { SentinelContextValue } from "./sentinelTypes";
 import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
@@ -57,6 +56,7 @@ import { useStreamIndexRefresh } from "./hooks/useStreamIndexRefresh";
 import { useStreamPayloadPersistence } from "./hooks/useStreamPayloadPersistence";
 import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
 import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
+import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -439,22 +439,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric, setBackendStatus],
   );
 
-  const preparePacketStream = useCallback(
-    async (
-      packetId: number,
-      preferredProtocol?: "HTTP" | "TCP" | "UDP",
-      filterOverride?: string,
-    ): Promise<PreparedPacketStream> => {
-      return preparePacketStreamState({
-        packetId,
-        preferredProtocol,
-        filterOverride,
-        locatePacketById,
-        setActiveStream,
-      });
-    },
-    [locatePacketById, setActiveStream],
-  );
+  const preparePacketStream = usePreparePacketStream({
+    locatePacketById,
+    setActiveStream,
+  });
 
   const persistStreamPayloads = useStreamPayloadPersistence({
     backendConnected,
