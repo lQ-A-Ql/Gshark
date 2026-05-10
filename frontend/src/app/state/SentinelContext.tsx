@@ -42,16 +42,13 @@ import {
   getCapturePreloadTimeoutError,
   getCapturePreloadWorkingStatus,
 } from "./capturePreloadStatus";
-import {
-  buildOpenedCaptureFromPath,
-  createClosedCaptureFileMeta,
-  createInitialCaptureFileMeta,
-} from "./captureOpenState";
+import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
-import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
+import { resetPacketViewportState } from "./captureResetState";
 import { initializeCaptureStartState } from "./captureStartState";
 import { commitValidatedCaptureState } from "./captureCommitState";
+import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { commitPacketPageState } from "./packetPageCommit";
@@ -81,11 +78,7 @@ import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { setActiveStreamState } from "./streamSwitchWorkflow";
 import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import { stopCaptureWorkflow } from "./captureStopWorkflow";
-import {
-  createEmptyStreamSwitchDurations,
-  createEmptyStreamSwitchHits,
-  resetStreamRuntimeRefs,
-} from "./streamRuntimeReset";
+import { createEmptyStreamSwitchDurations, createEmptyStreamSwitchHits } from "./streamRuntimeReset";
 import { recordStreamSwitchMetricSample } from "./streamSwitchMetrics";
 import {
   waitForCaptureSignal as waitForCaptureSignalUtil,
@@ -270,9 +263,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, [cancelPacketPageLoad]);
 
   const clearCaptureUiState = useCallback(() => {
-    resetPacketViewportState({
+    clearCaptureUiStateData({
       pageStartRef,
       hasMorePacketsRef,
+      preloadProcessedRef,
+      preloadTotalRef,
+      activeCapturePathRef,
+      httpCache: httpStreamCacheRef.current,
+      tcpCache: tcpStreamCacheRef.current,
+      udpCache: udpStreamCacheRef.current,
+      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
+      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
+      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
+      switchDurationsRef: streamSwitchDurationsRef,
+      switchHitsRef: streamSwitchHitsRef,
       setPackets,
       setTotalPackets,
       setPageStart,
@@ -282,34 +286,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setSelectedPacketDetail,
       setSelectedPacketRawHex,
       setSelectedPacketLayers,
-    });
-    resetPreloadCounterState({
-      preloadProcessedRef,
-      preloadTotalRef,
       setPreloadProcessed,
       setPreloadTotal,
+      resetAnalysisState,
+      setHttpStream,
+      setTcpStream,
+      setUdpStream,
+      setStreamIds,
+      setStreamSwitchMetrics,
+      setFileMeta,
+      setPacketPageError,
+      setCaptureTransaction,
+      setCaptureRevision,
     });
-    resetAnalysisState();
-    setHttpStream(EMPTY_HTTP_STREAM);
-    setTcpStream(EMPTY_BINARY_STREAM);
-    setUdpStream(createEmptyUdpStream());
-    setStreamIds(createEmptyStreamIds());
-    resetStreamRuntimeRefs({
-      httpCache: httpStreamCacheRef.current,
-      tcpCache: tcpStreamCacheRef.current,
-      udpCache: udpStreamCacheRef.current,
-      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
-      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
-      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
-      switchDurationsRef: streamSwitchDurationsRef,
-      switchHitsRef: streamSwitchHitsRef,
-    });
-    setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
-    setFileMeta(createClosedCaptureFileMeta());
-    setPacketPageError("");
-    setCaptureTransaction(createIdleCaptureTransactionStatus(false));
-    activeCapturePathRef.current = "";
-    setCaptureRevision((prev) => prev + 1);
   }, [resetAnalysisState]);
 
   const loadPacketPage = useCallback(
