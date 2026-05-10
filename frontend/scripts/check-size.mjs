@@ -493,8 +493,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/core/engine.ts",
-    maxLines: 445,
-    reason: "core engine should keep protocol tree and hex layout logic separate from display registries",
+    maxLines: 10,
+    reason: "core engine should remain a compatibility facade over split protocol tree modules",
+  },
+  {
+    path: "src/app/core/protocolTree.ts",
+    maxLines: 75,
+    reason: "base protocol tree builder should stay separate from tshark layer tree expansion",
+  },
+  {
+    path: "src/app/core/protocolLayerTree.ts",
+    maxLines: 320,
+    reason: "tshark layer tree builder should stay pure and avoid packet byte layout or display registry growth",
+  },
+  {
+    path: "src/app/core/protocolLayerFormat.ts",
+    maxLines: 65,
+    reason: "protocol layer formatting helpers should stay pure and separate from tree construction",
   },
   {
     path: "src/app/core/packetByteLayout.ts",
