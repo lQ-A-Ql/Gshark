@@ -461,13 +461,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/c2/C2AggregateTables.tsx",
-    maxLines: 340,
-    reason: "C2 aggregate table barrel should keep large table sections in sibling files",
+    maxLines: 20,
+    reason: "C2 aggregate table barrel should stay as compatibility exports only",
   },
   {
     path: "src/app/features/c2/CSHostURIAggregates.tsx",
     maxLines: 180,
     reason: "CS Host/URI aggregate table should stay focused on one table section",
+  },
+  {
+    path: "src/app/features/c2/CSDNSAggregates.tsx",
+    maxLines: 185,
+    reason: "CS DNS aggregate table should stay focused on DNS beacon aggregation rows and expansion",
+  },
+  {
+    path: "src/app/features/c2/VShellStreamAggregates.tsx",
+    maxLines: 185,
+    reason: "VShell stream aggregate table should stay focused on stream-level C2 signal rows and expansion",
   },
   {
     path: "src/app/features/c2/C2AggregateTableStyles.ts",
