@@ -74,6 +74,7 @@ export const PAGE_THEMES = {
 } as const;
 
 export type PageThemeName = keyof typeof PAGE_THEMES;
+export type PageTheme = (typeof PAGE_THEMES)[PageThemeName];
 
 export type MainNavItem = {
   path: string;
@@ -99,8 +100,9 @@ export const NAV_ITEMS: MainNavItem[] = [
   { path: "/updates", icon: RefreshCw, label: "检查更新", theme: "blue" },
 ];
 
-export function themeForPath(pathname: string): (typeof PAGE_THEMES)[PageThemeName] {
+export function themeForPath(pathname: string): PageTheme {
   const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme;
-  const fallbackTheme: PageThemeName = pathname === "/" || (!pathname.includes("udp") && !pathname.includes("http")) ? "blue" : "cyan";
+  const fallbackTheme: PageThemeName =
+    pathname === "/" || (!pathname.includes("udp") && !pathname.includes("http")) ? "blue" : "cyan";
   return PAGE_THEMES[navTheme ?? fallbackTheme];
 }

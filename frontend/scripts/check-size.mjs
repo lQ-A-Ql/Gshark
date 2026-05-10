@@ -336,8 +336,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/layouts/MainLayout.tsx",
-    maxLines: 450,
-    reason: "main layout should not grow into page or workflow orchestration",
+    maxLines: 245,
+    reason: "main layout should own route shell state and delegate header, sidebar, footer, and settings chrome",
+  },
+  {
+    path: "src/app/layouts/MainLayoutChrome.tsx",
+    maxLines: 330,
+    reason: "main layout chrome should own menu, sidebar nav, settings shell, and footer presentation only",
   },
   {
     path: "src/app/layouts/mainLayoutConfig.ts",

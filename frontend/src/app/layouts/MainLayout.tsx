@@ -1,37 +1,12 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import {
-  Activity,
-  Box,
-  FolderOpen,
-  KeyRound,
-  RefreshCw,
-  Save,
-  Settings2,
-  ShieldAlert,
-  Upload,
-} from "lucide-react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import logoImg from "../../assets/logo.png";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { formatBytes, useSentinel } from "../state/SentinelContext";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarProvider,
-  SidebarRail,
-  useSidebar,
-} from "../components/ui/sidebar";
-import { RuntimeSettingsSidebar } from "../components/RuntimeSettingsSidebar";
+import { Outlet, useLocation, useNavigate } from "react-router";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useSentinel } from "../state/SentinelContext";
+import { SidebarProvider } from "../components/ui/sidebar";
 import { TLSDecryptionDialog } from "../components/TLSDecryptionDialog";
 import { copyTextToClipboard, downloadText } from "../utils/browserFile";
 import { installBrowserPageDragGuard, preventBrowserPageDrag } from "./dragGuard";
-import { NAV_ITEMS, themeForPath } from "./mainLayoutConfig";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
+import { themeForPath } from "./mainLayoutConfig";
+import { MainFooter, MainHeader, MainSettingsChrome, MainSidebarNav } from "./MainLayoutChrome";
 
 type BackgroundFadeState = {
   key: string;
@@ -142,18 +117,13 @@ export function MainLayout() {
     return () => window.removeEventListener("keydown", handler);
   }, [navigate, openCapture]);
 
-  const HeaderSettingsButton = () => {
-    const { toggleSidebar } = useSidebar();
-    return (
-      <button
-        type="button"
-        onClick={toggleSidebar}
-        className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-        title="打开设置侧栏"
-      >
-        <Settings2 className="h-4 w-4" />
-      </button>
-    );
+  const focusFilter = () => {
+    window.dispatchEvent(new CustomEvent("gshark:focus-filter"));
+  };
+
+  const applyHttpFilter = () => {
+    setDisplayFilter("http");
+    applyFilter("http");
   };
 
   const activeTheme = themeForPath(location.pathname);
@@ -202,121 +172,22 @@ export function MainLayout() {
         onDragOverCapture={preventBrowserPageDrag}
         onDropCapture={preventBrowserPageDrag}
       >
-        <header className="relative z-50 flex shrink-0 flex-col border-b border-slate-200 bg-white/92 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] backdrop-blur">
-          <div className="flex h-12 items-center justify-between px-4">
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <img src={logoImg} alt="Logo" className="h-10 w-auto object-contain drop-shadow-sm transition-[transform_0.2s] hover:scale-105" /></div>
-
-              <nav className="ml-6 flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                <MenuGroup label="文件">
-                  <MenuItem onClick={() => void openCapture()} icon={<FolderOpen className="h-4 w-4" />}>打开</MenuItem>
-                  <MenuItem onClick={exportPacketsJson} icon={<Save className="h-4 w-4" />}>导出当前列表</MenuItem>
-                  <MenuItem onClick={() => void openCapture()} icon={<Upload className="h-4 w-4" />}>导入...</MenuItem>
-                  <MenuItem onClick={() => navigate("/updates")} icon={<RefreshCw className="h-4 w-4" />}>检查更新</MenuItem>
-                  <MenuDivider />
-                  <MenuItem danger onClick={() => window.close()}>退出</MenuItem>
-                </MenuGroup>
-
-                <MenuGroup label="编辑">
-                  <MenuItem onClick={() => void copySelectedPacket()}>复制所选数据包</MenuItem>
-                  <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>查找数据包...</MenuItem>
-                  <MenuItem onClick={() => setSettingsOpen(true)}>首选项</MenuItem>
-                </MenuGroup>
-
-                <MenuGroup label="视图">
-                  <MenuItem onClick={() => navigate("/")}>返回主工作区</MenuItem>
-                  <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
-                  <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
-                  <MenuItem onClick={() => window.dispatchEvent(new CustomEvent("gshark:focus-filter"))}>聚焦过滤输入</MenuItem>
-                </MenuGroup>
-
-                <MenuGroup label="解密">
-                  <MenuItem onClick={() => setTlsDialogOpen(true)} icon={<KeyRound className="h-4 w-4" />}>TLS 解密配置</MenuItem>
-                </MenuGroup>
-
-                <MenuGroup label="分析">
-                  <MenuItem onClick={() => navigate("/analysis-cockpit")}>分析驾驶舱</MenuItem>
-                  <MenuItem onClick={() => navigate("/c2-analysis")}>C2 样本分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/apt-analysis")}>APT 组织画像</MenuItem>
-                  <MenuItem
-                    onClick={() => {
-                      setDisplayFilter("http");
-                      applyFilter("http");
-                    }}
-                  >
-                    应用过滤器 http
-                  </MenuItem>
-                  <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
-                  <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/misc")}>MISC 工具箱</MenuItem>
-                  <MenuItem onClick={followSelectedStream}>追踪流</MenuItem>
-                  <MenuItem onClick={() => navigate("/hunting")}>专家信息</MenuItem>
-                </MenuGroup>
-
-                <MenuGroup label="统计">
-                  <MenuItem onClick={() => navigate("/traffic-graph")}>流量图</MenuItem>
-                  <MenuItem onClick={() => navigate("/industrial-analysis")}>工控分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/vehicle-analysis")}>车机分析</MenuItem>
-                  <MenuItem onClick={() => navigate("/media-analysis")}>媒体流还原</MenuItem>
-                  <MenuItem onClick={() => navigate("/usb-analysis")}>USB 分析</MenuItem>
-                  <MenuItem onClick={exportEndpointStats}>端点统计导出</MenuItem>
-                  <MenuItem onClick={exportProtocolStats}>协议统计导出</MenuItem>
-                </MenuGroup>
-              </nav>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <HeaderSettingsButton />
-              <span className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-rose-600 shadow-sm">
-                <ShieldAlert className="h-3.5 w-3.5" /> OWASP
-              </span>
-              <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-600 shadow-sm">
-                <Activity className="h-3.5 w-3.5" /> CTF
-              </span>
-              <button
-                type="button"
-                onClick={() => setTlsDialogOpen(true)}
-                className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-600 shadow-sm transition hover:bg-amber-100 hover:text-amber-700"
-                title="打开 TLS 解密配置"
-              >
-                <KeyRound className="h-3.5 w-3.5" /> 解密
-              </button>
-            </div>
-          </div>
-        </header>
+        <MainHeader
+          onApplyHttpFilter={applyHttpFilter}
+          onCopySelectedPacket={() => void copySelectedPacket()}
+          onExportEndpointStats={exportEndpointStats}
+          onExportPacketsJson={exportPacketsJson}
+          onExportProtocolStats={exportProtocolStats}
+          onFocusFilter={focusFilter}
+          onFollowSelectedStream={followSelectedStream}
+          onNavigate={navigate}
+          onOpenCapture={() => void openCapture()}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenTLSDialog={() => setTlsDialogOpen(true)}
+        />
 
         <div className="flex flex-1 overflow-hidden">
-          <aside className="z-40 flex w-16 shrink-0 flex-col items-center gap-4 border-r border-slate-200 bg-white/88 py-4 shadow-[8px_0_24px_-24px_rgba(15,23,42,0.28)] backdrop-blur">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  title={item.label}
-                  className={cn(
-                    "group relative rounded-2xl p-3 transition-all",
-                    isActive
-                      ? activeTheme.active
-                      : "text-muted-foreground hover:bg-slate-100 hover:text-slate-900",
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  {isActive && (
-                    <div className={cn("absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full", activeTheme.bar)} />
-                  )}
-
-                  <div className="pointer-events-none invisible absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-xl border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-700 opacity-0 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur transition-all group-hover:visible group-hover:opacity-100">
-                    {item.label}
-                  </div>
-                </Link>
-              );
-            })}
-          </aside>
+          <MainSidebarNav activeTheme={activeTheme} pathname={location.pathname} />
 
           <main className="gshark-page-bg gshark-theme-main relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {backgroundFade ? (
@@ -328,95 +199,29 @@ export function MainLayout() {
                 onAnimationEnd={() => setBackgroundFade(null)}
               />
             ) : null}
-            <div key={`route-${location.pathname}`} className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              key={`route-${location.pathname}`}
+              className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
               <Outlet />
             </div>
           </main>
         </div>
 
-        {settingsOpen ? (
-          <button
-            type="button"
-            aria-label="关闭设置侧栏"
-            className="fixed inset-0 z-40 bg-slate-100/65 backdrop-blur-[1px]"
-            onClick={() => setSettingsOpen(false)}
-          />
-        ) : null}
-
-        <Sidebar
-          side="right"
-          variant="floating"
-          collapsible="offcanvas"
-          className="z-[60] pt-14 pb-10 pr-3"
-        >
-          <SidebarHeader className="p-0" />
-          <SidebarContent className="p-0">
-            <RuntimeSettingsSidebar />
-          </SidebarContent>
-          <SidebarRail />
-        </Sidebar>
-
-        <footer className="z-40 flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-white/90 px-4 text-[11px] font-medium tracking-wider text-slate-500 backdrop-blur">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})</span>
-            <span className="flex items-center gap-1 text-blue-600">
-              显示: {filteredPackets.length.toLocaleString()} / 缓存: {packets.length.toLocaleString()} / 后端总计: {totalPackets.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1 text-amber-600"><KeyRound className="h-3.5 w-3.5" /> TLS 解密: {decryptionConfig.sslKeyLogPath ? "SSLKEYLOGFILE 已加载" : "未配置"}</span>
-            <span className={cn("flex items-center gap-1", backendConnected ? "text-emerald-600" : "text-muted-foreground")}>
-              <Activity className="h-3.5 w-3.5" /> 引擎: {backendStatus}
-            </span>
-          </div>
-        </footer>
+        <MainSettingsChrome settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} />
+        <MainFooter
+          backendConnected={backendConnected}
+          backendStatus={backendStatus}
+          decryptionConfigured={Boolean(decryptionConfig.sslKeyLogPath)}
+          fileMeta={fileMeta}
+          filteredPacketCount={filteredPackets.length}
+          packets={packets}
+          totalPackets={totalPackets}
+        />
         <TLSDecryptionDialog open={tlsDialogOpen} onOpenChange={setTlsDialogOpen} />
       </div>
     </SidebarProvider>
   );
 }
 
-function MenuGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="group relative">
-      <button className="cursor-default rounded-lg px-3 py-1.5 transition-colors hover:bg-cyan-50 hover:text-cyan-700">
-        {label}
-      </button>
-      <div className="invisible absolute left-0 top-full z-50 mt-1 max-h-[calc(100vh-5rem)] min-w-[190px] overflow-auto rounded-xl border border-slate-200 bg-white/95 py-1.5 opacity-0 shadow-[0_24px_64px_rgba(15,23,42,0.16)] backdrop-blur transition-all group-hover:visible group-hover:opacity-100">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function MenuItem({
-  children,
-  onClick,
-  icon,
-  danger = false,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  icon?: ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition-colors",
-        danger ? "hover:bg-rose-50 hover:text-rose-700" : "hover:bg-cyan-50 hover:text-cyan-700",
-      )}
-      onClick={onClick}
-    >
-      {icon}
-      <span>{children}</span>
-    </div>
-  );
-}
-
-function MenuDivider() {
-  return <div className="my-1 h-px bg-border" />;
-}
-
 export { installBrowserPageDragGuard, preventBrowserPageDrag };
-
