@@ -136,6 +136,26 @@ export const sourceSizeBudgets = [
     reason: "industrial detail mapper should keep controls, rule hits, and generic protocol details local",
   },
   {
+    path: "src/app/integrations/mappers/mediaMapper.ts",
+    maxLines: 25,
+    reason: "media mapper should stay as a composition layer over session and speech mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/mediaSessionMapper.ts",
+    maxLines: 50,
+    reason: "media session mapper should keep session and artifact conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/mediaTranscriptionMapper.ts",
+    maxLines: 35,
+    reason: "media transcription mapper should keep transcript and segment conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/speechBatchMapper.ts",
+    maxLines: 40,
+    reason: "speech batch mapper should keep batch queue status conversion local",
+  },
+  {
     path: "src/app/integrations/mappers/usbMapper.ts",
     maxLines: 45,
     reason: "USB mapper should stay as a composition layer over HID, mass-storage, other, and record mappers",
