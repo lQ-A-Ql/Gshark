@@ -287,7 +287,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 890,
+    maxLines: 790,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -341,6 +341,11 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/useFrontendCaptureTaskReset.ts",
     maxLines: 70,
     reason: "frontend capture task reset hook should only wire provider refs into task cancellation",
+  },
+  {
+    path: "src/app/state/hooks/useClearCaptureUiState.ts",
+    maxLines: 90,
+    reason: "clear capture UI state hook should only wire provider refs into the pure clear-state helper",
   },
   {
     path: "src/app/state/hooks/usePacketPageCommit.ts",
@@ -1572,6 +1577,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useFrontendCaptureTaskReset.test.tsx",
     maxLines: 85,
     reason: "frontend capture task reset tests should stay focused on provider-ref cancellation wiring",
+  },
+  {
+    path: "src/app/state/hooks/useClearCaptureUiState.test.tsx",
+    maxLines: 110,
+    reason: "clear capture UI state hook tests should stay focused on ref dereference and reset wiring",
   },
   {
     path: "src/app/state/hooks/usePacketPageCommit.test.tsx",

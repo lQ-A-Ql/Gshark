@@ -22,7 +22,6 @@ import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureSta
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
-import { clearCaptureUiStateData } from "./captureClearState";
 import { runPacketFilterAction } from "./packetFilterAction";
 import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
@@ -51,6 +50,7 @@ import { usePacketPageNavigation } from "./hooks/usePacketPageNavigation";
 import { useStreamAdjacentPrefetch } from "./hooks/useStreamAdjacentPrefetch";
 import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
 import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset";
+import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -204,44 +204,42 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setTotalPackets,
   });
 
-  const clearCaptureUiState = useCallback(() => {
-    clearCaptureUiStateData({
-      pageStartRef,
-      hasMorePacketsRef,
-      preloadProcessedRef,
-      preloadTotalRef,
-      activeCapturePathRef,
-      httpCache: httpStreamCacheRef.current,
-      tcpCache: tcpStreamCacheRef.current,
-      udpCache: udpStreamCacheRef.current,
-      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
-      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
-      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
-      switchDurationsRef: streamSwitchDurationsRef,
-      switchHitsRef: streamSwitchHitsRef,
-      setPackets,
-      setTotalPackets,
-      setPageStart,
-      setHasPrevPackets,
-      setHasMorePackets,
-      setSelectedPacketId,
-      setSelectedPacketDetail,
-      setSelectedPacketRawHex,
-      setSelectedPacketLayers,
-      setPreloadProcessed,
-      setPreloadTotal,
-      resetAnalysisState,
-      setHttpStream,
-      setTcpStream,
-      setUdpStream,
-      setStreamIds,
-      setStreamSwitchMetrics,
-      setFileMeta,
-      setPacketPageError,
-      setCaptureTransaction,
-      setCaptureRevision,
-    });
-  }, [resetAnalysisState]);
+  const clearCaptureUiState = useClearCaptureUiState({
+    pageStartRef,
+    hasMorePacketsRef,
+    preloadProcessedRef,
+    preloadTotalRef,
+    activeCapturePathRef,
+    httpStreamCacheRef,
+    tcpStreamCacheRef,
+    udpStreamCacheRef,
+    httpPrefetchInFlightRef,
+    tcpPrefetchInFlightRef,
+    udpPrefetchInFlightRef,
+    streamSwitchDurationsRef,
+    streamSwitchHitsRef,
+    setPackets,
+    setTotalPackets,
+    setPageStart,
+    setHasPrevPackets,
+    setHasMorePackets,
+    setSelectedPacketId,
+    setSelectedPacketDetail,
+    setSelectedPacketRawHex,
+    setSelectedPacketLayers,
+    setPreloadProcessed,
+    setPreloadTotal,
+    resetAnalysisState,
+    setHttpStream,
+    setTcpStream,
+    setUdpStream,
+    setStreamIds,
+    setStreamSwitchMetrics,
+    setFileMeta,
+    setPacketPageError,
+    setCaptureTransaction,
+    setCaptureRevision,
+  });
 
   const loadPacketPage = usePacketPageLoad({
     activeCapturePathRef,
