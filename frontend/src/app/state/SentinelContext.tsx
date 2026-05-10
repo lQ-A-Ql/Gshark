@@ -44,7 +44,6 @@ import {
   getCapturePreloadWorkingStatus,
 } from "./capturePreloadStatus";
 import {
-  buildCaptureFileMeta,
   buildOpenedCaptureFromPath,
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
@@ -53,6 +52,7 @@ import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import { initializeCaptureStartState } from "./captureStartState";
+import { commitValidatedCaptureState } from "./captureCommitState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
@@ -732,21 +732,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         if (!activeCaptureConfirmed || !firstPageLoaded) {
           throw new Error(getCapturePreloadTimeoutError());
         }
-        resetPacketViewportState({
+        commitValidatedCaptureState({
+          opened,
+          validatedFirstPage,
           pageStartRef,
           hasMorePacketsRef,
-          setPackets,
-          setTotalPackets,
-          setPageStart,
-          setHasPrevPackets,
-          setHasMorePackets,
-          setSelectedPacketId,
-          setSelectedPacketDetail,
-          setSelectedPacketRawHex,
-          setSelectedPacketLayers,
-          hasMorePackets: true,
-        });
-        resetStreamRuntimeRefs({
+          activeCapturePathRef,
           httpCache: httpStreamCacheRef.current,
           tcpCache: tcpStreamCacheRef.current,
           udpCache: udpStreamCacheRef.current,
@@ -756,15 +747,21 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           switchSequences: streamSwitchSequencesRef.current,
           switchDurationsRef: streamSwitchDurationsRef,
           switchHitsRef: streamSwitchHitsRef,
+          setPackets,
+          setTotalPackets,
+          setPageStart,
+          setHasPrevPackets,
+          setHasMorePackets,
+          setSelectedPacketId,
+          setSelectedPacketDetail,
+          setSelectedPacketRawHex,
+          setSelectedPacketLayers,
+          setStreamSwitchMetrics,
+          resetAnalysisState,
+          setFileMeta,
+          setCaptureRevision,
+          commitPacketPage,
         });
-        setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
-        resetAnalysisState();
-        setFileMeta(buildCaptureFileMeta(opened));
-        setCaptureRevision((prev) => prev + 1);
-        activeCapturePathRef.current = opened.filePath;
-        if (validatedFirstPage) {
-          commitPacketPage(0, validatedFirstPage);
-        }
         await refreshStreamIndex();
         if (captureSeq !== captureSeqRef.current) return false;
         setCaptureTransaction(createIdleCaptureTransactionStatus(true));

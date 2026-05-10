@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1045,
+    maxLines: 1040,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -31,6 +31,12 @@ export const sourceSizeBudgets = [
     maxLines: 75,
     reason:
       "capture start state helper should stay focused on preload reset, parse runtime, and pending transaction setup",
+  },
+  {
+    path: "src/app/state/captureCommitState.ts",
+    maxLines: 125,
+    reason:
+      "capture commit state helper should stay focused on packet, stream, file meta, and first page commit effects",
   },
   {
     path: "src/app/state/captureReplacementPrepare.ts",
@@ -865,6 +871,12 @@ export const testSizeBudgets = [
     maxLines: 90,
     reason:
       "capture start state tests should stay focused on reset, runtime, pending transaction, and recent capture effects",
+  },
+  {
+    path: "src/app/state/captureCommitState.test.ts",
+    maxLines: 170,
+    reason:
+      "capture commit state tests should stay focused on packet reset, stream runtime reset, metadata, and first page commit",
   },
   {
     path: "src/app/state/captureTransactionStatus.test.ts",
