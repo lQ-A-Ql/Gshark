@@ -56,6 +56,7 @@ import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
 import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
 import { useStreamIndexRefresh } from "./hooks/useStreamIndexRefresh";
 import { useStreamPayloadPersistence } from "./hooks/useStreamPayloadPersistence";
+import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -369,18 +370,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [packets, pageStart, selectedPacketDetail, selectedPacketId, selectedPacketLayers, totalPackets],
   );
 
-  const refreshAnalysisResult = useCallback(
-    async (options?: { capturePath?: string; quietSuccess?: boolean }) => {
-      await refreshAnalysisResultImpl({
-        ...options,
-        backendConnected,
-        activeCapturePath: activeCapturePathRef.current,
-        captureTaskScope: captureTaskScopeRef.current,
-        setBackendStatus,
-      });
-    },
-    [refreshAnalysisResultImpl, backendConnected],
-  );
+  const refreshAnalysisResult = useRefreshAnalysisResult({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    refreshAnalysisResultImpl,
+    setBackendStatus,
+  });
 
   const refreshStreamIndex = useStreamIndexRefresh({
     activeCapturePathRef,

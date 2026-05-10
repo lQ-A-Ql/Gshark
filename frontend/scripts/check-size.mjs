@@ -267,6 +267,11 @@ export const sourceSizeBudgets = [
     reason: "stream index refresh hook should only bind provider refs, bridge call, and stream-id setter",
   },
   {
+    path: "src/app/state/hooks/useRefreshAnalysisResult.ts",
+    maxLines: 45,
+    reason: "analysis refresh hook should only bind provider refs and backend status setter to analysis refresh",
+  },
+  {
     path: "src/app/state/hooks/useStreamPayloadPersistence.ts",
     maxLines: 45,
     reason:
@@ -1375,6 +1380,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useStreamIndexRefresh.test.tsx",
     maxLines: 55,
     reason: "stream index refresh hook tests should stay focused on hook wiring over pure refresh workflow",
+  },
+  {
+    path: "src/app/state/hooks/useRefreshAnalysisResult.test.tsx",
+    maxLines: 60,
+    reason: "analysis refresh hook tests should stay focused on provider ref and status setter wiring",
   },
   {
     path: "src/app/state/hooks/useStreamPayloadPersistence.test.tsx",
