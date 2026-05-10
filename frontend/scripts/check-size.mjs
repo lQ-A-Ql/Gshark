@@ -192,8 +192,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/vehicleDiagnosticMapper.ts",
-    maxLines: 110,
-    reason: "vehicle diagnostic mapper should keep J1939, DoIP, and UDS mapping local",
+    maxLines: 10,
+    reason: "vehicle diagnostic mapper should stay as a compatibility facade over protocol-specific mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleJ1939Mapper.ts",
+    maxLines: 35,
+    reason: "vehicle J1939 mapper should keep J1939 section and message conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleDoipMapper.ts",
+    maxLines: 35,
+    reason: "vehicle DoIP mapper should keep DoIP section and message conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleUdsMapper.ts",
+    maxLines: 60,
+    reason: "vehicle UDS mapper should keep UDS messages and transaction conversion local",
   },
   {
     path: "src/app/state/SentinelContext.tsx",
