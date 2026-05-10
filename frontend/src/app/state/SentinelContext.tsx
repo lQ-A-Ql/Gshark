@@ -27,16 +27,12 @@ import {
   shouldLoadSelectedPacketArtifacts,
   shouldLoadSelectedPacketDetail,
 } from "./selectedPacketState";
-import {
-  getCaptureOpenDisconnectedStatus,
-  getCapturePreloadDoneStatus,
-  getCapturePreloadWorkingStatus,
-} from "./capturePreloadStatus";
+import { getCaptureOpenDisconnectedStatus, getCapturePreloadDoneStatus } from "./capturePreloadStatus";
 import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
+import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState } from "./captureResetState";
-import { initializeCaptureStartState } from "./captureStartState";
 import { commitValidatedCaptureState } from "./captureCommitState";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
@@ -597,13 +593,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       let pendingCapture = buildOpenedCaptureFromPath(filePath ?? "");
 
       try {
-        const opened = filePath
-          ? (buildOpenedCaptureFromPath(filePath) ?? (await bridge.openPcapFile()))
-          : await bridge.openPcapFile();
+        const opened = await resolveOpenedCapture({
+          filePath,
+          openPcapFile: bridge.openPcapFile,
+        });
         pendingCapture = opened;
 
-        await prepareForCaptureReplacement();
-        initializeCaptureStartState({
+        const started = await prepareAndStartOpenedCapture({
           opened,
           openedAt: new Date().toISOString(),
           hadActiveCapture,
@@ -618,18 +614,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           setPreloadTotal,
           setIsPreloadingCapture,
           setCaptureTransaction,
+          setBackendStatus,
           rememberRecentCapture,
+          captureSeq,
+          captureSeqRef,
+          captureTaskScopeRef,
+          prepareForCaptureReplacement,
+          startStreamingPackets: bridge.startStreamingPackets,
         });
-
-        const startTask = captureTaskScopeRef.current.beginTask("capture-start");
-        try {
-          await bridge.startStreamingPackets(opened.filePath, "", startTask.signal);
-          if (!startTask.isCurrent()) return false;
-        } finally {
-          startTask.finish();
-        }
-        if (captureSeq !== captureSeqRef.current) return false;
-        setBackendStatus(getCapturePreloadWorkingStatus(opened.fileName));
+        if (!started) return false;
 
         const validatedFirstPage = await resolveCapturePreloadFirstPage({
           opened,

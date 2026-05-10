@@ -38,6 +38,12 @@ export const sourceSizeBudgets = [
       "capture start state helper should stay focused on preload reset, parse runtime, and pending transaction setup",
   },
   {
+    path: "src/app/state/captureStartBackend.ts",
+    maxLines: 125,
+    reason:
+      "capture start backend helper should keep opened-capture resolution, replacement init, and backend start task",
+  },
+  {
     path: "src/app/state/capturePreloadProbe.ts",
     maxLines: 185,
     reason:
@@ -897,6 +903,12 @@ export const testSizeBudgets = [
     maxLines: 90,
     reason:
       "capture start state tests should stay focused on reset, runtime, pending transaction, and recent capture effects",
+  },
+  {
+    path: "src/app/state/captureStartBackend.test.ts",
+    maxLines: 110,
+    reason:
+      "capture start backend tests should cover path resolution, dialog fallback, stale start, and preload status",
   },
   {
     path: "src/app/state/capturePreloadProbe.test.ts",
