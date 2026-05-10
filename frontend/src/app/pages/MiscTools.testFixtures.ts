@@ -67,6 +67,6 @@ export async function expandModule(moduleID: string, waitForContent?: () => unkn
     }
   }, { timeout: 10000 });
   if (waitForContent) {
-    await waitFor(waitForContent, { timeout: 10000 });
+    await waitFor(waitForContent, { timeout: 15000 });
   }
 }

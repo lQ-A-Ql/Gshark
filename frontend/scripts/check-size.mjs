@@ -125,8 +125,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/stream/StreamPayloadPanels.tsx",
-    maxLines: 285,
-    reason: "stream payload panels should keep current chunk, card, highlight, and dialog rendering local",
+    maxLines: 20,
+    reason: "stream payload panels should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/stream/StreamPayloadHighlight.tsx",
+    maxLines: 45,
+    reason: "stream payload highlight logic should stay pure and separate from panel layout",
+  },
+  {
+    path: "src/app/components/stream/StreamCurrentChunkPanel.tsx",
+    maxLines: 95,
+    reason: "stream current chunk panel should stay focused on selected chunk display",
+  },
+  {
+    path: "src/app/components/stream/StreamChunkCard.tsx",
+    maxLines: 80,
+    reason: "stream chunk card should stay focused on chunk preview and open action wiring",
+  },
+  {
+    path: "src/app/components/stream/StreamPayloadDialog.tsx",
+    maxLines: 110,
+    reason: "stream payload dialog should stay focused on metadata, copy, export, and full payload display",
   },
   {
     path: "src/app/components/analysis/AnalysisPrimitives.tsx",
