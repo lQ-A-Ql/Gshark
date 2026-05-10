@@ -512,6 +512,31 @@ export const sourceSizeBudgets = [
     reason: "protocol layer formatting helpers should stay pure and separate from tree construction",
   },
   {
+    path: "src/app/core/captureOverview.ts",
+    maxLines: 80,
+    reason: "capture overview should orchestrate split pure rules without absorbing scoring or filter logic",
+  },
+  {
+    path: "src/app/core/captureOverviewTypes.ts",
+    maxLines: 70,
+    reason: "capture overview model types should stay separate from scoring and rendering rules",
+  },
+  {
+    path: "src/app/core/captureOverviewRecommendations.ts",
+    maxLines: 100,
+    reason: "capture overview recommendations should stay focused on scoring routes and not render UI",
+  },
+  {
+    path: "src/app/core/captureOverviewQuickFilters.ts",
+    maxLines: 95,
+    reason: "capture overview quick filters should stay focused on filter suggestions only",
+  },
+  {
+    path: "src/app/core/captureOverviewFilters.ts",
+    maxLines: 60,
+    reason: "capture overview filter registry should stay static and reusable",
+  },
+  {
     path: "src/app/core/packetByteLayout.ts",
     maxLines: 95,
     reason: "packet byte layout and hex dump helpers should stay pure and separate from protocol tree rendering",
