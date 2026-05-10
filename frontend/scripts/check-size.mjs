@@ -101,6 +101,26 @@ export const sourceSizeBudgets = [
     reason: "threat mapper should stay isolated from packet and stream mapping",
   },
   {
+    path: "src/app/integrations/mappers/c2SampleMapper.ts",
+    maxLines: 10,
+    reason: "C2 sample mapper should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/integrations/mappers/c2IndicatorMapper.ts",
+    maxLines: 55,
+    reason: "C2 indicator mapper should keep candidate, beacon, and score factor mapping local",
+  },
+  {
+    path: "src/app/integrations/mappers/c2AggregateMapper.ts",
+    maxLines: 90,
+    reason: "C2 aggregate mapper should keep HTTP, DNS, and stream aggregate conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/c2FamilyMapper.ts",
+    maxLines: 50,
+    reason: "C2 family mapper should compose family-level sections without owning aggregate field mapping",
+  },
+  {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
     maxLines: 25,
     reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
