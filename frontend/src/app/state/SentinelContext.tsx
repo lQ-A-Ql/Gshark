@@ -39,7 +39,6 @@ import {
   CAPTURE_PRELOAD_TIMEOUT_MS,
   getCaptureEmptyParseError,
   getCaptureOpenDisconnectedStatus,
-  getCaptureOpenErrorMessage,
   getCapturePreloadDoneStatus,
   getCapturePreloadTimeoutError,
   getCapturePreloadWorkingStatus,
@@ -52,7 +51,7 @@ import {
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
 import {
-  createFailedCaptureTransactionStatus,
+  buildFailedCaptureTransactionStatus,
   createIdleCaptureTransactionStatus,
   createPendingCaptureTransactionStatus,
 } from "./captureTransactionStatus";
@@ -785,26 +784,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           return false;
         }
         if (captureSeq === captureSeqRef.current) {
-          const message = getCaptureOpenErrorMessage(error);
-          const normalizedMessage = message || "打开文件失败";
-          const reason =
-            normalizedMessage === getCapturePreloadTimeoutError()
-              ? "preload_timeout"
-              : normalizedMessage === getCaptureEmptyParseError("")
-                ? "empty_parse"
-                : hadActiveCapture
-                  ? "switch_failed"
-                  : "open_failed";
-          setCaptureTransaction(
-            createFailedCaptureTransactionStatus(
-              reason,
-              normalizedMessage,
-              pendingCapture?.fileName ?? (filePath?.trim() || ""),
-              pendingCapture?.filePath ?? (filePath?.trim() || ""),
-              hadActiveCapture,
-            ),
-          );
-          setBackendStatus(normalizedMessage);
+          const failedTransaction = buildFailedCaptureTransactionStatus({
+            error,
+            parseError: parseErrorRef.current,
+            hadActiveCapture,
+            fallbackName: filePath?.trim() || "",
+            fallbackPath: filePath?.trim() || "",
+            pendingCaptureName: pendingCapture?.fileName,
+            pendingCapturePath: pendingCapture?.filePath,
+          });
+          setCaptureTransaction(failedTransaction);
+          setBackendStatus(failedTransaction.message);
         }
         return false;
       } finally {

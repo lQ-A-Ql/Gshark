@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1085,
+    maxLines: 1065,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -853,6 +853,11 @@ export const testSizeBudgets = [
     path: "src/app/state/captureStopWorkflow.test.ts",
     maxLines: 85,
     reason: "capture stop workflow tests should stay focused on frontend reset, disconnect skip, and close errors",
+  },
+  {
+    path: "src/app/state/captureTransactionStatus.test.ts",
+    maxLines: 75,
+    reason: "capture transaction status tests should stay focused on failure reason and fallback capture fields",
   },
   {
     path: "src/app/state/packetPageLoad.test.ts",
