@@ -294,6 +294,12 @@ export const sourceSizeBudgets = [
     reason: "scheduled packet page load hook should only own timer dedupe and page-start load scheduling",
   },
   {
+    path: "src/app/state/hooks/useStreamAdjacentPrefetch.ts",
+    maxLines: 85,
+    reason:
+      "stream adjacent prefetch hook should only bind provider refs, caches, and bridge calls to pure prefetch state",
+  },
+  {
     path: "src/app/state/hooks/useStreamIndexRefresh.ts",
     maxLines: 35,
     reason: "stream index refresh hook should only bind provider refs, bridge call, and stream-id setter",
@@ -1438,6 +1444,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useScheduledPacketPageLoad.test.tsx",
     maxLines: 50,
     reason: "scheduled packet page load tests should stay focused on timer dedupe and cursor handoff",
+  },
+  {
+    path: "src/app/state/hooks/useStreamAdjacentPrefetch.test.tsx",
+    maxLines: 90,
+    reason: "stream adjacent prefetch hook tests should verify provider cache and bridge fetcher wiring",
   },
   {
     path: "src/app/state/hooks/useStreamIndexRefresh.test.tsx",
