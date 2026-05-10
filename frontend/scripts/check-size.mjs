@@ -361,8 +361,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/evidence/EvidencePanelSections.tsx",
-    maxLines: 330,
-    reason: "evidence panel sections should keep hero, filters, status, table, and caveats scoped",
+    maxLines: 20,
+    reason: "evidence panel sections should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/features/evidence/EvidenceHero.tsx",
+    maxLines: 55,
+    reason: "evidence hero should stay focused on heading, summary, and module chips",
+  },
+  {
+    path: "src/app/features/evidence/EvidenceFilters.tsx",
+    maxLines: 150,
+    reason: "evidence filters should keep severity, module, search, and export controls local",
+  },
+  {
+    path: "src/app/features/evidence/EvidenceResults.tsx",
+    maxLines: 140,
+    reason: "evidence results should keep loading/error state, table columns, and tag cells local",
+  },
+  {
+    path: "src/app/features/evidence/EvidenceCaveats.tsx",
+    maxLines: 35,
+    reason: "evidence caveats should stay focused on deduplicated caution display",
   },
   {
     path: "src/app/features/evidence/evidencePanelRules.ts",
