@@ -180,9 +180,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
-    maxLines: 375,
-    reason:
-      "decoder workbench should keep rendering panes, toolbar, batch controls, settings panels, and pure rules in sibling modules",
+    maxLines: 105,
+    reason: "decoder workbench should stay as a composition shell around decoder panels and state hook",
+  },
+  {
+    path: "src/app/components/useStreamDecoderWorkbench.ts",
+    maxLines: 295,
+    reason: "decoder workbench state hook should own workflow state while inspection and presentation stay separate",
+  },
+  {
+    path: "src/app/components/useStreamPayloadInspection.ts",
+    maxLines: 85,
+    reason: "stream payload inspection hook should keep bridge inspection and candidate selection isolated",
   },
   {
     path: "src/app/components/StreamDecoderWorkbenchUtils.ts",
