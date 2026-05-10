@@ -22,7 +22,6 @@ import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./capt
 import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
-import { resetPacketViewportState } from "./captureResetState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
@@ -57,6 +56,7 @@ import { useStreamPayloadPersistence } from "./hooks/useStreamPayloadPersistence
 import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
 import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
 import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
+import { usePacketViewportReset } from "./hooks/usePacketViewportReset";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -198,22 +198,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setTotalPackets,
   });
 
-  const resetPacketViewport = useCallback(() => {
-    cancelPacketPageLoad();
-    resetPacketViewportState({
-      pageStartRef,
-      hasMorePacketsRef,
-      setPackets,
-      setTotalPackets,
-      setPageStart,
-      setHasPrevPackets,
-      setHasMorePackets,
-      setSelectedPacketId,
-      setSelectedPacketDetail,
-      setSelectedPacketRawHex,
-      setSelectedPacketLayers,
-    });
-  }, [cancelPacketPageLoad]);
+  const resetPacketViewport = usePacketViewportReset({
+    cancelPacketPageLoad,
+    hasMorePacketsRef,
+    pageStartRef,
+    setHasMorePackets,
+    setHasPrevPackets,
+    setPackets,
+    setPageStart,
+    setSelectedPacketDetail,
+    setSelectedPacketId,
+    setSelectedPacketLayers,
+    setSelectedPacketRawHex,
+    setTotalPackets,
+  });
 
   const clearCaptureUiState = useCallback(() => {
     clearCaptureUiStateData({

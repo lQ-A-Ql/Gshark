@@ -252,6 +252,12 @@ export const sourceSizeBudgets = [
     reason: "packet stream prepare hook should only bind locate and stream activation callbacks to pure workflow",
   },
   {
+    path: "src/app/state/hooks/usePacketViewportReset.ts",
+    maxLines: 55,
+    reason:
+      "packet viewport reset hook should only bind cancel callback and packet viewport setters to pure reset workflow",
+  },
+  {
     path: "src/app/state/hooks/usePacketPageCancellation.ts",
     maxLines: 30,
     reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
@@ -1375,6 +1381,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/usePreparePacketStream.test.tsx",
     maxLines: 60,
     reason: "packet stream prepare hook tests should verify callback binding without duplicating workflow coverage",
+  },
+  {
+    path: "src/app/state/hooks/usePacketViewportReset.test.tsx",
+    maxLines: 95,
+    reason: "packet viewport reset hook tests should cover cancel plus provider setter wiring",
   },
   {
     path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",
