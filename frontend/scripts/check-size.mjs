@@ -338,6 +338,11 @@ export const sourceSizeBudgets = [
     reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
   },
   {
+    path: "src/app/state/hooks/useFrontendCaptureTaskReset.ts",
+    maxLines: 70,
+    reason: "frontend capture task reset hook should only wire provider refs into task cancellation",
+  },
+  {
     path: "src/app/state/hooks/usePacketPageCommit.ts",
     maxLines: 55,
     reason: "packet page commit hook should only bind provider refs and setters to pure page commit workflow",
@@ -1562,6 +1567,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",
     maxLines: 35,
     reason: "packet page cancellation tests should stay focused on sequence, task abort, and loading reset",
+  },
+  {
+    path: "src/app/state/hooks/useFrontendCaptureTaskReset.test.tsx",
+    maxLines: 85,
+    reason: "frontend capture task reset tests should stay focused on provider-ref cancellation wiring",
   },
   {
     path: "src/app/state/hooks/usePacketPageCommit.test.tsx",

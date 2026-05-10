@@ -23,7 +23,6 @@ import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
-import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { runPacketFilterAction } from "./packetFilterAction";
 import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
@@ -51,6 +50,7 @@ import { usePacketLocateById } from "./hooks/usePacketLocateById";
 import { usePacketPageNavigation } from "./hooks/usePacketPageNavigation";
 import { useStreamAdjacentPrefetch } from "./hooks/useStreamAdjacentPrefetch";
 import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
+import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -155,21 +155,18 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsThreatAnalysisLoading,
   });
 
-  const cancelAllFrontendCaptureTasks = useCallback(() => {
-    cancelFrontendCaptureTasks({
-      captureTaskScopeRef,
-      packetPageSeqRef,
-      threatAnalysisSeqRef,
-      streamSwitchSequences: streamSwitchSequencesRef.current,
-      httpPrefetchInFlight: httpPrefetchInFlightRef.current,
-      tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
-      udpPrefetchInFlight: udpPrefetchInFlightRef.current,
-      loadMoreScheduledRef,
-      clearScheduledLoadMore: window.clearTimeout,
-      setIsPageLoading,
-      setPacketPageError,
-    });
-  }, []);
+  const cancelAllFrontendCaptureTasks = useFrontendCaptureTaskReset({
+    captureTaskScopeRef,
+    packetPageSeqRef,
+    threatAnalysisSeqRef,
+    streamSwitchSequencesRef,
+    httpPrefetchInFlightRef,
+    tcpPrefetchInFlightRef,
+    udpPrefetchInFlightRef,
+    loadMoreScheduledRef,
+    setIsPageLoading,
+    setPacketPageError,
+  });
 
   const cancelPacketPageLoad = usePacketPageCancellation({
     captureTaskScopeRef,
