@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1335,
+    maxLines: 1300,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -37,6 +37,12 @@ export const sourceSizeBudgets = [
     maxLines: 85,
     reason:
       "packet page loading helper should keep request lifecycle, stale guards, and error mapping outside the provider",
+  },
+  {
+    path: "src/app/state/packetFilterWorkflow.ts",
+    maxLines: 90,
+    reason:
+      "packet filter workflow should keep sequence guards, viewport reset, polling, and status finalization outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -793,6 +799,11 @@ export const testSizeBudgets = [
     maxLines: 115,
     reason:
       "packet page load tests should stay focused on success, disconnected, failure, abort, and stale result behavior",
+  },
+  {
+    path: "src/app/state/packetFilterWorkflow.test.ts",
+    maxLines: 125,
+    reason: "packet filter workflow tests should stay focused on run, poll, clear, skip, and stale behaviors",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",

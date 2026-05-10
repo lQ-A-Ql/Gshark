@@ -46,13 +46,6 @@ import {
   shouldLoadSelectedPacketArtifacts,
   shouldLoadSelectedPacketDetail,
 } from "./selectedPacketState";
-import {
-  PACKET_FILTER_POLL_INTERVAL_MS,
-  PACKET_FILTER_POLL_TIMEOUT_MS,
-  getPacketFilterDoneStatus,
-  getPacketFilterPollingStatus,
-  getPacketFilterWorkingStatus,
-} from "./packetFilterStatus";
 import { getPacketPageRetryStatus } from "./packetPageStatus";
 import {
   getCaptureCloseErrorMessage,
@@ -84,6 +77,7 @@ import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreload
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
+import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -1023,28 +1017,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         setDisplayFilter(nextFilter);
       }
 
-      if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
-        const filterSeq = ++filterSeqRef.current;
-        setIsFilterLoading(true);
-        setPacketPageError("");
-        resetPacketViewport();
-        setBackendStatus(getPacketFilterWorkingStatus(nextFilter));
-        void (async () => {
-          let page = await loadPacketPage(0, nextFilter);
-          const deadline = Date.now() + PACKET_FILTER_POLL_TIMEOUT_MS;
-          while (filterSeq === filterSeqRef.current && page?.filtering && Date.now() < deadline) {
-            setBackendStatus(getPacketFilterPollingStatus(nextFilter));
-            await new Promise((resolve) => window.setTimeout(resolve, PACKET_FILTER_POLL_INTERVAL_MS));
-            page = await loadPacketPage(0, nextFilter);
-          }
-          if (filterSeq === filterSeqRef.current) {
-            setIsFilterLoading(false);
-            if (page) {
-              setBackendStatus(getPacketFilterDoneStatus(nextFilter));
-            }
-          }
-        })();
-      }
+      void runPacketFilterWorkflow({
+        filter: nextFilter,
+        shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
+        pollUntilSettled: true,
+        filterSeqRef,
+        loadPacketPage,
+        resetPacketViewport,
+        setIsFilterLoading,
+        setPacketPageError,
+        setBackendStatus,
+      });
     },
     [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, resetPacketViewport],
   );
@@ -1052,21 +1035,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const clearFilter = useCallback(() => {
     setDisplayFilter("");
 
-    if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
-      const filterSeq = ++filterSeqRef.current;
-      setIsFilterLoading(true);
-      setPacketPageError("");
-      resetPacketViewport();
-      setBackendStatus(getPacketFilterWorkingStatus(""));
-      void loadPacketPage(0, "").then((page) => {
-        if (filterSeq === filterSeqRef.current) {
-          setIsFilterLoading(false);
-          if (page) {
-            setBackendStatus(getPacketFilterDoneStatus(""));
-          }
-        }
-      });
-    }
+    void runPacketFilterWorkflow({
+      filter: "",
+      shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
+      pollUntilSettled: false,
+      filterSeqRef,
+      loadPacketPage,
+      resetPacketViewport,
+      setIsFilterLoading,
+      setPacketPageError,
+      setBackendStatus,
+    });
   }, [backendConnected, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
 
   const selectPacket = useCallback((id: number) => {
