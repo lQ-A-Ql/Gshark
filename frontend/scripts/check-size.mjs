@@ -446,8 +446,19 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/hunting/ThreatHuntingPanels.tsx",
-    maxLines: 380,
-    reason: "threat hunting display panels should stay presentational and avoid backend or route orchestration",
+    maxLines: 125,
+    reason: "threat hunting display panels should compose category, progress, and workbench sections only",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingSummaryPanels.tsx",
+    maxLines: 120,
+    reason: "threat hunting summary panels should keep category and progress presentation scoped",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingWorkbenchSections.tsx",
+    maxLines: 285,
+    reason:
+      "threat hunting workbench sections should keep config form, hits table, and selected detail presentation scoped",
   },
   {
     path: "src/app/pages/Workspace.tsx",
