@@ -1161,9 +1161,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/hunting/ThreatHuntingWorkbenchSections.tsx",
-    maxLines: 285,
-    reason:
-      "threat hunting workbench sections should keep config form, hits table, and selected detail presentation scoped",
+    maxLines: 15,
+    reason: "threat hunting workbench sections should remain a compatibility export surface",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingConfigPanel.tsx",
+    maxLines: 160,
+    reason: "threat hunting config panel should own YARA and prefix form presentation only",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingResultPanels.tsx",
+    maxLines: 145,
+    reason: "threat hunting result panels should own hits table and selected detail presentation only",
   },
   {
     path: "src/app/pages/Workspace.tsx",
