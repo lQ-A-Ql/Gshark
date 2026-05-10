@@ -876,8 +876,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/core/protocolLayerTree.ts",
-    maxLines: 250,
+    maxLines: 170,
     reason: "tshark layer tree builder should orchestrate layer and field tree construction only",
+  },
+  {
+    path: "src/app/core/protocolLayerOrdering.ts",
+    maxLines: 90,
+    reason: "protocol layer ordering rules should stay pure and separate from tree recursion",
   },
   {
     path: "src/app/core/protocolLayerSummary.ts",
