@@ -81,6 +81,26 @@ export const sourceSizeBudgets = [
     reason: "WinRM mapper should stay isolated from misc module and session material mapping",
   },
   {
+    path: "src/app/integrations/mappers/packetStreamMapper.ts",
+    maxLines: 10,
+    reason: "packet stream mapper should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/integrations/mappers/packetMapper.ts",
+    maxLines: 95,
+    reason: "packet mapper should keep packet and color-feature normalization local",
+  },
+  {
+    path: "src/app/integrations/mappers/streamMapper.ts",
+    maxLines: 75,
+    reason: "stream mapper should keep HTTP/Binary stream chunk and load metadata conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/threatMapper.ts",
+    maxLines: 30,
+    reason: "threat mapper should stay isolated from packet and stream mapping",
+  },
+  {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
     maxLines: 25,
     reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
