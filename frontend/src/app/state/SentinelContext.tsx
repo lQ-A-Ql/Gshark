@@ -37,7 +37,6 @@ import {
   getPacketPageCursor,
   getPrevPacketCursor,
   getTotalPacketPages,
-  normalizePacketCursor,
   normalizePacketId,
   packetPageHasPacket,
 } from "./packetPagination";
@@ -54,7 +53,7 @@ import {
   getPacketFilterPollingStatus,
   getPacketFilterWorkingStatus,
 } from "./packetFilterStatus";
-import { getPacketPageLoadErrorMessage, getPacketPageRetryStatus } from "./packetPageStatus";
+import { getPacketPageRetryStatus } from "./packetPageStatus";
 import {
   getCaptureCloseErrorMessage,
   getCaptureStopDoneStatus,
@@ -84,6 +83,7 @@ import {
 import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
+import { loadPacketPageState } from "./packetPageLoad";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -348,36 +348,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const loadPacketPage = useCallback(
     async (cursor: number, filterOverride?: string, options?: { finishFilterLoading?: boolean }) => {
-      if (!backendConnected || !activeCapturePathRef.current) return null;
-      const requestSeq = ++packetPageSeqRef.current;
-      const task = captureTaskScopeRef.current.beginTask("packet-page");
-      setIsPageLoading(true);
-      try {
-        const safeCursor = normalizePacketCursor(cursor);
-        const page = await bridge.listPacketsPage(safeCursor, PAGE_SIZE, filterOverride ?? displayFilter, task.signal);
-        if (!task.isCurrent() || requestSeq !== packetPageSeqRef.current) {
-          return null;
-        }
-        commitPacketPage(safeCursor, page);
-        return page;
-      } catch (error) {
-        if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-          return null;
-        }
-        const message = getPacketPageLoadErrorMessage(error);
-        setPacketPageError(message);
-        setBackendStatus(message);
-        return null;
-      } finally {
-        const isCurrent = task.isCurrent();
-        task.finish();
-        if (isCurrent && requestSeq === packetPageSeqRef.current) {
-          setIsPageLoading(false);
-          if (options?.finishFilterLoading) {
-            setIsFilterLoading(false);
-          }
-        }
-      }
+      return loadPacketPageState({
+        cursor,
+        pageSize: PAGE_SIZE,
+        filter: filterOverride ?? displayFilter,
+        activeCapturePathRef,
+        backendConnected,
+        packetPageSeqRef,
+        captureTaskScopeRef,
+        listPacketsPage: bridge.listPacketsPage,
+        commitPacketPage,
+        setIsPageLoading,
+        setIsFilterLoading,
+        setPacketPageError,
+        setBackendStatus,
+        finishFilterLoading: options?.finishFilterLoading,
+      });
     },
     [backendConnected, commitPacketPage, displayFilter],
   );

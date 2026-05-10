@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1390,
+    maxLines: 1335,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -31,6 +31,12 @@ export const sourceSizeBudgets = [
     maxLines: 60,
     reason:
       "capture task reset helper should stay focused on invalidating frontend capture work and clearing pending loads",
+  },
+  {
+    path: "src/app/state/packetPageLoad.ts",
+    maxLines: 85,
+    reason:
+      "packet page loading helper should keep request lifecycle, stale guards, and error mapping outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -781,6 +787,12 @@ export const testSizeBudgets = [
     maxLines: 75,
     reason:
       "capture task reset tests should stay focused on cancellation, sequence bumps, prefetch cleanup, and timer clearing",
+  },
+  {
+    path: "src/app/state/packetPageLoad.test.ts",
+    maxLines: 115,
+    reason:
+      "packet page load tests should stay focused on success, disconnected, failure, abort, and stale result behavior",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
