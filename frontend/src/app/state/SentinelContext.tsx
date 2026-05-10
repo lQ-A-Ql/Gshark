@@ -41,7 +41,6 @@ import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captur
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
-import { updateProgressFromStatusState } from "./progressStatusWorkflow";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { setActiveStreamState } from "./streamSwitchWorkflow";
@@ -55,6 +54,7 @@ import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
 import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
+import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -330,18 +330,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [loadPacketPage],
   );
 
-  const updateProgressFromStatus = useCallback((message: string): boolean => {
-    return updateProgressFromStatusState({
-      message,
-      preloadProcessedRef,
-      preloadTotalRef,
-      setPreloadProcessed,
-      setPreloadTotal,
-      setTotalPackets,
-      setMediaAnalysisProgress,
-      setThreatAnalysisProgress,
-    });
-  }, []);
+  const updateProgressFromStatus = useProgressStatusUpdater({
+    preloadProcessedRef,
+    preloadTotalRef,
+    setPreloadProcessed,
+    setPreloadTotal,
+    setTotalPackets,
+    setMediaAnalysisProgress,
+    setThreatAnalysisProgress,
+  });
 
   const prepareForCaptureReplacement = useCallback(async () => {
     await prepareCaptureReplacementState({
