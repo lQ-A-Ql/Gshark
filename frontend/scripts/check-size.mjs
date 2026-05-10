@@ -311,8 +311,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/analysis/AnalysisPrimitives.tsx",
-    maxLines: 310,
-    reason: "analysis primitives should stay focused on small shared cards, badges, charts, and lists",
+    maxLines: 20,
+    reason: "analysis primitives should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/analysis/analysisTone.ts",
+    maxLines: 65,
+    reason: "analysis tone tokens should stay declarative and free of React rendering logic",
+  },
+  {
+    path: "src/app/components/analysis/AnalysisCards.tsx",
+    maxLines: 150,
+    reason: "analysis cards should keep shared card, badge, callout, panel, and empty-state primitives together",
+  },
+  {
+    path: "src/app/components/analysis/AnalysisCollections.tsx",
+    maxLines: 110,
+    reason: "analysis collection primitives should keep bucket chart and count list rendering local",
   },
   {
     path: "src/app/components/analysis/AnalysisDataTable.tsx",
