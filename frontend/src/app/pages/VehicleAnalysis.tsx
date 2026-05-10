@@ -1,18 +1,13 @@
-import { Car, ShieldAlert } from "lucide-react";
+import { Car } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
-import {
-  AnalysisBucketChart as BucketChart,
-  AnalysisDataTable as DataTable,
-  AnalysisMiniStat as MiniStat,
-  AnalysisPanel as Panel,
-} from "../components/analysis/AnalysisPrimitives";
 import type { DBCProfile } from "../core/types";
-import { CanIdDataBoard, buildCanIdDataGroups } from "../features/vehicle/VehicleCanDataBoard";
+import { VehicleDetailPanels } from "../features/vehicle/VehicleDetailPanels";
 import { VehicleDbcPanel } from "../features/vehicle/VehicleDbcPanel";
 import { VehicleOverviewPanel, VEHICLE_PROTOCOL_TAGS } from "../features/vehicle/VehicleOverviewPanel";
+import { VehicleProtocolPanels } from "../features/vehicle/VehicleProtocolPanels";
 import { VehicleUdsTransactionsPanel } from "../features/vehicle/VehicleUdsTransactionsPanel";
 import { useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
 import { bridge } from "../integrations/wailsBridge";
@@ -37,7 +32,6 @@ export default function VehicleAnalysis() {
   });
   const [pageError, setPageError] = useState("");
   const error = analysisError || pageError;
-  const canIdDataGroups = useMemo(() => buildCanIdDataGroups(analysis), [analysis]);
   const [udsStatusFilter, setUdsStatusFilter] = useState("all");
   const filteredUdsTransactions = useMemo(() => {
     if (udsStatusFilter === "all") return analysis.uds.transactions;
@@ -139,238 +133,8 @@ export default function VehicleAnalysis() {
 
       <VehicleOverviewPanel analysis={analysis} />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="CAN 总线">
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <MiniStat title="扩展帧" value={analysis.can.extendedFrames} />
-            <MiniStat title="错误帧" value={analysis.can.errorFrames} />
-            <MiniStat title="RTR 帧" value={analysis.can.rtrFrames} />
-            <MiniStat title="DBC 信号" value={analysis.can.decodedSignals.length} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.can.busIds} barClassName="bg-cyan-500" maxHeightClassName="max-h-[320px]" />
-            <BucketChart
-              data={analysis.can.messageIds}
-              barClassName="bg-indigo-500"
-              maxHeightClassName="max-h-[320px]"
-            />
-          </div>
-        </Panel>
-        <Panel title="J1939">
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <MiniStat title="消息数" value={analysis.j1939.totalMessages} />
-            <MiniStat title="PGN 种类" value={analysis.j1939.pgns.length} />
-            <MiniStat title="源地址种类" value={analysis.j1939.sourceAddrs.length} />
-            <MiniStat title="目标地址种类" value={analysis.j1939.targetAddrs.length} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart data={analysis.j1939.pgns} barClassName="bg-emerald-500" maxHeightClassName="max-h-[320px]" />
-            <BucketChart
-              data={analysis.j1939.sourceAddrs}
-              barClassName="bg-violet-500"
-              maxHeightClassName="max-h-[320px]"
-            />
-          </div>
-        </Panel>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="DoIP">
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <MiniStat title="消息数" value={analysis.doip.totalMessages} />
-            <MiniStat title="VIN" value={analysis.doip.vins.length} />
-            <MiniStat title="消息类型" value={analysis.doip.messageTypes.length} />
-            <MiniStat title="逻辑地址" value={analysis.doip.endpoints.length} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart
-              data={analysis.doip.messageTypes}
-              barClassName="bg-sky-500"
-              maxHeightClassName="max-h-[320px]"
-            />
-            <BucketChart data={analysis.doip.vins} barClassName="bg-fuchsia-500" maxHeightClassName="max-h-[320px]" />
-          </div>
-        </Panel>
-        <Panel title="UDS">
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <MiniStat title="消息数" value={analysis.uds.totalMessages} />
-            <MiniStat title="服务数" value={analysis.uds.serviceIDs.length} />
-            <MiniStat title="负响应码" value={analysis.uds.negativeCodes.length} />
-            <MiniStat title="DTC 数" value={analysis.uds.dtcs.length} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <BucketChart
-              data={analysis.uds.serviceIDs}
-              barClassName="bg-orange-500"
-              maxHeightClassName="max-h-[320px]"
-            />
-            <BucketChart
-              data={analysis.uds.negativeCodes}
-              barClassName="bg-rose-500"
-              maxHeightClassName="max-h-[320px]"
-            />
-          </div>
-        </Panel>
-      </div>
-
-      <Panel title="安全提示" className="mt-4">
-        <div className="space-y-2 text-sm">
-          {analysis.recommendations.length === 0 ? (
-            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">
-              当前抓包未识别到车载协议。
-            </div>
-          ) : (
-            analysis.recommendations.map((note, index) => (
-              <div
-                key={`${note}-${index}`}
-                className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2"
-              >
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <span>{note}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </Panel>
-
-      <Panel title={`CAN 明细预览 (${analysis.can.frames.length} / ${analysis.can.totalFrames})`} className="mt-4">
-        <DataTable
-          headers={["包号", "时间", "Bus", "ID", "长度", "标志", "摘要"]}
-          rows={analysis.can.frames.map((item) => [
-            item.packetId,
-            item.time || "--",
-            item.busId || "--",
-            item.identifier || "--",
-            item.length || 0,
-            [item.isExtended ? "XTD" : "", item.isRTR ? "RTR" : "", item.isError ? item.errorFlags || "ERR" : ""]
-              .filter(Boolean)
-              .join(" / ") || "--",
-            item.summary || "--",
-          ])}
-        />
-      </Panel>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="CAN Payload 协议分布">
-          <BucketChart
-            data={analysis.can.payloadProtocols}
-            barClassName="bg-amber-500"
-            maxHeightClassName="max-h-[320px]"
-          />
-        </Panel>
-        <Panel title={`CAN Payload 明细预览 (${analysis.can.payloadRecords.length})`}>
-          <DataTable
-            headers={["包号", "时间", "Bus", "ID", "协议", "帧类型", "地址", "服务", "细节", "长度", "摘要"]}
-            rows={analysis.can.payloadRecords.map((item) => [
-              item.packetId,
-              item.time || "--",
-              item.busId || "--",
-              item.identifier || "--",
-              item.protocol || "--",
-              item.frameType || "--",
-              [item.sourceAddress, item.targetAddress].filter(Boolean).join(" -> ") || "--",
-              item.service || "--",
-              item.detail || item.rawData || "--",
-              item.length || 0,
-              item.summary || "--",
-            ])}
-          />
-        </Panel>
-      </div>
-
-      <Panel title={`CAN ID 数据区域 (${canIdDataGroups.length})`} className="mt-4">
-        <CanIdDataBoard groups={canIdDataGroups} />
-      </Panel>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="DBC 报文分布">
-          <BucketChart
-            data={analysis.can.decodedMessageDist}
-            barClassName="bg-emerald-500"
-            maxHeightClassName="max-h-[320px]"
-          />
-        </Panel>
-        <Panel title="DBC 信号分布">
-          <BucketChart
-            data={analysis.can.decodedSignals}
-            barClassName="bg-violet-500"
-            maxHeightClassName="max-h-[320px]"
-          />
-        </Panel>
-      </div>
-
-      <Panel title={`DBC 解码明细预览 (${analysis.can.decodedMessages.length})`} className="mt-4">
-        <DataTable
-          headers={["包号", "时间", "Bus", "ID", "数据库", "报文", "发送方", "信号", "摘要"]}
-          rows={analysis.can.decodedMessages.map((item) => [
-            item.packetId,
-            item.time || "--",
-            item.busId || "--",
-            item.identifier || "--",
-            item.database || "--",
-            item.messageName || "--",
-            item.sender || "--",
-            item.signals
-              .map((signal) => `${signal.name}=${signal.value}${signal.unit ? ` ${signal.unit}` : ""}`)
-              .join(" ; ") || "--",
-            item.summary || "--",
-          ])}
-        />
-      </Panel>
-
-      <Panel title={`DBC 信号时间线 (${analysis.can.signalTimelines.length})`} className="mt-4">
-        <DataTable
-          headers={["信号", "样本数", "最新值", "最小值", "最大值", "单位", "最近报文"]}
-          rows={analysis.can.signalTimelines.map((timeline) => {
-            const values = timeline.samples.map((sample) => sample.value);
-            const latest = timeline.samples[timeline.samples.length - 1];
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            return [
-              timeline.name,
-              timeline.samples.length,
-              latest ? latest.value : "--",
-              Number.isFinite(min) ? min : "--",
-              Number.isFinite(max) ? max : "--",
-              latest?.unit || "--",
-              latest?.messageName || "--",
-            ];
-          })}
-        />
-      </Panel>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title={`DoIP 明细预览 (${analysis.doip.messages.length} / ${analysis.doip.totalMessages})`}>
-          <DataTable
-            headers={["包号", "时间", "源", "目标", "类型", "VIN", "状态", "摘要"]}
-            rows={analysis.doip.messages.map((item) => [
-              item.packetId,
-              item.time || "--",
-              item.source || "--",
-              item.destination || "--",
-              item.type || "--",
-              item.vin || "--",
-              item.responseCode || item.diagnosticState || "--",
-              item.summary || "--",
-            ])}
-          />
-        </Panel>
-        <Panel title={`UDS 明细预览 (${analysis.uds.messages.length} / ${analysis.uds.totalMessages})`}>
-          <DataTable
-            headers={["包号", "时间", "SID", "名称", "源", "目标", "DID/DTC", "摘要"]}
-            rows={analysis.uds.messages.map((item) => [
-              item.packetId,
-              item.time || "--",
-              item.serviceId || "--",
-              item.serviceName || "--",
-              item.sourceAddress || "--",
-              item.targetAddress || "--",
-              item.dataIdentifier || item.dtc || item.negativeCode || "--",
-              item.summary || "--",
-            ])}
-          />
-        </Panel>
-      </div>
+      <VehicleProtocolPanels analysis={analysis} />
+      <VehicleDetailPanels analysis={analysis} />
 
       <VehicleUdsTransactionsPanel
         transactions={analysis.uds.transactions}

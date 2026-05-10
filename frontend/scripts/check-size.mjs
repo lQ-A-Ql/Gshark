@@ -226,8 +226,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/VehicleAnalysis.tsx",
-    maxLines: 385,
-    reason: "vehicle page should move larger protocol panels into feature components",
+    maxLines: 160,
+    reason: "vehicle page should only orchestrate DBC state, analysis loading, and feature-section composition",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleProtocolPanels.tsx",
+    maxLines: 135,
+    reason: "vehicle protocol panels should keep CAN/J1939/DoIP/UDS summaries and security notes presentational",
+  },
+  {
+    path: "src/app/features/vehicle/VehicleDetailPanels.tsx",
+    maxLines: 180,
+    reason: "vehicle detail panels should keep CAN, DBC, DoIP, and UDS table wiring outside the page",
   },
   {
     path: "src/app/features/vehicle/VehicleOverviewPanel.tsx",
