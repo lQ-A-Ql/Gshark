@@ -127,8 +127,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/modbusMapper.ts",
-    maxLines: 110,
-    reason: "Modbus mapper should keep summary, transaction, decoded input, and suspicious write conversion local",
+    maxLines: 30,
+    reason: "Modbus mapper should stay as a composition layer over Modbus detail mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/modbusDecodedInputMapper.ts",
+    maxLines: 30,
+    reason: "Modbus decoded input mapper should keep decoded text conversion isolated",
+  },
+  {
+    path: "src/app/integrations/mappers/modbusTransactionMapper.ts",
+    maxLines: 45,
+    reason: "Modbus transaction mapper should keep request/response and bit range conversion isolated",
+  },
+  {
+    path: "src/app/integrations/mappers/modbusSuspiciousWriteMapper.ts",
+    maxLines: 30,
+    reason: "Modbus suspicious write mapper should keep write summary conversion isolated",
   },
   {
     path: "src/app/integrations/mappers/industrialDetailMapper.ts",
