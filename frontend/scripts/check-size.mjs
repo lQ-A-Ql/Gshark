@@ -767,6 +767,26 @@ export const sourceSizeBudgets = [
     reason: "threat hunting page should stay focused on runtime config, data loading, and navigation orchestration",
   },
   {
+    path: "src/app/misc/MiscToolsShell.tsx",
+    maxLines: 105,
+    reason: "MISC shell should orchestrate category filtering and module list composition only",
+  },
+  {
+    path: "src/app/misc/MiscToolsHero.tsx",
+    maxLines: 115,
+    reason: "MISC hero should own import and category presentation only",
+  },
+  {
+    path: "src/app/misc/MiscModuleCard.tsx",
+    maxLines: 120,
+    reason: "MISC module card should own module header and renderer mount presentation only",
+  },
+  {
+    path: "src/app/misc/miscModuleRules.ts",
+    maxLines: 75,
+    reason: "MISC module rules should stay pure and not connect to unified Evidence",
+  },
+  {
     path: "src/app/features/hunting/ThreatHuntingPanels.tsx",
     maxLines: 125,
     reason: "threat hunting display panels should compose category, progress, and workbench sections only",
