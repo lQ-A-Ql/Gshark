@@ -262,7 +262,7 @@ export function createHttpBridge(context: HttpBridgeContext): BackendBridge {
 }
 
 function normalizeTransportError(error: unknown, path: string): Error {
-  if (error instanceof Error && error.name === "AbortError") {
+  if (isAbortError(error)) {
     return error;
   }
   const fallback = `无法连接后端接口 ${path}，请检查桌面后端是否已启动，或 127.0.0.1:17891 是否被非兼容实例占用。`;
@@ -273,4 +273,14 @@ function normalizeTransportError(error: unknown, path: string): Error {
     return new Error(`${fallback} 原始错误: ${error.message}`);
   }
   return new Error(fallback);
+}
+
+function isAbortError(error: unknown): error is Error {
+  return (
+    error instanceof Error && error.name === "AbortError"
+  ) || (
+    typeof DOMException !== "undefined" &&
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  );
 }
