@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -14,6 +14,11 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",
     maxLines: 110,
     reason: "C2 decrypt display mapper should stay focused on result-level record filtering and notes",
+  },
+  {
+    path: "src/app/integrations/mappers/c2DecryptMapper.ts",
+    maxLines: 30,
+    reason: "C2 decrypt mapper should only convert individual decrypted records",
   },
   {
     path: "src/app/integrations/mappers/vshellDecryptDisplayRules.ts",
@@ -121,6 +126,26 @@ export const sourceSizeBudgets = [
     reason: "C2 family mapper should compose family-level sections without owning aggregate field mapping",
   },
   {
+    path: "src/app/integrations/mappers/aptMapper.ts",
+    maxLines: 85,
+    reason: "APT mapper should keep actor profile and evidence record conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/evidenceMapper.ts",
+    maxLines: 55,
+    reason: "evidence mapper should only normalize unified evidence records and module names",
+  },
+  {
+    path: "src/app/integrations/mappers/mapperPrimitives.ts",
+    maxLines: 50,
+    reason: "mapper primitives should stay limited to shared scalar/list/object coercion helpers",
+  },
+  {
+    path: "src/app/integrations/mappers/objectMapper.ts",
+    maxLines: 30,
+    reason: "object mapper should only normalize extracted object records and lists",
+  },
+  {
     path: "src/app/integrations/mappers/industrialMapper.ts",
     maxLines: 35,
     reason: "industrial mapper should stay as a composition layer over Modbus and industrial detail mappers",
@@ -174,6 +199,26 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/runtimeMapper.ts",
     maxLines: 65,
     reason: "runtime mapper should keep tool runtime snapshot conversion local and re-export speech batch mapping",
+  },
+  {
+    path: "src/app/integrations/mappers/pluginMapper.ts",
+    maxLines: 45,
+    reason: "plugin mapper should keep plugin item and DBC profile conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/pluginSourceMapper.ts",
+    maxLines: 40,
+    reason: "plugin source mapper should only convert editable plugin source payloads and requests",
+  },
+  {
+    path: "src/app/integrations/mappers/tlsMapper.ts",
+    maxLines: 25,
+    reason: "TLS mapper should only convert TLS decryption config payloads and requests",
+  },
+  {
+    path: "src/app/integrations/mappers/trafficMapper.ts",
+    maxLines: 30,
+    reason: "traffic mapper should only normalize global traffic stats buckets",
   },
   {
     path: "src/app/integrations/mappers/usbMapper.ts",
@@ -1838,13 +1883,32 @@ export function findSizeBudgetFailures({ frontendRoot = root, budgets = sizeBudg
   return failures;
 }
 
+export function findUnbudgetedMapperFiles({ frontendRoot = root, budgets = sizeBudgets } = {}) {
+  const mapperDir = resolve(frontendRoot, "src/app/integrations/mappers");
+  const budgetedPaths = new Set(budgets.map((budget) => budget.path.replaceAll("\\", "/")));
+  return readdirSync(mapperDir)
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .map((name) => `src/app/integrations/mappers/${name}`)
+    .filter((path) => !budgetedPaths.has(path))
+    .sort();
+}
+
 function runCli() {
   const failures = findSizeBudgetFailures();
+  const unbudgetedMapperFiles = findUnbudgetedMapperFiles();
 
-  if (failures.length > 0) {
-    console.error("Frontend size budget exceeded:");
+  if (failures.length > 0 || unbudgetedMapperFiles.length > 0) {
+    if (failures.length > 0) {
+      console.error("Frontend size budget exceeded:");
+    }
     for (const failure of failures) {
       console.error(`- ${failure.path}: ${failure.lines}/${failure.maxLines} lines. ${failure.reason}`);
+    }
+    if (unbudgetedMapperFiles.length > 0) {
+      console.error("Frontend mapper files missing size budgets:");
+      for (const mapperPath of unbudgetedMapperFiles) {
+        console.error(`- ${mapperPath}`);
+      }
     }
     process.exit(1);
   }
