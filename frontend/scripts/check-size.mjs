@@ -1263,13 +1263,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/TcpStream.tsx",
-    maxLines: 280,
-    reason: "TCP stream page should keep state and pagination orchestration separate from raw stream sections",
+    maxLines: 20,
+    reason: "TCP stream route should stay a thin wrapper around the shared raw stream page",
   },
   {
     path: "src/app/pages/UdpStream.tsx",
-    maxLines: 270,
-    reason: "UDP stream page should keep state and pagination orchestration separate from raw stream sections",
+    maxLines: 20,
+    reason: "UDP stream route should stay a thin wrapper around the shared raw stream page",
+  },
+  {
+    path: "src/app/pages/RawStreamPage.tsx",
+    maxLines: 285,
+    reason: "shared raw stream page should own protocol-specific TCP/UDP orchestration without duplicating route pages",
   },
   {
     path: "src/app/pages/RawStreamUtils.ts",
