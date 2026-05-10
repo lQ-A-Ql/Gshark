@@ -136,6 +136,31 @@ export const sourceSizeBudgets = [
     reason: "industrial detail mapper should keep controls, rule hits, and generic protocol details local",
   },
   {
+    path: "src/app/integrations/mappers/usbMapper.ts",
+    maxLines: 45,
+    reason: "USB mapper should stay as a composition layer over HID, mass-storage, other, and record mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/usbHidMapper.ts",
+    maxLines: 60,
+    reason: "USB HID mapper should keep keyboard, mouse, and HID section conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/usbMassStorageMapper.ts",
+    maxLines: 55,
+    reason: "USB mass-storage mapper should keep operation and section conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/usbOtherMapper.ts",
+    maxLines: 25,
+    reason: "USB other mapper should keep control and raw record section conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/usbRecordMapper.ts",
+    maxLines: 30,
+    reason: "USB record mapper should keep flat packet record conversion only",
+  },
+  {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
     maxLines: 25,
     reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
