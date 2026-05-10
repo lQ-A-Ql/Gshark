@@ -431,8 +431,9 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/HttpStream.tsx",
-    maxLines: 350,
-    reason: "HTTP stream page should keep formatting helpers and payload transforms in sibling modules",
+    maxLines: 180,
+    reason:
+      "HTTP stream page should keep stream state orchestration separate from chunk helpers and presentation sections",
   },
   {
     path: "src/app/pages/TcpStream.tsx",
@@ -453,6 +454,16 @@ export const sourceSizeBudgets = [
     path: "src/app/pages/HttpStreamUtils.ts",
     maxLines: 165,
     reason: "HTTP stream formatting helpers should stay pure and avoid page orchestration",
+  },
+  {
+    path: "src/app/pages/HttpStreamChunks.ts",
+    maxLines: 80,
+    reason: "HTTP stream chunk helpers should stay pure and avoid rendering concerns",
+  },
+  {
+    path: "src/app/pages/HttpStreamSections.tsx",
+    maxLines: 380,
+    reason: "HTTP stream sections should keep title, toolbar, payload grid, and dialog rendering scoped",
   },
   {
     path: "src/app/features/media/MediaSessionTable.tsx",
@@ -596,6 +607,11 @@ export const testSizeBudgets = [
     path: "src/app/pages/HttpStreamUtils.test.ts",
     maxLines: 100,
     reason: "HTTP stream helper tests should stay focused on formatting and binary-body parsing",
+  },
+  {
+    path: "src/app/pages/HttpStreamChunks.test.ts",
+    maxLines: 60,
+    reason: "HTTP stream chunk helper tests should stay focused on fallback, filtering, match counts, and export text",
   },
   {
     path: "src/app/features/media/MediaOverviewPanels.test.tsx",
