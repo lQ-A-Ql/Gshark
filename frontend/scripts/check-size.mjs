@@ -811,8 +811,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/ui/sidebarMenu.tsx",
-    maxLines: 250,
-    reason: "sidebar menu primitives should stay separate from sidebar shell/provider concerns",
+    maxLines: 70,
+    reason: "sidebar menu shell should keep list and sub-list primitives only",
+  },
+  {
+    path: "src/app/components/ui/sidebarMenuButtons.tsx",
+    maxLines: 115,
+    reason: "sidebar menu button primitives should keep button variants and tooltip behavior isolated",
+  },
+  {
+    path: "src/app/components/ui/sidebarMenuAccessories.tsx",
+    maxLines: 90,
+    reason: "sidebar menu accessory primitives should keep action, badge, and skeleton behavior isolated",
   },
   {
     path: "src/app/components/ui/sidebarContext.tsx",
