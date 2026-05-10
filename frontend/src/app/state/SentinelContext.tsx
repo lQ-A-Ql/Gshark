@@ -83,18 +83,12 @@ import {
   createEmptyUdpStream,
   prettySize,
 } from "./streamState";
-import { applyCachedStreamSwitch } from "./streamSwitchCache";
-import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
-import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
 import { updateProgressFromStatusState } from "./progressStatusWorkflow";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
-import {
-  bumpStreamSwitchSequence,
-  createStreamSwitchSequences,
-  isLatestStreamSwitchSequence,
-} from "./streamSwitchSequence";
+import { createStreamSwitchSequences } from "./streamSwitchSequence";
+import { setActiveStreamState } from "./streamSwitchWorkflow";
 import {
   createEmptyStreamSwitchDurations,
   createEmptyStreamSwitchHits,
@@ -514,52 +508,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const setActiveStream = useCallback(
     async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
-      if (!backendConnected || !activeCapturePathRef.current || streamId < 0) return;
-      const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-      let cacheHit = false;
-      const task = captureTaskScopeRef.current.beginTask(`${protocol.toLowerCase()}-stream`);
-
-      const requestSeq = bumpStreamSwitchSequence(streamSwitchSequencesRef.current, protocol);
-
-      const isLatest = () =>
-        isLatestStreamSwitchSequence(streamSwitchSequencesRef.current, protocol, requestSeq, task.isCurrent);
-
-      const commitCachedSwitch = <T extends HttpStream | BinaryStream>(
-        metricProtocol: "HTTP" | "TCP" | "UDP",
-        cache: Map<number, T>,
-        apply: (stream: T) => void,
-      ) => {
-        if (!applyCachedStreamSwitch({ cache, streamId, isLatest, apply })) {
-          return false;
-        }
-        cacheHit = true;
-        const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
-        recordStreamSwitchMetric(metricProtocol, elapsed, cacheHit);
-        prefetchAdjacentStreams(metricProtocol, streamId);
-        return true;
-      };
-
-      const commitLoadedSwitch = <T extends HttpStream | BinaryStream>(
-        metricProtocol: "HTTP" | "TCP" | "UDP",
-        cache: Map<number, T>,
-        stream: T,
-        apply: (stream: T) => void,
-      ) => {
-        commitLoadedStreamSwitch({
-          protocol: metricProtocol,
-          requestedStreamId: streamId,
-          stream,
-          cache,
-          apply,
-          startedAt,
-          recordMetric: recordStreamSwitchMetric,
-          prefetchAdjacentStreams,
-        });
-      };
-
-      const switchTask = resolveStreamSwitchTask({
+      await setActiveStreamState({
+        backendConnected,
+        activeCapturePath: activeCapturePathRef.current,
         protocol,
         streamId,
+        streamSwitchSequences: streamSwitchSequencesRef.current,
+        captureTaskScope: captureTaskScopeRef.current,
         httpCache: httpStreamCacheRef.current,
         tcpCache: tcpStreamCacheRef.current,
         udpCache: udpStreamCacheRef.current,
@@ -578,27 +533,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
         fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
         fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+        recordMetric: recordStreamSwitchMetric,
+        prefetchAdjacentStreams,
+        setBackendStatus,
       });
-
-      try {
-        if (commitCachedSwitch(switchTask.protocol, switchTask.cache, switchTask.applyStream)) {
-          return;
-        }
-        switchTask.applyStream(switchTask.loadingStream);
-        const stream = await switchTask.fetchStream(streamId, task.signal);
-        if (!isLatest()) return;
-        commitLoadedSwitch(switchTask.protocol, switchTask.cache, stream, switchTask.applyStream);
-      } catch (error) {
-        if (!isLatest()) return;
-        if (isAbortLikeError(error, task.signal)) {
-          return;
-        }
-        setBackendStatus(error instanceof Error && error.message ? error.message : "流切换失败");
-      } finally {
-        task.finish();
-      }
     },
-    [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric],
+    [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric, setBackendStatus],
   );
 
   const preparePacketStream = useCallback(

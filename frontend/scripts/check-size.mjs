@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1165,
+    maxLines: 1115,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -77,6 +77,11 @@ export const sourceSizeBudgets = [
     maxLines: 70,
     reason:
       "stream adjacent prefetch should keep target selection and protocol-specific scheduling outside the provider",
+  },
+  {
+    path: "src/app/state/streamSwitchWorkflow.ts",
+    maxLines: 115,
+    reason: "stream switch workflow should keep cache, fetch, metric, stale, and abort behavior outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -870,6 +875,11 @@ export const testSizeBudgets = [
     path: "src/app/state/streamAdjacentPrefetch.test.ts",
     maxLines: 105,
     reason: "stream adjacent prefetch tests should stay focused on guard, scheduling, protocol, and cache behavior",
+  },
+  {
+    path: "src/app/state/streamSwitchWorkflow.test.ts",
+    maxLines: 130,
+    reason: "stream switch workflow tests should stay focused on guard, cache hit, fetch commit, and error behavior",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
