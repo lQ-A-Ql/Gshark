@@ -102,7 +102,7 @@ import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
-import { commitProtocolStreamPayloadPatches } from "./streamPayloadPatch";
+import { persistStreamPayloadsState } from "./streamPayloadPersist";
 import {
   bumpStreamSwitchSequence,
   createStreamSwitchSequences,
@@ -699,21 +699,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const persistStreamPayloads = useCallback(
     async (protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>) => {
-      if (!backendConnected || streamId < 0 || patches.length === 0) return;
-      await bridge.updateStreamPayloads(protocol, streamId, patches);
-
-      startTransition(() => {
-        commitProtocolStreamPayloadPatches({
-          protocol,
-          streamId,
-          patches,
-          setHttpStream,
-          setTcpStream,
-          setUdpStream,
-          httpCache: httpStreamCacheRef.current,
-          tcpCache: tcpStreamCacheRef.current,
-          udpCache: udpStreamCacheRef.current,
-        });
+      await persistStreamPayloadsState({
+        protocol,
+        streamId,
+        patches,
+        backendConnected,
+        updateStreamPayloads: bridge.updateStreamPayloads,
+        startTransition,
+        setHttpStream,
+        setTcpStream,
+        setUdpStream,
+        httpCache: httpStreamCacheRef.current,
+        tcpCache: tcpStreamCacheRef.current,
+        udpCache: udpStreamCacheRef.current,
       });
     },
     [backendConnected],
