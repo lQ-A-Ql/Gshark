@@ -38,6 +38,26 @@ export const sourceSizeBudgets = [
     reason: "selected packet resources hook should only compose detail, raw hex, and layers artifact loading",
   },
   {
+    path: "src/app/state/hooks/useBackendLifecycle.ts",
+    maxLines: 240,
+    reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
+  },
+  {
+    path: "src/app/state/hooks/backendLifecycleEvents.ts",
+    maxLines: 130,
+    reason: "backend lifecycle event handlers should own SSE packet/status/error effects only",
+  },
+  {
+    path: "src/app/state/hooks/backendLifecycleStartup.ts",
+    maxLines: 100,
+    reason: "backend lifecycle startup helpers should own runtime and TLS startup checks only",
+  },
+  {
+    path: "src/app/state/hooks/backendLifecycleTimers.ts",
+    maxLines: 15,
+    reason: "backend lifecycle timer helpers should stay tiny and generic",
+  },
+  {
     path: "src/app/state/captureClearState.ts",
     maxLines: 140,
     reason: "capture clear state helper should stay focused on UI, preload, stream runtime, and metadata clearing",
