@@ -160,8 +160,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/UsbAnalysis.tsx",
-    maxLines: 430,
-    reason: "USB page should keep domain panels and shared controls in feature components",
+    maxLines: 205,
+    reason: "USB page should only compose analysis loading, primary tabs, and domain panels",
+  },
+  {
+    path: "src/app/features/usb/UsbHidPanel.tsx",
+    maxLines: 135,
+    reason: "USB HID panel should own keyboard/mouse presentation without reintroducing page orchestration",
+  },
+  {
+    path: "src/app/features/usb/useUsbHidState.ts",
+    maxLines: 190,
+    reason: "USB HID state hook should own device filters, replay cursor, stats, and derived preview text",
+  },
+  {
+    path: "src/app/features/usb/UsbHidPanels.tsx",
+    maxLines: 305,
+    reason: "USB HID visual primitives should stay limited to replay, trajectory, heatmap, and behavior list rendering",
   },
   {
     path: "src/app/features/usb/UsbOverviewPanel.tsx",
