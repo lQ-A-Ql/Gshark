@@ -37,7 +37,6 @@ import {
   getPacketPageCursor,
   getPrevPacketCursor,
   getTotalPacketPages,
-  normalizePacketId,
   packetPageHasPacket,
 } from "./packetPagination";
 import {
@@ -78,6 +77,7 @@ import { resetPacketViewportState, resetPreloadCounterState } from "./captureRes
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
+import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -387,40 +387,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const locatePacketById = useCallback(
     async (packetId: number, filterOverride?: string) => {
-      const normalized = normalizePacketId(packetId);
-      if (normalized <= 0 || !activeCapturePathRef.current) return null;
-      const task = captureTaskScopeRef.current.beginTask("packet-locate");
-      try {
-        const effectiveFilter = filterOverride ?? displayFilter;
-        const located = await bridge.locatePacketPage(normalized, PAGE_SIZE, effectiveFilter, task.signal);
-        if (!task.isCurrent()) {
-          return null;
-        }
-        if (!located.found) {
-          setBackendStatus(`未找到数据包 #${normalized}`);
-          return null;
-        }
-        if (filterOverride !== undefined) {
-          setDisplayFilter(effectiveFilter);
-        }
-        const page = await loadPacketPage(located.cursor, effectiveFilter);
-        if (!page) {
-          return null;
-        }
-        if (!task.isCurrent()) {
-          return null;
-        }
-        setSelectedPacketId(normalized);
-        return page.items.find((item) => item.id === normalized) ?? null;
-      } catch (error) {
-        if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-          return null;
-        }
-        setBackendStatus(error instanceof Error ? error.message : "定位数据包失败");
-        return null;
-      } finally {
-        task.finish();
-      }
+      return locatePacketByIdWorkflow({
+        packetId,
+        pageSize: PAGE_SIZE,
+        filterOverride,
+        displayFilter,
+        activeCapturePathRef,
+        captureTaskScopeRef,
+        locatePacketPage: bridge.locatePacketPage,
+        loadPacketPage,
+        setDisplayFilter,
+        setSelectedPacketId,
+        setBackendStatus,
+      });
     },
     [displayFilter, loadPacketPage],
   );
