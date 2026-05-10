@@ -1,6 +1,5 @@
 import {
   createContext,
-  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -26,10 +25,9 @@ import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { runPacketFilterAction } from "./packetFilterAction";
-import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
+import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
-import { setActiveStreamState } from "./streamSwitchWorkflow";
 import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import { stopCaptureWorkflow } from "./captureStopWorkflow";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
@@ -52,6 +50,7 @@ import { usePacketPageLoad } from "./hooks/usePacketPageLoad";
 import { usePacketLocateById } from "./hooks/usePacketLocateById";
 import { usePacketPageNavigation } from "./hooks/usePacketPageNavigation";
 import { useStreamAdjacentPrefetch } from "./hooks/useStreamAdjacentPrefetch";
+import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -365,40 +364,23 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     udpPrefetchInFlightRef,
   });
 
-  const setActiveStream = useCallback(
-    async (protocol: "HTTP" | "TCP" | "UDP", streamId: number) => {
-      await setActiveStreamState({
-        backendConnected,
-        activeCapturePath: activeCapturePathRef.current,
-        protocol,
-        streamId,
-        streamSwitchSequences: streamSwitchSequencesRef.current,
-        captureTaskScope: captureTaskScopeRef.current,
-        httpCache: httpStreamCacheRef.current,
-        tcpCache: tcpStreamCacheRef.current,
-        udpCache: udpStreamCacheRef.current,
-        applyHttpStream: (next) =>
-          startTransition(() => {
-            setHttpStream(next);
-          }),
-        applyTcpStream: (next) =>
-          startTransition(() => {
-            setTcpStream(next);
-          }),
-        applyUdpStream: (next) =>
-          startTransition(() => {
-            setUdpStream(next);
-          }),
-        fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
-        fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-        fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-        recordMetric: recordStreamSwitchMetric,
-        prefetchAdjacentStreams,
-        setBackendStatus,
-      });
-    },
-    [backendConnected, prefetchAdjacentStreams, recordStreamSwitchMetric, setBackendStatus],
-  );
+  const setActiveStream = useActiveStreamSwitch({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    fetchHttpStream: bridge.getHttpStream,
+    fetchRawStreamPage: bridge.getRawStreamPage,
+    httpCacheRef: httpStreamCacheRef,
+    prefetchAdjacentStreams,
+    recordStreamSwitchMetric,
+    setBackendStatus,
+    setHttpStream,
+    setTcpStream,
+    setUdpStream,
+    streamSwitchSequencesRef,
+    tcpCacheRef: tcpStreamCacheRef,
+    udpCacheRef: udpStreamCacheRef,
+  });
 
   const preparePacketStream = usePreparePacketStream({
     locatePacketById,

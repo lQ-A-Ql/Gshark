@@ -284,6 +284,12 @@ export const sourceSizeBudgets = [
     reason: "packet page navigation hook should only bind provider state to pure page navigation workflows",
   },
   {
+    path: "src/app/state/hooks/useActiveStreamSwitch.ts",
+    maxLines: 95,
+    reason:
+      "active stream switch hook should only bind provider caches, setters, metrics, and bridge calls to pure switch workflow",
+  },
+  {
     path: "src/app/state/hooks/useProgressStatusUpdater.ts",
     maxLines: 35,
     reason: "progress status updater hook should only bind provider refs and setters to pure status workflow",
@@ -1449,6 +1455,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useStreamAdjacentPrefetch.test.tsx",
     maxLines: 90,
     reason: "stream adjacent prefetch hook tests should verify provider cache and bridge fetcher wiring",
+  },
+  {
+    path: "src/app/state/hooks/useActiveStreamSwitch.test.tsx",
+    maxLines: 90,
+    reason: "active stream switch hook tests should verify provider cache, setter, metric, and bridge wiring",
   },
   {
     path: "src/app/state/hooks/useStreamIndexRefresh.test.tsx",
