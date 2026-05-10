@@ -467,9 +467,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/RawStreamSections.tsx",
-    maxLines: 430,
-    reason:
-      "raw stream sections should keep shared TCP/UDP title, payload grid, control bar, and dialog rendering scoped",
+    maxLines: 285,
+    reason: "raw stream sections should keep shared TCP/UDP title, payload grid, and selected panel rendering scoped",
+  },
+  {
+    path: "src/app/pages/RawStreamControlBar.tsx",
+    maxLines: 130,
+    reason: "raw stream control bar should stay focused on stream navigation, search, view mode, and export actions",
+  },
+  {
+    path: "src/app/pages/RawStreamDialog.tsx",
+    maxLines: 65,
+    reason: "raw stream dialog should stay focused on expanded payload display and MISC handoff action",
   },
   {
     path: "src/app/pages/HttpStreamUtils.ts",
