@@ -23,8 +23,19 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 930,
+    maxLines: 910,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
+  },
+  {
+    path: "src/app/state/sentinelDerivedView.ts",
+    maxLines: 45,
+    reason:
+      "sentinel derived view helper should keep selected packet, protocol tree, hex, and pagination derivation only",
+  },
+  {
+    path: "src/app/state/hooks/useSelectedPacketResources.ts",
+    maxLines: 70,
+    reason: "selected packet resources hook should only compose detail, raw hex, and layers artifact loading",
   },
   {
     path: "src/app/state/captureClearState.ts",
@@ -935,6 +946,16 @@ export const testSizeBudgets = [
     path: "src/app/state/captureFinalizeWorkflow.test.ts",
     maxLines: 95,
     reason: "capture finalize workflow tests should cover success and stale finalization behavior",
+  },
+  {
+    path: "src/app/state/sentinelDerivedView.test.ts",
+    maxLines: 65,
+    reason: "sentinel derived view tests should cover selected packet, pagination, hex, and layer tree derivation only",
+  },
+  {
+    path: "src/app/state/hooks/useSelectedPacketResources.test.tsx",
+    maxLines: 70,
+    reason: "selected packet resources hook tests should stay focused on composed detail, raw, and layer loading",
   },
   {
     path: "src/app/state/captureClearState.test.ts",

@@ -9,24 +9,16 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import { buildHexDump, buildProtocolTree, buildProtocolTreeFromLayers } from "../core/engine";
 import type { BinaryStream, HttpStream, Packet, RecentCapture, StreamSwitchMetrics } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
-import { useSelectedPacketArtifact } from "./hooks/useSelectedPacketArtifact";
-import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
+import { useSelectedPacketResources } from "./hooks/useSelectedPacketResources";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
 import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
-import { getCurrentPacketPage, getTotalPacketPages } from "./packetPagination";
-import {
-  keepSelectedPacketDetailForId,
-  resolveSelectedPacket,
-  shouldLoadSelectedPacketArtifacts,
-  shouldLoadSelectedPacketDetail,
-} from "./selectedPacketState";
+import { keepSelectedPacketDetailForId } from "./selectedPacketState";
 import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
 import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
 import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
@@ -70,6 +62,7 @@ import {
   wakeCaptureWaiters as wakeCaptureWaitersUtil,
 } from "./captureSignal";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
+import { buildSentinelDerivedView } from "./sentinelDerivedView";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
@@ -410,9 +403,18 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const selectedPacket = useMemo(
-    () => resolveSelectedPacket(packets, selectedPacketId, selectedPacketDetail),
-    [packets, selectedPacketDetail, selectedPacketId],
+  const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useMemo(
+    () =>
+      buildSentinelDerivedView({
+        packets,
+        selectedPacketId,
+        selectedPacketDetail,
+        selectedPacketLayers,
+        pageStart,
+        totalPackets,
+        pageSize: PAGE_SIZE,
+      }),
+    [packets, pageStart, selectedPacketDetail, selectedPacketId, selectedPacketLayers, totalPackets],
   );
 
   const refreshAnalysisResult = useCallback(
@@ -546,34 +548,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [],
   );
 
-  useSelectedPacketDetail({
+  useSelectedPacketResources({
     selectedPacketId,
-    shouldLoad: shouldLoadSelectedPacketDetail(selectedPacketId, selectedPacketDetail),
+    selectedPacket,
+    selectedPacketDetail,
     captureTaskScopeRef,
     loadPacket: (packetId, signal) => bridge.getPacket(packetId, signal),
+    loadRawHex: (packetId, signal) => bridge.getPacketRawHex(packetId, signal),
+    loadLayers: (packetId, signal) => bridge.getPacketLayers(packetId, signal),
     setSelectedPacketDetail,
-  });
-
-  useSelectedPacketArtifact<string>({
-    selectedPacketId,
-    selectedPacket,
-    shouldLoad: shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket),
-    taskKey: "packet-raw-hex",
-    captureTaskScopeRef,
-    loadArtifact: (packetId, signal) => bridge.getPacketRawHex(packetId, signal),
-    setValue: setSelectedPacketRawHex,
-    resetValue: "",
-  });
-
-  useSelectedPacketArtifact<Record<string, unknown> | null>({
-    selectedPacketId,
-    selectedPacket,
-    shouldLoad: shouldLoadSelectedPacketArtifacts(selectedPacketId, selectedPacket),
-    taskKey: "packet-layers",
-    captureTaskScopeRef,
-    loadArtifact: (packetId, signal) => bridge.getPacketLayers(packetId, signal),
-    setValue: setSelectedPacketLayers,
-    resetValue: null,
+    setSelectedPacketRawHex,
+    setSelectedPacketLayers,
   });
 
   const startCapture = useCallback(
@@ -787,24 +772,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, setBackendStatus, wakeCaptureWaiters]);
 
-  const protocolTree = useMemo(
-    () =>
-      selectedPacketLayers
-        ? buildProtocolTreeFromLayers(selectedPacketLayers, selectedPacket)
-        : buildProtocolTree(selectedPacket),
-    [selectedPacketLayers, selectedPacket],
-  );
-  const hexDump = useMemo(() => buildHexDump(selectedPacket), [selectedPacket]);
   const value = useMemo<SentinelContextValue>(
     () => ({
       packets,
       totalPackets,
-      currentPage: getCurrentPacketPage(pageStart, PAGE_SIZE),
-      totalPages: getTotalPacketPages(totalPackets, PAGE_SIZE),
+      currentPage,
+      totalPages,
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
-      filteredPackets: packets,
+      filteredPackets,
       hasMorePackets,
       hasPrevPackets,
       isPageLoading,
@@ -860,7 +837,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [
       packets,
       totalPackets,
-      pageStart,
+      currentPage,
+      totalPages,
+      filteredPackets,
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
