@@ -27,7 +27,6 @@ import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
-import { commitPacketPageState } from "./packetPageCommit";
 import {
   jumpToPacketPage,
   loadNextPacketPage,
@@ -57,6 +56,7 @@ import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
 import { useStreamIndexRefresh } from "./hooks/useStreamIndexRefresh";
 import { useStreamPayloadPersistence } from "./hooks/useStreamPayloadPersistence";
 import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
+import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -183,27 +183,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsPageLoading,
   });
 
-  const commitPacketPage = useCallback(
-    (safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
-      commitPacketPageState({
-        safeCursor,
-        page,
-        pageStartRef,
-        hasMorePacketsRef,
-        setPageStart,
-        setTotalPackets,
-        setPackets,
-        setSelectedPacketId,
-        setSelectedPacketDetail,
-        setSelectedPacketRawHex,
-        setSelectedPacketLayers,
-        setHasPrevPackets,
-        setPacketPageError,
-        setHasMorePackets,
-      });
-    },
-    [],
-  );
+  const commitPacketPage = usePacketPageCommit({
+    hasMorePacketsRef,
+    pageStartRef,
+    setHasMorePackets,
+    setHasPrevPackets,
+    setPackets,
+    setPacketPageError,
+    setPageStart,
+    setSelectedPacketDetail,
+    setSelectedPacketId,
+    setSelectedPacketLayers,
+    setSelectedPacketRawHex,
+    setTotalPackets,
+  });
 
   const resetPacketViewport = useCallback(() => {
     cancelPacketPageLoad();

@@ -252,6 +252,11 @@ export const sourceSizeBudgets = [
     reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
   },
   {
+    path: "src/app/state/hooks/usePacketPageCommit.ts",
+    maxLines: 55,
+    reason: "packet page commit hook should only bind provider refs and setters to pure page commit workflow",
+  },
+  {
     path: "src/app/state/hooks/useProgressStatusUpdater.ts",
     maxLines: 35,
     reason: "progress status updater hook should only bind provider refs and setters to pure status workflow",
@@ -1365,6 +1370,12 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",
     maxLines: 35,
     reason: "packet page cancellation tests should stay focused on sequence, task abort, and loading reset",
+  },
+  {
+    path: "src/app/state/hooks/usePacketPageCommit.test.tsx",
+    maxLines: 95,
+    reason:
+      "packet page commit hook tests should cover provider setter wiring without duplicating page workflow coverage",
   },
   {
     path: "src/app/state/hooks/useProgressStatusUpdater.test.tsx",
