@@ -9,7 +9,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import type { BinaryStream, HttpStream, Packet, RecentCapture } from "../core/types";
+import type { BinaryStream, HttpStream, Packet } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
@@ -17,7 +17,6 @@ import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSelectedPacketResources } from "./hooks/useSelectedPacketResources";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
-import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
 import { keepSelectedPacketDetailForId } from "./selectedPacketState";
 import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
 import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
@@ -54,6 +53,7 @@ import { buildSentinelDerivedView } from "./sentinelDerivedView";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
+import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -94,7 +94,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [streamIds, setStreamIds] = useState(createEmptyStreamIds);
   const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
   const [captureRevision, setCaptureRevision] = useState(0);
-  const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>(() => readRecentCaptures());
+  const { recentCaptures, rememberRecentCapture } = useRecentCapturesState();
 
   const pageStartRef = useRef(0);
   const captureTaskScopeRef = useRef(createCaptureTaskScope());
@@ -364,14 +364,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;
   }, [hasMorePackets]);
-
-  const rememberRecentCapture = useCallback((entry: RecentCapture) => {
-    setRecentCaptures((prev) => {
-      const next = updateRecentCaptures(prev, entry);
-      writeRecentCaptures(next);
-      return next;
-    });
-  }, []);
 
   const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useMemo(
     () =>

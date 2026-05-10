@@ -177,6 +177,11 @@ export const sourceSizeBudgets = [
     reason: "capture signal waiters hook should only own waiter refs and wake/wait callbacks",
   },
   {
+    path: "src/app/state/hooks/useRecentCapturesState.ts",
+    maxLines: 25,
+    reason: "recent captures hook should only own localStorage-backed capture history state",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1249,6 +1254,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useCaptureSignalWaiters.test.tsx",
     maxLines: 35,
     reason: "capture signal waiters hook tests should stay focused on waiter wake behavior",
+  },
+  {
+    path: "src/app/state/hooks/useRecentCapturesState.test.tsx",
+    maxLines: 40,
+    reason: "recent captures hook tests should stay focused on load and remember persistence behavior",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
