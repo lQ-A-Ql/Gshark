@@ -663,8 +663,33 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/layouts/MainLayoutChrome.tsx",
-    maxLines: 330,
-    reason: "main layout chrome should own menu, sidebar nav, settings shell, and footer presentation only",
+    maxLines: 20,
+    reason: "main layout chrome should remain a compatibility export layer",
+  },
+  {
+    path: "src/app/layouts/MainHeader.tsx",
+    maxLines: 190,
+    reason: "main header should own menu presentation only and avoid layout shell state",
+  },
+  {
+    path: "src/app/layouts/MainSidebarNav.tsx",
+    maxLines: 45,
+    reason: "main sidebar nav should own route icon rail presentation only",
+  },
+  {
+    path: "src/app/layouts/MainSettingsChrome.tsx",
+    maxLines: 40,
+    reason: "main settings chrome should only wrap runtime settings sidebar presentation",
+  },
+  {
+    path: "src/app/layouts/MainFooter.tsx",
+    maxLines: 60,
+    reason: "main footer should own status presentation only",
+  },
+  {
+    path: "src/app/layouts/mainLayoutChromeTypes.ts",
+    maxLines: 40,
+    reason: "main layout chrome types should stay separate from rendering components",
   },
   {
     path: "src/app/layouts/mainLayoutConfig.ts",
