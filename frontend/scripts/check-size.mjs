@@ -250,6 +250,21 @@ export const sourceSizeBudgets = [
     reason: "object export page should only orchestrate filtering, selection, and download actions",
   },
   {
+    path: "src/app/pages/EvidencePanel.tsx",
+    maxLines: 85,
+    reason: "evidence page should only orchestrate loading, filters, and export actions",
+  },
+  {
+    path: "src/app/features/evidence/EvidencePanelSections.tsx",
+    maxLines: 330,
+    reason: "evidence panel sections should keep hero, filters, status, table, and caveats scoped",
+  },
+  {
+    path: "src/app/features/evidence/evidencePanelRules.ts",
+    maxLines: 130,
+    reason: "evidence panel rules should keep filtering, sorting, labels, counts, and export formatting pure",
+  },
+  {
     path: "src/app/features/object/ObjectExportPanels.tsx",
     maxLines: 250,
     reason: "object export panels should stay focused on hero, filters, grouped grid, and footer presentation",
@@ -611,6 +626,11 @@ export const testSizeBudgets = [
     path: "src/app/features/object/objectExportRules.test.ts",
     maxLines: 55,
     reason: "object export rule tests should stay focused on classification, filtering, and grouping",
+  },
+  {
+    path: "src/app/features/evidence/evidencePanelRules.test.ts",
+    maxLines: 80,
+    reason: "evidence panel rule tests should stay focused on filtering, sorting, counts, and exports",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
