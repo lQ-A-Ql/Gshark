@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1265,
+    maxLines: 1240,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -49,6 +49,12 @@ export const sourceSizeBudgets = [
     maxLines: 95,
     reason:
       "packet locate workflow should keep locate task scope, filter override, page load, and status mapping outside the provider",
+  },
+  {
+    path: "src/app/state/streamIndexRefresh.ts",
+    maxLines: 60,
+    reason:
+      "stream index refresh should keep stream id loading, stale capture guards, and status mapping outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -816,6 +822,11 @@ export const testSizeBudgets = [
     maxLines: 125,
     reason:
       "packet locate workflow tests should stay focused on found, missing, override, invalid, abort, and failure behavior",
+  },
+  {
+    path: "src/app/state/streamIndexRefresh.test.ts",
+    maxLines: 90,
+    reason: "stream index refresh tests should stay focused on load, skip, stale, abort, and failure behavior",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",

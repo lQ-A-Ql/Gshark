@@ -100,6 +100,7 @@ import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { resolveStreamSwitchTask } from "./streamSwitchTask";
+import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { commitProtocolStreamPayloadPatches } from "./streamPayloadPatch";
 import {
@@ -540,28 +541,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const refreshStreamIndex = useCallback(async () => {
-    if (!backendConnected) return;
-    const capturePath = activeCapturePathRef.current;
-    if (!capturePath) return;
-    const task = captureTaskScopeRef.current.beginTask("stream-index");
-    try {
-      const [httpIds, tcpIds, udpIds] = await Promise.all([
-        bridge.listStreamIds("HTTP", task.signal),
-        bridge.listStreamIds("TCP", task.signal),
-        bridge.listStreamIds("UDP", task.signal),
-      ]);
-      if (!task.isCurrent() || activeCapturePathRef.current !== capturePath) {
-        return;
-      }
-      setStreamIds({ http: httpIds, tcp: tcpIds, udp: udpIds });
-    } catch (error) {
-      if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
-        return;
-      }
-      setBackendStatus("流索引刷新失败");
-    } finally {
-      task.finish();
-    }
+    await refreshStreamIndexState({
+      backendConnected,
+      activeCapturePathRef,
+      captureTaskScopeRef,
+      listStreamIds: bridge.listStreamIds,
+      setStreamIds,
+      setBackendStatus,
+    });
   }, [backendConnected]);
 
   const prefetchAdjacentStreams = useCallback(
