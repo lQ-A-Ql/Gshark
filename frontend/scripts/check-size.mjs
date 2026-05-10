@@ -56,6 +56,31 @@ export const sourceSizeBudgets = [
     reason: "Shiro rememberMe mapper should stay isolated from other protocol tool mappers",
   },
   {
+    path: "src/app/integrations/mappers/toolMapper.ts",
+    maxLines: 10,
+    reason: "tool mapper should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/integrations/mappers/miscModuleMapper.ts",
+    maxLines: 65,
+    reason: "misc module mapper should keep manifest, import, run, form, and table mapping local",
+  },
+  {
+    path: "src/app/integrations/mappers/miscModuleSchemaMapper.ts",
+    maxLines: 80,
+    reason: "misc module schema mapper should keep form, interface, and table schema mapping local",
+  },
+  {
+    path: "src/app/integrations/mappers/sessionMaterialMapper.ts",
+    maxLines: 75,
+    reason: "session material mapper should keep SMB3 and NTLM session mapping local",
+  },
+  {
+    path: "src/app/integrations/mappers/winrmMapper.ts",
+    maxLines: 25,
+    reason: "WinRM mapper should stay isolated from misc module and session material mapping",
+  },
+  {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
     maxLines: 25,
     reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
