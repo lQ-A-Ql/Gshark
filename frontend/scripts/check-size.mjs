@@ -140,8 +140,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/C2Analysis.tsx",
-    maxLines: 410,
-    reason: "C2 page should move forms, tables, and result panels into feature components",
+    maxLines: 250,
+    reason: "C2 page should only orchestrate analysis loading, tabs, and feature-section composition",
+  },
+  {
+    path: "src/app/features/c2/C2DecryptWorkbench.tsx",
+    maxLines: 175,
+    reason: "C2 decrypt workbench should own decrypt form state and keep result display in sibling components",
+  },
+  {
+    path: "src/app/features/c2/C2DecryptFormControls.tsx",
+    maxLines: 250,
+    reason: "C2 decrypt form controls should keep key-mode UI and field primitives separate from request orchestration",
+  },
+  {
+    path: "src/app/features/c2/C2BeaconPatternList.tsx",
+    maxLines: 45,
+    reason: "C2 beacon pattern list should remain a small display component",
   },
   {
     path: "src/app/pages/UsbAnalysis.tsx",
