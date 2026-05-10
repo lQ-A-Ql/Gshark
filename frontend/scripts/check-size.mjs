@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1185,
+    maxLines: 1165,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -71,6 +71,12 @@ export const sourceSizeBudgets = [
     maxLines: 85,
     reason:
       "progress status workflow should keep media, threat, and capture preload progress updates outside the provider",
+  },
+  {
+    path: "src/app/state/streamAdjacentPrefetch.ts",
+    maxLines: 70,
+    reason:
+      "stream adjacent prefetch should keep target selection and protocol-specific scheduling outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -859,6 +865,11 @@ export const testSizeBudgets = [
     maxLines: 125,
     reason:
       "progress workflow tests should stay focused on non-progress, malformed, media, threat, and capture progress",
+  },
+  {
+    path: "src/app/state/streamAdjacentPrefetch.test.ts",
+    maxLines: 105,
+    reason: "stream adjacent prefetch tests should stay focused on guard, scheduling, protocol, and cache behavior",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",

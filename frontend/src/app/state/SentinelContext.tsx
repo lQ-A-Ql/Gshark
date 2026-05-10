@@ -81,18 +81,15 @@ import {
   EMPTY_SWITCH_METRICS,
   createEmptyStreamIds,
   createEmptyUdpStream,
-  getStreamIdsForProtocol,
   prettySize,
 } from "./streamState";
-import { pickAdjacentStreamTargets } from "./streamPrefetchPlan";
-import { resolveStreamPrefetchTask } from "./streamPrefetchTask";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
-import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
 import { updateProgressFromStatusState } from "./progressStatusWorkflow";
+import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
 import {
   bumpStreamSwitchSequence,
   createStreamSwitchSequences,
@@ -493,34 +490,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const prefetchAdjacentStreams = useCallback(
     (protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {
-      if (!backendConnected || !activeCapturePathRef.current || currentStreamId < 0 || STREAM_PREFETCH_LIMIT <= 0)
-        return;
-
-      const ids = getStreamIdsForProtocol(streamIds, protocol);
-      const targets = pickAdjacentStreamTargets(ids, currentStreamId, STREAM_PREFETCH_LIMIT);
-      for (const targetId of targets) {
-        const { taskKey, cache, inFlight, fetchStream } = resolveStreamPrefetchTask({
-          protocol,
-          targetId,
-          httpCache: httpStreamCacheRef.current,
-          tcpCache: tcpStreamCacheRef.current,
-          udpCache: udpStreamCacheRef.current,
-          httpInFlight: httpPrefetchInFlightRef.current,
-          tcpInFlight: tcpPrefetchInFlightRef.current,
-          udpInFlight: udpPrefetchInFlightRef.current,
-          fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
-          fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-          fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
-        });
-        scheduleStreamPrefetch({
-          targetId,
-          taskKey,
-          cache,
-          inFlight,
-          beginTask: captureTaskScopeRef.current.beginTask,
-          fetchStream,
-        });
-      }
+      prefetchAdjacentStreamsState({
+        backendConnected,
+        activeCapturePath: activeCapturePathRef.current,
+        protocol,
+        currentStreamId,
+        limit: STREAM_PREFETCH_LIMIT,
+        streamIds,
+        httpCache: httpStreamCacheRef.current,
+        tcpCache: tcpStreamCacheRef.current,
+        udpCache: udpStreamCacheRef.current,
+        httpInFlight: httpPrefetchInFlightRef.current,
+        tcpInFlight: tcpPrefetchInFlightRef.current,
+        udpInFlight: udpPrefetchInFlightRef.current,
+        beginTask: captureTaskScopeRef.current.beginTask,
+        fetchHttpStream: (id, signal) => bridge.getHttpStream(id, signal),
+        fetchRawTcpStream: (id, signal) => bridge.getRawStreamPage("TCP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+        fetchRawUdpStream: (id, signal) => bridge.getRawStreamPage("UDP", id, 0, RAW_STREAM_PAGE_SIZE, signal),
+      });
     },
     [backendConnected, streamIds.http, streamIds.tcp, streamIds.udp],
   );
