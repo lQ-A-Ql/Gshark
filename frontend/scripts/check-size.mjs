@@ -267,6 +267,12 @@ export const sourceSizeBudgets = [
     reason: "stream index refresh hook should only bind provider refs, bridge call, and stream-id setter",
   },
   {
+    path: "src/app/state/hooks/useStreamPayloadPersistence.ts",
+    maxLines: 45,
+    reason:
+      "stream payload persistence hook should only bind provider refs and active stream setters to pure persist workflow",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1369,6 +1375,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useStreamIndexRefresh.test.tsx",
     maxLines: 55,
     reason: "stream index refresh hook tests should stay focused on hook wiring over pure refresh workflow",
+  },
+  {
+    path: "src/app/state/hooks/useStreamPayloadPersistence.test.tsx",
+    maxLines: 70,
+    reason: "stream payload persistence hook tests should stay focused on backend update and local patch wiring",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
