@@ -1185,8 +1185,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/Workspace.tsx",
-    maxLines: 290,
+    maxLines: 275,
     reason: "workspace page should stay focused on state wiring, navigation, and selection orchestration",
+  },
+  {
+    path: "src/app/components/workspace/WorkspaceTitleActions.tsx",
+    maxLines: 95,
+    reason: "workspace title actions should compose capture, paging, and packet locator controls only",
+  },
+  {
+    path: "src/app/components/workspace/WorkspaceFilterSection.tsx",
+    maxLines: 65,
+    reason: "workspace filter section should compose filter bar, syntax hint, and filter error display only",
   },
   {
     path: "src/app/components/workspace/WorkspacePanels.tsx",

@@ -5,9 +5,9 @@ import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { WorkbenchTitleBar } from "../components/DesignSystem";
 import { CaptureTransactionBanner } from "../components/workspace/CaptureTransactionBanner";
 import { CaptureTransactionErrorPanel } from "../components/workspace/CaptureTransactionErrorPanel";
-import { DisplayFilterBar } from "../components/workspace/DisplayFilterBar";
+import { WorkspaceFilterSection } from "../components/workspace/WorkspaceFilterSection";
 import { WorkspacePanels, WorkspacePreloadProgress } from "../components/workspace/WorkspacePanels";
-import { CaptureFileControls, PacketLocatorControls, PacketPagingControls } from "../components/workspace/WorkspaceTopControls";
+import { WorkspaceTitleActions } from "../components/workspace/WorkspaceTitleActions";
 import { useWorkspaceFilterProgress } from "../components/workspace/useWorkspaceFilterProgress";
 import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
 import { useWorkspaceProtocolSelection } from "../components/workspace/useWorkspaceProtocolSelection";
@@ -119,9 +119,15 @@ export default function Workspace() {
     () => isFilterLoading && !isPreloadingCapture && filteredPackets.length === 0,
     [filteredPackets.length, isFilterLoading, isPreloadingCapture],
   );
-  const filterLoadingTitle = useMemo(() => getWorkspaceFilterLoadingTitle(backendStatus, displayFilter), [backendStatus, displayFilter]);
+  const filterLoadingTitle = useMemo(
+    () => getWorkspaceFilterLoadingTitle(backendStatus, displayFilter),
+    [backendStatus, displayFilter],
+  );
   const filterLoadingDetail = useMemo(() => getWorkspaceFilterLoadingDetail(displayFilter), [displayFilter]);
-  const filterErrorMessage = useMemo(() => getWorkspaceFilterErrorMessage(backendStatus, displayFilter), [backendStatus, displayFilter]);
+  const filterErrorMessage = useMemo(
+    () => getWorkspaceFilterErrorMessage(backendStatus, displayFilter),
+    [backendStatus, displayFilter],
+  );
   const pagerItems = useMemo(() => {
     const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
     return Array.from(pages)
@@ -169,64 +175,50 @@ export default function Workspace() {
     <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(147,197,253,0.22),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f8fafc_100%)] text-sm text-foreground">
       <WorkbenchTitleBar
         title="流量工作区"
-        subtitle={fileMeta.path ? `${fileMeta.name} · ${totalPackets.toLocaleString()} packets` : "打开 PCAP/PCAPNG 后开始分析"}
+        subtitle={
+          fileMeta.path ? `${fileMeta.name} · ${totalPackets.toLocaleString()} packets` : "打开 PCAP/PCAPNG 后开始分析"
+        }
         icon={<Network className="h-4 w-4 text-blue-600" />}
         className="border-blue-100 bg-white/90 shadow-[0_18px_48px_rgba(148,163,184,0.16)] backdrop-blur-xl"
-        actions={(
-          <>
-            <CaptureFileControls
-              capturePath={capturePath}
-              onCapturePathChange={setCapturePath}
-              onChooseFile={() => void openCapture()}
-              onOpenPath={() => void openCapture(capturePath)}
-              onStop={() => void stopCapture()}
-              disabled={captureActionsDisabled}
-              backendConnected={backendConnected}
-            />
-            <PacketPagingControls
-              hasPrevPackets={hasPrevPackets}
-              hasMorePackets={hasMorePackets}
-              isPreloadingCapture={isPreloadingCapture}
-              isPageLoading={isPageLoading}
-              totalPackets={totalPackets}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageInput={pageInput}
-              pagerItems={pagerItems}
-              onPageInputChange={setPageInput}
-              onLoadPrev={() => void loadPrevPackets()}
-              onLoadMore={() => void loadMorePackets()}
-              onJumpToPage={(page) => void jumpToPage(page)}
-            />
-            <PacketLocatorControls
-              packetIdInput={packetIdInput}
-              onPacketIdInputChange={setPacketIdInput}
-              onLocatePacket={(packetId) => void locatePacketById(packetId)}
-              disabled={isPreloadingCapture || isPageLoading}
-            />
-          </>
-        )}
+        actions={
+          <WorkspaceTitleActions
+            capturePath={capturePath}
+            pageInput={pageInput}
+            packetIdInput={packetIdInput}
+            hasPrevPackets={hasPrevPackets}
+            hasMorePackets={hasMorePackets}
+            isPreloadingCapture={isPreloadingCapture}
+            isPageLoading={isPageLoading}
+            totalPackets={totalPackets}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pagerItems={pagerItems}
+            captureActionsDisabled={captureActionsDisabled}
+            backendConnected={backendConnected}
+            onCapturePathChange={setCapturePath}
+            onChooseFile={() => void openCapture()}
+            onOpenPath={() => void openCapture(capturePath)}
+            onStop={() => void stopCapture()}
+            onPageInputChange={setPageInput}
+            onLoadPrev={() => void loadPrevPackets()}
+            onLoadMore={() => void loadMorePackets()}
+            onJumpToPage={(page) => void jumpToPage(page)}
+            onPacketIdInputChange={setPacketIdInput}
+            onLocatePacket={(packetId) => void locatePacketById(packetId)}
+          />
+        }
       />
-      <div className="border-b border-blue-100 bg-white/80 shadow-[0_12px_32px_rgba(148,163,184,0.12)] backdrop-blur-xl">
-        <DisplayFilterBar
-          value={displayFilter}
-          suggestions={filterSuggestions}
-          inputRef={filterInputRef}
-          disabled={isPreloadingCapture || isPageLoading}
-          onChange={setDisplayFilter}
-          onApply={() => applyFilterWithHistory()}
-          onClear={clearFilter}
-          onClearHistory={clearFilterHistory}
-        />
-        <div className="px-3 pb-2 text-[11px] text-slate-500">
-          {'过滤器已切换为 tshark display filter 原生语法，支持 "http.request"、"tcp.stream eq 3"、"frame.number >= 100"、"ip.addr == 192.168.1.10" 等表达式。'}
-        </div>
-      </div>
-      {filterErrorMessage && (
-        <div className="border-b border-rose-200 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700 shrink-0">
-          {filterErrorMessage}
-        </div>
-      )}
+      <WorkspaceFilterSection
+        value={displayFilter}
+        suggestions={filterSuggestions}
+        inputRef={filterInputRef}
+        disabled={isPreloadingCapture || isPageLoading}
+        errorMessage={filterErrorMessage}
+        onChange={setDisplayFilter}
+        onApply={() => applyFilterWithHistory()}
+        onClear={clearFilter}
+        onClearHistory={clearFilterHistory}
+      />
 
       {isPreloadingCapture && (
         <WorkspacePreloadProgress
