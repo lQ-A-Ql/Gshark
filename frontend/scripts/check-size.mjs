@@ -23,8 +23,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1115,
+    maxLines: 1100,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
+  },
+  {
+    path: "src/app/state/captureReplacementPrepare.ts",
+    maxLines: 55,
+    reason: "capture replacement prepare should keep pre-replacement reset and backend cleanup outside the provider",
   },
   {
     path: "src/app/state/captureTaskReset.ts",
@@ -832,6 +837,12 @@ export const testSizeBudgets = [
     maxLines: 75,
     reason:
       "capture task reset tests should stay focused on cancellation, sequence bumps, prefetch cleanup, and timer clearing",
+  },
+  {
+    path: "src/app/state/captureReplacementPrepare.test.ts",
+    maxLines: 75,
+    reason:
+      "capture replacement prepare tests should stay focused on local reset, backend cleanup, and disconnect skips",
   },
   {
     path: "src/app/state/packetPageLoad.test.ts",

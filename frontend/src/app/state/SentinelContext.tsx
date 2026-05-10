@@ -89,6 +89,7 @@ import { updateProgressFromStatusState } from "./progressStatusWorkflow";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { setActiveStreamState } from "./streamSwitchWorkflow";
+import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import {
   createEmptyStreamSwitchDurations,
   createEmptyStreamSwitchHits,
@@ -415,23 +416,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   }, []);
 
   const prepareForCaptureReplacement = useCallback(async () => {
-    cancelAllFrontendCaptureTasks();
-    wakeCaptureWaiters();
-    finishCaptureParseRuntime({
+    await prepareCaptureReplacementState({
+      backendConnected,
       parseFinishedRef,
       parseErrorRef,
       preloadingRef,
+      preloadProcessedRef,
+      preloadTotalRef,
+      cancelAllFrontendCaptureTasks,
+      wakeCaptureWaiters,
       setIsPreloadingCapture,
+      setIsFilterLoading,
+      setPreloadProcessed,
+      setPreloadTotal,
+      stopStreamingPackets: bridge.stopStreamingPackets,
+      prepareCaptureReplacement: bridge.prepareCaptureReplacement,
     });
-    setIsFilterLoading(false);
-    setPreloadProcessed(0);
-    setPreloadTotal(0);
-    preloadProcessedRef.current = 0;
-    preloadTotalRef.current = 0;
-
-    if (!backendConnected) return;
-    await bridge.stopStreamingPackets().catch(() => null);
-    await bridge.prepareCaptureReplacement().catch(() => null);
   }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
 
   const waitForCaptureSignal = useCallback(
