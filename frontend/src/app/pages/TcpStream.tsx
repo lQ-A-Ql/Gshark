@@ -1,31 +1,21 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { useSentinel } from "../state/SentinelContext";
-import { cn } from "../components/ui/utils";
-import {
-  StreamChunkCard,
-  StreamControlBar,
-  StreamCurrentChunkPanel,
-  StreamNavigator,
-  StreamPayloadDialog,
-  StreamSearchBar,
-  ViewModeToggle,
-  WorkbenchChip,
-  WorkbenchTitleBar,
-} from "../components/stream/StreamWorkbench";
-import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
+import { bridge } from "../integrations/wailsBridge";
+import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
 import {
-  buildRawStreamChunkChips,
-  buildRawStreamDialogMeta,
+  RawStreamControlBar,
+  RawStreamDialog,
+  RawStreamPayloadGrid,
+  RawStreamSelectedPanel,
+  RawStreamTitleBar,
+  TCP_RAW_STREAM_TONE,
+} from "./RawStreamSections";
+import {
   buildRawStreamExportContent,
   countRawChunkMatches,
   filterRawChunks,
-  formatRawStreamLoadMeta,
-  getRawDirectionLabel,
-  isRawStreamChunkTruncated,
   renderRawStreamChunk,
   toVisibleRawChunks,
   type RawChunk,
@@ -63,7 +53,7 @@ export default function TcpStream() {
   useEffect(() => {
     setStreamView({
       id: tcpStream.id,
-      protocol: "TCP" as const,
+      protocol: "TCP",
       from: tcpStream.from,
       to: tcpStream.to,
       chunks: tcpStream.chunks,
@@ -166,183 +156,99 @@ export default function TcpStream() {
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.22),transparent_34%),linear-gradient(180deg,#fbfaff_0%,#f6f7ff_42%,#f8fafc_100%)] text-sm text-foreground">
-      <WorkbenchTitleBar
+      <RawStreamTitleBar
+        chunkCount={streamView.chunks.length}
+        from={streamView.from}
+        loadMeta={streamView.loadMeta}
+        protocol="TCP"
+        streamId={streamView.id}
+        to={streamView.to}
+        totalChunks={streamView.totalChunks}
         onBack={() => navigate(-1)}
-        title={`TCP 流追踪 (stream eq ${streamView.id})`}
-        subtitle={
-          <span className="flex min-w-0 items-center gap-1 font-mono">
-            <span className="truncate">{streamView.from}</span>
-            <ArrowLeftRight className="h-3 w-3 shrink-0" />
-            <span className="truncate">{streamView.to}</span>
-          </span>
-        }
-        meta={
-          <>
-            <WorkbenchChip>
-              已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-            </WorkbenchChip>
-            <WorkbenchChip className="max-w-[520px] truncate">
-              {formatRawStreamLoadMeta("TCP", streamView.loadMeta)}
-            </WorkbenchChip>
-          </>
-        }
       />
 
       <div className="grid min-h-0 flex-1 gap-4 bg-transparent p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
-        <div
-          ref={viewportRef}
-          className="min-h-0 overflow-auto rounded-[24px] border border-white/80 bg-white/88 p-4 font-mono text-sm leading-relaxed shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl"
-          onScroll={(event) => {
-            const nextScrollTop = event.currentTarget.scrollTop;
-            const nearBottom =
-              nextScrollTop + event.currentTarget.clientHeight >= event.currentTarget.scrollHeight - 480;
-            if (nearBottom) {
-              void loadMore();
-            }
-          }}
-        >
-          {loadError && (
-            <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-              {loadError}
-            </div>
-          )}
-          {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
-            <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700">
-              正在解析 tcp.stream eq {streamView.id}，当前只先加载这一条流。
-            </div>
-          )}
-          <div className="flex max-w-4xl flex-col gap-2">
-            {displayChunks.map((chunk, index) => (
-              <StreamChunkCard
-                key={chunk.key}
-                directionLabel={`[${getRawDirectionLabel(chunk.direction)}]`}
-                packetId={chunk.packetId}
-                rendered={renderRawStreamChunk(chunk.body, viewMode, false)}
-                highlight={deferredSearch}
-                tone={
-                  chunk.direction === "client"
-                    ? "border-rose-500/30 bg-rose-500/10 text-rose-700"
-                    : "border-blue-500/30 bg-blue-500/10 text-blue-700"
-                }
-                selected={selectedChunkIndex === index}
-                onSelect={() => setSelectedChunkIndex(index)}
-                onOpen={() => setExpandedChunk(chunk)}
-                truncated={isRawStreamChunkTruncated(chunk.body, viewMode)}
-              />
-            ))}
-            {(loadingMore || streamView.hasMore) && (
-              <div className="flex justify-center pt-2 text-xs text-muted-foreground">
-                {loadingMore ? "正在加载更多流片段..." : "继续下滚可加载更多"}
-              </div>
-            )}
-          </div>
-        </div>
+        <RawStreamPayloadGrid
+          chunks={displayChunks}
+          hasMore={streamView.hasMore}
+          loadedChunkCount={streamView.chunks.length}
+          loadError={loadError}
+          loadingMore={loadingMore}
+          loadingText="继续下滚可加载更多"
+          loadMeta={streamView.loadMeta}
+          protocol="TCP"
+          search={deferredSearch}
+          selectedChunkIndex={selectedChunkIndex}
+          streamId={streamView.id}
+          tone={TCP_RAW_STREAM_TONE}
+          totalChunks={streamView.totalChunks}
+          viewportRef={viewportRef}
+          viewMode={viewMode}
+          onLoadMore={() => void loadMore()}
+          onOpenChunk={setExpandedChunk}
+          onScrollNearBottom={() => void loadMore()}
+          onSelectChunk={setSelectedChunkIndex}
+        />
         <div className="min-h-0 min-w-0 space-y-4 overflow-auto pb-4 pr-1">
-          <StreamCurrentChunkPanel
+          <RawStreamSelectedPanel
+            chunk={selectedChunk}
             description="右侧固定查看当前 TCP payload，解码类实验工具已收敛到 MISC 工作台"
-            badge={
-              selectedChunk ? (
-                <span
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-                    selectedChunk.direction === "client"
-                      ? "border-rose-200 bg-rose-50 text-rose-700"
-                      : "border-blue-200 bg-blue-50 text-blue-700",
-                  )}
-                >
-                  {getRawDirectionLabel(selectedChunk.direction)}
-                </span>
-              ) : undefined
-            }
-            chips={selectedChunk ? buildRawStreamChunkChips(selectedChunk) : []}
-            content={selectedChunk ? selectedChunkRendered || "(empty payload)" : null}
-            highlight={deferredSearch}
-            emptyText="选择左侧片段后，可在这里固定查看完整上下文。"
-            showOpenButton={selectedChunk ? isRawStreamChunkTruncated(selectedChunk.body, viewMode) : false}
-            onOpen={() => selectedChunk && setExpandedChunk(selectedChunk)}
+            rendered={selectedChunkRendered}
+            search={deferredSearch}
+            tone={TCP_RAW_STREAM_TONE}
+            viewMode={viewMode}
+            onOpenChunk={setExpandedChunk}
           />
         </div>
       </div>
 
-      <StreamControlBar>
-        <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-          切流 last {streamSwitchMetrics.byProtocol.TCP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.TCP.p50Ms}ms /
-          p95 {streamSwitchMetrics.byProtocol.TCP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.TCP.cacheHitRate}
-          %
-        </div>
-        <ViewModeToggle<RawViewMode>
-          value={viewMode}
-          onChange={setViewMode}
-          options={[
-            { value: "ascii", label: "ASCII" },
-            { value: "hex", label: "Hex Dump" },
-            { value: "raw", label: "Raw" },
-          ]}
-        />
-        <StreamNavigator
-          protocolLabel="TCP"
-          ordinalLabel={ordinalLabel}
-          streamId={streamView.id}
-          streamTotal={streamIds.tcp.length}
-          streamInput={streamInput}
-          onStreamInputChange={setStreamInput}
-          onSubmitStream={() => {
-            const id = Number(streamInput);
-            if (id >= 0) void setActiveStream("TCP", id);
-          }}
-          onPrev={() => {
-            if (hasPrev) void setActiveStream("TCP", streamIds.tcp[currentIndex - 1]);
-          }}
-          onNext={() => {
-            if (hasNext) void setActiveStream("TCP", streamIds.tcp[currentIndex + 1]);
-          }}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-        />
-        <StreamSearchBar
-          value={search}
-          onChange={(value) => {
-            setSearch(value);
-            setSelectedChunkIndex(0);
-          }}
-          onPrev={() => setSelectedChunkIndex((prev) => Math.max(prev - 1, 0))}
-          onNext={() => setSelectedChunkIndex((prev) => Math.min(prev + 1, Math.max(0, displayChunks.length - 1)))}
-          matchCount={matchCount}
-          resultCount={displayChunks.length}
-          currentIndex={selectedChunkIndex}
-          placeholder="搜索 TCP payload..."
-        />
-        <WorkbenchChip>
-          已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-        </WorkbenchChip>
-        <div className="ml-auto">
-          <button
-            onClick={exportAll}
-            className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent"
-          >
-            <Download className="h-3.5 w-3.5" /> 导出为文件
-          </button>
-        </div>
-      </StreamControlBar>
+      <RawStreamControlBar
+        currentIndex={selectedChunkIndex}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        loadedChunkCount={streamView.chunks.length}
+        matchCount={matchCount}
+        metrics={streamSwitchMetrics}
+        ordinalLabel={ordinalLabel}
+        protocol="TCP"
+        resultCount={displayChunks.length}
+        search={search}
+        streamId={streamView.id}
+        streamInput={streamInput}
+        streamTotal={streamIds.tcp.length}
+        totalChunks={streamView.totalChunks}
+        viewMode={viewMode}
+        onExportAll={exportAll}
+        onNext={() => {
+          if (hasNext) void setActiveStream("TCP", streamIds.tcp[currentIndex + 1]);
+        }}
+        onNextMatch={() => setSelectedChunkIndex((prev) => Math.min(prev + 1, Math.max(0, displayChunks.length - 1)))}
+        onPrev={() => {
+          if (hasPrev) void setActiveStream("TCP", streamIds.tcp[currentIndex - 1]);
+        }}
+        onPrevMatch={() => setSelectedChunkIndex((prev) => Math.max(prev - 1, 0))}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setSelectedChunkIndex(0);
+        }}
+        onStreamInputChange={setStreamInput}
+        onSubmitStream={() => {
+          const id = Number(streamInput);
+          if (id >= 0) void setActiveStream("TCP", id);
+        }}
+        onViewModeChange={setViewMode}
+      />
 
       {expandedChunk && (
-        <StreamPayloadDialog
-          title={`Payload 详情 #${expandedChunk.packetId}`}
-          subtitle={`${getRawDirectionLabel(expandedChunk.direction)} · chunk #${expandedChunk.streamIndex + 1} · ${buildRawStreamChunkChips(expandedChunk)[1]}`}
-          meta={buildRawStreamDialogMeta("TCP", streamView.id, expandedChunk, streamView.chunks.length, viewMode)}
-          extraActions={
-            <button
-              type="button"
-              onClick={() => navigate("/misc")}
-              className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 shadow-sm transition-colors hover:bg-cyan-100"
-            >
-              打开 MISC 解码工作台
-            </button>
-          }
-          content={renderRawStreamChunk(expandedChunk.body, viewMode, true)}
-          highlight={deferredSearch}
-          filename={`tcp-stream-${streamView.id}-packet-${expandedChunk.packetId}.txt`}
+        <RawStreamDialog
+          chunk={expandedChunk}
+          protocol="TCP"
+          search={deferredSearch}
+          streamId={streamView.id}
+          totalChunks={streamView.chunks.length}
+          viewMode={viewMode}
           onClose={() => setExpandedChunk(null)}
+          onOpenMisc={() => navigate("/misc")}
         />
       )}
     </div>

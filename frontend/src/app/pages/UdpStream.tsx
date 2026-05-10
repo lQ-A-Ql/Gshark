@@ -1,31 +1,21 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { useSentinel } from "../state/SentinelContext";
-import { cn } from "../components/ui/utils";
-import {
-  StreamChunkCard,
-  StreamControlBar,
-  StreamCurrentChunkPanel,
-  StreamNavigator,
-  StreamPayloadDialog,
-  StreamSearchBar,
-  ViewModeToggle,
-  WorkbenchChip,
-  WorkbenchTitleBar,
-} from "../components/stream/StreamWorkbench";
-import { bridge } from "../integrations/wailsBridge";
 import type { StreamLoadMeta } from "../core/types";
+import { bridge } from "../integrations/wailsBridge";
+import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
 import {
-  buildRawStreamChunkChips,
-  buildRawStreamDialogMeta,
+  RawStreamControlBar,
+  RawStreamDialog,
+  RawStreamPayloadGrid,
+  RawStreamSelectedPanel,
+  RawStreamTitleBar,
+  UDP_RAW_STREAM_TONE,
+} from "./RawStreamSections";
+import {
   buildRawStreamExportContent,
   countRawChunkMatches,
   filterRawChunks,
-  formatRawStreamLoadMeta,
-  getRawDirectionLabel,
-  isRawStreamChunkTruncated,
   renderRawStreamChunk,
   toVisibleRawChunks,
   type RawChunk,
@@ -82,7 +72,7 @@ export default function UdpStream() {
   useEffect(() => {
     setStreamView({
       id: udpStream.id,
-      protocol: "UDP" as const,
+      protocol: "UDP",
       from: udpStream.from,
       to: udpStream.to,
       chunks: udpStream.chunks,
@@ -161,176 +151,97 @@ export default function UdpStream() {
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.22),transparent_34%),linear-gradient(180deg,#fbfaff_0%,#f6f7ff_42%,#f8fafc_100%)] text-sm text-foreground">
-      <WorkbenchTitleBar
+      <RawStreamTitleBar
+        chunkCount={streamView.chunks.length}
+        from={streamView.from}
+        loadMeta={streamView.loadMeta}
+        protocol="UDP"
+        streamId={streamView.id}
+        to={streamView.to}
+        totalChunks={streamView.totalChunks}
         onBack={() => navigate(-1)}
-        title={`UDP 流追踪 (stream eq ${streamView.id})`}
-        subtitle={
-          <span className="flex min-w-0 items-center gap-1 font-mono">
-            <span className="truncate">{streamView.from}</span>
-            <ArrowLeftRight className="h-3 w-3 shrink-0" />
-            <span className="truncate">{streamView.to}</span>
-          </span>
-        }
-        meta={
-          <>
-            <WorkbenchChip>
-              已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-            </WorkbenchChip>
-            <WorkbenchChip className="max-w-[520px] truncate">
-              {formatRawStreamLoadMeta("UDP", streamView.loadMeta)}
-            </WorkbenchChip>
-          </>
-        }
       />
 
       <div className="grid min-h-0 flex-1 gap-4 bg-transparent p-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
-        <div className="min-h-0 overflow-auto rounded-[24px] border border-white/80 bg-white/88 p-4 font-mono text-sm leading-relaxed shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl">
-          {loadError && (
-            <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-              {loadError}
-            </div>
-          )}
-          {streamView.loadMeta?.loading && streamView.chunks.length === 0 && (
-            <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700">
-              正在解析 udp.stream eq {streamView.id}，当前只先加载这一条流。
-            </div>
-          )}
-          <div className="flex max-w-4xl flex-col gap-2">
-            {visibleChunks.map((chunk, index) => (
-              <StreamChunkCard
-                key={chunk.key}
-                directionLabel={`[${getRawDirectionLabel(chunk.direction)}]`}
-                packetId={chunk.packetId}
-                rendered={renderRawStreamChunk(chunk.body, viewMode, false)}
-                highlight={deferredSearch}
-                tone={
-                  chunk.direction === "client"
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-700"
-                    : "border-cyan-500/30 bg-cyan-500/10 text-cyan-700"
-                }
-                selected={selectedChunkIndex === index}
-                onSelect={() => setSelectedChunkIndex(index)}
-                onOpen={() => setExpandedChunk(chunk)}
-                truncated={isRawStreamChunkTruncated(chunk.body, viewMode)}
-              />
-            ))}
-            {streamView.hasMore && (
-              <button
-                className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-              >
-                {loadingMore
-                  ? "正在加载..."
-                  : `加载更多 (${streamView.chunks.length}/${streamView.totalChunks || streamView.chunks.length})`}
-              </button>
-            )}
-          </div>
-        </div>
+        <RawStreamPayloadGrid
+          chunks={visibleChunks}
+          hasMore={streamView.hasMore}
+          loadedChunkCount={streamView.chunks.length}
+          loadError={loadError}
+          loadingMore={loadingMore}
+          loadingText=""
+          loadMeta={streamView.loadMeta}
+          protocol="UDP"
+          search={deferredSearch}
+          selectedChunkIndex={selectedChunkIndex}
+          streamId={streamView.id}
+          tone={UDP_RAW_STREAM_TONE}
+          totalChunks={streamView.totalChunks}
+          viewMode={viewMode}
+          onLoadMore={() => void loadMore()}
+          onOpenChunk={setExpandedChunk}
+          onSelectChunk={setSelectedChunkIndex}
+        />
         <div className="space-y-4 xl:sticky xl:top-0">
-          <StreamCurrentChunkPanel
+          <RawStreamSelectedPanel
+            chunk={selectedChunk}
             description="固定查看当前 UDP payload，解码类实验工具已收敛到 MISC 工作台"
-            badge={
-              selectedChunk ? (
-                <span
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-                    selectedChunk.direction === "client"
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-cyan-200 bg-cyan-50 text-cyan-700",
-                  )}
-                >
-                  {getRawDirectionLabel(selectedChunk.direction)}
-                </span>
-              ) : undefined
-            }
-            chips={selectedChunk ? buildRawStreamChunkChips(selectedChunk) : []}
-            content={selectedChunk ? selectedChunkRendered || "(empty payload)" : null}
-            highlight={deferredSearch}
-            showOpenButton={selectedChunk ? isRawStreamChunkTruncated(selectedChunk.body, viewMode) : false}
-            onOpen={() => selectedChunk && setExpandedChunk(selectedChunk)}
+            rendered={selectedChunkRendered}
+            search={deferredSearch}
+            tone={UDP_RAW_STREAM_TONE}
+            viewMode={viewMode}
+            onOpenChunk={setExpandedChunk}
           />
         </div>
       </div>
 
-      <StreamControlBar>
-        <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-          切流 last {streamSwitchMetrics.byProtocol.UDP.lastMs}ms / p50 {streamSwitchMetrics.byProtocol.UDP.p50Ms}ms /
-          p95 {streamSwitchMetrics.byProtocol.UDP.p95Ms}ms / fast-path {streamSwitchMetrics.byProtocol.UDP.cacheHitRate}
-          %
-        </div>
-        <ViewModeToggle<RawViewMode>
-          value={viewMode}
-          onChange={setViewMode}
-          options={[
-            { value: "ascii", label: "ASCII" },
-            { value: "hex", label: "Hex Dump" },
-            { value: "raw", label: "Raw" },
-          ]}
-        />
-        <StreamNavigator
-          protocolLabel="UDP"
-          ordinalLabel={ordinalLabel}
-          streamId={streamView.id}
-          streamTotal={streamIds.udp.length}
-          streamInput={streamInput}
-          onStreamInputChange={setStreamInput}
-          onSubmitStream={() => {
-            const id = Number(streamInput);
-            if (id >= 0) void setActiveStream("UDP", id);
-          }}
-          onPrev={() => {
-            if (hasPrev) void setActiveStream("UDP", streamIds.udp[currentIndex - 1]);
-          }}
-          onNext={() => {
-            if (hasNext) void setActiveStream("UDP", streamIds.udp[currentIndex + 1]);
-          }}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-        />
-        <StreamSearchBar
-          value={search}
-          onChange={(value) => {
-            setSearch(value);
-            setSelectedChunkIndex(0);
-          }}
-          onPrev={() => setSelectedChunkIndex((prev) => Math.max(prev - 1, 0))}
-          onNext={() => setSelectedChunkIndex((prev) => Math.min(prev + 1, Math.max(0, visibleChunks.length - 1)))}
-          matchCount={matchCount}
-          resultCount={visibleChunks.length}
-          currentIndex={selectedChunkIndex}
-          placeholder="搜索 UDP payload..."
-        />
-        <WorkbenchChip>
-          已载入 {streamView.chunks.length}/{streamView.totalChunks || streamView.chunks.length}
-        </WorkbenchChip>
-        <div className="ml-auto flex items-center gap-3">
-          <button
-            onClick={exportAll}
-            className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent"
-          >
-            <Download className="h-3.5 w-3.5" /> 导出为文件
-          </button>
-        </div>
-      </StreamControlBar>
+      <RawStreamControlBar
+        currentIndex={selectedChunkIndex}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        loadedChunkCount={streamView.chunks.length}
+        matchCount={matchCount}
+        metrics={streamSwitchMetrics}
+        ordinalLabel={ordinalLabel}
+        protocol="UDP"
+        resultCount={visibleChunks.length}
+        search={search}
+        streamId={streamView.id}
+        streamInput={streamInput}
+        streamTotal={streamIds.udp.length}
+        totalChunks={streamView.totalChunks}
+        viewMode={viewMode}
+        onExportAll={exportAll}
+        onNext={() => {
+          if (hasNext) void setActiveStream("UDP", streamIds.udp[currentIndex + 1]);
+        }}
+        onNextMatch={() => setSelectedChunkIndex((prev) => Math.min(prev + 1, Math.max(0, visibleChunks.length - 1)))}
+        onPrev={() => {
+          if (hasPrev) void setActiveStream("UDP", streamIds.udp[currentIndex - 1]);
+        }}
+        onPrevMatch={() => setSelectedChunkIndex((prev) => Math.max(prev - 1, 0))}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setSelectedChunkIndex(0);
+        }}
+        onStreamInputChange={setStreamInput}
+        onSubmitStream={() => {
+          const id = Number(streamInput);
+          if (id >= 0) void setActiveStream("UDP", id);
+        }}
+        onViewModeChange={setViewMode}
+      />
+
       {expandedChunk && (
-        <StreamPayloadDialog
-          title={`Payload 详情 #${expandedChunk.packetId}`}
-          subtitle={`${getRawDirectionLabel(expandedChunk.direction)} · chunk #${expandedChunk.streamIndex + 1} · ${buildRawStreamChunkChips(expandedChunk)[1]}`}
-          meta={buildRawStreamDialogMeta("UDP", streamView.id, expandedChunk, streamView.chunks.length, viewMode)}
-          extraActions={
-            <button
-              type="button"
-              onClick={() => navigate("/misc")}
-              className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 shadow-sm transition-colors hover:bg-cyan-100"
-            >
-              打开 MISC 解码工作台
-            </button>
-          }
-          content={renderRawStreamChunk(expandedChunk.body, viewMode, true)}
-          highlight={deferredSearch}
-          filename={`udp-stream-${streamView.id}-packet-${expandedChunk.packetId}.txt`}
+        <RawStreamDialog
+          chunk={expandedChunk}
+          protocol="UDP"
+          search={deferredSearch}
+          streamId={streamView.id}
+          totalChunks={streamView.chunks.length}
+          viewMode={viewMode}
           onClose={() => setExpandedChunk(null)}
+          onOpenMisc={() => navigate("/misc")}
         />
       )}
     </div>

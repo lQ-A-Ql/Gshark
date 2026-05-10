@@ -437,18 +437,24 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/TcpStream.tsx",
-    maxLines: 370,
-    reason: "TCP stream page should keep payload formatting helpers in RawStreamUtils",
+    maxLines: 280,
+    reason: "TCP stream page should keep state and pagination orchestration separate from raw stream sections",
   },
   {
     path: "src/app/pages/UdpStream.tsx",
-    maxLines: 355,
-    reason: "UDP stream page should keep payload formatting helpers in RawStreamUtils",
+    maxLines: 270,
+    reason: "UDP stream page should keep state and pagination orchestration separate from raw stream sections",
   },
   {
     path: "src/app/pages/RawStreamUtils.ts",
     maxLines: 140,
     reason: "raw TCP/UDP stream helpers should stay pure and own shared chunk search/export/dialog helpers",
+  },
+  {
+    path: "src/app/pages/RawStreamSections.tsx",
+    maxLines: 430,
+    reason:
+      "raw stream sections should keep shared TCP/UDP title, payload grid, control bar, and dialog rendering scoped",
   },
   {
     path: "src/app/pages/HttpStreamUtils.ts",
