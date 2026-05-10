@@ -406,8 +406,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureMissionControl.tsx",
-    maxLines: 300,
+    maxLines: 230,
     reason: "capture mission control should stay focused on overview loading and navigation orchestration",
+  },
+  {
+    path: "src/app/components/CaptureMissionOverviewHeader.tsx",
+    maxLines: 160,
+    reason: "capture mission overview header should keep cockpit title, protocol chips, and metric cards scoped",
   },
   {
     path: "src/app/components/CaptureMissionPanels.tsx",
