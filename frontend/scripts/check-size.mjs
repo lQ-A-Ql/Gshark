@@ -71,6 +71,11 @@ export const sourceSizeBudgets = [
     reason: "packet page commit helper should stay focused on cursor, page, selected packet, and page flags",
   },
   {
+    path: "src/app/state/packetPageNavigation.ts",
+    maxLines: 70,
+    reason: "packet page navigation should keep next, previous, jump, and retry cursor actions outside the provider",
+  },
+  {
     path: "src/app/state/packetFilterWorkflow.ts",
     maxLines: 90,
     reason:
@@ -914,6 +919,11 @@ export const testSizeBudgets = [
     path: "src/app/state/packetPageCommit.test.ts",
     maxLines: 130,
     reason: "packet page commit tests should stay focused on page commit and selected packet retention or clearing",
+  },
+  {
+    path: "src/app/state/packetPageNavigation.test.ts",
+    maxLines: 75,
+    reason: "packet page navigation tests should stay focused on cursor actions and retry status",
   },
   {
     path: "src/app/state/packetFilterWorkflow.test.ts",

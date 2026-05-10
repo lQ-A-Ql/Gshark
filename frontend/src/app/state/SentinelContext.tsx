@@ -20,20 +20,13 @@ import { useSelectedPacketDetail } from "./hooks/useSelectedPacketDetail";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
 import { readRecentCaptures, updateRecentCaptures, writeRecentCaptures } from "./recentCaptures";
-import {
-  getCurrentPacketPage,
-  getNextPacketCursor,
-  getPacketPageCursor,
-  getPrevPacketCursor,
-  getTotalPacketPages,
-} from "./packetPagination";
+import { getCurrentPacketPage, getTotalPacketPages } from "./packetPagination";
 import {
   keepSelectedPacketDetailForId,
   resolveSelectedPacket,
   shouldLoadSelectedPacketArtifacts,
   shouldLoadSelectedPacketDetail,
 } from "./selectedPacketState";
-import { getPacketPageRetryStatus } from "./packetPageStatus";
 import {
   CAPTURE_PRELOAD_TIMEOUT_MS,
   getCaptureEmptyParseError,
@@ -52,6 +45,12 @@ import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { commitPacketPageState } from "./packetPageCommit";
+import {
+  jumpToPacketPage,
+  loadNextPacketPage,
+  loadPreviousPacketPage,
+  retryPacketPageLoad,
+} from "./packetPageNavigation";
 import { runPacketFilterAction } from "./packetFilterAction";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { preparePacketStreamState } from "./packetStreamPrepare";
@@ -324,26 +323,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const loadMorePackets = useCallback(async () => {
-    const next = getNextPacketCursor(pageStartRef.current, PAGE_SIZE);
-    await loadPacketPage(next);
+    await loadNextPacketPage({ pageStartRef, pageSize: PAGE_SIZE, loadPacketPage });
   }, [loadPacketPage]);
 
   const loadPrevPackets = useCallback(async () => {
-    const prev = getPrevPacketCursor(pageStartRef.current, PAGE_SIZE);
-    await loadPacketPage(prev);
+    await loadPreviousPacketPage({ pageStartRef, pageSize: PAGE_SIZE, loadPacketPage });
   }, [loadPacketPage]);
 
   const jumpToPage = useCallback(
     async (page: number) => {
-      const cursor = getPacketPageCursor(page, totalPackets, PAGE_SIZE);
-      await loadPacketPage(cursor);
+      await jumpToPacketPage({ page, totalPackets, pageSize: PAGE_SIZE, loadPacketPage });
     },
     [loadPacketPage, totalPackets],
   );
 
   const retryPacketPage = useCallback(async () => {
-    setBackendStatus(getPacketPageRetryStatus(displayFilter));
-    await loadPacketPage(pageStartRef.current);
+    await retryPacketPageLoad({ pageStartRef, displayFilter, loadPacketPage, setBackendStatus });
   }, [displayFilter, loadPacketPage, setBackendStatus]);
 
   const locatePacketById = useCallback(
