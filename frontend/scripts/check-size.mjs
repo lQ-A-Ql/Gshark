@@ -121,6 +121,21 @@ export const sourceSizeBudgets = [
     reason: "C2 family mapper should compose family-level sections without owning aggregate field mapping",
   },
   {
+    path: "src/app/integrations/mappers/industrialMapper.ts",
+    maxLines: 35,
+    reason: "industrial mapper should stay as a composition layer over Modbus and industrial detail mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/modbusMapper.ts",
+    maxLines: 110,
+    reason: "Modbus mapper should keep summary, transaction, decoded input, and suspicious write conversion local",
+  },
+  {
+    path: "src/app/integrations/mappers/industrialDetailMapper.ts",
+    maxLines: 85,
+    reason: "industrial detail mapper should keep controls, rule hits, and generic protocol details local",
+  },
+  {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
     maxLines: 25,
     reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
