@@ -56,6 +56,21 @@ export const sourceSizeBudgets = [
     reason: "Shiro rememberMe mapper should stay isolated from other protocol tool mappers",
   },
   {
+    path: "src/app/integrations/mappers/vehicleMapper.ts",
+    maxLines: 25,
+    reason: "vehicle mapper should stay as a composition facade over CAN and diagnostic section mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleCanMapper.ts",
+    maxLines: 105,
+    reason: "vehicle CAN mapper should keep CAN frames, payload records, DBC messages, and signal timelines local",
+  },
+  {
+    path: "src/app/integrations/mappers/vehicleDiagnosticMapper.ts",
+    maxLines: 110,
+    reason: "vehicle diagnostic mapper should keep J1939, DoIP, and UDS mapping local",
+  },
+  {
     path: "src/app/state/SentinelContext.tsx",
     maxLines: 910,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
