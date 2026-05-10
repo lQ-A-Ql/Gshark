@@ -212,6 +212,11 @@ export const sourceSizeBudgets = [
     reason: "selected packet action hook should only own id selection and stale detail pruning",
   },
   {
+    path: "src/app/state/hooks/usePacketPageCancellation.ts",
+    maxLines: 30,
+    reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1294,6 +1299,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketAction.test.tsx",
     maxLines: 35,
     reason: "selected packet action tests should stay focused on id selection and stale detail pruning",
+  },
+  {
+    path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",
+    maxLines: 35,
+    reason: "packet page cancellation tests should stay focused on sequence, task abort, and loading reset",
   },
   {
     path: "src/app/state/captureClearState.test.ts",

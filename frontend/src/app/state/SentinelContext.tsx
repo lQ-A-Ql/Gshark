@@ -54,6 +54,7 @@ import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
+import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -174,11 +175,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const cancelPacketPageLoad = useCallback(() => {
-    packetPageSeqRef.current += 1;
-    captureTaskScopeRef.current.abortTask("packet-page");
-    setIsPageLoading(false);
-  }, []);
+  const cancelPacketPageLoad = usePacketPageCancellation({
+    captureTaskScopeRef,
+    packetPageSeqRef,
+    setIsPageLoading,
+  });
 
   const commitPacketPage = useCallback(
     (safeCursor: number, page: { items: Packet[]; total: number; hasMore: boolean }) => {
