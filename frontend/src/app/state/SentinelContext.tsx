@@ -52,7 +52,7 @@ import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { commitPacketPageState } from "./packetPageCommit";
-import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
+import { runPacketFilterAction } from "./packetFilterAction";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { preparePacketStreamState } from "./packetStreamPrepare";
 import {
@@ -803,17 +803,16 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const applyFilter = useCallback(
     (value?: string) => {
       const nextFilter = value ?? displayFilter;
-      if (value !== undefined) {
-        setDisplayFilter(nextFilter);
-      }
 
-      void runPacketFilterWorkflow({
+      void runPacketFilterAction({
         filter: nextFilter,
-        shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
+        syncDisplayFilter: value !== undefined,
         pollUntilSettled: true,
+        shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
         filterSeqRef,
         loadPacketPage,
         resetPacketViewport,
+        setDisplayFilter,
         setIsFilterLoading,
         setPacketPageError,
         setBackendStatus,
@@ -823,15 +822,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const clearFilter = useCallback(() => {
-    setDisplayFilter("");
-
-    void runPacketFilterWorkflow({
+    void runPacketFilterAction({
       filter: "",
-      shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
+      syncDisplayFilter: true,
       pollUntilSettled: false,
+      shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
       filterSeqRef,
       loadPacketPage,
       resetPacketViewport,
+      setDisplayFilter,
       setIsFilterLoading,
       setPacketPageError,
       setBackendStatus,

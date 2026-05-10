@@ -77,6 +77,11 @@ export const sourceSizeBudgets = [
       "packet filter workflow should keep sequence guards, viewport reset, polling, and status finalization outside the provider",
   },
   {
+    path: "src/app/state/packetFilterAction.ts",
+    maxLines: 55,
+    reason: "packet filter action should keep display-filter sync and workflow dispatch outside the provider",
+  },
+  {
     path: "src/app/state/packetLocateWorkflow.ts",
     maxLines: 95,
     reason:
@@ -914,6 +919,11 @@ export const testSizeBudgets = [
     path: "src/app/state/packetFilterWorkflow.test.ts",
     maxLines: 125,
     reason: "packet filter workflow tests should stay focused on run, poll, clear, skip, and stale behaviors",
+  },
+  {
+    path: "src/app/state/packetFilterAction.test.ts",
+    maxLines: 85,
+    reason: "packet filter action tests should cover sync, clear, current-value, and inactive-capture behavior",
   },
   {
     path: "src/app/state/packetLocateWorkflow.test.ts",
