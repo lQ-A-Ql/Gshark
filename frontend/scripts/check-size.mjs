@@ -348,6 +348,11 @@ export const sourceSizeBudgets = [
     reason: "clear capture UI state hook should only wire provider refs into the pure clear-state helper",
   },
   {
+    path: "src/app/state/hooks/useDisplayFilterWorkflow.ts",
+    maxLines: 85,
+    reason: "display filter workflow hook should only wire provider state into packet filter actions",
+  },
+  {
     path: "src/app/state/hooks/usePacketPageCommit.ts",
     maxLines: 55,
     reason: "packet page commit hook should only bind provider refs and setters to pure page commit workflow",
@@ -1582,6 +1587,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useClearCaptureUiState.test.tsx",
     maxLines: 110,
     reason: "clear capture UI state hook tests should stay focused on ref dereference and reset wiring",
+  },
+  {
+    path: "src/app/state/hooks/useDisplayFilterWorkflow.test.tsx",
+    maxLines: 105,
+    reason: "display filter workflow tests should stay focused on apply, clear, and inactive-capture behavior",
   },
   {
     path: "src/app/state/hooks/usePacketPageCommit.test.tsx",

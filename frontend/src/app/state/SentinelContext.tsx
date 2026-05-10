@@ -22,7 +22,6 @@ import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureSta
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
-import { runPacketFilterAction } from "./packetFilterAction";
 import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
@@ -51,6 +50,7 @@ import { useStreamAdjacentPrefetch } from "./hooks/useStreamAdjacentPrefetch";
 import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
 import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset";
 import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
+import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -558,42 +558,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     ],
   );
 
-  const applyFilter = useCallback(
-    (value?: string) => {
-      const nextFilter = value ?? displayFilter;
-
-      void runPacketFilterAction({
-        filter: nextFilter,
-        syncDisplayFilter: value !== undefined,
-        pollUntilSettled: true,
-        shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
-        filterSeqRef,
-        loadPacketPage,
-        resetPacketViewport,
-        setDisplayFilter,
-        setIsFilterLoading,
-        setPacketPageError,
-        setBackendStatus,
-      });
-    },
-    [backendConnected, displayFilter, isPreloadingCapture, loadPacketPage, resetPacketViewport],
-  );
-
-  const clearFilter = useCallback(() => {
-    void runPacketFilterAction({
-      filter: "",
-      syncDisplayFilter: true,
-      pollUntilSettled: false,
-      shouldRun: Boolean(activeCapturePathRef.current && backendConnected && !isPreloadingCapture),
-      filterSeqRef,
-      loadPacketPage,
-      resetPacketViewport,
-      setDisplayFilter,
-      setIsFilterLoading,
-      setPacketPageError,
-      setBackendStatus,
-    });
-  }, [backendConnected, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
+  const { applyFilter, clearFilter } = useDisplayFilterWorkflow({
+    activeCapturePathRef,
+    backendConnected,
+    displayFilter,
+    isPreloadingCapture,
+    filterSeqRef,
+    loadPacketPage,
+    resetPacketViewport,
+    setDisplayFilter,
+    setIsFilterLoading,
+    setPacketPageError,
+    setBackendStatus,
+  });
 
   const selectPacket = useSelectedPacketAction({ setSelectedPacketDetail, setSelectedPacketId });
 
