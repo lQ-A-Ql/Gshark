@@ -9,7 +9,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import type { BinaryStream, HttpStream, Packet, RecentCapture, StreamSwitchMetrics } from "../core/types";
+import type { BinaryStream, HttpStream, Packet, RecentCapture } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
@@ -40,13 +40,7 @@ import { runPacketFilterAction } from "./packetFilterAction";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { preparePacketStreamState } from "./packetStreamPrepare";
 import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
-import {
-  EMPTY_BINARY_STREAM,
-  EMPTY_HTTP_STREAM,
-  EMPTY_SWITCH_METRICS,
-  createEmptyStreamIds,
-  createEmptyUdpStream,
-} from "./streamState";
+import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
 import { updateProgressFromStatusState } from "./progressStatusWorkflow";
@@ -55,15 +49,11 @@ import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { setActiveStreamState } from "./streamSwitchWorkflow";
 import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import { stopCaptureWorkflow } from "./captureStopWorkflow";
-import { createEmptyStreamSwitchDurations, createEmptyStreamSwitchHits } from "./streamRuntimeReset";
-import { recordStreamSwitchMetricSample } from "./streamSwitchMetrics";
-import {
-  waitForCaptureSignal as waitForCaptureSignalUtil,
-  wakeCaptureWaiters as wakeCaptureWaitersUtil,
-} from "./captureSignal";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import { buildSentinelDerivedView } from "./sentinelDerivedView";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
+import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
+import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -116,7 +106,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const preloadingRef = useRef(false);
   const captureSeqRef = useRef(0);
   const filterSeqRef = useRef(0);
-  const captureWaitersRef = useRef(new Set<() => void>());
+  const { captureWaitersRef, wakeCaptureWaiters, waitForCaptureSignal } = useCaptureSignalWaiters();
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
@@ -132,9 +122,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
-  const [streamSwitchMetrics, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
-  const streamSwitchDurationsRef = useRef(createEmptyStreamSwitchDurations());
-  const streamSwitchHitsRef = useRef(createEmptyStreamSwitchHits());
+  const {
+    streamSwitchMetrics,
+    setStreamSwitchMetrics,
+    streamSwitchDurationsRef,
+    streamSwitchHitsRef,
+    recordStreamSwitchMetric,
+  } = useStreamSwitchMetrics();
   const {
     backendConnected,
     backendStatus,
@@ -163,21 +157,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setThreatAnalysisProgress,
     setIsThreatAnalysisLoading,
   });
-
-  const recordStreamSwitchMetric = useCallback(
-    (protocol: "HTTP" | "TCP" | "UDP", elapsedMs: number, cacheHit: boolean) => {
-      setStreamSwitchMetrics(
-        recordStreamSwitchMetricSample({
-          protocol,
-          elapsedMs,
-          cacheHit,
-          switchDurationsRef: streamSwitchDurationsRef,
-          switchHitsRef: streamSwitchHitsRef,
-        }),
-      );
-    },
-    [],
-  );
 
   const cancelAllFrontendCaptureTasks = useCallback(() => {
     cancelFrontendCaptureTasks({
@@ -363,10 +342,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const wakeCaptureWaiters = useCallback(() => {
-    wakeCaptureWaitersUtil(captureWaitersRef.current);
-  }, []);
-
   const prepareForCaptureReplacement = useCallback(async () => {
     await prepareCaptureReplacementState({
       backendConnected,
@@ -385,11 +360,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       prepareCaptureReplacement: bridge.prepareCaptureReplacement,
     });
   }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
-
-  const waitForCaptureSignal = useCallback(
-    (delayMs: number) => waitForCaptureSignalUtil(captureWaitersRef.current, delayMs),
-    [],
-  );
 
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;

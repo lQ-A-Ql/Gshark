@@ -152,7 +152,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 910,
+    maxLines: 890,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -165,6 +165,16 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketResources.ts",
     maxLines: 70,
     reason: "selected packet resources hook should only compose detail, raw hex, and layers artifact loading",
+  },
+  {
+    path: "src/app/state/hooks/useStreamSwitchMetrics.ts",
+    maxLines: 45,
+    reason: "stream switch metrics hook should only own metric state, refs, and sample recording",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureSignalWaiters.ts",
+    maxLines: 25,
+    reason: "capture signal waiters hook should only own waiter refs and wake/wait callbacks",
   },
   {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
@@ -1229,6 +1239,16 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketResources.test.tsx",
     maxLines: 70,
     reason: "selected packet resources hook tests should stay focused on composed detail, raw, and layer loading",
+  },
+  {
+    path: "src/app/state/hooks/useStreamSwitchMetrics.test.tsx",
+    maxLines: 35,
+    reason: "stream switch metrics hook tests should stay focused on state, refs, and record behavior",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureSignalWaiters.test.tsx",
+    maxLines: 35,
+    reason: "capture signal waiters hook tests should stay focused on waiter wake behavior",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
