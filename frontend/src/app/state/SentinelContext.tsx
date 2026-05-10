@@ -25,7 +25,6 @@ import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
-import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
 import { stopCaptureWorkflow } from "./captureStopWorkflow";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import { buildSentinelDerivedView } from "./sentinelDerivedView";
@@ -51,6 +50,7 @@ import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
 import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset";
 import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
+import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepare";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -289,24 +289,22 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setThreatAnalysisProgress,
   });
 
-  const prepareForCaptureReplacement = useCallback(async () => {
-    await prepareCaptureReplacementState({
-      backendConnected,
-      parseFinishedRef,
-      parseErrorRef,
-      preloadingRef,
-      preloadProcessedRef,
-      preloadTotalRef,
-      cancelAllFrontendCaptureTasks,
-      wakeCaptureWaiters,
-      setIsPreloadingCapture,
-      setIsFilterLoading,
-      setPreloadProcessed,
-      setPreloadTotal,
-      stopStreamingPackets: bridge.stopStreamingPackets,
-      prepareCaptureReplacement: bridge.prepareCaptureReplacement,
-    });
-  }, [backendConnected, cancelAllFrontendCaptureTasks, wakeCaptureWaiters]);
+  const prepareForCaptureReplacement = useCaptureReplacementPrepare({
+    backendConnected,
+    parseFinishedRef,
+    parseErrorRef,
+    preloadingRef,
+    preloadProcessedRef,
+    preloadTotalRef,
+    cancelAllFrontendCaptureTasks,
+    wakeCaptureWaiters,
+    setIsPreloadingCapture,
+    setIsFilterLoading,
+    setPreloadProcessed,
+    setPreloadTotal,
+    stopStreamingPackets: bridge.stopStreamingPackets,
+    prepareCaptureReplacement: bridge.prepareCaptureReplacement,
+  });
 
   useEffect(() => {
     hasMorePacketsRef.current = hasMorePackets;
