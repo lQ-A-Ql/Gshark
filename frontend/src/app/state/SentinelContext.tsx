@@ -25,7 +25,6 @@ import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
-import { loadPacketPageState } from "./packetPageLoad";
 import {
   jumpToPacketPage,
   loadNextPacketPage,
@@ -57,6 +56,7 @@ import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
 import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
 import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
 import { usePacketViewportReset } from "./hooks/usePacketViewportReset";
+import { usePacketPageLoad } from "./hooks/usePacketPageLoad";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -252,27 +252,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, [resetAnalysisState]);
 
-  const loadPacketPage = useCallback(
-    async (cursor: number, filterOverride?: string, options?: { finishFilterLoading?: boolean }) => {
-      return loadPacketPageState({
-        cursor,
-        pageSize: PAGE_SIZE,
-        filter: filterOverride ?? displayFilter,
-        activeCapturePathRef,
-        backendConnected,
-        packetPageSeqRef,
-        captureTaskScopeRef,
-        listPacketsPage: bridge.listPacketsPage,
-        commitPacketPage,
-        setIsPageLoading,
-        setIsFilterLoading,
-        setPacketPageError,
-        setBackendStatus,
-        finishFilterLoading: options?.finishFilterLoading,
-      });
-    },
-    [backendConnected, commitPacketPage, displayFilter],
-  );
+  const loadPacketPage = usePacketPageLoad({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    commitPacketPage,
+    displayFilter,
+    listPacketsPage: bridge.listPacketsPage,
+    packetPageSeqRef,
+    pageSize: PAGE_SIZE,
+    setBackendStatus,
+    setIsFilterLoading,
+    setIsPageLoading,
+    setPacketPageError,
+  });
 
   const loadMorePackets = useCallback(async () => {
     await loadNextPacketPage({ pageStartRef, pageSize: PAGE_SIZE, loadPacketPage });
