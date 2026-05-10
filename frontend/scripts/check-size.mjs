@@ -255,6 +255,31 @@ export const sourceSizeBudgets = [
     reason: "media overview panels should stay presentational and avoid playback or transcription side effects",
   },
   {
+    path: "src/app/features/media/MediaDisplayPanels.tsx",
+    maxLines: 20,
+    reason: "media display panel compatibility layer should stay as exports only",
+  },
+  {
+    path: "src/app/features/media/MediaAnalysisProgressPanel.tsx",
+    maxLines: 95,
+    reason: "media analysis progress panel should stay focused on phase and recent progress display",
+  },
+  {
+    path: "src/app/features/media/BatchTranscriptionStatusPanel.tsx",
+    maxLines: 65,
+    reason: "media batch transcription status should stay focused on queue progress display",
+  },
+  {
+    path: "src/app/features/media/MediaPlaybackDialog.tsx",
+    maxLines: 85,
+    reason: "media playback dialog should stay focused on audio and video playback presentation",
+  },
+  {
+    path: "src/app/features/media/MediaDependencyDialogs.tsx",
+    maxLines: 80,
+    reason: "media dependency dialogs should stay focused on ffmpeg and speech dependency messages",
+  },
+  {
     path: "src/app/components/ui/sidebar.tsx",
     maxLines: 630,
     reason: "shared sidebar primitive should keep provider state in sidebarContext and avoid feature-specific logic",
