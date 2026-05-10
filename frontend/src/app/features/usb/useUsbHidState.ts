@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { USBAnalysis } from "../../core/types";
-import { keyboardReplayToken } from "./UsbHidPanels";
+import { keyboardReplayToken } from "./usbHidRules";
 
 export type HidSubTab = "keyboard" | "mouse";
 

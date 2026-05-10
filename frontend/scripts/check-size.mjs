@@ -215,8 +215,38 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/usb/UsbHidPanels.tsx",
-    maxLines: 305,
-    reason: "USB HID visual primitives should stay limited to replay, trajectory, heatmap, and behavior list rendering",
+    maxLines: 20,
+    reason: "USB HID panels should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/features/usb/UsbKeyboardReplay.tsx",
+    maxLines: 150,
+    reason: "USB keyboard replay should keep playback controls and current-event presentation local",
+  },
+  {
+    path: "src/app/features/usb/UsbMouseTrajectory.tsx",
+    maxLines: 70,
+    reason: "USB mouse trajectory should stay focused on path rendering and legend",
+  },
+  {
+    path: "src/app/features/usb/UsbMouseHeatmap.tsx",
+    maxLines: 95,
+    reason: "USB mouse heatmap should stay focused on density and click hotspot rendering",
+  },
+  {
+    path: "src/app/features/usb/UsbMouseBehaviorList.tsx",
+    maxLines: 45,
+    reason: "USB mouse behavior list should stay focused on compact recent-event display",
+  },
+  {
+    path: "src/app/features/usb/UsbHidEmptyState.tsx",
+    maxLines: 15,
+    reason: "USB HID empty state should remain a tiny shared display helper",
+  },
+  {
+    path: "src/app/features/usb/usbHidRules.ts",
+    maxLines: 45,
+    reason: "USB HID rules should keep replay token, mouse badges, and point normalization pure",
   },
   {
     path: "src/app/features/usb/UsbOverviewPanel.tsx",
