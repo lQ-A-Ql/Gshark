@@ -38,6 +38,12 @@ export const sourceSizeBudgets = [
       "capture start state helper should stay focused on preload reset, parse runtime, and pending transaction setup",
   },
   {
+    path: "src/app/state/capturePreloadProbe.ts",
+    maxLines: 185,
+    reason:
+      "capture preload probe should keep first-page validation, polling, stale guards, and timeout errors together",
+  },
+  {
     path: "src/app/state/captureCommitState.ts",
     maxLines: 125,
     reason:
@@ -891,6 +897,11 @@ export const testSizeBudgets = [
     maxLines: 90,
     reason:
       "capture start state tests should stay focused on reset, runtime, pending transaction, and recent capture effects",
+  },
+  {
+    path: "src/app/state/capturePreloadProbe.test.ts",
+    maxLines: 125,
+    reason: "capture preload probe tests should cover success, polling, stale, empty parse, and timeout behavior",
   },
   {
     path: "src/app/state/captureCommitState.test.ts",
