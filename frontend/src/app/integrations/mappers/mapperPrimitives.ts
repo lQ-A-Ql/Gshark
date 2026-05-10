@@ -35,3 +35,13 @@ export function asPlainObject(input: unknown): Record<string, unknown> | undefin
   }
   return input as Record<string, unknown>;
 }
+
+export function optionalString(input: unknown): string | undefined {
+  const value = String(input ?? "");
+  return value || undefined;
+}
+
+export function optionalNumber(input: unknown): number | undefined {
+  const value = Number(input ?? 0);
+  return value || undefined;
+}

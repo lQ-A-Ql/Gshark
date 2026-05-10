@@ -31,6 +31,31 @@ export const sourceSizeBudgets = [
     reason: "VShell hex preview helpers should keep UTF-8, best-effort text, and low-info hex checks isolated",
   },
   {
+    path: "src/app/integrations/mappers/protocolToolMapper.ts",
+    maxLines: 15,
+    reason: "protocol tool mapper should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/integrations/mappers/httpLoginMapper.ts",
+    maxLines: 80,
+    reason: "HTTP login mapper should stay isolated from other protocol tool mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/smtpMapper.ts",
+    maxLines: 70,
+    reason: "SMTP mapper should stay isolated from other protocol tool mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/mysqlMapper.ts",
+    maxLines: 70,
+    reason: "MySQL mapper should stay isolated from other protocol tool mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/shiroRememberMeMapper.ts",
+    maxLines: 55,
+    reason: "Shiro rememberMe mapper should stay isolated from other protocol tool mappers",
+  },
+  {
     path: "src/app/state/SentinelContext.tsx",
     maxLines: 910,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
