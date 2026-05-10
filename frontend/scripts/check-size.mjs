@@ -765,9 +765,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/media/useMediaTranscriptionWorkflow.ts",
-    maxLines: 310,
-    reason:
-      "media transcription workflow should own playback, batch polling, dependency dialogs, and copy/export effects",
+    maxLines: 220,
+    reason: "media transcription workflow should own speech/batch polling and delegate playback/download effects",
+  },
+  {
+    path: "src/app/features/media/useMediaPlaybackWorkflow.ts",
+    maxLines: 95,
+    reason: "media playback workflow should own artifact playback/download side effects",
+  },
+  {
+    path: "src/app/features/media/mediaTranscriptionRules.ts",
+    maxLines: 55,
+    reason: "media transcription rules should keep pure merge and dependency classification helpers",
   },
   {
     path: "src/app/features/media/MediaOverviewPanels.tsx",
