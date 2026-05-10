@@ -78,6 +78,7 @@ import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
 import { runPacketFilterWorkflow } from "./packetFilterWorkflow";
 import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
+import { preparePacketStreamState } from "./packetStreamPrepare";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -96,7 +97,6 @@ import {
 } from "./streamState";
 import { pickAdjacentStreamTargets } from "./streamPrefetchPlan";
 import { resolveStreamPrefetchTask } from "./streamPrefetchTask";
-import { resolvePacketStreamProtocol } from "./streamProtocol";
 import { applyCachedStreamSwitch } from "./streamSwitchCache";
 import { commitLoadedStreamSwitch } from "./streamSwitchCommit";
 import { resolveStreamSwitchTask } from "./streamSwitchTask";
@@ -680,19 +680,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       preferredProtocol?: "HTTP" | "TCP" | "UDP",
       filterOverride?: string,
     ): Promise<PreparedPacketStream> => {
-      const packet = await locatePacketById(packetId, filterOverride);
-      if (!packet || packet.streamId == null || packet.streamId < 0) {
-        return { packet, protocol: null, streamId: null };
-      }
-
-      const protocol = resolvePacketStreamProtocol(packet.proto, preferredProtocol ?? null);
-
-      await setActiveStream(protocol, packet.streamId);
-      return {
-        packet,
-        protocol,
-        streamId: packet.streamId,
-      };
+      return preparePacketStreamState({
+        packetId,
+        preferredProtocol,
+        filterOverride,
+        locatePacketById,
+        setActiveStream,
+      });
     },
     [locatePacketById, setActiveStream],
   );

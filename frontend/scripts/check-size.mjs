@@ -23,7 +23,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1225,
+    maxLines: 1210,
     reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
   },
   {
@@ -60,6 +60,11 @@ export const sourceSizeBudgets = [
     path: "src/app/state/streamPayloadPersist.ts",
     maxLines: 70,
     reason: "stream payload persist should keep backend update and local stream patch commit outside the provider",
+  },
+  {
+    path: "src/app/state/packetStreamPrepare.ts",
+    maxLines: 45,
+    reason: "packet stream prepare should keep packet location to active stream resolution outside the provider",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -837,6 +842,11 @@ export const testSizeBudgets = [
     path: "src/app/state/streamPayloadPersist.test.ts",
     maxLines: 115,
     reason: "stream payload persist tests should stay focused on backend update, skip guards, and failure behavior",
+  },
+  {
+    path: "src/app/state/packetStreamPrepare.test.ts",
+    maxLines: 70,
+    reason: "packet stream prepare tests should stay focused on locate, preferred protocol, and missing stream guards",
   },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
