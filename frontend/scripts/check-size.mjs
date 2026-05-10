@@ -156,6 +156,11 @@ export const sourceSizeBudgets = [
     reason: "speech batch mapper should keep batch queue status conversion local",
   },
   {
+    path: "src/app/integrations/mappers/runtimeMapper.ts",
+    maxLines: 65,
+    reason: "runtime mapper should keep tool runtime snapshot conversion local and re-export speech batch mapping",
+  },
+  {
     path: "src/app/integrations/mappers/usbMapper.ts",
     maxLines: 45,
     reason: "USB mapper should stay as a composition layer over HID, mass-storage, other, and record mappers",
