@@ -759,7 +759,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/Workspace.tsx",
-    maxLines: 350,
+    maxLines: 290,
     reason: "workspace page should stay focused on state wiring, navigation, and selection orchestration",
   },
   {
@@ -781,6 +781,16 @@ export const sourceSizeBudgets = [
     path: "src/app/components/workspace/workspaceSelection.ts",
     maxLines: 60,
     reason: "workspace selection helpers should stay pure and small",
+  },
+  {
+    path: "src/app/components/workspace/useWorkspaceProtocolSelection.ts",
+    maxLines: 80,
+    reason: "workspace protocol selection hook should own tree byte selection and scroll refs only",
+  },
+  {
+    path: "src/app/components/workspace/useWorkspaceFilterProgress.ts",
+    maxLines: 35,
+    reason: "workspace filter progress hook should only own optimistic loading progress",
   },
   {
     path: "src/app/state/packetPageStatus.ts",

@@ -8,10 +8,11 @@ import { CaptureTransactionErrorPanel } from "../components/workspace/CaptureTra
 import { DisplayFilterBar } from "../components/workspace/DisplayFilterBar";
 import { WorkspacePanels, WorkspacePreloadProgress } from "../components/workspace/WorkspacePanels";
 import { CaptureFileControls, PacketLocatorControls, PacketPagingControls } from "../components/workspace/WorkspaceTopControls";
+import { useWorkspaceFilterProgress } from "../components/workspace/useWorkspaceFilterProgress";
 import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
-import { buildFrameBytes, findClosestNodeByOffset } from "../components/workspace/workspaceSelection";
+import { useWorkspaceProtocolSelection } from "../components/workspace/useWorkspaceProtocolSelection";
 import { useSentinel } from "../state/SentinelContext";
-import type { Packet, ProtocolTreeNode } from "../core/types";
+import type { Packet } from "../core/types";
 import {
   getWorkspaceFilterErrorMessage,
   getWorkspaceFilterLoadingDetail,
@@ -59,17 +60,23 @@ export default function Workspace() {
     tsharkStatus,
   } = useSentinel();
 
-  const [selectedTreeNode, setSelectedTreeNode] = useState<string>("frame");
-  const [selectedByteOffset, setSelectedByteOffset] = useState<number | null>(null);
   const [capturePath, setCapturePath] = useState(fileMeta.name);
   const [pageInput, setPageInput] = useState("1");
   const [packetIdInput, setPacketIdInput] = useState("");
-  const [filterLoadingProgress, setFilterLoadingProgress] = useState(18);
   const filterInputRef = useRef<HTMLInputElement | null>(null);
-  const treeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const hexPanelRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const { filterSuggestions, rememberFilter, clearFilterHistory } = useWorkspaceFilterHistory();
+  const filterLoadingProgress = useWorkspaceFilterProgress(isFilterLoading, isPreloadingCapture);
+  const {
+    selectedTreeNode,
+    selectedByteOffset,
+    selectedByteRange,
+    frameBytes,
+    hexPanelRef,
+    handleSelectTreeNode,
+    handleSelectByte,
+    registerNodeRef,
+  } = useWorkspaceProtocolSelection(selectedPacket, selectedPacketRawHex, protocolTree);
 
   const applyFilterWithHistory = (value?: string) => {
     const next = (value ?? displayFilter).trim();
@@ -102,56 +109,6 @@ export default function Workspace() {
     return () => window.removeEventListener("gshark:focus-filter", handler);
   }, []);
 
-  useEffect(() => {
-    setSelectedTreeNode("frame");
-    setSelectedByteOffset(null);
-  }, [selectedPacket?.id]);
-
-  useEffect(() => {
-    const node = treeRefs.current.get(selectedTreeNode);
-    if (node) {
-      node.scrollIntoView({ block: "nearest" });
-    }
-  }, [selectedTreeNode]);
-
-  useEffect(() => {
-    if (selectedByteOffset == null || !hexPanelRef.current) return;
-    const el = hexPanelRef.current.querySelector<HTMLButtonElement>(`button[data-byte='${selectedByteOffset}']`);
-    if (el) {
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    }
-  }, [selectedByteOffset]);
-
-  useEffect(() => {
-    if (!isFilterLoading || isPreloadingCapture) {
-      setFilterLoadingProgress(12);
-      return;
-    }
-    setFilterLoadingProgress(18);
-    const timer = window.setInterval(() => {
-      setFilterLoadingProgress((prev) => {
-        if (prev >= 92) return 92;
-        const step = Math.max(1, Math.round((96 - prev) * 0.18));
-        return Math.min(92, prev + step);
-      });
-    }, 180);
-    return () => window.clearInterval(timer);
-  }, [isFilterLoading, isPreloadingCapture]);
-
-  const treeRangeMap = useMemo(() => {
-    const map = new Map<string, [number, number]>();
-    const walk = (node: ProtocolTreeNode) => {
-      if (node.byteRange) {
-        map.set(node.id, node.byteRange);
-      }
-      node.children?.forEach(walk);
-    };
-    protocolTree.forEach(walk);
-    return map;
-  }, [protocolTree]);
-
-  const selectedByteRange = treeRangeMap.get(selectedTreeNode) ?? null;
-  const frameBytes = useMemo(() => buildFrameBytes(selectedPacket, selectedPacketRawHex), [selectedPacket, selectedPacketRawHex]);
   const preloadPercent = useMemo(() => {
     if (preloadTotal <= 0) return 0;
     return Math.max(0, Math.min(100, Math.floor((preloadProcessed / preloadTotal) * 100)));
@@ -171,22 +128,6 @@ export default function Workspace() {
       .filter((p) => p >= 1 && p <= totalPages)
       .sort((a, b) => a - b);
   }, [currentPage, totalPages]);
-
-  const handleSelectTreeNode = (nodeId: string) => {
-    setSelectedTreeNode(nodeId);
-    const range = treeRangeMap.get(nodeId);
-    if (range) {
-      setSelectedByteOffset(range[0]);
-    }
-  };
-
-  const handleSelectByte = (offset: number) => {
-    setSelectedByteOffset(offset);
-    const matched = findClosestNodeByOffset(offset, protocolTree);
-    if (matched) {
-      setSelectedTreeNode(matched);
-    }
-  };
 
   const handleFollowStream = (packet: Packet, target: "http" | "tcp" | "udp") => {
     if (packet.streamId == null) return;
@@ -331,13 +272,7 @@ export default function Workspace() {
         onLoadMorePackets={() => void loadMorePackets()}
         onSelectTreeNode={handleSelectTreeNode}
         onSelectByte={handleSelectByte}
-        registerNodeRef={(id, el) => {
-          if (el) {
-            treeRefs.current.set(id, el);
-          } else {
-            treeRefs.current.delete(id);
-          }
-        }}
+        registerNodeRef={registerNodeRef}
       />
     </div>
   );
