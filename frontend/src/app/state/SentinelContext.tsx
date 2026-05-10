@@ -36,11 +36,6 @@ import {
 } from "./selectedPacketState";
 import { getPacketPageRetryStatus } from "./packetPageStatus";
 import {
-  getCaptureCloseErrorMessage,
-  getCaptureStopDoneStatus,
-  getCaptureStopRequestStatus,
-} from "./captureStopStatus";
-import {
   CAPTURE_PRELOAD_TIMEOUT_MS,
   getCaptureEmptyParseError,
   getCaptureOpenDisconnectedStatus,
@@ -61,7 +56,7 @@ import {
   createIdleCaptureTransactionStatus,
   createPendingCaptureTransactionStatus,
 } from "./captureTransactionStatus";
-import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
+import { startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import { loadPacketPageState } from "./packetPageLoad";
@@ -90,6 +85,7 @@ import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { setActiveStreamState } from "./streamSwitchWorkflow";
 import { prepareCaptureReplacementState } from "./captureReplacementPrepare";
+import { stopCaptureWorkflow } from "./captureStopWorkflow";
 import {
   createEmptyStreamSwitchDurations,
   createEmptyStreamSwitchHits,
@@ -887,31 +883,24 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const stopCapture = useCallback(async () => {
-    captureSeqRef.current += 1;
-    filterSeqRef.current += 1;
-    finishCaptureParseRuntime({
+    await stopCaptureWorkflow({
+      backendConnected,
+      captureSeqRef,
+      filterSeqRef,
+      threatAnalysisSeqRef,
       parseFinishedRef,
       parseErrorRef,
       preloadingRef,
       setIsPreloadingCapture,
+      setIsFilterLoading,
+      cancelAllFrontendCaptureTasks,
+      wakeCaptureWaiters,
+      clearCaptureUiState,
+      setBackendStatus,
+      cancelMediaBatchTranscription: bridge.cancelMediaBatchTranscription,
+      closeCapture: bridge.closeCapture,
     });
-    setIsFilterLoading(false);
-    cancelAllFrontendCaptureTasks();
-    wakeCaptureWaiters();
-    clearCaptureUiState();
-    threatAnalysisSeqRef.current += 1;
-    setBackendStatus(getCaptureStopRequestStatus(backendConnected));
-    if (!backendConnected) return;
-
-    let closeError = "";
-    try {
-      await bridge.cancelMediaBatchTranscription().catch(() => null);
-      await bridge.closeCapture();
-    } catch (error) {
-      closeError = getCaptureCloseErrorMessage(error);
-    }
-    setBackendStatus(getCaptureStopDoneStatus(closeError));
-  }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, wakeCaptureWaiters]);
+  }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, setBackendStatus, wakeCaptureWaiters]);
 
   const protocolTree = useMemo(
     () =>
