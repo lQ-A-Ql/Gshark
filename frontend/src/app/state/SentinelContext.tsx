@@ -25,12 +25,6 @@ import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { clearCaptureUiStateData } from "./captureClearState";
 import { cancelFrontendCaptureTasks } from "./captureTaskReset";
-import {
-  jumpToPacketPage,
-  loadNextPacketPage,
-  loadPreviousPacketPage,
-  retryPacketPageLoad,
-} from "./packetPageNavigation";
 import { runPacketFilterAction } from "./packetFilterAction";
 import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
@@ -57,6 +51,7 @@ import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
 import { usePacketViewportReset } from "./hooks/usePacketViewportReset";
 import { usePacketPageLoad } from "./hooks/usePacketPageLoad";
 import { usePacketLocateById } from "./hooks/usePacketLocateById";
+import { usePacketPageNavigation } from "./hooks/usePacketPageNavigation";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -267,24 +262,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setPacketPageError,
   });
 
-  const loadMorePackets = useCallback(async () => {
-    await loadNextPacketPage({ pageStartRef, pageSize: PAGE_SIZE, loadPacketPage });
-  }, [loadPacketPage]);
-
-  const loadPrevPackets = useCallback(async () => {
-    await loadPreviousPacketPage({ pageStartRef, pageSize: PAGE_SIZE, loadPacketPage });
-  }, [loadPacketPage]);
-
-  const jumpToPage = useCallback(
-    async (page: number) => {
-      await jumpToPacketPage({ page, totalPackets, pageSize: PAGE_SIZE, loadPacketPage });
-    },
-    [loadPacketPage, totalPackets],
-  );
-
-  const retryPacketPage = useCallback(async () => {
-    await retryPacketPageLoad({ pageStartRef, displayFilter, loadPacketPage, setBackendStatus });
-  }, [displayFilter, loadPacketPage, setBackendStatus]);
+  const { jumpToPage, loadMorePackets, loadPrevPackets, retryPacketPage } = usePacketPageNavigation({
+    displayFilter,
+    loadPacketPage,
+    pageSize: PAGE_SIZE,
+    pageStartRef,
+    setBackendStatus,
+    totalPackets,
+  });
 
   const locatePacketById = usePacketLocateById({
     activeCapturePathRef,

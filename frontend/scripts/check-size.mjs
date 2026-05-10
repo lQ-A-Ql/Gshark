@@ -279,6 +279,11 @@ export const sourceSizeBudgets = [
       "packet locate hook should only bind provider refs, bridge call, and selection setters to pure locate workflow",
   },
   {
+    path: "src/app/state/hooks/usePacketPageNavigation.ts",
+    maxLines: 55,
+    reason: "packet page navigation hook should only bind provider state to pure page navigation workflows",
+  },
+  {
     path: "src/app/state/hooks/useProgressStatusUpdater.ts",
     maxLines: 35,
     reason: "progress status updater hook should only bind provider refs and setters to pure status workflow",
@@ -1418,6 +1423,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/usePacketLocateById.test.tsx",
     maxLines: 80,
     reason: "packet locate hook tests should verify filter, page loader, and selection wiring",
+  },
+  {
+    path: "src/app/state/hooks/usePacketPageNavigation.test.tsx",
+    maxLines: 75,
+    reason: "packet page navigation hook tests should verify next, previous, jump, and retry wiring",
   },
   {
     path: "src/app/state/hooks/useProgressStatusUpdater.test.tsx",
