@@ -112,6 +112,30 @@ func TestWithAuthAllowsTrustedDesktopOriginWithoutToken(t *testing.T) {
 	}
 }
 
+func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
+	server := &Server{}
+	server.SetAuthToken("secret-token")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runtime/identity", nil)
+	rec := httptest.NewRecorder()
+	server.handleRuntimeIdentity(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected runtime identity endpoint to succeed, got %d", rec.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode runtime identity payload: %v", err)
+	}
+	if got := payload["service"]; got != "gshark-sentinel" {
+		t.Fatalf("unexpected service value: %#v", got)
+	}
+	if got := payload["auth_enabled"]; got != true {
+		t.Fatalf("unexpected auth_enabled value: %#v", got)
+	}
+}
+
 func TestWithAuditRecordsSensitiveRequests(t *testing.T) {
 	server := &Server{}
 	handler := server.withAudit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

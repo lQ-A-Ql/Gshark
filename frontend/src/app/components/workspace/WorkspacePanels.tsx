@@ -5,6 +5,7 @@ import { Progress } from "../ui/progress";
 import type { Packet, ProtocolTreeNode } from "../../core/types";
 import { HexAsciiPanel } from "./HexAsciiPanel";
 import { ProtocolTreePanel } from "./ProtocolTreePanel";
+import { WorkspacePacketErrorPanel } from "./WorkspacePacketErrorPanel";
 
 type StreamTarget = "http" | "tcp" | "udp";
 
@@ -49,6 +50,9 @@ interface WorkspacePanelsProps {
   filterLoadingTitle: string;
   filterLoadingDetail: string;
   filterLoadingProgress: number;
+  packetPageError: string;
+  captureName: string;
+  displayFilter: string;
   packets: Packet[];
   selectedPacketId: number | null;
   hasMorePackets: boolean;
@@ -62,6 +66,7 @@ interface WorkspacePanelsProps {
   onSelectPacket: (id: number) => void;
   onDoubleClickHttp: () => void;
   onFollowStream: (packet: Packet, target: StreamTarget) => void;
+  onRetryPacketPage: () => void;
   onLoadMorePackets: () => void;
   onSelectTreeNode: (nodeId: string) => void;
   onSelectByte: (offset: number) => void;
@@ -73,6 +78,9 @@ export function WorkspacePanels({
   filterLoadingTitle,
   filterLoadingDetail,
   filterLoadingProgress,
+  packetPageError,
+  captureName,
+  displayFilter,
   packets,
   selectedPacketId,
   hasMorePackets,
@@ -86,6 +94,7 @@ export function WorkspacePanels({
   onSelectPacket,
   onDoubleClickHttp,
   onFollowStream,
+  onRetryPacketPage,
   onLoadMorePackets,
   onSelectTreeNode,
   onSelectByte,
@@ -94,7 +103,14 @@ export function WorkspacePanels({
   return (
     <PanelGroup direction="vertical" className="flex min-h-0 flex-1 flex-col">
       <Panel defaultSize={50} minSize={20} className="bg-white/82 backdrop-blur-xl">
-        {showFilterLoadingBlankState ? (
+        {packetPageError ? (
+          <WorkspacePacketErrorPanel
+            message={packetPageError}
+            captureName={captureName}
+            displayFilter={displayFilter}
+            onRetry={onRetryPacketPage}
+          />
+        ) : showFilterLoadingBlankState ? (
           <WorkspaceFilterLoadingPanel
             title={filterLoadingTitle}
             detail={filterLoadingDetail}

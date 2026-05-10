@@ -35,9 +35,11 @@ export interface SentinelContextValue {
   hasPrevPackets: boolean;
   isPageLoading: boolean;
   isFilterLoading: boolean;
+  packetPageError: string;
   loadMorePackets: () => Promise<void>;
   loadPrevPackets: () => Promise<void>;
   jumpToPage: (page: number) => Promise<void>;
+  retryPacketPage: () => Promise<void>;
   locatePacketById: (packetId: number, filterOverride?: string) => Promise<Packet | null>;
   selectedPacket: Packet | null;
   selectedPacketRawHex: string;

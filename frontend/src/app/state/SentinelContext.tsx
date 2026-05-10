@@ -54,6 +54,7 @@ import {
   getPacketFilterPollingStatus,
   getPacketFilterWorkingStatus,
 } from "./packetFilterStatus";
+import { getPacketPageLoadErrorMessage, getPacketPageRetryStatus } from "./packetPageStatus";
 import {
   getCaptureCloseErrorMessage,
   getCaptureStopDoneStatus,
@@ -133,6 +134,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [hasPrevPackets, setHasPrevPackets] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [packetPageError, setPacketPageError] = useState("");
   const [displayFilter, setDisplayFilter] = useState("");
   const [selectedPacketId, setSelectedPacketId] = useState<number | null>(null);
   const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
@@ -247,6 +249,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       loadMoreScheduledRef.current = null;
     }
     setIsPageLoading(false);
+    setPacketPageError("");
   }, []);
 
   const cancelPacketPageLoad = useCallback(() => {
@@ -272,6 +275,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setSelectedPacketRawHex("");
       setSelectedPacketLayers(null);
       setHasPrevPackets(safeCursor > 0);
+      setPacketPageError("");
       hasMorePacketsRef.current = page.hasMore;
       setHasMorePackets(page.hasMore);
     },
@@ -332,6 +336,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
     setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
     setFileMeta(createClosedCaptureFileMeta());
+    setPacketPageError("");
     activeCapturePathRef.current = "";
     setCaptureRevision((prev) => prev + 1);
   }, [resetAnalysisState]);
@@ -354,7 +359,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         if (!task.isCurrent() || isAbortLikeError(error, task.signal)) {
           return null;
         }
-        setBackendStatus(error instanceof Error ? error.message : "数据包加载失败");
+        const message = getPacketPageLoadErrorMessage(error);
+        setPacketPageError(message);
+        setBackendStatus(message);
         return null;
       } finally {
         const isCurrent = task.isCurrent();
@@ -387,6 +394,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     },
     [loadPacketPage, totalPackets],
   );
+
+  const retryPacketPage = useCallback(async () => {
+    setBackendStatus(getPacketPageRetryStatus(displayFilter));
+    await loadPacketPage(pageStartRef.current);
+  }, [displayFilter, loadPacketPage, setBackendStatus]);
 
   const locatePacketById = useCallback(
     async (packetId: number, filterOverride?: string) => {
@@ -815,6 +827,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
         await prepareForCaptureReplacement();
         setIsFilterLoading(false);
+        setPacketPageError("");
         resetPacketViewportState({
           pageStartRef,
           hasMorePacketsRef,
@@ -969,6 +982,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
         const filterSeq = ++filterSeqRef.current;
         setIsFilterLoading(true);
+        setPacketPageError("");
         resetPacketViewport();
         setBackendStatus(getPacketFilterWorkingStatus(nextFilter));
         void (async () => {
@@ -981,7 +995,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           }
           if (filterSeq === filterSeqRef.current) {
             setIsFilterLoading(false);
-            setBackendStatus(getPacketFilterDoneStatus(nextFilter));
+            if (page) {
+              setBackendStatus(getPacketFilterDoneStatus(nextFilter));
+            }
           }
         })();
       }
@@ -995,12 +1011,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     if (activeCapturePathRef.current && backendConnected && !isPreloadingCapture) {
       const filterSeq = ++filterSeqRef.current;
       setIsFilterLoading(true);
+      setPacketPageError("");
       resetPacketViewport();
       setBackendStatus(getPacketFilterWorkingStatus(""));
-      void loadPacketPage(0, "").finally(() => {
+      void loadPacketPage(0, "").then((page) => {
         if (filterSeq === filterSeqRef.current) {
           setIsFilterLoading(false);
-          setBackendStatus(getPacketFilterDoneStatus(""));
+          if (page) {
+            setBackendStatus(getPacketFilterDoneStatus(""));
+          }
         }
       });
     }
@@ -1071,9 +1090,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       hasPrevPackets,
       isPageLoading,
       isFilterLoading,
+      packetPageError,
       loadMorePackets,
       loadPrevPackets,
       jumpToPage,
+      retryPacketPage,
       locatePacketById,
       selectedPacket,
       selectedPacketRawHex,
@@ -1129,9 +1150,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       hasPrevPackets,
       isPageLoading,
       isFilterLoading,
+      packetPageError,
       loadMorePackets,
       loadPrevPackets,
       jumpToPage,
+      retryPacketPage,
       locatePacketById,
       selectedPacket,
       selectedPacketRawHex,

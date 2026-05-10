@@ -176,8 +176,13 @@ func (a *DesktopApp) startBackendIfPossible() error {
 		fmt.Fprintln(os.Stdout, "desktop startup: backend process already started in this app instance")
 		return nil
 	}
-	if isBackendAlive("127.0.0.1:17891") {
+	if isLoopbackBackendListening("127.0.0.1:17891") {
 		if allowReuseExistingBackend() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if err := probeReusableBackend(ctx, a.backendAuthToken); err != nil {
+				return fmt.Errorf("backend port 127.0.0.1:17891 is occupied by an incompatible instance: %w", err)
+			}
 			a.backendStatus = "running (reused-existing)"
 			fmt.Fprintln(os.Stdout, "desktop startup: reusing existing backend on 127.0.0.1:17891 due to GSHARK_ALLOW_EXISTING_BACKEND=1")
 			return nil
@@ -339,7 +344,7 @@ func resolveBackendDir() (string, error) {
 	return "", fmt.Errorf("backend directory not found from cwd=%q exe=%q", cwd, exeDir)
 }
 
-func isBackendAlive(addr string) bool {
+func isLoopbackBackendListening(addr string) bool {
 	conn, err := net.DialTimeout("tcp", addr, 400*time.Millisecond)
 	if err != nil {
 		return false

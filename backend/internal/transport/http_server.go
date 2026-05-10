@@ -93,6 +93,7 @@ func (s *Server) SetAuthToken(token string) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/api/runtime/identity", s.handleRuntimeIdentity)
 	mux.HandleFunc("/api/tools/tshark", s.handleTsharkConfig)
 	mux.HandleFunc("/api/tools/runtime-config", s.handleToolRuntimeConfig)
 	mux.HandleFunc("/api/tools/ffmpeg", s.handleFFmpegStatus)
@@ -172,6 +173,18 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	authEnabled := strings.TrimSpace(s.authToken) != ""
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"service":      "gshark-sentinel",
+		"version":      "dev",
+		"build_commit": "",
+		"auth_enabled": authEnabled,
+	})
 }
 
 func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {

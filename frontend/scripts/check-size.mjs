@@ -571,6 +571,11 @@ export const sourceSizeBudgets = [
     reason: "workspace panels should stay presentational and avoid capture/filter state ownership",
   },
   {
+    path: "src/app/components/workspace/WorkspacePacketErrorPanel.tsx",
+    maxLines: 70,
+    reason: "workspace packet error panel should stay focused on data-plane failure diagnostics",
+  },
+  {
     path: "src/app/components/workspace/useWorkspaceFilterHistory.ts",
     maxLines: 105,
     reason: "workspace filter history should only own local suggestions and persistence",
@@ -579,6 +584,11 @@ export const sourceSizeBudgets = [
     path: "src/app/components/workspace/workspaceSelection.ts",
     maxLines: 60,
     reason: "workspace selection helpers should stay pure and small",
+  },
+  {
+    path: "src/app/state/packetPageStatus.ts",
+    maxLines: 20,
+    reason: "packet page status helpers should stay as tiny message builders",
   },
   {
     path: "src/app/pages/IndustrialAnalysis.tsx",
@@ -914,6 +924,16 @@ export const testSizeBudgets = [
     path: "src/app/features/usb/UsbTablesSplit.test.tsx",
     maxLines: 115,
     reason: "USB split table tests should stay focused on barrel compatibility and row wiring",
+  },
+  {
+    path: "src/app/components/workspace/WorkspacePanels.test.tsx",
+    maxLines: 80,
+    reason: "workspace panel tests should stay focused on table, loading, and diagnostic panel wiring",
+  },
+  {
+    path: "src/app/state/packetPageStatus.test.ts",
+    maxLines: 30,
+    reason: "packet page status tests should stay focused on message formatting",
   },
 ];
 

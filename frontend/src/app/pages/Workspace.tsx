@@ -28,9 +28,11 @@ export default function Workspace() {
     hasPrevPackets,
     isPageLoading,
     isFilterLoading,
+    packetPageError,
     loadMorePackets,
     loadPrevPackets,
     jumpToPage,
+    retryPacketPage,
     locatePacketById,
     selectedPacket,
     selectedPacketRawHex,
@@ -300,6 +302,9 @@ export default function Workspace() {
         filterLoadingTitle={filterLoadingTitle}
         filterLoadingDetail={filterLoadingDetail}
         filterLoadingProgress={filterLoadingProgress}
+        packetPageError={packetPageError}
+        captureName={fileMeta.name}
+        displayFilter={displayFilter}
         packets={filteredPackets}
         selectedPacketId={selectedPacketId}
         hasMorePackets={hasMorePackets}
@@ -313,6 +318,7 @@ export default function Workspace() {
         onSelectPacket={selectPacket}
         onDoubleClickHttp={() => navigate("/http-stream")}
         onFollowStream={handleFollowStream}
+        onRetryPacketPage={() => void retryPacketPage()}
         onLoadMorePackets={() => void loadMorePackets()}
         onSelectTreeNode={handleSelectTreeNode}
         onSelectByte={handleSelectByte}
