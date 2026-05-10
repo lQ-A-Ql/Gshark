@@ -3,6 +3,8 @@ import { Network } from "lucide-react";
 import { useNavigate } from "react-router";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { WorkbenchTitleBar } from "../components/DesignSystem";
+import { CaptureTransactionBanner } from "../components/workspace/CaptureTransactionBanner";
+import { CaptureTransactionErrorPanel } from "../components/workspace/CaptureTransactionErrorPanel";
 import { DisplayFilterBar } from "../components/workspace/DisplayFilterBar";
 import { WorkspacePanels, WorkspacePreloadProgress } from "../components/workspace/WorkspacePanels";
 import { CaptureFileControls, PacketLocatorControls, PacketPagingControls } from "../components/workspace/WorkspaceTopControls";
@@ -10,6 +12,14 @@ import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceF
 import { buildFrameBytes, findClosestNodeByOffset } from "../components/workspace/workspaceSelection";
 import { useSentinel } from "../state/SentinelContext";
 import type { Packet, ProtocolTreeNode } from "../core/types";
+import {
+  getWorkspaceFilterErrorMessage,
+  getWorkspaceFilterLoadingDetail,
+  getWorkspaceFilterLoadingTitle,
+  shouldShowWorkspaceOpenFailure,
+  shouldShowWorkspaceSwitchFailureBanner,
+  shouldShowWorkspaceWelcome,
+} from "./workspaceStatus";
 
 export default function Workspace() {
   const {
@@ -29,6 +39,7 @@ export default function Workspace() {
     isPageLoading,
     isFilterLoading,
     packetPageError,
+    captureTransaction,
     loadMorePackets,
     loadPrevPackets,
     jumpToPage,
@@ -151,32 +162,9 @@ export default function Workspace() {
     () => isFilterLoading && !isPreloadingCapture && filteredPackets.length === 0,
     [filteredPackets.length, isFilterLoading, isPreloadingCapture],
   );
-  const filterLoadingTitle = useMemo(() => {
-    const message = backendStatus.trim();
-    if (message.startsWith("正在应用过滤器")) return message;
-    if (message.startsWith("正在重置过滤器")) return message;
-    return displayFilter.trim() ? `正在扫描过滤结果: ${displayFilter.trim()}` : "正在恢复全部流量";
-  }, [backendStatus, displayFilter]);
-  const filterLoadingDetail = useMemo(() => (
-    displayFilter.trim()
-      ? "旧页已清空，首屏命中结果返回前会在这里显示实时进度。"
-      : "正在重新装载未过滤的数据包第一页。"
-  ), [displayFilter]);
-  const filterErrorMessage = useMemo(() => {
-    const message = backendStatus.trim();
-    if (!message || !displayFilter.trim()) return "";
-    const normalized = message.toLowerCase();
-    if (
-      normalized.includes("filter")
-      || normalized.includes("过滤")
-      || normalized.includes("tshark")
-      || normalized.includes("unexpected")
-      || normalized.includes("invalid")
-    ) {
-      return message;
-    }
-    return "";
-  }, [backendStatus, displayFilter]);
+  const filterLoadingTitle = useMemo(() => getWorkspaceFilterLoadingTitle(backendStatus, displayFilter), [backendStatus, displayFilter]);
+  const filterLoadingDetail = useMemo(() => getWorkspaceFilterLoadingDetail(displayFilter), [displayFilter]);
+  const filterErrorMessage = useMemo(() => getWorkspaceFilterErrorMessage(backendStatus, displayFilter), [backendStatus, displayFilter]);
   const pagerItems = useMemo(() => {
     const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
     return Array.from(pages)
@@ -220,8 +208,20 @@ export default function Workspace() {
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
 
-  if (!hasOpenedCapture) {
+  if (shouldShowWorkspaceWelcome(hasOpenedCapture, captureTransaction)) {
     return <CaptureWelcomePanel />;
+  }
+
+  if (shouldShowWorkspaceOpenFailure(hasOpenedCapture, captureTransaction)) {
+    return (
+      <CaptureTransactionErrorPanel
+        captureName={captureTransaction.pendingCaptureName}
+        message={captureTransaction.message}
+        hasActiveCapture={captureTransaction.hasActiveCapture}
+        onRetry={() => void openCapture(captureTransaction.pendingCapturePath)}
+        onChooseAnother={() => void openCapture()}
+      />
+    );
   }
 
   return (
@@ -294,6 +294,15 @@ export default function Workspace() {
           totalPackets={totalPackets}
           preloadPercent={preloadPercent}
           hasDeterministicPreloadProgress={hasDeterministicPreloadProgress}
+        />
+      )}
+
+      {shouldShowWorkspaceSwitchFailureBanner(captureTransaction) && (
+        <CaptureTransactionBanner
+          captureName={captureTransaction.pendingCaptureName}
+          message={captureTransaction.message}
+          onRetry={() => void openCapture(captureTransaction.pendingCapturePath)}
+          onChooseAnother={() => void openCapture()}
         />
       )}
 

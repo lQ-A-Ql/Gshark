@@ -17,6 +17,12 @@ export interface PacketsPageResult {
   filtering?: boolean;
 }
 
+export interface CaptureStatus {
+  filePath: string;
+  hasCapture: boolean;
+  packetCount: number;
+}
+
 export interface PacketLocateResult {
   packetId: number;
   cursor: number;
@@ -34,6 +40,7 @@ export interface CaptureClient {
   stopStreamingPackets(): Promise<void>;
   prepareCaptureReplacement(): Promise<void>;
   closeCapture(): Promise<void>;
+  getCaptureStatus(signal?: AbortSignal): Promise<CaptureStatus>;
   listPackets(): Promise<Packet[]>;
   listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
   locatePacketPage(packetId: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketLocateResult>;
@@ -101,6 +108,11 @@ export function createCaptureClient(
       await request("/api/capture/close", { method: "POST" });
     },
 
+    async getCaptureStatus(signal?: AbortSignal) {
+      const payload = await request<any>("/api/capture/status", { signal });
+      return asCaptureStatus(payload);
+    },
+
     async listPackets() {
       const rows = await request<any[]>("/api/packets");
       return rows.map(asPacket);
@@ -146,6 +158,14 @@ export function createCaptureClient(
       const payload = await request<any>(`/api/packet?id=${encodeURIComponent(String(packetId))}`, { signal });
       return asPacket(payload);
     },
+  };
+}
+
+export function asCaptureStatus(payload: any): CaptureStatus {
+  return {
+    filePath: String(payload?.file_path ?? payload?.filePath ?? ""),
+    hasCapture: Boolean(payload?.has_capture ?? payload?.hasCapture),
+    packetCount: Number(payload?.packet_count ?? payload?.packetCount ?? 0),
   };
 }
 

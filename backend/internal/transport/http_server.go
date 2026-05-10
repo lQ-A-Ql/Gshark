@@ -104,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/capture/stop", s.handleCaptureStop)
 	mux.HandleFunc("/api/capture/prepare-replacement", s.handleCapturePrepareReplacement)
 	mux.HandleFunc("/api/capture/close", s.handleCaptureClose)
+	mux.HandleFunc("/api/capture/status", s.handleCaptureStatus)
 	mux.HandleFunc("/api/capture/upload", s.handleCaptureUpload)
 	mux.HandleFunc("/api/packets", s.handlePackets)
 	mux.HandleFunc("/api/packets/page", s.handlePacketsPage)
@@ -384,6 +385,14 @@ func (s *Server) handleCaptureClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "closed"})
+}
+
+func (s *Server) handleCaptureStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.svc.CaptureStatus())
 }
 
 func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {

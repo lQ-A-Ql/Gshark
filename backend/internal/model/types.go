@@ -127,6 +127,12 @@ type ToolRuntimeSnapshot struct {
 	Yara   YaraToolStatus     `json:"yara"`
 }
 
+type CaptureStatus struct {
+	FilePath    string `json:"file_path"`
+	HasCapture  bool   `json:"has_capture"`
+	PacketCount int    `json:"packet_count"`
+}
+
 type WinRMDecryptRequest struct {
 	Port                 int    `json:"port"`
 	AuthMode             string `json:"auth_mode"`

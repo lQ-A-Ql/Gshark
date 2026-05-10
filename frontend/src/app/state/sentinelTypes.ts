@@ -22,6 +22,15 @@ export interface PreparedPacketStream {
   streamId: number | null;
 }
 
+export interface CaptureTransactionStatus {
+  phase: "idle" | "pending" | "failed";
+  reason: "open_failed" | "switch_failed" | "preload_timeout" | "empty_parse" | "";
+  message: string;
+  pendingCaptureName: string;
+  pendingCapturePath: string;
+  hasActiveCapture: boolean;
+}
+
 export interface SentinelContextValue {
   packets: Packet[];
   totalPackets: number;
@@ -36,6 +45,7 @@ export interface SentinelContextValue {
   isPageLoading: boolean;
   isFilterLoading: boolean;
   packetPageError: string;
+  captureTransaction: CaptureTransactionStatus;
   loadMorePackets: () => Promise<void>;
   loadPrevPackets: () => Promise<void>;
   jumpToPage: (page: number) => Promise<void>;
@@ -71,7 +81,7 @@ export interface SentinelContextValue {
   fileMeta: CaptureFileMeta;
   captureRevision: number;
   recentCaptures: RecentCapture[];
-  openCapture: (filePath?: string) => Promise<void>;
+  openCapture: (filePath?: string) => Promise<boolean>;
   stopCapture: () => Promise<void>;
   preparePacketStream: (
     packetId: number,

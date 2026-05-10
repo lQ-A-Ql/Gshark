@@ -377,6 +377,90 @@ func TestLoadPCAPReplacementCancelsPreviousLoad(t *testing.T) {
 	}
 }
 
+func TestLoadPCAPFailureKeepsPreviousCaptureActive(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldStream := streamPacketsFn
+	oldCompat := streamPacketsCompatFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFn = oldStream
+		streamPacketsCompatFn = oldCompat
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 1, nil
+	}
+	streamPacketsFn = func(context.Context, model.ParseOptions, func(model.Packet) error, func(int)) error {
+		return errors.New("boom")
+	}
+	streamPacketsCompatFn = func(context.Context, model.ParseOptions, func(model.Packet) error, func(int)) error {
+		return errors.New("boom")
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{ID: 7, Protocol: "HTTP", Info: "old"}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	svc.pcap = "old.pcap"
+	oldPath := svc.packetStore.Path()
+
+	capture := writeTempCaptureFile(t)
+	err := svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture})
+	if err == nil || err.Error() != "boom" {
+		t.Fatalf("expected parse failure, got %v", err)
+	}
+	if svc.pcap != "old.pcap" {
+		t.Fatalf("expected previous capture path to remain active, got %q", svc.pcap)
+	}
+	if svc.packetStore.Count() != 1 {
+		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.packetStore.Count())
+	}
+	if svc.packetStore.Path() != oldPath {
+		t.Fatalf("expected previous packet store path to remain active, got %q", svc.packetStore.Path())
+	}
+}
+
+func TestLoadPCAPZeroPacketsKeepsPreviousCaptureActive(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldStream := streamPacketsFn
+	oldCompat := streamPacketsCompatFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFn = oldStream
+		streamPacketsCompatFn = oldCompat
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 1, nil
+	}
+	streamPacketsFn = func(context.Context, model.ParseOptions, func(model.Packet) error, func(int)) error {
+		return nil
+	}
+	streamPacketsCompatFn = func(context.Context, model.ParseOptions, func(model.Packet) error, func(int)) error {
+		return nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	if err := svc.packetStore.Append([]model.Packet{{ID: 9, Protocol: "TCP", Info: "old"}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	svc.pcap = "old-zero.pcap"
+
+	capture := writeTempCaptureFile(t)
+	err := svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture})
+	if err == nil || err.Error() != "capture parse completed but produced no packets" {
+		t.Fatalf("expected zero-packet parse failure, got %v", err)
+	}
+	if svc.pcap != "old-zero.pcap" {
+		t.Fatalf("expected previous capture path to remain active, got %q", svc.pcap)
+	}
+	if svc.packetStore.Count() != 1 {
+		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.packetStore.Count())
+	}
+}
+
 func writeTempCaptureFile(t *testing.T) string {
 	t.Helper()
 	file, err := os.CreateTemp(t.TempDir(), "capture-*.pcap")

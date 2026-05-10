@@ -43,10 +43,10 @@ import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema"
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 import type { EventHandlers } from "./clients/eventClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
-import type { OpenFileResult, PacketLocateResult, PacketsPageResult } from "./clients/captureClient";
+import type { CaptureStatus, OpenFileResult, PacketLocateResult, PacketsPageResult } from "./clients/captureClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 
-export type { OpenFileResult } from "./clients/captureClient";
+export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
@@ -68,6 +68,7 @@ export interface BackendBridge {
   stopStreamingPackets(): Promise<void>;
   prepareCaptureReplacement(): Promise<void>;
   closeCapture(): Promise<void>;
+  getCaptureStatus(signal?: AbortSignal): Promise<CaptureStatus>;
   listPackets(): Promise<Packet[]>;
   listPacketsPage(cursor: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketsPageResult>;
   locatePacketPage(packetId: number, limit: number, filter?: string, signal?: AbortSignal): Promise<PacketLocateResult>;
@@ -149,6 +150,7 @@ export interface DesktopTransportBinding {
   StopCapture?: () => Promise<void>;
   PrepareCaptureReplacement?: () => Promise<void>;
   CloseCapture?: () => Promise<void>;
+  GetCaptureStatus?: () => Promise<unknown>;
   GetTLSConfig?: () => Promise<unknown>;
   UpdateTLSConfig?: (cfg: unknown) => Promise<void>;
 }

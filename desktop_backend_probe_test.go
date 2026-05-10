@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -81,5 +82,25 @@ func TestProbeReusableBackendAtReportsAuthMismatch(t *testing.T) {
 	}
 	if err.Error() != "runtime identity probe failed: backend requires a matching GSHARK_BACKEND_TOKEN" {
 		t.Fatalf("unexpected auth mismatch error: %v", err)
+	}
+}
+
+func TestDetectPackagedDesktopRuntimeForDirTreatsReleaseOutAsPackaged(t *testing.T) {
+	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "gshark", "release", "out", "v-test"))
+	if !packaged {
+		t.Fatal("expected release/out dir to be treated as packaged runtime")
+	}
+	if hint != "release-out" {
+		t.Fatalf("unexpected packaged runtime hint: %q", hint)
+	}
+}
+
+func TestDetectPackagedDesktopRuntimeForDirTreatsExternalDirWithoutBackendAsPackaged(t *testing.T) {
+	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "Downloads", "gshark-portable"))
+	if !packaged {
+		t.Fatal("expected external dir without backend source tree to be treated as packaged runtime")
+	}
+	if hint != "packaged-external" {
+		t.Fatalf("unexpected packaged runtime hint: %q", hint)
 	}
 }

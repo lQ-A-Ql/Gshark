@@ -17,6 +17,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+$bundledBackendPath = Join-Path $root "frontend/dist/sentinel-backend.exe"
+$bundledRulePath = Join-Path $root "frontend/dist/rules/yara/default.yar"
 
 if ([string]::IsNullOrWhiteSpace($AssetName)) {
   $AssetName = "gshark.$Version.exe"
@@ -35,6 +37,13 @@ Set-Location $root
 if (-not $SkipBuild) {
   Write-Host "[gshark] building desktop release with wails build" -ForegroundColor Cyan
   wails build
+}
+
+if (-not (Test-Path $bundledBackendPath)) {
+  throw "required bundled backend is missing: $bundledBackendPath"
+}
+if (-not (Test-Path $bundledRulePath)) {
+  throw "required bundled rules are missing: $bundledRulePath"
 }
 
 if ([string]::IsNullOrWhiteSpace($SourceExePath)) {
@@ -84,6 +93,16 @@ if (-not $NoRepoManifestUpdate) {
   $repoManifestPath = Join-Path $root "release/version.json"
   Copy-Item -LiteralPath $manifestPath -Destination $repoManifestPath -Force
   Write-Host "[gshark] repository manifest updated: $repoManifestPath" -ForegroundColor Green
+}
+
+Write-Host "[gshark] running release smoke check" -ForegroundColor Cyan
+$smokeOutput = & $releaseExePath 2>&1
+$smokeExitCode = $LASTEXITCODE
+if ($smokeExitCode -ne 0) {
+  throw "release smoke check failed with exit code $smokeExitCode: $smokeOutput"
+}
+if (-not ($smokeOutput -join "`n").Contains("release smoke check: ok")) {
+  throw "release smoke check did not confirm bundled backend bootstrap: $smokeOutput"
 }
 
 Write-Host "[gshark] release package ready" -ForegroundColor Green

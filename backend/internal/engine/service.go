@@ -198,61 +198,26 @@ func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOption
 func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
 	s.mu.RLock()
 	oldPCAP := s.pcap
+	currentTLS := s.tlsConf
 	s.mu.RUnlock()
 	if oldPCAP != "" {
 		tshark.ClearFieldScanCache(oldPCAP)
 	}
 	tshark.ClearFieldScanCache(opts.FilePath)
 
-	s.objMu.Lock()
-	if s.exportDir != "" {
-		os.RemoveAll(s.exportDir)
-		s.exportDir = ""
+	nextStore, err := newPacketStore()
+	if err != nil {
+		return err
 	}
-	s.objectsLoaded = false
-	s.objects = nil
-	s.objMu.Unlock()
-
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
-
-	if s.packetStore != nil {
-		if err := s.packetStore.Reset(); err != nil {
-			return err
+	commitPending := false
+	defer func() {
+		if !commitPending {
+			_ = nextStore.Close()
 		}
-	}
+	}()
 
-	s.mu.Lock()
-	if s.mediaExportDir != "" {
-		_ = os.RemoveAll(s.mediaExportDir)
-		s.mediaExportDir = ""
-	}
-	s.cancelDisplayFilterCacheLocked()
-	s.pcap = opts.FilePath
-	s.displayFilterCache = map[string]*filteredPacketIndex{}
-	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
-	s.globalTrafficStats = nil
-	s.industrialAnalysis = nil
-	s.vehicleAnalysis = nil
-	s.mediaAnalysis = nil
-	s.usbAnalysis = nil
-	s.c2Analysis = nil
-	s.aptAnalysis = nil
-	s.mediaArtifacts = map[string]string{}
-	s.mediaPlayback = map[string]string{}
-	s.mediaSpeech = map[string]model.MediaTranscription{}
-	s.cancelSpeechBatchLocked()
-	s.speechBatch = nil
-	s.streamCache = map[string]model.ReassembledStream{}
-	s.streamCacheOrder = s.streamCacheOrder[:0]
-	s.rawStreamIndex = map[string]model.ReassembledStream{}
-	s.streamOverrides = map[string]map[int]string{}
 	// Inject current TLS config into parse options
-	opts.TLS = s.tlsConf
-	s.mu.Unlock()
+	opts.TLS = currentTLS
 
 	tsharkStatus := tshark.CurrentStatus()
 	log.Printf(
@@ -294,15 +259,16 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		if len(pending) == 0 {
 			return
 		}
-		if s.packetStore != nil {
-			if err := s.packetStore.Append(pending); err != nil {
-				s.emitStatus("写入数据包存储失败: " + err.Error())
+		if appendErr := nextStore.Append(pending); appendErr != nil {
+			s.emitStatus("写入数据包存储失败: " + appendErr.Error())
+			if err == nil {
+				err = appendErr
 			}
 		}
 		pending = pending[:0]
 	}
 
-	err := streamFn(runCtx, opts, func(packet model.Packet) error {
+	err = streamFn(runCtx, opts, func(packet model.Packet) error {
 		if atomic.LoadInt64(&s.runID) != currentRunID {
 			return nil
 		}
@@ -336,10 +302,8 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		}
 		if needsFallback {
 			s.emitStatus("fast_list compatibility fallback: retrying parse with EK mode")
-			if s.packetStore != nil {
-				if resetErr := s.packetStore.Reset(); resetErr != nil {
-					return resetErr
-				}
+			if resetErr := nextStore.Reset(); resetErr != nil {
+				return resetErr
 			}
 			processed = 0
 			accepted = 0
@@ -378,10 +342,8 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		if needsCompatFallback {
 			s.emitStatus("compatibility fallback: retrying parse with minimal field mode")
 			log.Printf("engine: switching parser to compat_fields fallback for %q", opts.FilePath)
-			if s.packetStore != nil {
-				if resetErr := s.packetStore.Reset(); resetErr != nil {
-					return resetErr
-				}
+			if resetErr := nextStore.Reset(); resetErr != nil {
+				return resetErr
 			}
 			processed = 0
 			accepted = 0
@@ -425,10 +387,8 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	if processed > 0 {
 		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
 	}
-	if s.packetStore != nil {
-		log.Printf("engine: packet store path=%q rows=%d", s.packetStore.Path(), s.packetStore.Count())
-		s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", s.packetStore.Count()))
-	}
+	log.Printf("engine: packet store path=%q rows=%d", nextStore.Path(), nextStore.Count())
+	s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", nextStore.Count()))
 	if opts.FastList && dropped > 0 {
 		s.emitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
 	}
@@ -443,6 +403,19 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 
 	switch err {
 	case nil:
+		if accepted == 0 {
+			s.emitStatus("解析失败: 未读取到有效数据包")
+			return errors.New("capture parse completed but produced no packets")
+		}
+		if atomic.LoadInt64(&s.runID) != currentRunID {
+			s.emitStatus("解析被取消")
+			return context.Canceled
+		}
+		if err := s.commitLoadedCapture(opts.FilePath, nextStore, rawStreamIndex); err != nil {
+			s.emitStatus("解析失败: " + err.Error())
+			return err
+		}
+		commitPending = true
 		s.mu.Lock()
 		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(rawStreamIndex))
 		for key, stream := range rawStreamIndex {
@@ -459,6 +432,67 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		s.emitStatus("解析失败: " + err.Error())
 	}
 	return err
+}
+
+func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, nextRawStreamIndex map[string]*model.ReassembledStream) error {
+	if nextStore == nil {
+		return errors.New("replacement packet store is nil")
+	}
+	s.objMu.Lock()
+	if s.exportDir != "" {
+		_ = os.RemoveAll(s.exportDir)
+		s.exportDir = ""
+	}
+	s.objectsLoaded = false
+	s.objects = nil
+	s.objMu.Unlock()
+
+	s.yaraMu.Lock()
+	s.yaraLoaded = false
+	s.yaraHits = nil
+	s.yaraLastError = ""
+	s.yaraMu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaExportDir)
+		s.mediaExportDir = ""
+	}
+	if s.packetStore == nil {
+		return errors.New("active packet store is not initialized")
+	}
+	if err := s.packetStore.ReplaceWith(nextStore); err != nil {
+		return err
+	}
+	s.cancelDisplayFilterCacheLocked()
+	s.pcap = filePath
+	s.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.globalTrafficStats = nil
+	s.industrialAnalysis = nil
+	s.vehicleAnalysis = nil
+	s.mediaAnalysis = nil
+	s.usbAnalysis = nil
+	s.c2Analysis = nil
+	s.aptAnalysis = nil
+	s.mediaArtifacts = map[string]string{}
+	s.mediaPlayback = map[string]string{}
+	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.cancelSpeechBatchLocked()
+	s.speechBatch = nil
+	s.streamCache = map[string]model.ReassembledStream{}
+	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.rawStreamIndex = make(map[string]model.ReassembledStream, len(nextRawStreamIndex))
+	for key, stream := range nextRawStreamIndex {
+		if stream == nil {
+			continue
+		}
+		s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+	}
+	s.streamOverrides = map[string]map[int]string{}
+	return nil
 }
 
 func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
@@ -699,6 +733,22 @@ func (s *Service) ClearCapture() error {
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
 	return nil
+}
+
+func (s *Service) CaptureStatus() model.CaptureStatus {
+	s.mu.RLock()
+	filePath := strings.TrimSpace(s.pcap)
+	s.mu.RUnlock()
+
+	packetCount := 0
+	if s.packetStore != nil {
+		packetCount = s.packetStore.Count()
+	}
+	return model.CaptureStatus{
+		FilePath:    filePath,
+		HasCapture:  filePath != "" && packetCount > 0,
+		PacketCount: packetCount,
+	}
 }
 
 func (s *Service) Packets() []model.Packet {

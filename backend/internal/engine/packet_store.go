@@ -94,6 +94,56 @@ func (s *packetStore) Close() error {
 	return nil
 }
 
+func (s *packetStore) ReplaceWith(next *packetStore) error {
+	if s == nil {
+		return fmt.Errorf("packet store not initialized")
+	}
+	if next == nil {
+		return fmt.Errorf("replacement packet store is nil")
+	}
+	if s == next {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	next.mu.Lock()
+	defer next.mu.Unlock()
+
+	oldPath := s.path
+	oldDB := s.db
+
+	s.path = next.path
+	s.db = next.db
+	s.ids = append([]int64(nil), next.ids...)
+	s.positions = clonePacketPositions(next.positions)
+
+	next.path = ""
+	next.db = nil
+	next.ids = nil
+	next.positions = nil
+
+	if oldDB != nil {
+		_ = oldDB.Close()
+	}
+	if oldPath != "" {
+		_ = removePacketStoreFiles(oldPath)
+	}
+	return nil
+}
+
+func clonePacketPositions(src map[int64]int) map[int64]int {
+	if len(src) == 0 {
+		return map[int64]int{}
+	}
+	dst := make(map[int64]int, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
 func (s *packetStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -488,6 +488,33 @@ func TestHandleCapturePrepareReplacement(t *testing.T) {
 	}
 }
 
+func TestHandleCaptureStatusReportsEmptyCapture(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/capture/status", nil)
+	rec := httptest.NewRecorder()
+	server.handleCaptureStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected capture status endpoint to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload model.CaptureStatus
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode capture status payload: %v", err)
+	}
+	if payload.HasCapture || payload.FilePath != "" || payload.PacketCount != 0 {
+		t.Fatalf("unexpected empty capture status payload: %+v", payload)
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, "/api/capture/status", nil)
+	postRec := httptest.NewRecorder()
+	server.handleCaptureStatus(postRec, postReq)
+	if postRec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected non-GET capture status request to fail, got %d", postRec.Code)
+	}
+}
+
 func TestBroadcastPrioritizesStatusEventsWhenClientBufferIsFull(t *testing.T) {
 	server := &Server{
 		clients: map[chan event]struct{}{},

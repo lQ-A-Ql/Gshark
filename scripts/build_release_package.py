@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO = "lQ-A-Ql/Gshark"
 DEFAULT_SOURCE_EXE = ROOT / "build" / "bin" / "gshark-sentinel.exe"
+BUNDLED_BACKEND_PATH = ROOT / "frontend" / "dist" / "sentinel-backend.exe"
+BUNDLED_RULE_PATH = ROOT / "frontend" / "dist" / "rules" / "yara" / "default.yar"
 
 
 @dataclass
@@ -63,10 +66,48 @@ def run_command(args: list[str], cwd: Path) -> None:
     subprocess.run(args, cwd=str(cwd), check=True)
 
 
+def ensure_release_inputs() -> None:
+    missing: list[str] = []
+    if not BUNDLED_BACKEND_PATH.is_file():
+        missing.append(str(BUNDLED_BACKEND_PATH))
+    if not BUNDLED_RULE_PATH.is_file():
+        missing.append(str(BUNDLED_RULE_PATH))
+    if missing:
+        raise FileNotFoundError(
+            "required bundled release inputs are missing: " + ", ".join(missing)
+        )
+
+
+def run_release_smoke_check(exe_path: Path) -> None:
+    env = os.environ.copy()
+    env["GSHARK_RELEASE_SMOKE_CHECK"] = "1"
+    completed = subprocess.run(
+        [str(exe_path)],
+        cwd=str(exe_path.parent),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    output = completed.stdout or ""
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"release smoke check failed with exit code {completed.returncode}: {output.strip()}"
+        )
+    if "release smoke check: ok" not in output:
+        raise RuntimeError(
+            f"release smoke check did not confirm bundled backend bootstrap: {output.strip()}"
+        )
+
+
 def build_release(config: ReleaseConfig) -> tuple[Path, Path]:
     if not config.skip_build:
         print("[gshark] building desktop release with wails build")
         run_command(["wails", "build"], ROOT)
+
+    ensure_release_inputs()
 
     if not config.source_exe_path.is_file():
         raise FileNotFoundError(f"source exe not found: {config.source_exe_path}")
@@ -85,6 +126,9 @@ def build_release(config: ReleaseConfig) -> tuple[Path, Path]:
         repo_manifest_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest_path, repo_manifest_path)
         print(f"[gshark] repository manifest updated: {repo_manifest_path}")
+
+    print("[gshark] running release smoke check")
+    run_release_smoke_check(release_exe_path)
 
     return release_exe_path, manifest_path
 

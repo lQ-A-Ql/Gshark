@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -47,6 +48,15 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 	if err := a.startBackendIfPossible(); err != nil {
 		a.setBackendStatus("failed: " + err.Error())
 		fmt.Fprintf(os.Stderr, "desktop startup: backend bootstrap failed: %v\n", err)
+		if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
+			os.Exit(1)
+		}
+		return
+	}
+	if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
+		fmt.Fprintln(os.Stdout, "release smoke check: ok")
+		a.stopBackend()
+		os.Exit(0)
 	}
 }
 
@@ -216,22 +226,54 @@ func (a *DesktopApp) startBackendIfPossible() error {
 }
 
 func buildBackendCommand() (*exec.Cmd, error) {
-	if binaryPath, err := resolveBundledBackendBinary(); err == nil {
-		cmd := exec.Command(binaryPath, "serve", "127.0.0.1:17891")
-		cmd.Dir = filepath.Dir(binaryPath)
-		fmt.Fprintf(os.Stdout, "desktop startup: using bundled backend binary %q\n", binaryPath)
+	bundledBinaryPath, bundledErr := resolveBundledBackendBinary()
+	if bundledErr == nil {
+		cmd := exec.Command(bundledBinaryPath, "serve", "127.0.0.1:17891")
+		cmd.Dir = filepath.Dir(bundledBinaryPath)
+		fmt.Fprintf(os.Stdout, "desktop startup: using bundled backend binary %q\n", bundledBinaryPath)
 		return cmd, nil
+	}
+
+	packaged, packagedHint := detectPackagedDesktopRuntime()
+	if packaged {
+		return nil, fmt.Errorf("packaged desktop backend bootstrap failed: %w (runtime=%s)", bundledErr, packagedHint)
 	}
 
 	backendDir, err := resolveBackendDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bundled backend unavailable: %v; source backend unavailable: %w", bundledErr, err)
 	}
 
 	cmd := exec.Command("go", "run", "./cmd/sentinel", "serve", "127.0.0.1:17891")
 	cmd.Dir = backendDir
-	fmt.Fprintf(os.Stdout, "desktop startup: using go run backend from %q\n", backendDir)
+	fmt.Fprintf(os.Stdout, "desktop startup: bundled backend unavailable (%v); using go run backend from %q\n", bundledErr, backendDir)
 	return cmd, nil
+}
+
+func detectPackagedDesktopRuntime() (bool, string) {
+	exePath, err := os.Executable()
+	if err != nil {
+		return false, "executable-unavailable"
+	}
+	return detectPackagedDesktopRuntimeForDir(filepath.Dir(exePath))
+}
+
+func detectPackagedDesktopRuntimeForDir(exeDir string) (bool, string) {
+	cleanDir := strings.ToLower(filepath.Clean(exeDir))
+	if strings.Contains(cleanDir, strings.ToLower(filepath.Clean(filepath.Join("release", "out")))) {
+		return true, "release-out"
+	}
+	for _, marker := range []string{
+		filepath.Join(exeDir, "backend"),
+		filepath.Join(exeDir, "..", "backend"),
+		filepath.Join(exeDir, "..", "..", "backend"),
+	} {
+		cleanMarker := filepath.Clean(marker)
+		if st, statErr := os.Stat(filepath.Join(cleanMarker, "go.mod")); statErr == nil && !st.IsDir() {
+			return false, "source-checkout"
+		}
+	}
+	return true, "packaged-external"
 }
 
 func resolveBundledBackendBinary() (string, error) {
@@ -255,40 +297,70 @@ func resolveBundledBackendBinary() (string, error) {
 
 	for _, candidate := range candidates {
 		clean := filepath.Clean(candidate)
-		if st, err := os.Stat(clean); err == nil && !st.IsDir() {
+		fmt.Fprintf(os.Stdout, "desktop startup: checking bundled backend candidate %q\n", clean)
+		if st, statErr := os.Stat(clean); statErr == nil && !st.IsDir() {
 			return clean, nil
 		}
 	}
 
-	if extracted, err := extractBundledBackendFromAssets(name); err == nil {
+	extracted, extractErr := extractBundledBackendFromAssets(name)
+	if extractErr == nil {
 		return extracted, nil
 	}
-
-	return "", fmt.Errorf("bundled backend binary not found near %q", exeDir)
+	return "", fmt.Errorf("bundled backend binary not found near %q: %w", exeDir, extractErr)
 }
 
 func extractBundledBackendFromAssets(filename string) (string, error) {
 	embeddedPath := filepath.ToSlash(filepath.Join("frontend", "dist", filename))
 	data, err := assets.ReadFile(embeddedPath)
 	if err != nil {
-		return "", err
+		fmt.Fprintf(os.Stderr, "desktop startup: bundled backend asset read failed path=%q err=%v\n", embeddedPath, err)
+		return "", fmt.Errorf("read embedded backend asset %q: %w", embeddedPath, err)
 	}
 
-	targetDir := filepath.Join(os.TempDir(), "gshark-sentinel", "backend")
+	digest := sha256.Sum256(data)
+	targetDir := filepath.Join(os.TempDir(), "gshark-sentinel", "backend", hex.EncodeToString(digest[:8]))
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return "", err
+		return "", fmt.Errorf("create backend extraction directory %q: %w", targetDir, err)
 	}
 
 	target := filepath.Join(targetDir, filename)
-	if writeErr := os.WriteFile(target, data, 0o755); writeErr != nil {
-		return "", writeErr
+	fmt.Fprintf(os.Stdout, "desktop startup: extracting bundled backend asset path=%q target=%q\n", embeddedPath, target)
+	if st, statErr := os.Stat(target); statErr == nil && !st.IsDir() {
+		fmt.Fprintf(os.Stdout, "desktop startup: reusing extracted bundled backend %q\n", target)
+		_ = extractOptionalBundledRules(targetDir)
+		return target, nil
+	}
+
+	tempFile, err := os.CreateTemp(targetDir, filename+".*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("create temporary backend file in %q: %w", targetDir, err)
+	}
+	tempPath := tempFile.Name()
+	if _, err := tempFile.Write(data); err != nil {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+		return "", fmt.Errorf("write extracted backend temp file %q: %w", tempPath, err)
+	}
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return "", fmt.Errorf("close extracted backend temp file %q: %w", tempPath, err)
+	}
+	if runtime.GOOS != "windows" {
+		_ = os.Chmod(tempPath, 0o755)
+	}
+	_ = os.Remove(target)
+	if err := os.Rename(tempPath, target); err != nil {
+		_ = os.Remove(tempPath)
+		return "", fmt.Errorf("promote extracted backend from %q to %q: %w", tempPath, target, err)
 	}
 	if runtime.GOOS != "windows" {
 		_ = os.Chmod(target, 0o755)
 	}
 
-	_ = extractOptionalBundledRules(targetDir)
-
+	if err := extractOptionalBundledRules(targetDir); err != nil {
+		fmt.Fprintf(os.Stderr, "desktop startup: optional bundled rules extraction failed target=%q err=%v\n", targetDir, err)
+	}
 	return target, nil
 }
 
@@ -296,14 +368,33 @@ func extractOptionalBundledRules(targetDir string) error {
 	rulesAssetPath := filepath.ToSlash(filepath.Join("frontend", "dist", "rules", "yara", "default.yar"))
 	data, err := assets.ReadFile(rulesAssetPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("read embedded rules asset %q: %w", rulesAssetPath, err)
 	}
 	rulesDir := filepath.Join(targetDir, "rules", "yara")
 	if mkErr := os.MkdirAll(rulesDir, 0o755); mkErr != nil {
-		return mkErr
+		return fmt.Errorf("create extracted rules directory %q: %w", rulesDir, mkErr)
 	}
 	ruleFile := filepath.Join(rulesDir, "default.yar")
-	return os.WriteFile(ruleFile, data, 0o644)
+	tmpRule, err := os.CreateTemp(rulesDir, "default.yar.*.tmp")
+	if err != nil {
+		return fmt.Errorf("create rules temp file in %q: %w", rulesDir, err)
+	}
+	tmpRulePath := tmpRule.Name()
+	if _, err := tmpRule.Write(data); err != nil {
+		_ = tmpRule.Close()
+		_ = os.Remove(tmpRulePath)
+		return fmt.Errorf("write rules temp file %q: %w", tmpRulePath, err)
+	}
+	if err := tmpRule.Close(); err != nil {
+		_ = os.Remove(tmpRulePath)
+		return fmt.Errorf("close rules temp file %q: %w", tmpRulePath, err)
+	}
+	_ = os.Remove(ruleFile)
+	if err := os.Rename(tmpRulePath, ruleFile); err != nil {
+		_ = os.Remove(tmpRulePath)
+		return fmt.Errorf("promote extracted rules to %q: %w", ruleFile, err)
+	}
+	return nil
 }
 
 func resolveBackendDir() (string, error) {

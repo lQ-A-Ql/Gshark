@@ -220,6 +220,16 @@ func (a *DesktopApp) CloseCapture() error {
 	return a.backendProxy().postJSON(ctx, "/api/capture/close", map[string]any{}, nil)
 }
 
+func (a *DesktopApp) GetCaptureStatus() (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	if err := a.backendProxy().getJSON(ctx, "/api/capture/status", &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
 func (a *DesktopApp) GetTLSConfig() (desktopTLSConfig, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()

@@ -76,6 +76,11 @@ import {
   createClosedCaptureFileMeta,
   createInitialCaptureFileMeta,
 } from "./captureOpenState";
+import {
+  createFailedCaptureTransactionStatus,
+  createIdleCaptureTransactionStatus,
+  createPendingCaptureTransactionStatus,
+} from "./captureTransactionStatus";
 import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
 import {
@@ -119,6 +124,7 @@ import {
   waitForCaptureSignal as waitForCaptureSignalUtil,
   wakeCaptureWaiters as wakeCaptureWaitersUtil,
 } from "./captureSignal";
+import { isCommittedCaptureStatusForPath } from "./captureCommitStatus";
 import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
@@ -135,6 +141,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [packetPageError, setPacketPageError] = useState("");
+  const [captureTransaction, setCaptureTransaction] = useState(createIdleCaptureTransactionStatus(false));
   const [displayFilter, setDisplayFilter] = useState("");
   const [selectedPacketId, setSelectedPacketId] = useState<number | null>(null);
   const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
@@ -337,6 +344,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setStreamSwitchMetrics(EMPTY_SWITCH_METRICS);
     setFileMeta(createClosedCaptureFileMeta());
     setPacketPageError("");
+    setCaptureTransaction(createIdleCaptureTransactionStatus(false));
     activeCapturePathRef.current = "";
     setCaptureRevision((prev) => prev + 1);
   }, [resetAnalysisState]);
@@ -813,21 +821,125 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     async (filePath?: string, filterOverride?: string) => {
       if (!backendConnected) {
         setBackendStatus(getCaptureOpenDisconnectedStatus());
-        return;
+        return false;
       }
 
       const captureSeq = ++captureSeqRef.current;
       filterSeqRef.current += 1;
       const effectiveFilter = filterOverride ?? displayFilter;
+      const hadActiveCapture = Boolean(activeCapturePathRef.current);
+      let pendingCapture = buildOpenedCaptureFromPath(filePath ?? "");
 
       try {
         const opened = filePath
           ? (buildOpenedCaptureFromPath(filePath) ?? (await bridge.openPcapFile()))
           : await bridge.openPcapFile();
+        pendingCapture = opened;
 
         await prepareForCaptureReplacement();
         setIsFilterLoading(false);
         setPacketPageError("");
+        resetPreloadCounterState({
+          preloadProcessedRef,
+          preloadTotalRef,
+          setPreloadProcessed,
+          setPreloadTotal,
+        });
+        startCaptureParseRuntime({
+          parseFinishedRef,
+          parseErrorRef,
+          preloadingRef,
+          setIsPreloadingCapture,
+        });
+        setCaptureTransaction(
+          createPendingCaptureTransactionStatus(opened.fileName, opened.filePath, hadActiveCapture),
+        );
+        rememberRecentCapture(buildRecentCapture(opened, new Date().toISOString()));
+
+        const startTask = captureTaskScopeRef.current.beginTask("capture-start");
+        try {
+          await bridge.startStreamingPackets(opened.filePath, "", startTask.signal);
+          if (!startTask.isCurrent()) return false;
+        } finally {
+          startTask.finish();
+        }
+        if (captureSeq !== captureSeqRef.current) return false;
+        setBackendStatus(getCapturePreloadWorkingStatus(opened.fileName));
+
+        const waitDeadline = Date.now() + CAPTURE_PRELOAD_TIMEOUT_MS;
+        let firstPageLoaded = false;
+        let activeCaptureConfirmed = false;
+        let validatedFirstPage: Pick<
+          Awaited<ReturnType<typeof bridge.listPacketsPage>>,
+          "items" | "total" | "hasMore"
+        > | null = null;
+        while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
+          const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
+          const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
+          try {
+            const [probePage, captureStatus] = await Promise.all([
+              bridge.listPacketsPage(0, probeLimit, effectiveFilter, probeTask.signal),
+              bridge.getCaptureStatus(probeTask.signal).catch(() => null),
+            ]);
+            if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return false;
+            activeCaptureConfirmed = isCommittedCaptureStatusForPath(captureStatus, opened.filePath);
+            if (activeCaptureConfirmed && probePage.total > 0) {
+              setTotalPackets(probePage.total);
+              if (preloadTotalRef.current <= 0) {
+                setPreloadProcessed(probePage.total);
+                preloadProcessedRef.current = probePage.total;
+              }
+            }
+            if (!firstPageLoaded && activeCaptureConfirmed && probePage.total > 0) {
+              validatedFirstPage = {
+                items: probePage.items,
+                total: probePage.total,
+                hasMore: probePage.hasMore,
+              };
+              firstPageLoaded = true;
+            }
+          } finally {
+            probeTask.finish();
+          }
+
+          if (activeCaptureConfirmed && firstPageLoaded) {
+            break;
+          }
+          if (parseFinishedRef.current) {
+            break;
+          }
+
+          await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
+        }
+
+        if (captureSeq !== captureSeqRef.current) return false;
+        const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
+        let probePage: Awaited<ReturnType<typeof bridge.listPacketsPage>>;
+        let captureStatus: Awaited<ReturnType<typeof bridge.getCaptureStatus>> | null = null;
+        try {
+          [probePage, captureStatus] = await Promise.all([
+            bridge.listPacketsPage(0, firstPageLoaded ? 1 : PAGE_SIZE, effectiveFilter, probeTask.signal),
+            bridge.getCaptureStatus(probeTask.signal).catch(() => null),
+          ]);
+          if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return false;
+        } finally {
+          probeTask.finish();
+        }
+        activeCaptureConfirmed = isCommittedCaptureStatusForPath(captureStatus, opened.filePath);
+        if (!firstPageLoaded && activeCaptureConfirmed && probePage.total > 0) {
+          validatedFirstPage = {
+            items: probePage.items,
+            total: probePage.total,
+            hasMore: probePage.hasMore,
+          };
+          firstPageLoaded = true;
+        }
+        if (probePage.total === 0 && parseFinishedRef.current) {
+          throw new Error(getCaptureEmptyParseError(parseErrorRef.current));
+        }
+        if (!activeCaptureConfirmed || !firstPageLoaded) {
+          throw new Error(getCapturePreloadTimeoutError());
+        }
         resetPacketViewportState({
           pageStartRef,
           hasMorePacketsRef,
@@ -841,18 +953,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           setSelectedPacketRawHex,
           setSelectedPacketLayers,
           hasMorePackets: true,
-        });
-        resetPreloadCounterState({
-          preloadProcessedRef,
-          preloadTotalRef,
-          setPreloadProcessed,
-          setPreloadTotal,
-        });
-        startCaptureParseRuntime({
-          parseFinishedRef,
-          parseErrorRef,
-          preloadingRef,
-          setIsPreloadingCapture,
         });
         resetStreamRuntimeRefs({
           httpCache: httpStreamCacheRef.current,
@@ -870,84 +970,45 @@ export function SentinelProvider({ children }: PropsWithChildren) {
         setFileMeta(buildCaptureFileMeta(opened));
         setCaptureRevision((prev) => prev + 1);
         activeCapturePathRef.current = opened.filePath;
-        rememberRecentCapture(buildRecentCapture(opened, new Date().toISOString()));
-
-        const startTask = captureTaskScopeRef.current.beginTask("capture-start");
-        try {
-          await bridge.startStreamingPackets(opened.filePath, "", startTask.signal);
-          if (!startTask.isCurrent()) return;
-        } finally {
-          startTask.finish();
-        }
-        if (captureSeq !== captureSeqRef.current) return;
-        setBackendStatus(getCapturePreloadWorkingStatus(opened.fileName));
-
-        const waitDeadline = Date.now() + CAPTURE_PRELOAD_TIMEOUT_MS;
-        let firstPageLoaded = false;
-        while (Date.now() < waitDeadline && captureSeq === captureSeqRef.current) {
-          const probeLimit = firstPageLoaded ? 1 : PAGE_SIZE;
-          const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
-          try {
-            const probePage = await bridge.listPacketsPage(0, probeLimit, effectiveFilter, probeTask.signal);
-            if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
-            if (probePage.total > 0) {
-              setTotalPackets(probePage.total);
-              if (preloadTotalRef.current <= 0) {
-                setPreloadProcessed(probePage.total);
-                preloadProcessedRef.current = probePage.total;
-              }
-            }
-            if (!firstPageLoaded && probePage.total > 0) {
-              commitPacketPage(0, {
-                items: probePage.items,
-                total: probePage.total,
-                hasMore: probePage.hasMore,
-              });
-              firstPageLoaded = true;
-            }
-          } finally {
-            probeTask.finish();
-          }
-
-          if (parseFinishedRef.current) {
-            break;
-          }
-
-          await waitForCaptureSignal(firstPageLoaded ? PRELOAD_SIGNAL_WAIT_MS : PRELOAD_POLL_INTERVAL_MS);
-        }
-
-        if (captureSeq !== captureSeqRef.current) return;
-        const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
-        let probePage: Awaited<ReturnType<typeof bridge.listPacketsPage>>;
-        try {
-          probePage = await bridge.listPacketsPage(0, 1, effectiveFilter, probeTask.signal);
-          if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) return;
-        } finally {
-          probeTask.finish();
-        }
-        if (probePage.total === 0 && parseFinishedRef.current) {
-          throw new Error(getCaptureEmptyParseError(parseErrorRef.current));
-        }
-        if (!parseFinishedRef.current && Date.now() >= waitDeadline) {
-          throw new Error(getCapturePreloadTimeoutError());
-        }
-        if (!firstPageLoaded && probePage.total > 0) {
-          await loadPacketPage(0, effectiveFilter);
+        if (validatedFirstPage) {
+          commitPacketPage(0, validatedFirstPage);
         }
         await refreshStreamIndex();
-        if (captureSeq !== captureSeqRef.current) return;
+        if (captureSeq !== captureSeqRef.current) return false;
+        setCaptureTransaction(createIdleCaptureTransactionStatus(true));
         setBackendStatus(getCapturePreloadDoneStatus(opened.fileName));
         void refreshAnalysisResult({
           capturePath: opened.filePath,
           quietSuccess: true,
         });
+        return true;
       } catch (error) {
         if (isAbortLikeError(error)) {
-          return;
+          return false;
         }
         if (captureSeq === captureSeqRef.current) {
-          setBackendStatus(getCaptureOpenErrorMessage(error));
+          const message = getCaptureOpenErrorMessage(error);
+          const normalizedMessage = message || "打开文件失败";
+          const reason =
+            normalizedMessage === getCapturePreloadTimeoutError()
+              ? "preload_timeout"
+              : normalizedMessage === getCaptureEmptyParseError("")
+                ? "empty_parse"
+                : hadActiveCapture
+                  ? "switch_failed"
+                  : "open_failed";
+          setCaptureTransaction(
+            createFailedCaptureTransactionStatus(
+              reason,
+              normalizedMessage,
+              pendingCapture?.fileName ?? (filePath?.trim() || ""),
+              pendingCapture?.filePath ?? (filePath?.trim() || ""),
+              hadActiveCapture,
+            ),
+          );
+          setBackendStatus(normalizedMessage);
         }
+        return false;
       } finally {
         if (captureSeq === captureSeqRef.current) {
           stopCapturePreloading({
@@ -1033,7 +1094,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const openCapture = useCallback(
     async (filePath?: string) => {
       setDisplayFilter("");
-      await startCapture(filePath, "");
+      return startCapture(filePath, "");
     },
     [startCapture],
   );
@@ -1091,6 +1152,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isPageLoading,
       isFilterLoading,
       packetPageError,
+      captureTransaction,
       loadMorePackets,
       loadPrevPackets,
       jumpToPage,
@@ -1151,6 +1213,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isPageLoading,
       isFilterLoading,
       packetPageError,
+      captureTransaction,
       loadMorePackets,
       loadPrevPackets,
       jumpToPage,

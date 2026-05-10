@@ -1,4 +1,5 @@
 import { Radar } from "lucide-react";
+import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureMissionControl } from "../components/CaptureMissionControl";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
@@ -7,9 +8,10 @@ import { useSentinel } from "../state/SentinelContext";
 
 export default function AnalysisCockpit() {
   const { fileMeta } = useSentinel();
+  const navigate = useNavigate();
 
   if (!fileMeta.path) {
-    return <CaptureWelcomePanel />;
+    return <CaptureWelcomePanel onCaptureOpened={() => navigate("/")} />;
   }
 
   return (

@@ -1,4 +1,5 @@
 import type { DecryptionConfig, ToolRuntimeConfig } from "../core/types";
+import { asCaptureStatus } from "./clients/captureClient";
 import type { TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
@@ -72,6 +73,12 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         return await fallbackBridge.closeCapture();
       }
       await desktopApp.CloseCapture();
+    },
+    async getCaptureStatus() {
+      if (!desktopApp.GetCaptureStatus) {
+        return await fallbackBridge.getCaptureStatus();
+      }
+      return asCaptureStatus(await desktopApp.GetCaptureStatus());
     },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {

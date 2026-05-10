@@ -17,17 +17,22 @@ function formatRecentTime(value: string) {
   });
 }
 
-export function CaptureWelcomePanel() {
-  const {
-    backendConnected,
-    backendStatus,
-    tsharkStatus,
-    recentCaptures,
-    openCapture,
-  } = useSentinel();
+interface CaptureWelcomePanelProps {
+  onCaptureOpened?: () => void;
+}
+
+export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProps = {}) {
+  const { backendConnected, backendStatus, captureTransaction, tsharkStatus, recentCaptures, openCapture } =
+    useSentinel();
   const [capturePath, setCapturePath] = useState("");
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
   const recentItems = useMemo(() => recentCaptures, [recentCaptures]);
+  const handleOpenCapture = async (filePath?: string) => {
+    const opened = await openCapture(filePath);
+    if (opened) {
+      onCaptureOpened?.();
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_36%),linear-gradient(180deg,_#f8fbff_0%,_#f6f8fb_100%)] p-6 text-foreground">
@@ -42,7 +47,8 @@ export function CaptureWelcomePanel() {
               先帮你找到方向，再进入流量细节。
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
-              打开抓包后，首屏会自动总结协议特征、推荐分析入口，并把威胁命中、过滤器、流追踪和 payload 解码串成一条更顺手的路径。
+              打开抓包后，首屏会自动总结协议特征、推荐分析入口，并把威胁命中、过滤器、流追踪和 payload
+              解码串成一条更顺手的路径。
             </p>
 
             <div className="mt-8 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -58,7 +64,7 @@ export function CaptureWelcomePanel() {
                 className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
               />
               <button
-                onClick={() => void openCapture()}
+                onClick={() => void handleOpenCapture()}
                 disabled={captureActionsDisabled}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-600 px-5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -66,7 +72,7 @@ export function CaptureWelcomePanel() {
                 选择文件
               </button>
               <button
-                onClick={() => void openCapture(capturePath.trim())}
+                onClick={() => void handleOpenCapture(capturePath.trim())}
                 disabled={captureActionsDisabled || !capturePath.trim()}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -95,10 +101,10 @@ export function CaptureWelcomePanel() {
 
             {/* Empty space logo filler */}
             <div className="pointer-events-none absolute -bottom-10 left-0 right-8 z-[0] flex justify-end opacity-10 mix-blend-multiply select-none">
-              <img 
-                src={logoImg} 
-                alt="GShark Background" 
-                className="w-full max-w-[440px] object-contain drop-shadow-sm transition-opacity duration-700 hover:opacity-[0.85]" 
+              <img
+                src={logoImg}
+                alt="GShark Background"
+                className="w-full max-w-[440px] object-contain drop-shadow-sm transition-opacity duration-700 hover:opacity-[0.85]"
               />
             </div>
           </div>
@@ -107,16 +113,30 @@ export function CaptureWelcomePanel() {
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ENGINE STATUS</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
-                <span className={`h-2.5 w-2.5 rounded-full ${backendConnected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${backendConnected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+                />
                 {backendConnected ? "后端已连接" : "后端连接中"}
               </div>
               <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-900">
-                <span className={`h-2.5 w-2.5 rounded-full ${tsharkStatus.available ? "bg-emerald-500" : "bg-rose-500"}`} />
-                {tsharkStatus.available ? `tshark 已就绪: ${tsharkStatus.path || "tshark"}` : (tsharkStatus.message || "等待配置 tshark")}
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${tsharkStatus.available ? "bg-emerald-500" : "bg-rose-500"}`}
+                />
+                {tsharkStatus.available
+                  ? `tshark 已就绪: ${tsharkStatus.path || "tshark"}`
+                  : tsharkStatus.message || "等待配置 tshark"}
               </div>
               <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-600">
                 {backendStatus}
               </div>
+              {captureTransaction.phase === "failed" && !captureTransaction.hasActiveCapture && (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                  <div className="font-semibold">
+                    {captureTransaction.reason === "open_failed" ? "抓包打开失败" : "抓包预加载失败"}
+                  </div>
+                  <div className="mt-1 break-all font-mono">{captureTransaction.message}</div>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -135,21 +155,23 @@ export function CaptureWelcomePanel() {
               ) : (
                 <div className="mt-4 min-h-0 max-h-[420px] flex-1 overflow-y-auto pr-2">
                   <div className="space-y-3">
-                  {recentItems.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => void openCapture(item.path)}
-                      disabled={captureActionsDisabled}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-all hover:border-blue-200 hover:bg-blue-50/60 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <div className="truncate text-sm font-medium text-slate-900">{item.name || item.path.split(/[\\/]/).pop() || item.path}</div>
-                      <div className="mt-1 truncate font-mono text-[11px] text-slate-500">{item.path}</div>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-                        <span>{formatBytes(item.sizeBytes)}</span>
-                        <span>{formatRecentTime(item.lastOpenedAt)}</span>
-                      </div>
-                    </button>
-                  ))}
+                    {recentItems.map((item) => (
+                      <button
+                        key={item.path}
+                        onClick={() => void handleOpenCapture(item.path)}
+                        disabled={captureActionsDisabled}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-all hover:border-blue-200 hover:bg-blue-50/60 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <div className="truncate text-sm font-medium text-slate-900">
+                          {item.name || item.path.split(/[\\/]/).pop() || item.path}
+                        </div>
+                        <div className="mt-1 truncate font-mono text-[11px] text-slate-500">{item.path}</div>
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                          <span>{formatBytes(item.sizeBytes)}</span>
+                          <span>{formatRecentTime(item.lastOpenedAt)}</span>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -161,15 +183,7 @@ export function CaptureWelcomePanel() {
   );
 }
 
-function GuideCard({
-  icon,
-  title,
-  text,
-}: {
-  icon: ReactNode;
-  title: string;
-  text: string;
-}) {
+function GuideCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
     <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">

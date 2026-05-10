@@ -179,6 +179,7 @@ export function createHttpBridge(context: HttpBridgeContext): BackendBridge {
     stopStreamingPackets: captureClient.stopStreamingPackets,
     prepareCaptureReplacement: captureClient.prepareCaptureReplacement,
     closeCapture: captureClient.closeCapture,
+    getCaptureStatus: captureClient.getCaptureStatus,
     listPackets: captureClient.listPackets,
     listPacketsPage: captureClient.listPacketsPage,
 

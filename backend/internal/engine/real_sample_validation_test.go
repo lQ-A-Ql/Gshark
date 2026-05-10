@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	realSampleOptInEnv            = "GSHARK_ENABLE_REAL_SAMPLE_TESTS"
 	realSampleCS                  = `C:\Users\QAQ\Downloads\cs流量分析.pcapng`
 	realSampleVShell              = `C:\Users\QAQ\Desktop\贺春\hard_pcap\attch.pcapng`
 	realSampleWebShellBehinder    = `C:\Users\QAQ\Desktop\gshark\bx3base.pcap`
@@ -21,6 +22,16 @@ const (
 	realSampleVShellTargetPreview = "hacked_by_fallsnow&paperplane(QAQ)"
 	realSampleCSRawKey            = "a4553adf7a841e1dcf708afc912275ee"
 )
+
+func requireRealSampleRegression(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skip local real-sample regression in short mode")
+	}
+	if strings.TrimSpace(os.Getenv(realSampleOptInEnv)) != "1" {
+		t.Skipf("local real-sample regression disabled; set %s=1 to run", realSampleOptInEnv)
+	}
+}
 
 func TestRealSampleCSBuildsC2Evidence(t *testing.T) {
 	svc := loadRealSample(t, "GSHARK_SAMPLE_CS", realSampleCS)
@@ -245,6 +256,7 @@ func TestRealSampleCANVehicleBaselineDoesNotEmitFalseHighUDS(t *testing.T) {
 
 func realSamplePath(t *testing.T, envName, fallback string) string {
 	t.Helper()
+	requireRealSampleRegression(t)
 	path := strings.TrimSpace(os.Getenv(envName))
 	if path == "" {
 		path = fallback
