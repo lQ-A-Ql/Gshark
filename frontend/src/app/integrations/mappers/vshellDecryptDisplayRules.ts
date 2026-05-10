@@ -1,6 +1,16 @@
 import type { C2DecryptedRecord } from "../../core/types";
-
-const vshellLowInfoControlMaxBytes = 24;
+import {
+  decodeBytesToUtf8,
+  extractBestEffortTextFromBytes,
+  isLowInfoHexPreview,
+  parseHexPreviewBytes,
+} from "./vshellHexPreview";
+import {
+  getVShellLowInfoControlMaxBytes,
+  hasMeaningfulVisibleText,
+  isTimestampOnlyText,
+  normalizePreviewTextForDisplay,
+} from "./vshellTextSignals";
 
 type C2PreviewNormalization = {
   record: C2DecryptedRecord;
@@ -11,18 +21,13 @@ type C2PreviewNormalization = {
   hiddenReason?: "utf8-invisible" | "timestamp-only";
 };
 
-type HexPreviewBytes = {
-  bytes: Uint8Array;
-  truncated: boolean;
-};
-
 export function isLikelyVShellLowInfoControlRecord(record: C2DecryptedRecord): boolean {
   if (record.error || (record.parsed && Object.keys(record.parsed).length > 0)) {
     return false;
   }
 
   const decryptedLength = record.decryptedLength ?? 0;
-  if (decryptedLength <= 0 || decryptedLength > vshellLowInfoControlMaxBytes) {
+  if (decryptedLength <= 0 || decryptedLength > getVShellLowInfoControlMaxBytes()) {
     return false;
   }
 
@@ -48,6 +53,7 @@ export function normalizeC2DecryptedRecordPreview(record: C2DecryptedRecord): C2
   if (record.error) {
     return { record, converted: false };
   }
+
   const preview = record.plaintextPreview ?? "";
   const hexPreview = parseHexPreviewBytes(preview, record.decryptedLength);
   if (hexPreview) {
@@ -85,11 +91,7 @@ function normalizeDecodedC2Preview(
 
   if (!hasMeaningfulVisibleText(normalized.text)) {
     return {
-      record: {
-        ...record,
-        plaintextPreview: normalized.text,
-        tags,
-      },
+      record: { ...record, plaintextPreview: normalized.text, tags },
       converted: options.converted,
       bestEffortConverted: options.bestEffortConverted,
       truncatedHexPreview: options.truncatedHexPreview,
@@ -100,11 +102,7 @@ function normalizeDecodedC2Preview(
 
   if (isTimestampOnlyText(normalized.text)) {
     return {
-      record: {
-        ...record,
-        plaintextPreview: normalized.text,
-        tags,
-      },
+      record: { ...record, plaintextPreview: normalized.text, tags },
       converted: options.converted,
       bestEffortConverted: options.bestEffortConverted,
       truncatedHexPreview: options.truncatedHexPreview,
@@ -114,178 +112,10 @@ function normalizeDecodedC2Preview(
   }
 
   return {
-    record: {
-      ...record,
-      plaintextPreview: normalized.text,
-      tags,
-    },
+    record: { ...record, plaintextPreview: normalized.text, tags },
     converted: options.converted,
     bestEffortConverted: options.bestEffortConverted,
     truncatedHexPreview: options.truncatedHexPreview,
     ansiStripped: normalized.ansiStripped,
   };
-}
-
-function decodeBytesToUtf8(bytes: Uint8Array): string | undefined {
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return undefined;
-  }
-}
-
-function extractBestEffortTextFromBytes(bytes: Uint8Array): string | undefined {
-  let out = "";
-  for (const byte of bytes) {
-    if ((byte >= 0x20 && byte <= 0x7e) || byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0x1b) {
-      out += String.fromCharCode(byte);
-    } else if (out && !out.endsWith(" ")) {
-      out += " ";
-    }
-  }
-  const normalized = normalizePreviewTextForDisplay(out).text;
-  if (!hasMeaningfulVisibleText(normalized)) {
-    return undefined;
-  }
-  if (!hasForensicTextSignal(normalized) && Array.from(normalized).filter((char) => /\S/.test(char)).length < 6) {
-    return undefined;
-  }
-  return normalized;
-}
-
-function normalizePreviewTextForDisplay(value: string): { text: string; ansiStripped: boolean } {
-  const ansiStripped = stripAnsiControlSequences(value);
-  const controlCleaned = ansiStripped
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f]/g, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n");
-  return {
-    text: controlCleaned.trim(),
-    ansiStripped: ansiStripped !== value,
-  };
-}
-
-function stripAnsiControlSequences(value: string): string {
-  return value
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-    .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
-    .replace(/\x1b[@-Z\\-_]/g, "");
-}
-
-function parseHexPreviewBytes(preview: string, decryptedLength?: number): HexPreviewBytes | undefined {
-  const normalized = preview.trim();
-  if (!normalized || normalized.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(normalized)) {
-    return undefined;
-  }
-  const byteLength = normalized.length / 2;
-  const expectedLength = decryptedLength && decryptedLength > 0 ? decryptedLength : undefined;
-  if (expectedLength !== undefined && byteLength > expectedLength) {
-    return undefined;
-  }
-  const bytes = new Uint8Array(byteLength);
-  for (let index = 0; index < normalized.length; index += 2) {
-    bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
-  }
-  return {
-    bytes,
-    truncated: expectedLength !== undefined && byteLength < expectedLength,
-  };
-}
-
-function hasMeaningfulVisibleText(value: string): boolean {
-  const normalized = stripAnsiControlSequences(value).replace(/[\u0000-\u001f\u007f]/g, "");
-  const visibleChars = Array.from(normalized).filter((char) => /\S/.test(char));
-  if (visibleChars.length < 2) {
-    return false;
-  }
-  if (hasForensicTextSignal(normalized)) {
-    return true;
-  }
-  const meaningfulChars = visibleChars.filter((char) => /[\p{L}\p{N}_{}\[\]:"'./\\=&()\-]/u.test(char));
-  if (meaningfulChars.length >= 3) {
-    return true;
-  }
-  return false;
-}
-
-function isTimestampOnlyText(value: string): boolean {
-  const normalized = stripAnsiControlSequences(value).trim();
-  if (!normalized) {
-    return false;
-  }
-  if (/^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?$/.test(normalized)) {
-    return true;
-  }
-  if (/^\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(normalized)) {
-    return true;
-  }
-  if (/^\d{10}$/.test(normalized)) {
-    const epochMs = Number(normalized) * 1000;
-    return epochMs >= Date.UTC(2000, 0, 1) && epochMs <= Date.UTC(2100, 0, 1);
-  }
-  if (/^\d{13}$/.test(normalized)) {
-    const epochMs = Number(normalized);
-    return epochMs >= Date.UTC(2000, 0, 1) && epochMs <= Date.UTC(2100, 0, 1);
-  }
-  return false;
-}
-
-function hasForensicTextSignal(value: string): boolean {
-  const normalized = value.trim();
-  if (!normalized) {
-    return false;
-  }
-  if (/^\s*[\[{]/.test(value)) {
-    return true;
-  }
-  if (/\b(?:ok|id|ip|cmd|whoami|powershell|verifykey|hacked_by|fallsnow|paperplane)\b/i.test(normalized)) {
-    return true;
-  }
-  if (/\b\d+(?:\.\d+){1,3}\b/.test(normalized)) {
-    return true;
-  }
-  if (
-    /(?:[A-Za-z]:\\|\\\\|\/(?:bin|etc|home|tmp|usr|var)\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.test(
-      normalized,
-    )
-  ) {
-    return true;
-  }
-  if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(normalized)) {
-    return true;
-  }
-  return /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\b/.test(normalized);
-}
-
-function isLowInfoHexPreview(preview: string, decryptedLength: number): boolean | undefined {
-  const parsed = parseHexPreviewBytes(preview, decryptedLength);
-  const bytes = parsed?.bytes;
-  if (!bytes || bytes.length === 0 || bytes.length > vshellLowInfoControlMaxBytes) {
-    return undefined;
-  }
-
-  const visibleAsciiBytes = Array.from(bytes).filter((byte) => byte >= 0x20 && byte <= 0x7e);
-  const visibleAsciiText = String.fromCharCode(...visibleAsciiBytes);
-  if (hasForensicTextSignal(visibleAsciiText)) {
-    return false;
-  }
-
-  const meaningfulVisibleBytes = visibleAsciiBytes.filter(
-    (byte) =>
-      (byte >= 0x30 && byte <= 0x39) ||
-      (byte >= 0x41 && byte <= 0x5a) ||
-      (byte >= 0x61 && byte <= 0x7a) ||
-      byte === 0x2e ||
-      byte === 0x2f ||
-      byte === 0x5f ||
-      byte === 0x2d ||
-      byte === 0x3a ||
-      byte === 0x7b ||
-      byte === 0x7d,
-  );
-  if (meaningfulVisibleBytes.length >= 2 && visibleAsciiBytes.length / bytes.length >= 0.35) {
-    return false;
-  }
-
-  return true;
 }

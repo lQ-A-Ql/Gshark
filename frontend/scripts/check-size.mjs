@@ -17,9 +17,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/vshellDecryptDisplayRules.ts",
-    maxLines: 305,
-    reason:
-      "VShell decrypt display rules should keep preview decoding, ANSI cleanup, timestamp hiding, and low-info frame checks isolated",
+    maxLines: 130,
+    reason: "VShell decrypt display rules should stay as record-level normalizer and delegate text/hex helpers",
+  },
+  {
+    path: "src/app/integrations/mappers/vshellTextSignals.ts",
+    maxLines: 90,
+    reason: "VShell text signal rules should keep ANSI, timestamp, and forensic text checks isolated",
+  },
+  {
+    path: "src/app/integrations/mappers/vshellHexPreview.ts",
+    maxLines: 90,
+    reason: "VShell hex preview helpers should keep UTF-8, best-effort text, and low-info hex checks isolated",
   },
   {
     path: "src/app/state/SentinelContext.tsx",
