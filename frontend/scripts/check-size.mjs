@@ -801,8 +801,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/ui/sidebar.tsx",
-    maxLines: 360,
-    reason: "shared sidebar primitive should keep provider state in sidebarContext and avoid feature-specific logic",
+    maxLines: 230,
+    reason: "shared sidebar shell should keep desktop/mobile container, trigger, rail, and inset only",
+  },
+  {
+    path: "src/app/components/ui/sidebarStructure.tsx",
+    maxLines: 145,
+    reason: "sidebar structure primitives should stay separate from sidebar shell/provider and menu concerns",
   },
   {
     path: "src/app/components/ui/sidebarMenu.tsx",
