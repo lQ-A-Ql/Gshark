@@ -207,6 +207,11 @@ export const sourceSizeBudgets = [
     reason: "recent captures hook should only own localStorage-backed capture history state",
   },
   {
+    path: "src/app/state/hooks/useSelectedPacketAction.ts",
+    maxLines: 30,
+    reason: "selected packet action hook should only own id selection and stale detail pruning",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1284,6 +1289,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useRecentCapturesState.test.tsx",
     maxLines: 40,
     reason: "recent captures hook tests should stay focused on load and remember persistence behavior",
+  },
+  {
+    path: "src/app/state/hooks/useSelectedPacketAction.test.tsx",
+    maxLines: 35,
+    reason: "selected packet action tests should stay focused on id selection and stale detail pruning",
   },
   {
     path: "src/app/state/captureClearState.test.ts",

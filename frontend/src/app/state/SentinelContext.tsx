@@ -17,7 +17,6 @@ import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSelectedPacketResources } from "./hooks/useSelectedPacketResources";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
-import { keepSelectedPacketDetailForId } from "./selectedPacketState";
 import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
 import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
 import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
@@ -54,6 +53,7 @@ import type { PreparedPacketStream, SentinelContextValue } from "./sentinelTypes
 import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
+import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -701,10 +701,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     });
   }, [backendConnected, isPreloadingCapture, loadPacketPage, resetPacketViewport]);
 
-  const selectPacket = useCallback((id: number) => {
-    setSelectedPacketId(id);
-    setSelectedPacketDetail((prev) => keepSelectedPacketDetailForId(prev, id));
-  }, []);
+  const selectPacket = useSelectedPacketAction({ setSelectedPacketDetail, setSelectedPacketId });
 
   const openCapture = useCallback(
     async (filePath?: string) => {
