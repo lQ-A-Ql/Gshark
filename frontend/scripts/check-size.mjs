@@ -557,8 +557,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/industrial/IndustrialModbusPanels.tsx",
-    maxLines: 310,
-    reason: "industrial Modbus panels should keep write, decoded-input, and transaction tables local",
+    maxLines: 60,
+    reason: "industrial Modbus panels should only compose focused Modbus panel modules",
+  },
+  {
+    path: "src/app/features/industrial/ModbusSuspiciousWritesPanel.tsx",
+    maxLines: 125,
+    reason: "Modbus suspicious writes panel should stay focused on write aggregation display",
+  },
+  {
+    path: "src/app/features/industrial/ModbusDecodedInputsPanel.tsx",
+    maxLines: 95,
+    reason: "Modbus decoded inputs panel should stay focused on reconstructed UTF-8 input display",
+  },
+  {
+    path: "src/app/features/industrial/ModbusTransactionsPanel.tsx",
+    maxLines: 220,
+    reason: "Modbus transactions panel should keep transaction filters, table, and summary cells local",
   },
   {
     path: "src/app/features/c2/C2AggregateTables.tsx",
