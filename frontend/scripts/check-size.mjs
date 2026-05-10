@@ -23,8 +23,14 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 1450,
-    reason: "provider remains oversized and should not absorb new state domains",
+    maxLines: 1390,
+    reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
+  },
+  {
+    path: "src/app/state/captureTaskReset.ts",
+    maxLines: 60,
+    reason:
+      "capture task reset helper should stay focused on invalidating frontend capture work and clearing pending loads",
   },
   {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
@@ -770,6 +776,12 @@ export const sourceSizeBudgets = [
 ];
 
 export const testSizeBudgets = [
+  {
+    path: "src/app/state/captureTaskReset.test.ts",
+    maxLines: 75,
+    reason:
+      "capture task reset tests should stay focused on cancellation, sequence bumps, prefetch cleanup, and timer clearing",
+  },
   {
     path: "src/app/pages/MiscTools.testFixtures.ts",
     maxLines: 120,

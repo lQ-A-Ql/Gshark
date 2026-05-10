@@ -83,6 +83,7 @@ import {
 } from "./captureTransactionStatus";
 import { finishCaptureParseRuntime, startCaptureParseRuntime, stopCapturePreloading } from "./captureParseRuntimeState";
 import { resetPacketViewportState, resetPreloadCounterState } from "./captureResetState";
+import { cancelFrontendCaptureTasks } from "./captureTaskReset";
 import {
   PAGE_SIZE,
   PRELOAD_POLL_INTERVAL_MS,
@@ -108,13 +109,11 @@ import { resolveStreamSwitchTask } from "./streamSwitchTask";
 import { scheduleStreamPrefetch } from "./streamPrefetchScheduler";
 import { commitProtocolStreamPayloadPatches } from "./streamPayloadPatch";
 import {
-  bumpAllStreamSwitchSequences,
   bumpStreamSwitchSequence,
   createStreamSwitchSequences,
   isLatestStreamSwitchSequence,
 } from "./streamSwitchSequence";
 import {
-  clearStreamPrefetchInFlight,
   createEmptyStreamSwitchDurations,
   createEmptyStreamSwitchHits,
   resetStreamRuntimeRefs,
@@ -242,21 +241,19 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   );
 
   const cancelAllFrontendCaptureTasks = useCallback(() => {
-    captureTaskScopeRef.current.invalidate();
-    packetPageSeqRef.current += 1;
-    threatAnalysisSeqRef.current += 1;
-    bumpAllStreamSwitchSequences(streamSwitchSequencesRef.current);
-    clearStreamPrefetchInFlight({
+    cancelFrontendCaptureTasks({
+      captureTaskScopeRef,
+      packetPageSeqRef,
+      threatAnalysisSeqRef,
+      streamSwitchSequences: streamSwitchSequencesRef.current,
       httpPrefetchInFlight: httpPrefetchInFlightRef.current,
       tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
       udpPrefetchInFlight: udpPrefetchInFlightRef.current,
+      loadMoreScheduledRef,
+      clearScheduledLoadMore: window.clearTimeout,
+      setIsPageLoading,
+      setPacketPageError,
     });
-    if (loadMoreScheduledRef.current != null) {
-      window.clearTimeout(loadMoreScheduledRef.current);
-      loadMoreScheduledRef.current = null;
-    }
-    setIsPageLoading(false);
-    setPacketPageError("");
   }, []);
 
   const cancelPacketPageLoad = useCallback(() => {
