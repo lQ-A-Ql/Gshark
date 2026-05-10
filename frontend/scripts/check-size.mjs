@@ -552,8 +552,24 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/HttpStreamSections.tsx",
-    maxLines: 380,
-    reason: "HTTP stream sections should keep title, toolbar, payload grid, and dialog rendering scoped",
+    maxLines: 20,
+    reason: "HTTP stream sections should stay as compatibility exports only",
+  },
+  {
+    path: "src/app/pages/HttpStreamTitleBar.tsx",
+    maxLines: 165,
+    reason:
+      "HTTP stream title and toolbar should keep stream navigation, view mode, search, and export controls scoped",
+  },
+  {
+    path: "src/app/pages/HttpStreamPayloadGrid.tsx",
+    maxLines: 170,
+    reason: "HTTP stream payload grid should keep chunk cards and selected preview presentation scoped",
+  },
+  {
+    path: "src/app/pages/HttpStreamDialog.tsx",
+    maxLines: 75,
+    reason: "HTTP stream dialog should stay focused on expanded payload display and MISC handoff action",
   },
   {
     path: "src/app/features/media/MediaSessionTable.tsx",
