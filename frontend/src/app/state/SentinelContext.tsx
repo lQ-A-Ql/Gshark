@@ -32,7 +32,6 @@ import {
   retryPacketPageLoad,
 } from "./packetPageNavigation";
 import { runPacketFilterAction } from "./packetFilterAction";
-import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
@@ -57,6 +56,7 @@ import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
 import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
 import { usePacketViewportReset } from "./hooks/usePacketViewportReset";
 import { usePacketPageLoad } from "./hooks/usePacketPageLoad";
+import { usePacketLocateById } from "./hooks/usePacketLocateById";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -286,24 +286,17 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     await retryPacketPageLoad({ pageStartRef, displayFilter, loadPacketPage, setBackendStatus });
   }, [displayFilter, loadPacketPage, setBackendStatus]);
 
-  const locatePacketById = useCallback(
-    async (packetId: number, filterOverride?: string) => {
-      return locatePacketByIdWorkflow({
-        packetId,
-        pageSize: PAGE_SIZE,
-        filterOverride,
-        displayFilter,
-        activeCapturePathRef,
-        captureTaskScopeRef,
-        locatePacketPage: bridge.locatePacketPage,
-        loadPacketPage,
-        setDisplayFilter,
-        setSelectedPacketId,
-        setBackendStatus,
-      });
-    },
-    [displayFilter, loadPacketPage],
-  );
+  const locatePacketById = usePacketLocateById({
+    activeCapturePathRef,
+    captureTaskScopeRef,
+    displayFilter,
+    loadPacketPage,
+    locatePacketPage: bridge.locatePacketPage,
+    pageSize: PAGE_SIZE,
+    setBackendStatus,
+    setDisplayFilter,
+    setSelectedPacketId,
+  });
 
   const scheduleLoadMore = useScheduledPacketPageLoad({ loadMoreScheduledRef, pageStartRef, loadPacketPage });
 
