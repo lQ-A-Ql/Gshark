@@ -39,7 +39,6 @@ import { locatePacketByIdWorkflow } from "./packetLocateWorkflow";
 import { preparePacketStreamState } from "./packetStreamPrepare";
 import { PAGE_SIZE, RAW_STREAM_PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
-import { refreshStreamIndexState } from "./streamIndexRefresh";
 import { persistStreamPayloadsState } from "./streamPayloadPersist";
 import { prefetchAdjacentStreamsState } from "./streamAdjacentPrefetch";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
@@ -56,6 +55,7 @@ import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
 import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
 import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
 import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
+import { useStreamIndexRefresh } from "./hooks/useStreamIndexRefresh";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -382,16 +382,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [refreshAnalysisResultImpl, backendConnected],
   );
 
-  const refreshStreamIndex = useCallback(async () => {
-    await refreshStreamIndexState({
-      backendConnected,
-      activeCapturePathRef,
-      captureTaskScopeRef,
-      listStreamIds: bridge.listStreamIds,
-      setStreamIds,
-      setBackendStatus,
-    });
-  }, [backendConnected]);
+  const refreshStreamIndex = useStreamIndexRefresh({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    listStreamIds: bridge.listStreamIds,
+    setBackendStatus,
+    setStreamIds,
+  });
 
   const prefetchAdjacentStreams = useCallback(
     (protocol: "HTTP" | "TCP" | "UDP", currentStreamId: number) => {

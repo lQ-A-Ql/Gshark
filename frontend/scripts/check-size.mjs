@@ -262,6 +262,11 @@ export const sourceSizeBudgets = [
     reason: "scheduled packet page load hook should only own timer dedupe and page-start load scheduling",
   },
   {
+    path: "src/app/state/hooks/useStreamIndexRefresh.ts",
+    maxLines: 35,
+    reason: "stream index refresh hook should only bind provider refs, bridge call, and stream-id setter",
+  },
+  {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 240,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
@@ -1359,6 +1364,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useScheduledPacketPageLoad.test.tsx",
     maxLines: 50,
     reason: "scheduled packet page load tests should stay focused on timer dedupe and cursor handoff",
+  },
+  {
+    path: "src/app/state/hooks/useStreamIndexRefresh.test.tsx",
+    maxLines: 55,
+    reason: "stream index refresh hook tests should stay focused on hook wiring over pure refresh workflow",
   },
   {
     path: "src/app/state/captureClearState.test.ts",
