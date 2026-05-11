@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ExtractedObject } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export interface UseObjectExportOptions {
   backendConnected: boolean;
@@ -21,7 +21,7 @@ export function useObjectExport({ backendConnected, extractedObjects }: UseObjec
     }
 
     let cancelled = false;
-    void bridge
+    void backendClients.object
       .listObjects()
       .then((rows) => {
         if (!cancelled) {

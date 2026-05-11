@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
 import { useSentinel } from "../state/SentinelContext";
 import {
@@ -37,7 +37,7 @@ export default function ObjectExport() {
   const downloadZip = async (ids: number[]) => {
     if (ids.length === 0) return;
     try {
-      await bridge.downloadObjectsZip(ids);
+      await backendClients.object.downloadObjectsZip(ids);
     } catch (err) {
       console.error("下载失败:", err);
     }

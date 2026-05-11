@@ -5648,3 +5648,39 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: migrate another isolated feature hook or page to a narrow client, preferably one with a single-domain method set and existing tests.
+
+---
+
+## Round 155 - Object Export Domain Client Migration
+
+Time: 2026-05-11 23:40:05 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with the object-export surface.
+- Moved object listing and zip download calls from the aggregate `bridge` to `backendClients.object`.
+- Kept object filtering, grouping, report generation, fallback loading, and download behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/object/useObjectExport.ts` to call `backendClients.object.listObjects()`.
+- Updated `frontend/src/app/pages/ObjectExport.tsx` to call `backendClients.object.downloadObjectsZip(...)`.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/features/object/objectExportRules.test.ts src/app/features/object/objectInvestigationReport.test.ts src/app/integrations/bridgeDomains.test.ts` passed, 3 files / 5 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round stays within one domain and avoids touching capture or stream state ownership.
+- Object export now advertises its dependency on object-only backend methods instead of receiving the full bridge surface.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: continue migrating isolated feature hooks (`media`, `traffic`, or `analysis`) while avoiding high-coupling lifecycle paths until more domain consumers are narrowed.
