@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { USBAnalysis as USBAnalysisData } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export const EMPTY_USB_ANALYSIS: USBAnalysisData = {
   totalUSBPackets: 0,
@@ -93,7 +93,7 @@ export function useUsbAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => bridge.getUSBAnalysis(signal),
+        request: (signal) => backendClients.analysis.getUSBAnalysis(signal),
         onSuccess: (payload) => {
           if (cacheKey) {
             usbAnalysisCache.set(cacheKey, payload);

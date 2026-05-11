@@ -27,8 +27,10 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
-  bridge: {
-    getUSBAnalysis: mocks.getUSBAnalysis,
+  backendClients: {
+    analysis: {
+      getUSBAnalysis: mocks.getUSBAnalysis,
+    },
   },
 }));
 

@@ -5756,3 +5756,39 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: continue with another single-method analysis hook such as USB, APT, or vehicle, then reserve Round 160 for the required 10-round self-audit.
+
+---
+
+## Round 158 - USB Analysis Domain Client Migration
+
+Time: 2026-05-12 00:23:32 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with the USB analysis loading hook.
+- Moved the USB analysis request from the aggregate `bridge` to `backendClients.analysis`.
+- Kept USB cache keys, preload gating, abort handling, loading state, tab behavior, and error behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/usb/useUsbAnalysis.ts` to call `backendClients.analysis.getUSBAnalysis(signal)`.
+- Updated `frontend/src/app/pages/UsbAnalysis.test.tsx` to mock the narrowed analysis client instead of the aggregate bridge.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/pages/UsbAnalysis.test.tsx src/app/features/usb/UsbTablesSplit.test.tsx src/app/integrations/bridgeDomains.test.ts` passed, 3 files / 8 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round keeps the same one-hook migration pattern used for media and industrial analysis.
+- USB analysis now declares an analysis-domain dependency without exposing unrelated bridge methods.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: migrate APT or vehicle analysis hook, then reserve Round 160 for the required 10-round self-audit and drift check.
