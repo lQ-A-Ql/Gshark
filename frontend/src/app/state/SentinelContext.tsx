@@ -43,6 +43,7 @@ import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepa
 import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
 import { useSentinelDerivedView } from "./hooks/useSentinelDerivedView";
 import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
+import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -551,13 +552,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const selectPacket = useSelectedPacketAction({ setSelectedPacketDetail, setSelectedPacketId });
 
-  const openCapture = useCallback(
-    async (filePath?: string) => {
-      setDisplayFilter("");
-      return startCapture(filePath, "");
-    },
-    [startCapture],
-  );
+  const openCapture = useOpenCaptureAction({ setDisplayFilter, startCapture });
 
   const stopCapture = useCaptureStopWorkflow({
     backendConnected,

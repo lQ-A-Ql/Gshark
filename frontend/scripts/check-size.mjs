@@ -322,6 +322,11 @@ export const sourceSizeBudgets = [
     reason: "capture task scope cleanup hook should only invalidate scoped tasks on provider unmount",
   },
   {
+    path: "src/app/state/hooks/useOpenCaptureAction.ts",
+    maxLines: 25,
+    reason: "open capture action hook should only reset display filter and delegate capture start",
+  },
+  {
     path: "src/app/state/hooks/useRecentCapturesState.ts",
     maxLines: 25,
     reason: "recent captures hook should only own localStorage-backed capture history state",
@@ -1582,6 +1587,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useCaptureTaskScopeCleanup.test.tsx",
     maxLines: 35,
     reason: "capture task scope cleanup tests should stay focused on unmount invalidation behavior",
+  },
+  {
+    path: "src/app/state/hooks/useOpenCaptureAction.test.tsx",
+    maxLines: 45,
+    reason: "open capture action tests should stay focused on filter reset and start delegation",
   },
   {
     path: "src/app/state/hooks/useRecentCapturesState.test.tsx",
