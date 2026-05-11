@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 164 - Traffic Graph Domain Client Migration
+
+Time: 2026-05-12 01:58:28 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued replacing direct aggregate bridge imports in feature hooks.
+- Targeted `useTrafficGraph`, which has a primary global stats path and a fallback packet aggregation path.
+
+### Changes
+
+- Updated `features/traffic/useTrafficGraph.ts` to call `backendClients.analysis.getGlobalTrafficStats(signal)` for the primary stats request.
+- Updated the local fallback path to call `backendClients.packet.listPackets()` before rebuilding summary stats from packets.
+- Preserved existing cache-key behavior, abort-like error handling, and fallback semantics.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/TrafficGraph.test.ts src/app/pages/analysisCacheKeys.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Traffic graph no longer imports the aggregate bridge directly.
+- This was a two-domain hook migration, but the behavior remains identical because both methods already exist in the domain projection.
+
+---
+
 ## Round 163 - C2 Decrypt Domain Client Migration
 
 Time: 2026-05-12 01:54:52 +08:00  

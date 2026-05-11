@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GlobalTrafficStats, Packet } from "../../core/types";
 import { isAbortLikeError, useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
@@ -63,12 +63,12 @@ export function useTrafficGraph({
     return runStatsRequest({
       request: async (signal) => {
         try {
-          return await bridge.getGlobalTrafficStats(signal);
+          return await backendClients.analysis.getGlobalTrafficStats(signal);
         } catch (fetchError) {
           if (isAbortLikeError(fetchError, signal)) {
             throw fetchError;
           }
-          const packets = await bridge.listPackets();
+          const packets = await backendClients.packet.listPackets();
           if (signal.aborted) {
             throw new DOMException("The operation was aborted.", "AbortError");
           }
