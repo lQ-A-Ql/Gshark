@@ -1592,8 +1592,33 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/RuntimeSettingsSections.tsx",
-    maxLines: 240,
-    reason: "runtime settings domain sections should stay presentational and avoid save or refresh orchestration",
+    maxLines: 10,
+    reason: "runtime settings sections should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSectionTypes.ts",
+    maxLines: 15,
+    reason: "runtime settings section types should only contain shared props",
+  },
+  {
+    path: "src/app/components/CaptureSettingsSection.tsx",
+    maxLines: 35,
+    reason: "capture runtime settings section should keep TShark path and status fields only",
+  },
+  {
+    path: "src/app/components/YaraSettingsSection.tsx",
+    maxLines: 85,
+    reason: "YARA runtime settings section should keep YARA controls and status details only",
+  },
+  {
+    path: "src/app/components/MediaSettingsSection.tsx",
+    maxLines: 35,
+    reason: "media runtime settings section should keep FFmpeg path and status fields only",
+  },
+  {
+    path: "src/app/components/SpeechSettingsSection.tsx",
+    maxLines: 80,
+    reason: "speech runtime settings section should keep speech dependency fields and status cards only",
   },
   {
     path: "src/app/components/RuntimeSettingsShell.tsx",
@@ -2028,6 +2053,11 @@ export const testSizeBudgets = [
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",
     maxLines: 110,
     reason: "runtime settings helper tests should stay focused on normalization and dependency status rules",
+  },
+  {
+    path: "src/app/components/RuntimeSettingsSections.test.tsx",
+    maxLines: 85,
+    reason: "runtime settings section tests should stay focused on field rendering and setter wiring",
   },
   {
     path: "src/app/components/StreamDecoderBatchPanel.test.tsx",
