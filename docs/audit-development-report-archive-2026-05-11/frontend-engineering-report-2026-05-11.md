@@ -1,5 +1,37 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 167 - MISC Analysis Domain Client Migration
+
+Time: 2026-05-12 02:16:12 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge domain migration on MISC built-in analysis modules.
+- Kept MISC shell/module behavior unchanged; only narrowed the analysis API surface.
+
+### Changes
+
+- Updated `HTTPLoginAnalysisModule`, `MySQLSessionAnalysisModule`, `SMTPSessionAnalysisModule`, and `ShiroRememberMeAnalysisModule` to import `backendClients` instead of aggregate `bridge`.
+- Replaced MISC analysis calls with `backendClients.analysis.*` equivalents.
+- Updated MISC page test mocks to expose `backendClients.analysis` so lazy-loaded modules exercise the same domain-client path as production.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.test.tsx src/app/integrations/bridgeDomains.test.ts src/app/integrations/clients/analysisClient.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run format:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- The four MISC built-in analysis modules no longer directly call aggregate bridge methods.
+- Remaining MISC direct bridge users are custom modules, payload/stream/session utility modules, and export/decrypt flows; these stay as later focused rounds.
+
+---
+
 ## Round 166 - Vehicle DBC Domain Client Migration
 
 Time: 2026-05-12 02:06:22 +08:00  

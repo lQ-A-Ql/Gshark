@@ -1,7 +1,7 @@
 import { Mail, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { SMTPAnalysis } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -36,7 +36,7 @@ const EMPTY_ANALYSIS: SMTPAnalysis = {
 export function SMTPSessionAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
-  const fetchAnalysis = useCallback((signal: AbortSignal) => bridge.getSMTPAnalysis(signal), []);
+  const fetchAnalysis = useCallback((signal: AbortSignal) => backendClients.analysis.getSMTPAnalysis(signal), []);
   const { analysis, loading, error, refresh } = useMiscModuleAnalysis<SMTPAnalysis>({
     fetch: fetchAnalysis,
     emptyData: EMPTY_ANALYSIS,

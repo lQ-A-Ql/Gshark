@@ -39,6 +39,9 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
+  backendClients: {
+    analysis: { getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis, getMySQLAnalysis: mocks.getMySQLAnalysis, getSMTPAnalysis: mocks.getSMTPAnalysis, getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis },
+  },
   bridge: {
     listMiscModules: mocks.listMiscModules,
     importMiscModulePackage: mocks.importMiscModulePackage,

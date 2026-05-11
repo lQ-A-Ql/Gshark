@@ -1,7 +1,7 @@
 import { KeyRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ShiroRememberMeAnalysis } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -57,7 +57,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => bridge.getShiroRememberMeAnalysis(keys, signal),
+        request: (signal) => backendClients.analysis.getShiroRememberMeAnalysis(keys, signal),
         onSuccess: (payload) => {
           setAnalysis(payload);
           setSelectedPacketId((current) =>

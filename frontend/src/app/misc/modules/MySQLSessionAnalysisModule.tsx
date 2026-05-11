@@ -1,7 +1,7 @@
 import { Database, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { MySQLAnalysis } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";
@@ -36,7 +36,7 @@ const EMPTY_ANALYSIS: MySQLAnalysis = {
 export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
   const hasCapture = Boolean(fileMeta.path);
-  const fetchAnalysis = useCallback((signal: AbortSignal) => bridge.getMySQLAnalysis(signal), []);
+  const fetchAnalysis = useCallback((signal: AbortSignal) => backendClients.analysis.getMySQLAnalysis(signal), []);
   const { analysis, loading, error, refresh } = useMiscModuleAnalysis<MySQLAnalysis>({
     fetch: fetchAnalysis,
     emptyData: EMPTY_ANALYSIS,
