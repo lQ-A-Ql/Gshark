@@ -306,10 +306,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     prepareCaptureReplacement: bridge.prepareCaptureReplacement,
   });
 
-  useEffect(() => {
-    hasMorePacketsRef.current = hasMorePackets;
-  }, [hasMorePackets]);
-
   const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useSentinelDerivedView({
     packets,
     selectedPacketId,
@@ -390,6 +386,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useSyncedRefValue(scheduleLoadMoreRef, scheduleLoadMore);
   useSyncedRefValue(refreshAnalysisResultRef, refreshAnalysisResult);
   useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
+  useSyncedRefValue(hasMorePacketsRef, hasMorePackets);
 
   useEffect(
     () => () => {
