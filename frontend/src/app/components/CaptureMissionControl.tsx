@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { buildCaptureOverview, type CaptureRecommendation } from "../core/captureOverview";
-import type { GlobalTrafficStats, IndustrialAnalysis, MediaAnalysis, USBAnalysis, VehicleAnalysis } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import { CaptureMissionOverviewHeader } from "./CaptureMissionOverviewHeader";
 import {
@@ -11,16 +9,7 @@ import {
   CaptureRecommendationsPanel,
   CaptureSuspiciousHitsPanel,
 } from "./CaptureMissionPanels";
-
-interface OverviewBundle {
-  stats: GlobalTrafficStats | null;
-  industrial: IndustrialAnalysis | null;
-  vehicle: VehicleAnalysis | null;
-  media: MediaAnalysis | null;
-  usb: USBAnalysis | null;
-}
-
-const overviewCache = new Map<string, OverviewBundle>();
+import { useCaptureMissionOverviewBundle } from "./useCaptureMissionOverviewBundle";
 
 export function CaptureMissionControl() {
   const navigate = useNavigate();
@@ -40,51 +29,15 @@ export function CaptureMissionControl() {
     backendConnected,
     isPreloadingCapture,
   } = useSentinel();
-  const [overviewBundle, setOverviewBundle] = useState<OverviewBundle | null>(null);
-  const [overviewLoading, setOverviewLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState("");
   const captureKey = useMemo(() => (
     fileMeta.path ? `${fileMeta.path}::${totalPackets}` : ""
   ), [fileMeta.path, totalPackets]);
-
-  useEffect(() => {
-    if (!backendConnected || !captureKey || isPreloadingCapture) {
-      setOverviewBundle(null);
-      setOverviewLoading(false);
-      return;
-    }
-
-    if (overviewCache.has(captureKey)) {
-      setOverviewBundle(overviewCache.get(captureKey) ?? null);
-      setOverviewLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const abortController = new AbortController();
-    setOverviewLoading(true);
-    void Promise.all([
-      bridge.getGlobalTrafficStats(abortController.signal).catch(() => null),
-      bridge.getIndustrialAnalysis(abortController.signal).catch(() => null),
-      bridge.getVehicleAnalysis(abortController.signal).catch(() => null),
-      bridge.getMediaAnalysis(false, abortController.signal).catch(() => null),
-      bridge.getUSBAnalysis(abortController.signal).catch(() => null),
-    ]).then(([stats, industrial, vehicle, media, usb]) => {
-      if (cancelled) return;
-      const next = { stats, industrial, vehicle, media, usb };
-      overviewCache.set(captureKey, next);
-      setOverviewBundle(next);
-    }).finally(() => {
-      if (!cancelled) {
-        setOverviewLoading(false);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      abortController.abort();
-    };
-  }, [backendConnected, captureKey, isPreloadingCapture]);
+  const { overviewBundle, overviewLoading } = useCaptureMissionOverviewBundle({
+    backendConnected,
+    captureKey,
+    isPreloadingCapture,
+  });
 
   const overview = useMemo(() => buildCaptureOverview({
     stats: overviewBundle?.stats ?? null,

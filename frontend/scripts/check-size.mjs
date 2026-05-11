@@ -1255,8 +1255,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureMissionControl.tsx",
-    maxLines: 230,
+    maxLines: 180,
     reason: "capture mission control should stay focused on overview loading and navigation orchestration",
+  },
+  {
+    path: "src/app/components/useCaptureMissionOverviewBundle.ts",
+    maxLines: 80,
+    reason: "capture mission overview hook should own only overview analysis fetch/cache state",
   },
   {
     path: "src/app/components/CaptureMissionOverviewHeader.tsx",
@@ -2123,6 +2128,11 @@ export const testSizeBudgets = [
     path: "src/app/components/RuntimeSettingsSections.test.tsx",
     maxLines: 85,
     reason: "runtime settings section tests should stay focused on field rendering and setter wiring",
+  },
+  {
+    path: "src/app/components/useCaptureMissionOverviewBundle.test.tsx",
+    maxLines: 75,
+    reason: "capture mission overview hook tests should stay focused on fetch/cache and unavailable state",
   },
   {
     path: "src/app/components/StreamDecoderBatchPanel.test.tsx",
