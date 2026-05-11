@@ -1315,7 +1315,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/ThreatHunting.tsx",
-    maxLines: 280,
+    maxLines: 230,
     reason: "threat hunting page should stay focused on runtime config, data loading, and navigation orchestration",
   },
   {
@@ -1347,6 +1347,11 @@ export const sourceSizeBudgets = [
     path: "src/app/features/hunting/ThreatHuntingSummaryPanels.tsx",
     maxLines: 120,
     reason: "threat hunting summary panels should keep category and progress presentation scoped",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingMetricCards.tsx",
+    maxLines: 55,
+    reason: "threat hunting metric cards should own only top-level count presentation",
   },
   {
     path: "src/app/features/hunting/ThreatHuntingWorkbenchSections.tsx",
@@ -2058,6 +2063,11 @@ export const testSizeBudgets = [
     path: "src/app/pages/C2Analysis.candidates.test.tsx",
     maxLines: 190,
     reason: "C2 candidate tests should keep row navigation and detail assertions scoped",
+  },
+  {
+    path: "src/app/features/hunting/ThreatHuntingMetricCards.test.tsx",
+    maxLines: 45,
+    reason: "threat hunting metric card tests should stay focused on count rendering",
   },
   {
     path: "src/app/pages/HttpStreamUtils.test.ts",
