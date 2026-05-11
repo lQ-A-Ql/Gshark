@@ -1,6 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import type { StreamLoadMeta } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
@@ -19,26 +18,13 @@ import {
   filterRawChunks,
   renderRawStreamChunk,
   toVisibleRawChunks,
-  type RawChunk,
   type RawViewMode,
   type VisibleRawChunk,
 } from "./RawStreamUtils";
+import { createEmptyRawStreamView, type RawStreamViewState } from "./RawStreamViewState";
+import { useRawStreamRouteSelection, type RawStreamProtocol } from "./useRawStreamRouteSelection";
 
 const STREAM_PAGE_SIZE = 96;
-
-type RawStreamProtocol = "TCP" | "UDP";
-
-interface RawStreamViewState {
-  id: number;
-  protocol: RawStreamProtocol;
-  from: string;
-  to: string;
-  chunks: RawChunk[];
-  loadMeta?: StreamLoadMeta;
-  nextCursor: number;
-  totalChunks: number;
-  hasMore: boolean;
-}
 
 export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
@@ -48,8 +34,7 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const [expandedChunk, setExpandedChunk] = useState<VisibleRawChunk | null>(null);
   const [search, setSearch] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
-  const [streamView, setStreamView] = useState<RawStreamViewState>(() => emptyStreamView(protocol));
-  const consumedRouteStreamIdRef = useRef<number | null>(null);
+  const [streamView, setStreamView] = useState<RawStreamViewState>(() => createEmptyRawStreamView(protocol));
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,20 +72,14 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
     }
   }, [enableScrollLoad, sourceStream.id]);
 
-  useEffect(() => {
-    const state = location.state as { streamId?: number } | null;
-    const routeStreamId = Number(state?.streamId ?? -1);
-    const selectedStreamId = Number(selectedPacket?.streamId ?? -1);
-    const hasPendingRouteStream = routeStreamId >= 0 && routeStreamId !== consumedRouteStreamIdRef.current;
-    const streamId = hasPendingRouteStream ? routeStreamId : streamView.id < 0 ? selectedStreamId : -1;
-    if (streamId < 0 || !streamList.includes(streamId) || streamView.id === streamId) {
-      return;
-    }
-    if (hasPendingRouteStream) {
-      consumedRouteStreamIdRef.current = routeStreamId;
-    }
-    void setActiveStream(protocol, streamId);
-  }, [location.state, protocol, selectedPacket?.streamId, setActiveStream, streamList, streamView.id]);
+  useRawStreamRouteSelection({
+    locationState: location.state,
+    protocol,
+    selectedPacketStreamId: selectedPacket?.streamId,
+    setActiveStream,
+    streamList,
+    streamViewId: streamView.id,
+  });
 
   const currentIndex = streamList.findIndex((id) => id === streamView.id);
   const ordinalLabel =
@@ -265,18 +244,4 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
       )}
     </div>
   );
-}
-
-function emptyStreamView(protocol: RawStreamProtocol): RawStreamViewState {
-  return {
-    id: -1,
-    protocol,
-    from: "",
-    to: "",
-    chunks: [],
-    loadMeta: undefined,
-    nextCursor: 0,
-    totalChunks: 0,
-    hasMore: false,
-  };
 }
