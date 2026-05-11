@@ -5828,3 +5828,54 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: Round 160 self-audit and drift check, then continue the remaining vehicle/mixed-domain bridge migrations if the audit confirms alignment.
+
+---
+
+## Round 160 - Ten-Round Self-Audit
+
+Time: 2026-05-12 00:46:40 +08:00  
+Author: Codex
+
+### Scope
+
+- Performed the required 10-round self-audit to check for plan drift.
+- Reviewed the latest 10 commits, current working tree state, remaining aggregate `bridge` imports, and adopted `backendClients.*` consumers.
+- No production behavior changes were made in this round.
+
+### Audit Findings
+
+- Recent commits remain aligned with the current plan:
+  - Split aggregate bridge types into domain interfaces.
+  - Added domain client projections.
+  - Migrated low-risk evidence, object, media, industrial, USB, and APT consumers to narrowed domain clients.
+  - Kept each migration small, tested, and reversible.
+- No drift detected toward unrelated UI redesign, backend API changes, mapper rewrites, or MISC/Evidence coupling.
+- Current direct `bridge` imports in `frontend/src` are down to 28 files.
+- Current `backendClients.*` production consumers are 7 files:
+  - `useEvidence.ts`
+  - `useObjectExport.ts`
+  - `ObjectExport.tsx`
+  - `useMediaAnalysis.ts`
+  - `useIndustrialAnalysis.ts`
+  - `useUsbAnalysis.ts`
+  - `useAPTAnalysis.ts`
+
+### Validation
+
+- `git status --short` was clean before the audit report edit.
+- `git log --oneline -10` confirmed recent commits are bridge-domain and boundary-related.
+- `grep` checks confirmed the remaining direct bridge import list and current domain-client adoption list.
+
+### Review
+
+- Continue the same migration direction.
+- Preferred next low-risk target: `frontend/src/app/features/vehicle/useVehicleAnalysis.ts` using `backendClients.analysis.getVehicleAnalysis(signal)`.
+- After remaining single-domain hooks are migrated, move to mixed-domain workflows carefully:
+  - media playback/transcription should split between `backendClients.media` and `backendClients.runtime`.
+  - stream decoder/payload workflows should use `backendClients.stream`.
+  - lifecycle/capture state should be delayed until simpler consumers are complete.
+- Mainline boundaries remain intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
