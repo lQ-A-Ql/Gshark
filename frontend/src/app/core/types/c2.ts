@@ -1,3 +1,4 @@
+import type { InvestigationReport } from "./report";
 import type { AnalysisConversation, TrafficBucket } from "./traffic";
 
 export interface C2IndicatorRecord {
@@ -118,6 +119,7 @@ export interface C2FamilyAnalysis {
   notes: string[];
   relatedActors?: TrafficBucket[];
   deliveryChains?: TrafficBucket[];
+  report?: InvestigationReport;
 }
 
 export interface C2SampleAnalysis {

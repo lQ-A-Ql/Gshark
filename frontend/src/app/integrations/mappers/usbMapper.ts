@@ -1,4 +1,5 @@
 import type { USBAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asBucket, asStringList } from "./mapperPrimitives";
 import { asUSBHidAnalysis, asUSBKeyboardEvent, asUSBMouseEvent } from "./usbHidMapper";
 import { asUSBMassStorageAnalysis } from "./usbMassStorageMapper";
@@ -27,5 +28,6 @@ export function asUSBAnalysis(payload: any): USBAnalysis {
     massStorage: asUSBMassStorageAnalysis(payload?.mass_storage),
     other: asUSBOtherAnalysis(payload?.other),
     notes: asStringList(payload?.notes),
+    report: asInvestigationReport(payload?.report),
   };
 }

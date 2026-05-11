@@ -116,6 +116,12 @@ describe("usbMapper", () => {
         notes: ["other note"],
       },
       notes: ["usb note"],
+      report: {
+        summary: [{ title: "USB 概览", summary: "USB 包 9 / 设备 1 / Endpoint 1" }],
+        evidence: [{ title: "USB 存储写入: WRITE(10)", severity: "medium", packet_id: 8 }],
+        details: [{ title: "USB 键盘事件", packet_id: 2 }],
+        recommendations: ["优先定位 USB Mass Storage 写操作。"],
+      },
     });
 
     expect(result.totalUSBPackets).toBe(9);
@@ -132,6 +138,11 @@ describe("usbMapper", () => {
     });
     expect(result.other.controlRecords[0]).toMatchObject({ packetId: 9 });
     expect(result.notes).toEqual(["usb note"]);
+    expect(result.report?.evidence[0]).toMatchObject({
+      title: "USB 存储写入: WRITE(10)",
+      severity: "medium",
+      packetId: 8,
+    });
   });
 
   it("returns empty defaults for missing sections", () => {
@@ -140,5 +151,6 @@ describe("usbMapper", () => {
     expect(result.hid.keyboardEvents).toEqual([]);
     expect(result.massStorage.writeOperations).toEqual([]);
     expect(result.other.records).toEqual([]);
+    expect(result.report?.summary).toEqual([]);
   });
 });

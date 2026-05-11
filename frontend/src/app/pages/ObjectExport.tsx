@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import { bridge } from "../integrations/wailsBridge";
+import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
 import { useSentinel } from "../state/SentinelContext";
 import {
   ObjectExportFooter,
@@ -26,6 +28,7 @@ export default function ObjectExport() {
   const selectedObjects = objects.filter((item) => selected.includes(item.id));
   const selectedBytes = selectedObjects.reduce((sum, item) => sum + item.sizeBytes, 0);
   const magicGroups = useMemo(() => groupObjectsByMagic(objects), [objects]);
+  const report = useMemo(() => buildObjectInvestigationReport(objects), [objects]);
 
   const toggleSelect = (id: number) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -55,6 +58,7 @@ export default function ObjectExport() {
           onTypeFilterChange={setTypeFilter}
         />
         <ObjectGroupChips groups={magicGroups} />
+        <InvestigationReportPanel className="mt-6" report={report} title="对象调查报告" />
         <ObjectGroupGrid
           expandedGroups={expandedGroups}
           groups={magicGroups}

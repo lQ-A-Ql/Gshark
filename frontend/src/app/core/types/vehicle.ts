@@ -1,3 +1,4 @@
+import type { InvestigationReport } from "./report";
 import type { AnalysisConversation, TrafficBucket } from "./traffic";
 
 export interface CANFrameSummary {
@@ -183,4 +184,5 @@ export interface VehicleAnalysis {
   doip: DoIPAnalysis;
   uds: UDSAnalysis;
   recommendations: string[];
+  report?: InvestigationReport;
 }

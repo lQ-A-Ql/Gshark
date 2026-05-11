@@ -1,6 +1,7 @@
 export * from "./packet";
 export * from "./stream";
 export * from "./traffic";
+export * from "./report";
 export * from "./c2";
 export * from "./apt";
 export * from "./industrial";

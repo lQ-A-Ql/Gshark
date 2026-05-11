@@ -1,6 +1,7 @@
 import { Car } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
 import type { DBCProfile } from "../core/types";
@@ -132,6 +133,12 @@ export default function VehicleAnalysis() {
       />
 
       <VehicleOverviewPanel analysis={analysis} />
+      <InvestigationReportPanel
+        className="mt-4"
+        preferredProtocol="TCP"
+        report={analysis.report}
+        title="车机调查报告"
+      />
 
       <VehicleProtocolPanels analysis={analysis} />
       <VehicleDetailPanels analysis={analysis} />

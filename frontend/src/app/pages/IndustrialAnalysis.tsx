@@ -1,6 +1,7 @@
 import { Factory, Workflow } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
 import {
@@ -19,16 +20,7 @@ import {
   IndustrialRuleHitsPanel,
 } from "../features/industrial/IndustrialAuxiliaryPanels";
 
-const INDUSTRIAL_PROTOCOL_TAGS = [
-  "Modbus",
-  "S7",
-  "DNP3",
-  "CIP",
-  "BACnet",
-  "IEC104",
-  "OPC UA",
-  "PROFINET",
-];
+const INDUSTRIAL_PROTOCOL_TAGS = ["Modbus", "S7", "DNP3", "CIP", "BACnet", "IEC104", "OPC UA", "PROFINET"];
 
 export default function IndustrialAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
@@ -74,9 +66,17 @@ export default function IndustrialAnalysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && <StatusHint tone="slate" className="mb-3">正在调用 tshark 生成工控分析结果...</StatusHint>}
+      {loading && (
+        <StatusHint tone="slate" className="mb-3">
+          正在调用 tshark 生成工控分析结果...
+        </StatusHint>
+      )}
 
-      {!loading && error && <StatusHint tone="amber" className="mb-3">{error}</StatusHint>}
+      {!loading && error && (
+        <StatusHint tone="amber" className="mb-3">
+          {error}
+        </StatusHint>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <StatCard title="工控相关包" value={analysis.totalIndustrialPackets.toLocaleString()} />
@@ -126,10 +126,19 @@ export default function IndustrialAnalysis() {
 
       <IndustrialRuleHitsPanel ruleHits={analysis.ruleHits ?? []} />
 
+      <InvestigationReportPanel
+        className="mt-4"
+        preferredProtocol="TCP"
+        report={analysis.report}
+        title="工控调查报告"
+      />
+
       <Panel title="分析提示" className="mt-4">
         <div className="space-y-2 text-sm">
           {analysis.notes.length === 0 ? (
-            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">当前抓包未识别到工控协议。</div>
+            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">
+              当前抓包未识别到工控协议。
+            </div>
           ) : (
             analysis.notes.map((note, index) => (
               <AnalysisCallout key={`${note}-${index}`} tone="blue" icon={<Workflow className="h-4 w-4" />}>

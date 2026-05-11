@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
+import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { bridge } from "../../integrations/wailsBridge";
 import { LRUCache } from "../../utils/lruCache";
@@ -18,6 +19,7 @@ const EMPTY_FAMILY: C2FamilyAnalysis = {
   notes: [],
   relatedActors: [],
   deliveryChains: [],
+  report: EMPTY_INVESTIGATION_REPORT,
 };
 
 export const EMPTY_C2_ANALYSIS: C2SampleAnalysis = {

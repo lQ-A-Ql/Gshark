@@ -1,3 +1,4 @@
+import type { InvestigationReport } from "./report";
 import type { TrafficBucket } from "./traffic";
 
 export interface USBPacketRecord {
@@ -124,4 +125,5 @@ export interface USBAnalysis {
   massStorage: USBMassStorageAnalysis;
   other: USBOtherAnalysis;
   notes: string[];
+  report?: InvestigationReport;
 }

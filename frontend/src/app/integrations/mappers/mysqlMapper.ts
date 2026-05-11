@@ -1,4 +1,5 @@
 import type { MySQLAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 
 export function asMySQLAnalysis(input: any): MySQLAnalysis {
@@ -54,5 +55,6 @@ export function asMySQLAnalysis(input: any): MySQLAnalysis {
         }))
       : [],
     notes: asStringList(input.notes),
+    report: asInvestigationReport(input.report),
   };
 }

@@ -1,4 +1,5 @@
 import type { VehicleAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asBucket, asConversation, asStringList } from "./mapperPrimitives";
 import { asCANSection } from "./vehicleCanMapper";
 import { asDoIPSection, asJ1939Section, asUDSSection } from "./vehicleDiagnosticMapper";
@@ -13,5 +14,6 @@ export function asVehicleAnalysis(payload: any): VehicleAnalysis {
     doip: asDoIPSection(payload?.doip),
     uds: asUDSSection(payload?.uds),
     recommendations: asStringList(payload?.recommendations),
+    report: asInvestigationReport(payload?.report),
   };
 }

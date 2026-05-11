@@ -38,6 +38,12 @@ describe("protocolToolMapper", () => {
         },
       ],
       notes: ["http note"],
+      report: {
+        summary: [{ title: "候选端点", summary: "1 个端点 / 2 次尝试" }],
+        evidence: [{ title: "POST example.test/login 疑似爆破", severity: "high", packet_id: 10 }],
+        details: [{ title: "POST example.test/login", stream_id: 3 }],
+        recommendations: ["继续打开 HTTP 流确认 token 下发。"],
+      },
     });
 
     expect(result).toMatchObject({ totalAttempts: 2, candidateEndpoints: 1, bruteforceCount: 1 });
@@ -52,6 +58,12 @@ describe("protocolToolMapper", () => {
       responsePacketId: 12,
       username: "admin",
       passwordPresent: true,
+    });
+    expect(result.report!).toMatchObject({
+      summary: [{ title: "候选端点", summary: "1 个端点 / 2 次尝试" }],
+      evidence: [{ title: "POST example.test/login 疑似爆破", severity: "high", packetId: 10 }],
+      details: [{ title: "POST example.test/login", streamId: 3 }],
+      recommendations: ["继续打开 HTTP 流确认 token 下发。"],
     });
   });
 
@@ -80,6 +92,12 @@ describe("protocolToolMapper", () => {
           possible_cleartext: true,
         },
       ],
+      report: {
+        summary: [{ title: "SMTP 会话", summary: "1 条会话 / 1 封邮件" }],
+        evidence: [{ title: "SMTP stream #5 存在附件线索", severity: "medium", packet_id: 20 }],
+        details: [{ title: "SMTP stream #5", stream_id: 5 }],
+        recommendations: ["继续定位 DATA 正文和附件文件名。"],
+      },
     });
 
     expect(result.sessions[0]).toMatchObject({
@@ -90,6 +108,11 @@ describe("protocolToolMapper", () => {
     });
     expect(result.sessions[0].commands?.[0]).toMatchObject({ packetId: 20, statusCode: 235 });
     expect(result.sessions[0].messages?.[0]).toMatchObject({ subject: "Report", packetIds: [21, 22] });
+    expect(result.report!.evidence[0]).toMatchObject({
+      title: "SMTP stream #5 存在附件线索",
+      severity: "medium",
+      packetId: 20,
+    });
   });
 
   it("maps MySQL sessions with login, query, and server events", () => {
@@ -116,6 +139,12 @@ describe("protocolToolMapper", () => {
           notes: ["mysql note"],
         },
       ],
+      report: {
+        summary: [{ title: "MySQL 会话", summary: "1 条会话 / 登录 1" }],
+        evidence: [{ title: "MySQL stream #7 返回错误响应", severity: "medium", packet_id: 32 }],
+        details: [{ title: "MySQL stream #7", stream_id: 7 }],
+        recommendations: ["检查 ERR 响应对应的查询包。"],
+      },
     });
 
     expect(result.sessions[0]).toMatchObject({
@@ -127,6 +156,11 @@ describe("protocolToolMapper", () => {
     });
     expect(result.sessions[0].queries[0]).toMatchObject({ packetId: 31, sql: "SELECT 1", responseCode: undefined });
     expect(result.sessions[0].serverEvents[0]).toMatchObject({ packetId: 32, kind: "ERR", code: 1064 });
+    expect(result.report!.evidence[0]).toMatchObject({
+      title: "MySQL stream #7 返回错误响应",
+      severity: "medium",
+      packetId: 32,
+    });
   });
 
   it("maps Shiro rememberMe candidates and key results", () => {
@@ -155,6 +189,12 @@ describe("protocolToolMapper", () => {
         },
       ],
       notes: ["shiro note"],
+      report: {
+        summary: [{ title: "rememberMe 候选", summary: "1 个 Cookie 样本 / 密钥命中 1" }],
+        evidence: [{ title: "rememberMe @ shiro.example/ 命中候选密钥", severity: "high", packet_id: 40 }],
+        details: [{ title: "rememberMe @ shiro.example/", stream_id: 8 }],
+        recommendations: ["回到对应 HTTP 包确认 Cookie 下发和回收。"],
+      },
     });
 
     expect(result).toMatchObject({ candidateCount: 1, hitCount: 1 });
@@ -172,6 +212,11 @@ describe("protocolToolMapper", () => {
       hit: true,
       payloadClass: "org.apache.shiro.subject.SimplePrincipalCollection",
     });
+    expect(result.report!.evidence[0]).toMatchObject({
+      title: "rememberMe @ shiro.example/ 命中候选密钥",
+      severity: "high",
+      packetId: 40,
+    });
   });
 
   it("returns empty defaults for missing protocol sections", () => {
@@ -179,5 +224,6 @@ describe("protocolToolMapper", () => {
     expect(asSMTPAnalysis({}).sessions).toEqual([]);
     expect(asMySQLAnalysis({}).sessions).toEqual([]);
     expect(asShiroRememberMeAnalysis({}).candidates).toEqual([]);
+    expect(asHTTPLoginAnalysis({}).report?.summary).toEqual([]);
   });
 });

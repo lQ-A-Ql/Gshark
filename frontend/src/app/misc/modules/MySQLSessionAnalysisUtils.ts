@@ -1,4 +1,5 @@
 import type { MySQLAnalysis, MySQLSession } from "../../core/types";
+import { renderInvestigationReportText } from "./investigationReportText";
 
 export type MySQLSessionFilter = "ALL" | "LOGIN" | "ERROR";
 
@@ -72,6 +73,10 @@ export function renderMySQLAnalysisText(analysis: MySQLAnalysis) {
       );
     }
     lines.push("");
+  }
+  const reportText = renderInvestigationReportText(analysis.report);
+  if (reportText) {
+    lines.push(reportText);
   }
   return lines.join("\n");
 }

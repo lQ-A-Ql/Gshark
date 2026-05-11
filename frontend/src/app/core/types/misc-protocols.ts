@@ -1,3 +1,4 @@
+import type { InvestigationReport } from "./report";
 import type { TrafficBucket } from "./traffic";
 
 export interface WinRMDecryptRequest {
@@ -133,6 +134,7 @@ export interface HTTPLoginAnalysis {
   endpoints: HTTPLoginEndpoint[];
   attempts: HTTPLoginAttempt[];
   notes: string[];
+  report?: InvestigationReport;
 }
 
 export interface SMTPCommandRecord {
@@ -188,6 +190,7 @@ export interface SMTPAnalysis {
   attachmentHintCount: number;
   sessions: SMTPSession[];
   notes: string[];
+  report?: InvestigationReport;
 }
 
 export interface MySQLQueryRecord {
@@ -242,6 +245,7 @@ export interface MySQLAnalysis {
   resultsetCount: number;
   sessions: MySQLSession[];
   notes: string[];
+  report?: InvestigationReport;
 }
 
 export interface ShiroRememberMeKeyResult {
@@ -281,6 +285,7 @@ export interface ShiroRememberMeAnalysis {
   hitCount: number;
   candidates: ShiroRememberMeCandidate[];
   notes: string[];
+  report?: InvestigationReport;
 }
 
 export interface SMB3RandomSessionKeyResult {

@@ -2,20 +2,33 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
+import { buildThreatHuntingInvestigationReport } from "../features/hunting/threatHuntingInvestigationReport";
 import { ThreatHuntingMetricCards } from "../features/hunting/ThreatHuntingMetricCards";
 import {
   ThreatHuntingCategoryPanel,
   ThreatHuntingProgressPanel,
   ThreatHuntingWorkbenchPanel,
-  type ThreatHuntingProgressView,
 } from "../features/hunting/ThreatHuntingPanels";
+import {
+  buildThreatHuntingProgressView,
+  parseThreatPrefixes,
+  routeForPreparedStream,
+} from "../features/hunting/threatHuntingRules";
 import { bridge } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function ThreatHunting() {
   const navigate = useNavigate();
-  const { threatHits, backendConnected, locatePacketById, preparePacketStream, isThreatAnalysisLoading, threatAnalysisProgress } = useSentinel();
+  const {
+    threatHits,
+    backendConnected,
+    locatePacketById,
+    preparePacketStream,
+    isThreatAnalysisLoading,
+    threatAnalysisProgress,
+  } = useSentinel();
   const [hits, setHits] = useState(threatHits);
   const [selectedHit, setSelectedHit] = useState<number | null>(threatHits[0]?.id ?? null);
   const [prefixText, setPrefixText] = useState("flag{,ctf{");
@@ -27,12 +40,6 @@ export default function ThreatHunting() {
   const [huntBusy, setHuntBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState("");
   const [statusText, setStatusText] = useState("");
-
-  const parsePrefixes = (value: string) =>
-    value
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
 
   const runHunt = async (prefixes: string[]) => {
     if (!backendConnected) return;
@@ -69,7 +76,7 @@ export default function ThreatHunting() {
 
   const applyConfigAndRun = async () => {
     if (!backendConnected) return;
-    const prefixes = parsePrefixes(prefixText);
+    const prefixes = parseThreatPrefixes(prefixText);
     if (prefixes.length === 0) {
       setStatusText("至少需要一个 Prefix（例如 flag{）");
       return;
@@ -113,30 +120,12 @@ export default function ThreatHunting() {
     const anomaly = hits.filter((hit) => hit.category === "Anomaly").length;
     return { ctf, owasp, anomaly };
   }, [hits]);
+  const report = useMemo(() => buildThreatHuntingInvestigationReport(hits), [hits]);
 
-  const progress = useMemo<ThreatHuntingProgressView | null>(() => {
-    if (threatAnalysisProgress.active) {
-      return {
-        title: huntBusy ? "正在执行狩猎" : "后台威胁分析进行中",
-        detail: threatAnalysisProgress.label || "正在整理对象、重组流并执行 YARA 扫描。",
-        value: Math.max(4, threatAnalysisProgress.percent || 4),
-        phaseLabel: threatAnalysisProgress.phaseLabel || "处理中",
-        current: threatAnalysisProgress.current,
-        total: threatAnalysisProgress.total,
-      };
-    }
-    if (huntBusy || isThreatAnalysisLoading) {
-      return {
-        title: huntBusy ? "正在执行狩猎" : "后台威胁分析进行中",
-        detail: "正在准备威胁分析任务...",
-        value: 12,
-        phaseLabel: "准备",
-        current: 0,
-        total: 5,
-      };
-    }
-    return null;
-  }, [huntBusy, isThreatAnalysisLoading, threatAnalysisProgress]);
+  const progress = useMemo(
+    () => buildThreatHuntingProgressView({ huntBusy, isThreatAnalysisLoading, progress: threatAnalysisProgress }),
+    [huntBusy, isThreatAnalysisLoading, threatAnalysisProgress],
+  );
 
   const selected = hits.find((hit) => hit.id === selectedHit) ?? null;
 
@@ -158,15 +147,7 @@ export default function ThreatHunting() {
         navigate("/");
         return;
       }
-      if (prepared.protocol === "HTTP") {
-        navigate("/http-stream", { state: { streamId: prepared.streamId } });
-        return;
-      }
-      if (prepared.protocol === "UDP") {
-        navigate("/udp-stream", { state: { streamId: prepared.streamId } });
-        return;
-      }
-      navigate("/tcp-stream", { state: { streamId: prepared.streamId } });
+      navigate(routeForPreparedStream(prepared.protocol), { state: { streamId: prepared.streamId } });
     } finally {
       setActionBusy("");
     }
@@ -185,13 +166,14 @@ export default function ThreatHunting() {
         tags={["YARA", "OWASP", "CTF", "异常流量"]}
         tagsLabel="狩猎域"
         theme="blue"
-        onRefresh={() => void runHunt(parsePrefixes(prefixText))}
+        onRefresh={() => void runHunt(parseThreatPrefixes(prefixText))}
         refreshLabel="重新狩猎"
       />
 
       <ThreatHuntingMetricCards hits={hits} stats={stats} />
 
       {progress && <ThreatHuntingProgressPanel progress={progress} />}
+      <InvestigationReportPanel className="mt-4" preferredProtocol="TCP" report={report} title="威胁狩猎调查报告" />
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <ThreatHuntingCategoryPanel stats={stats} />
@@ -214,7 +196,7 @@ export default function ThreatHunting() {
           onLoadConfig={loadConfig}
           onOpenRelatedStream={openRelatedStream}
           onPrefixTextChange={setPrefixText}
-          onRunWithoutSave={() => runHunt(parsePrefixes(prefixText))}
+          onRunWithoutSave={() => runHunt(parseThreatPrefixes(prefixText))}
           onSelectHit={setSelectedHit}
           onYaraBinChange={setYaraBin}
           onYaraEnabledChange={setYaraEnabled}

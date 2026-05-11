@@ -136,6 +136,11 @@ export const sourceSizeBudgets = [
     reason: "evidence mapper should only normalize unified evidence records and module names",
   },
   {
+    path: "src/app/integrations/mappers/investigationReportMapper.ts",
+    maxLines: 30,
+    reason: "investigation report mapper should only normalize shared report section items and recommendation lists",
+  },
+  {
     path: "src/app/integrations/mappers/mapperPrimitives.ts",
     maxLines: 50,
     reason: "mapper primitives should stay limited to shared scalar/list/object coercion helpers",

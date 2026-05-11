@@ -5,6 +5,7 @@ import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
 import { ErrorBlock, NotesList } from "../ui";
@@ -19,12 +20,14 @@ import {
   shouldPreserveShiroSelection,
   type ShiroRememberMeCandidateFilter,
 } from "./ShiroRememberMeUtils";
+import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 
 const EMPTY_ANALYSIS: ShiroRememberMeAnalysis = {
   candidateCount: 0,
   hitCount: 0,
   candidates: [],
   notes: [],
+  report: EMPTY_INVESTIGATION_REPORT,
 };
 
 export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
@@ -131,6 +134,7 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
 
         {!error && <NotesList notes={analysis.notes} />}
         {error && <ErrorBlock message={error} />}
+        <InvestigationReportPanel report={analysis.report} preferredProtocol="HTTP" />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)]">
           <ShiroRememberMeCandidateList

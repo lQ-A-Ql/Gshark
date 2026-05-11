@@ -108,6 +108,7 @@ func buildSMTPAnalysisFromPackets(ctx context.Context, packets []model.Packet) (
 		return analysis.Sessions[i].StreamID < analysis.Sessions[j].StreamID
 	})
 	analysis.Notes = buildSMTPNotes(analysis)
+	analysis.Report = buildSMTPInvestigationReport(analysis)
 	return analysis, nil
 }
 

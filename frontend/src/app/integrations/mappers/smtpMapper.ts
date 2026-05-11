@@ -1,4 +1,5 @@
 import type { SMTPAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asPositiveFiniteNumbers, asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 
 export function asSMTPAnalysis(input: any): SMTPAnalysis {
@@ -55,5 +56,6 @@ export function asSMTPAnalysis(input: any): SMTPAnalysis {
         }))
       : [],
     notes: asStringList(input.notes),
+    report: asInvestigationReport(input.report),
   };
 }

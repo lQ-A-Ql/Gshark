@@ -54,6 +54,7 @@ function createFallbackBridge(overrides: Partial<BackendBridge> = {}): BackendBr
     listPacketsPage: vi.fn(),
     getRawStreamPage: vi.fn(),
     getIndustrialAnalysis: vi.fn(),
+    getHTTPLoginAnalysis: vi.fn(),
     subscribeEvents: vi.fn(() => vi.fn()),
     ...overrides,
   };
@@ -153,6 +154,24 @@ describe("createDesktopBridge", () => {
         },
         details: [],
         notes: [],
+        report: { summary: [], evidence: [], details: [], recommendations: [] },
+      })),
+      getHTTPLoginAnalysis: vi.fn(async () => ({
+        totalAttempts: 1,
+        candidateEndpoints: 1,
+        successCount: 0,
+        failureCount: 1,
+        uncertainCount: 0,
+        bruteforceCount: 0,
+        endpoints: [],
+        attempts: [],
+        notes: [],
+        report: {
+          summary: [{ title: "候选端点", summary: "1 个端点 / 1 次尝试" }],
+          evidence: [],
+          details: [],
+          recommendations: [],
+        },
       })),
       subscribeEvents: vi.fn(() => unsubscribe),
     });
@@ -164,12 +183,16 @@ describe("createDesktopBridge", () => {
     await bridge.listPacketsPage(100, 50, "http");
     await bridge.getRawStreamPage("TCP", 3, 0, 4096);
     await bridge.getIndustrialAnalysis();
+    await expect(bridge.getHTTPLoginAnalysis()).resolves.toMatchObject({
+      report: { summary: [{ title: "候选端点", summary: "1 个端点 / 1 次尝试" }] },
+    });
     const stop = bridge.subscribeEvents({ status: vi.fn() });
     stop();
 
     expect(fallbackBridge.listPacketsPage).toHaveBeenCalledWith(100, 50, "http");
     expect(fallbackBridge.getRawStreamPage).toHaveBeenCalledWith("TCP", 3, 0, 4096);
     expect(fallbackBridge.getIndustrialAnalysis).toHaveBeenCalledWith();
+    expect(fallbackBridge.getHTTPLoginAnalysis).toHaveBeenCalledWith();
     expect(fallbackBridge.subscribeEvents).toHaveBeenCalled();
     expect(unsubscribe).toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asBucket, asConversation, asStringList } from "./mapperPrimitives";
 import { asC2DNSAggregate, asC2HTTPEndpointAggregate, asC2StreamAggregate } from "./c2AggregateMapper";
 import { asC2BeaconPattern, asC2Record } from "./c2IndicatorMapper";
@@ -31,5 +32,6 @@ function asC2Family(item: any): C2FamilyAnalysis {
     notes: asStringList(item.notes),
     relatedActors: Array.isArray(item.related_actors) ? item.related_actors.map(asBucket) : [],
     deliveryChains: Array.isArray(item.delivery_chains) ? item.delivery_chains.map(asBucket) : [],
+    report: asInvestigationReport(item.report),
   };
 }

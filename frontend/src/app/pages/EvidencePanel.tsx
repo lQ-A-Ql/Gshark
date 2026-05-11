@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import {
   EvidenceCaveats,
@@ -8,16 +9,10 @@ import {
   EvidenceTable,
   EvidenceToolbar,
 } from "../features/evidence/EvidencePanelSections";
-import {
-  buildEvidenceCsv,
-  countEvidenceSeverity,
-  filterEvidenceRecords,
-  sortEvidenceRecords,
-} from "../features/evidence/evidencePanelRules";
 import type { EvidenceSeverity } from "../features/evidence/evidenceSchema";
+import { useEvidencePanelModel } from "../features/evidence/useEvidencePanelModel";
 import { useEvidence } from "../features/evidence/useEvidence";
 import { useSentinel } from "../state/SentinelContext";
-import { downloadText } from "../utils/browserFile";
 
 export default function EvidencePanel() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
@@ -34,24 +29,13 @@ export default function EvidencePanel() {
     modules: selectedModules.length > 0 ? selectedModules : undefined,
   });
 
-  const filtered = useMemo(
-    () => filterEvidenceRecords(evidence, query, severityFilter),
-    [evidence, query, severityFilter],
+  const { sorted, severityCounts, report, exportCSV, exportJSON } = useEvidencePanelModel(
+    evidence,
+    query,
+    severityFilter,
   );
-  const sorted = useMemo(() => sortEvidenceRecords(filtered), [filtered]);
-  const severityCounts = useMemo(() => countEvidenceSeverity(evidence), [evidence]);
-
-  const toggleModule = (module: string) => {
+  const toggleModule = (module: string) =>
     setSelectedModules((prev) => (prev.includes(module) ? prev.filter((item) => item !== module) : [...prev, module]));
-  };
-
-  const handleExportJSON = () => {
-    downloadText("evidence-export.json", JSON.stringify(sorted, null, 2), "application/json;charset=utf-8");
-  };
-
-  const handleExportCSV = () => {
-    downloadText("evidence-export.csv", buildEvidenceCsv(sorted), "text/csv;charset=utf-8");
-  };
 
   return (
     <PageShell
@@ -70,12 +54,13 @@ export default function EvidencePanel() {
           query={query}
           resultCount={sorted.length}
           selectedModules={selectedModules}
-          onExportCSV={handleExportCSV}
-          onExportJSON={handleExportJSON}
+          onExportCSV={exportCSV}
+          onExportJSON={exportJSON}
           onQueryChange={setQuery}
           onToggleModule={toggleModule}
         />
         <EvidenceStatusMessage error={error} loading={loading} />
+        <InvestigationReportPanel className="mb-6" preferredProtocol="TCP" report={report} title="统一证据调查报告" />
         <EvidenceTable loading={loading} records={sorted} />
         <EvidenceCaveats records={sorted} />
       </section>

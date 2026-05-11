@@ -100,6 +100,7 @@ func buildMySQLAnalysisFromPackets(ctx context.Context, packets []model.Packet) 
 		return analysis.Sessions[i].StreamID < analysis.Sessions[j].StreamID
 	})
 	analysis.Notes = buildMySQLAnalysisNotes(analysis)
+	analysis.Report = buildMySQLInvestigationReport(analysis)
 	return analysis, nil
 }
 

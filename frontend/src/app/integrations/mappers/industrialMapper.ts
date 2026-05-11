@@ -1,4 +1,5 @@
 import type { IndustrialAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asBucket, asConversation } from "./mapperPrimitives";
 import { asIndustrialControlCommands, asIndustrialDetails, asIndustrialRuleHits } from "./industrialDetailMapper";
 import { asModbusAnalysis, asModbusSuspiciousWrites } from "./modbusMapper";
@@ -14,5 +15,6 @@ export function asIndustrialAnalysis(payload: any): IndustrialAnalysis {
     ruleHits: asIndustrialRuleHits(payload.rule_hits),
     details: asIndustrialDetails(payload.details),
     notes: Array.isArray(payload.notes) ? payload.notes.map((item: unknown) => String(item ?? "")) : [],
+    report: asInvestigationReport(payload.report),
   };
 }

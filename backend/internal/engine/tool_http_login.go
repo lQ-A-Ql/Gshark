@@ -123,6 +123,7 @@ func buildHTTPLoginAnalysisFromPackets(ctx context.Context, packets []model.Pack
 	}
 
 	aggregateHTTPLoginAnalysis(&result)
+	result.Report = buildHTTPLoginInvestigationReport(result)
 	return result, nil
 }
 

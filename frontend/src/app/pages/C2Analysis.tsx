@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { MetricCard, StatusHint } from "../components/DesignSystem";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { AnalysisBucketChart, AnalysisList } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { CSDNSAggregates, CSHostURIAggregates, VShellStreamAggregates } from "../features/c2/C2AggregateTables";
@@ -152,6 +153,12 @@ export default function C2Analysis() {
           <C2FeatureCard key={item.title} title={item.title} text={item.text} />
         ))}
       </div>
+      <InvestigationReportPanel
+        className="mt-4"
+        preferredProtocol="HTTP"
+        report={family.report}
+        title={`${familyLabel} 调查报告`}
+      />
 
       {activeTab === "vshell" && (
         <>

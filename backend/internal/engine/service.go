@@ -1733,6 +1733,7 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 	if err != nil {
 		return model.IndustrialAnalysis{}, err
 	}
+	analysis.Report = buildIndustrialInvestigationReport(analysis)
 
 	s.mu.Lock()
 	if s.industrialAnalysis == nil {
@@ -1767,6 +1768,7 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 	if err != nil {
 		return model.VehicleAnalysis{}, err
 	}
+	analysis.Report = buildVehicleInvestigationReport(analysis)
 
 	s.mu.Lock()
 	if s.vehicleAnalysis == nil {
@@ -1966,6 +1968,7 @@ func (s *Service) USBAnalysis() (model.USBAnalysis, error) {
 	if err != nil {
 		return model.USBAnalysis{}, err
 	}
+	analysis.Report = buildUSBInvestigationReport(analysis)
 
 	s.mu.Lock()
 	if s.usbAnalysis == nil {
@@ -2015,6 +2018,8 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 	if err := ctx.Err(); err != nil {
 		return model.C2SampleAnalysis{}, err
 	}
+	analysis.CS.Report = buildC2FamilyInvestigationReport("cs", analysis.CS)
+	analysis.VShell.Report = buildC2FamilyInvestigationReport("vshell", analysis.VShell)
 
 	s.mu.Lock()
 	if s.c2Analysis == nil {
@@ -2041,6 +2046,7 @@ func emptyC2SampleAnalysis() model.C2SampleAnalysis {
 			Notes:            []string{},
 			RelatedActors:    []model.TrafficBucket{},
 			DeliveryChains:   []model.TrafficBucket{},
+			Report:           emptyInvestigationReport(),
 		},
 		VShell: model.C2FamilyAnalysis{
 			CandidateCount:   0,
@@ -2053,6 +2059,7 @@ func emptyC2SampleAnalysis() model.C2SampleAnalysis {
 			Notes:            []string{},
 			RelatedActors:    []model.TrafficBucket{},
 			DeliveryChains:   []model.TrafficBucket{},
+			Report:           emptyInvestigationReport(),
 		},
 		Notes: []string{},
 	}

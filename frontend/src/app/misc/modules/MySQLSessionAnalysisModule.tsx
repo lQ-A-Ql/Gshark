@@ -4,6 +4,7 @@ import type { MySQLAnalysis } from "../../core/types";
 import { bridge } from "../../integrations/wailsBridge";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
@@ -19,6 +20,7 @@ import {
   selectMySQLSession,
   type MySQLSessionFilter,
 } from "./MySQLSessionAnalysisUtils";
+import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 
 const EMPTY_ANALYSIS: MySQLAnalysis = {
   sessionCount: 0,
@@ -28,6 +30,7 @@ const EMPTY_ANALYSIS: MySQLAnalysis = {
   resultsetCount: 0,
   sessions: [],
   notes: [],
+  report: EMPTY_INVESTIGATION_REPORT,
 };
 
 export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
@@ -137,6 +140,7 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
 
         {!error && <NotesList notes={analysis.notes} />}
         {error && <ErrorBlock message={error} />}
+        <InvestigationReportPanel report={analysis.report} preferredProtocol="TCP" />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.94fr)_minmax(0,1.06fr)]">
           <MySQLSessionList

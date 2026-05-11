@@ -1,4 +1,5 @@
 import type { SMTPAnalysis, SMTPSession } from "../../core/types";
+import { renderInvestigationReportText } from "./investigationReportText";
 
 export type SMTPSessionFilter = "ALL" | "AUTH" | "ATTACHMENT";
 
@@ -80,6 +81,10 @@ export function renderSMTPAnalysisText(analysis: SMTPAnalysis) {
       if (message.bodyPreview) lines.push(`    Body: ${message.bodyPreview}`);
     }
     lines.push("");
+  }
+  const reportText = renderInvestigationReportText(analysis.report);
+  if (reportText) {
+    lines.push(reportText);
   }
   return lines.join("\n");
 }

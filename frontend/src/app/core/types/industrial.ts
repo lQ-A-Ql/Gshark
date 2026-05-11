@@ -1,3 +1,4 @@
+import type { InvestigationReport } from "./report";
 import type { AnalysisConversation, TrafficBucket } from "./traffic";
 
 export interface ModbusBitRange {
@@ -127,4 +128,5 @@ export interface IndustrialAnalysis {
   ruleHits?: IndustrialRuleHit[];
   details: IndustrialProtocolDetail[];
   notes: string[];
+  report?: InvestigationReport;
 }

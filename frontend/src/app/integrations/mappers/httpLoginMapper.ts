@@ -1,4 +1,5 @@
 import type { HTTPLoginAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asBucket, asPositiveFiniteNumbers, asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 
 export function asHTTPLoginAnalysis(input: any): HTTPLoginAnalysis {
@@ -64,5 +65,6 @@ export function asHTTPLoginAnalysis(input: any): HTTPLoginAnalysis {
         }))
       : [],
     notes: asStringList(input.notes),
+    report: asInvestigationReport(input.report),
   };
 }

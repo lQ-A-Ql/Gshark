@@ -5,6 +5,7 @@ import { bridge } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useMiscModuleAnalysis } from "../hooks/useMiscModuleAnalysis";
@@ -20,6 +21,7 @@ import {
   selectHTTPLoginEndpoint,
   type HTTPLoginResultFilter,
 } from "./HTTPLoginAnalysisUtils";
+import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 
 const EMPTY_ANALYSIS: HTTPLoginAnalysis = {
   totalAttempts: 0,
@@ -31,6 +33,7 @@ const EMPTY_ANALYSIS: HTTPLoginAnalysis = {
   endpoints: [],
   attempts: [],
   notes: [],
+  report: EMPTY_INVESTIGATION_REPORT,
 };
 
 export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
@@ -146,6 +149,7 @@ export function HTTPLoginAnalysisModule({ module, surfaceVariant = "card" }: Mis
 
         {!error && <NotesList notes={analysis.notes} />}
         {error && <ErrorBlock message={error} />}
+        <InvestigationReportPanel report={analysis.report} preferredProtocol="HTTP" />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
           <HTTPLoginEndpointList

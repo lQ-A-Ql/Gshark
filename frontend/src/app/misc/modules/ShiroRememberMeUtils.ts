@@ -1,4 +1,5 @@
 import type { ShiroRememberMeAnalysis, ShiroRememberMeCandidate } from "../../core/types";
+import { renderInvestigationReportText } from "./investigationReportText";
 
 export type ShiroRememberMeCandidateFilter = "ALL" | "HIT" | "DELETEME";
 
@@ -72,6 +73,10 @@ export function renderShiroAnalysisText(analysis: ShiroRememberMeAnalysis) {
     for (const result of candidate.keyResults ?? []) {
       lines.push(renderShiroKeyResultLine(result));
     }
+  }
+  const reportText = renderInvestigationReportText(analysis.report);
+  if (reportText) {
+    lines.push("", reportText);
   }
   return lines.join("\n");
 }

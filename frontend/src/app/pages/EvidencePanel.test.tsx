@@ -110,8 +110,9 @@ describe("EvidencePanel", () => {
       expect(screen.getByText("证据链总览")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "车机分析" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "USB 分析" })).toBeInTheDocument();
-      expect(screen.getByText("UDS 负响应: 0x27 Security Access / 安全访问被拒")).toBeInTheDocument();
-      expect(screen.getByText("USB 存储写入: WRITE(10) / Bus 1 Device 2 / LUN 0")).toBeInTheDocument();
+      expect(screen.getByText("统一证据调查报告")).toBeInTheDocument();
+      expect(screen.getAllByText("UDS 负响应: 0x27 Security Access / 安全访问被拒").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("USB 存储写入: WRITE(10) / Bus 1 Device 2 / LUN 0").length).toBeGreaterThan(0);
     });
 
     expect(screen.queryByRole("button", { name: "MISC" })).not.toBeInTheDocument();
@@ -122,7 +123,7 @@ describe("EvidencePanel", () => {
     render(<EvidencePanel />);
 
     await waitFor(() => {
-      expect(screen.getByText("UDS 负响应: 0x27 Security Access / 安全访问被拒")).toBeInTheDocument();
+      expect(screen.getAllByText("UDS 负响应: 0x27 Security Access / 安全访问被拒").length).toBeGreaterThan(0);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "车机分析" }));

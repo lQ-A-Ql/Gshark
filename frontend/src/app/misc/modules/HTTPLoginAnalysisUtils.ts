@@ -1,4 +1,5 @@
 import type { HTTPLoginAnalysis, HTTPLoginEndpoint } from "../../core/types";
+import { renderInvestigationReportText } from "./investigationReportText";
 
 export type HTTPLoginResultFilter = "ALL" | "SUCCESS" | "FAILURE" | "UNCERTAIN";
 
@@ -71,6 +72,11 @@ export function renderHTTPLoginAnalysisText(analysis: HTTPLoginAnalysis) {
     if ((endpoint.responseIndicators?.length ?? 0) > 0) {
       lines.push(`  响应信号: ${endpoint.responseIndicators!.join(", ")}`);
     }
+  }
+  const reportText = renderInvestigationReportText(analysis.report);
+  if (reportText) {
+    lines.push("");
+    lines.push(reportText);
   }
   return lines.join("\n");
 }

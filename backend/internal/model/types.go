@@ -266,6 +266,7 @@ type HTTPLoginAnalysis struct {
 	Endpoints          []HTTPLoginEndpoint `json:"endpoints,omitempty"`
 	Attempts           []HTTPLoginAttempt  `json:"attempts,omitempty"`
 	Notes              []string            `json:"notes,omitempty"`
+	Report             InvestigationReport `json:"report,omitempty"`
 }
 
 type SMTPCommandRecord struct {
@@ -315,12 +316,13 @@ type SMTPSession struct {
 }
 
 type SMTPAnalysis struct {
-	SessionCount        int           `json:"session_count"`
-	MessageCount        int           `json:"message_count"`
-	AuthCount           int           `json:"auth_count"`
-	AttachmentHintCount int           `json:"attachment_hint_count"`
-	Sessions            []SMTPSession `json:"sessions,omitempty"`
-	Notes               []string      `json:"notes,omitempty"`
+	SessionCount        int                 `json:"session_count"`
+	MessageCount        int                 `json:"message_count"`
+	AuthCount           int                 `json:"auth_count"`
+	AttachmentHintCount int                 `json:"attachment_hint_count"`
+	Sessions            []SMTPSession       `json:"sessions,omitempty"`
+	Notes               []string            `json:"notes,omitempty"`
+	Report              InvestigationReport `json:"report,omitempty"`
 }
 
 type MySQLQueryRecord struct {
@@ -368,13 +370,14 @@ type MySQLSession struct {
 }
 
 type MySQLAnalysis struct {
-	SessionCount   int            `json:"session_count"`
-	LoginCount     int            `json:"login_count"`
-	QueryCount     int            `json:"query_count"`
-	ErrorCount     int            `json:"error_count"`
-	ResultsetCount int            `json:"resultset_count"`
-	Sessions       []MySQLSession `json:"sessions,omitempty"`
-	Notes          []string       `json:"notes,omitempty"`
+	SessionCount   int                 `json:"session_count"`
+	LoginCount     int                 `json:"login_count"`
+	QueryCount     int                 `json:"query_count"`
+	ErrorCount     int                 `json:"error_count"`
+	ResultsetCount int                 `json:"resultset_count"`
+	Sessions       []MySQLSession      `json:"sessions,omitempty"`
+	Notes          []string            `json:"notes,omitempty"`
+	Report         InvestigationReport `json:"report,omitempty"`
 }
 
 type ShiroRememberMeKeyResult struct {
@@ -414,6 +417,7 @@ type ShiroRememberMeAnalysis struct {
 	HitCount       int                        `json:"hit_count"`
 	Candidates     []ShiroRememberMeCandidate `json:"candidates,omitempty"`
 	Notes          []string                   `json:"notes,omitempty"`
+	Report         InvestigationReport        `json:"report,omitempty"`
 }
 
 type ShiroRememberMeRequest struct {
@@ -795,6 +799,7 @@ type C2FamilyAnalysis struct {
 	Notes             []string                  `json:"notes"`
 	RelatedActors     []TrafficBucket           `json:"related_actors,omitempty"`
 	DeliveryChains    []TrafficBucket           `json:"delivery_chains,omitempty"`
+	Report            InvestigationReport       `json:"report,omitempty"`
 }
 
 type C2SampleAnalysis struct {
@@ -1054,6 +1059,7 @@ type IndustrialAnalysis struct {
 	RuleHits               []IndustrialRuleHit        `json:"rule_hits,omitempty"`
 	Details                []IndustrialProtocolDetail `json:"details"`
 	Notes                  []string                   `json:"notes"`
+	Report                 InvestigationReport        `json:"report,omitempty"`
 }
 
 type CANFrameSummary struct {
@@ -1239,6 +1245,7 @@ type VehicleAnalysis struct {
 	DoIP                DoIPAnalysis           `json:"doip"`
 	UDS                 UDSAnalysis            `json:"uds"`
 	Recommendations     []string               `json:"recommendations"`
+	Report              InvestigationReport    `json:"report,omitempty"`
 }
 
 type MediaArtifact struct {
@@ -1475,6 +1482,7 @@ type USBAnalysis struct {
 	MassStorage        USBMassStorageAnalysis `json:"mass_storage"`
 	Other              USBOtherAnalysis       `json:"other"`
 	Notes              []string               `json:"notes"`
+	Report             InvestigationReport    `json:"report,omitempty"`
 }
 
 type EvidenceRecord struct {

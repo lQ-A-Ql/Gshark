@@ -1,6 +1,7 @@
 import { Usb } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
+import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import type { USBAnalysis as USBAnalysisData, USBMassStorageOperation } from "../core/types";
 import { Banner } from "../features/usb/UsbAnalysisControls";
@@ -105,6 +106,12 @@ export default function UsbAnalysis() {
         analysis={analysis}
         activePrimaryTab={activePrimaryTab}
         onPrimaryTabChange={setActivePrimaryTab}
+      />
+      <InvestigationReportPanel
+        className="mt-4"
+        preferredProtocol="TCP"
+        report={analysis.report}
+        title="USB 调查报告"
       />
 
       {activePrimaryTab === "hid" && <UsbHidPanel analysis={analysis} />}

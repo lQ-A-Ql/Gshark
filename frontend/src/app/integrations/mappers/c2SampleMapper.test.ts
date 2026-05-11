@@ -105,9 +105,21 @@ describe("c2SampleMapper", () => {
         notes: ["cs note"],
         related_actors: [{ label: "actor", count: 1 }],
         delivery_chains: [{ label: "http", count: 1 }],
+        report: {
+          summary: [{ title: "CS 候选概览", summary: "候选 2 / 规则位 1 / 通道 1" }],
+          evidence: [{ title: "candidate", severity: "high", packet_id: 9, stream_id: 4 }],
+          details: [{ title: "c2.example /submit.php", packet_id: 9 }],
+          recommendations: ["优先回到最高置信候选原始包。"],
+        },
       },
       vshell: {
         candidates: [{ packet_id: 11, family: "vshell", summary: "vshell candidate" }],
+        report: {
+          summary: [{ title: "VSHELL 候选概览", summary: "候选 1 / 规则位 0 / 通道 0" }],
+          evidence: [{ title: "vshell candidate", severity: "medium", packet_id: 11 }],
+          details: [],
+          recommendations: [],
+        },
       },
     });
 
@@ -142,6 +154,13 @@ describe("c2SampleMapper", () => {
       attributionConfidence: 55,
     });
     expect(result.vshell.candidates[0]).toMatchObject({ packetId: 11, family: "vshell" });
+    expect(result.cs.report?.evidence[0]).toMatchObject({
+      title: "candidate",
+      severity: "high",
+      packetId: 9,
+      streamId: 4,
+    });
+    expect(result.vshell.report?.summary[0]).toMatchObject({ title: "VSHELL 候选概览" });
     expect(result.notes).toEqual(["sample note"]);
   });
 
@@ -161,5 +180,6 @@ describe("c2SampleMapper", () => {
     });
     expect(result.cs.notes).toEqual([]);
     expect(result.vshell.candidates).toEqual([]);
+    expect(result.cs.report?.summary).toEqual([]);
   });
 });

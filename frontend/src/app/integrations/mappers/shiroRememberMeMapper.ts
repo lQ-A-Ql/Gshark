@@ -1,4 +1,5 @@
 import type { ShiroRememberMeAnalysis } from "../../core/types";
+import { asInvestigationReport } from "./investigationReportMapper";
 import { asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 
 export function asShiroRememberMeAnalysis(input: any): ShiroRememberMeAnalysis {
@@ -39,5 +40,6 @@ export function asShiroRememberMeAnalysis(input: any): ShiroRememberMeAnalysis {
         }))
       : [],
     notes: asStringList(input.notes),
+    report: asInvestigationReport(input.report),
   };
 }

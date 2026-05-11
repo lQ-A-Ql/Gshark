@@ -101,6 +101,7 @@ func buildShiroRememberMeAnalysisFromPackets(ctx context.Context, packets []mode
 		return analysis.Candidates[i].CookieName < analysis.Candidates[j].CookieName
 	})
 	analysis.Notes = buildShiroRememberMeNotes(analysis)
+	analysis.Report = buildShiroInvestigationReport(analysis)
 	return analysis, nil
 }
 
