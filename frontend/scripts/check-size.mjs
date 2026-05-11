@@ -302,6 +302,11 @@ export const sourceSizeBudgets = [
     reason: "selected packet resources hook should only compose detail, raw hex, and layers artifact loading",
   },
   {
+    path: "src/app/state/hooks/useSentinelDerivedView.ts",
+    maxLines: 45,
+    reason: "sentinel derived view hook should only memoize pure derived packet state",
+  },
+  {
     path: "src/app/state/hooks/useStreamSwitchMetrics.ts",
     maxLines: 45,
     reason: "stream switch metrics hook should only own metric state, refs, and sample recording",
@@ -1552,6 +1557,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketResources.test.tsx",
     maxLines: 70,
     reason: "selected packet resources hook tests should stay focused on composed detail, raw, and layer loading",
+  },
+  {
+    path: "src/app/state/hooks/useSentinelDerivedView.test.tsx",
+    maxLines: 70,
+    reason: "sentinel derived view hook tests should stay focused on memoization and selected packet changes",
   },
   {
     path: "src/app/state/hooks/useStreamSwitchMetrics.test.tsx",

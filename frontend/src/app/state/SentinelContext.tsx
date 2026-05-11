@@ -26,7 +26,6 @@ import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
-import { buildSentinelDerivedView } from "./sentinelDerivedView";
 import type { SentinelContextValue } from "./sentinelTypes";
 import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
@@ -51,6 +50,7 @@ import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
 import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepare";
 import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
+import { useSentinelDerivedView } from "./hooks/useSentinelDerivedView";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -310,19 +310,15 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     hasMorePacketsRef.current = hasMorePackets;
   }, [hasMorePackets]);
 
-  const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useMemo(
-    () =>
-      buildSentinelDerivedView({
-        packets,
-        selectedPacketId,
-        selectedPacketDetail,
-        selectedPacketLayers,
-        pageStart,
-        totalPackets,
-        pageSize: PAGE_SIZE,
-      }),
-    [packets, pageStart, selectedPacketDetail, selectedPacketId, selectedPacketLayers, totalPackets],
-  );
+  const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useSentinelDerivedView({
+    packets,
+    selectedPacketId,
+    selectedPacketDetail,
+    selectedPacketLayers,
+    pageStart,
+    totalPackets,
+    pageSize: PAGE_SIZE,
+  });
 
   const refreshAnalysisResult = useRefreshAnalysisResult({
     activeCapturePathRef,
