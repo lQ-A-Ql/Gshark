@@ -7,10 +7,12 @@ export { RawStreamDialog } from "./RawStreamDialog";
 export {
   RawStreamPayloadGrid,
   RawStreamSelectedPanel,
+} from "./RawStreamPayloadPanels";
+export {
   TCP_RAW_STREAM_TONE,
   UDP_RAW_STREAM_TONE,
   type RawStreamTone,
-} from "./RawStreamPayloadPanels";
+} from "./RawStreamTone";
 
 interface RawStreamTitleBarProps {
   chunkCount: number;

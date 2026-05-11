@@ -1,7 +1,9 @@
 import { type MutableRefObject } from "react";
 import { StreamChunkCard, StreamCurrentChunkPanel } from "../components/stream/StreamWorkbench";
-import { cn } from "../components/ui/utils";
 import type { StreamLoadMeta } from "../core/types";
+import { RawDirectionBadge } from "./RawStreamDirectionBadge";
+import { RawStreamLoadMore } from "./RawStreamLoadMore";
+import type { RawStreamTone } from "./RawStreamTone";
 import {
   buildRawStreamChunkChips,
   getRawDirectionLabel,
@@ -10,27 +12,6 @@ import {
   type RawViewMode,
   type VisibleRawChunk,
 } from "./RawStreamUtils";
-
-export type RawStreamTone = {
-  clientBadge: string;
-  clientCard: string;
-  serverBadge: string;
-  serverCard: string;
-};
-
-export const TCP_RAW_STREAM_TONE: RawStreamTone = {
-  clientBadge: "border-rose-200 bg-rose-50 text-rose-700",
-  clientCard: "border-rose-500/30 bg-rose-500/10 text-rose-700",
-  serverBadge: "border-blue-200 bg-blue-50 text-blue-700",
-  serverCard: "border-blue-500/30 bg-blue-500/10 text-blue-700",
-};
-
-export const UDP_RAW_STREAM_TONE: RawStreamTone = {
-  clientBadge: "border-amber-200 bg-amber-50 text-amber-700",
-  clientCard: "border-amber-500/30 bg-amber-500/10 text-amber-700",
-  serverBadge: "border-cyan-200 bg-cyan-50 text-cyan-700",
-  serverCard: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700",
-};
 
 interface RawStreamPayloadGridProps {
   chunks: VisibleRawChunk[];
@@ -128,44 +109,6 @@ export function RawStreamPayloadGrid({
   );
 }
 
-interface RawStreamLoadMoreProps {
-  hasMore: boolean;
-  loadedChunkCount: number;
-  loadingMore: boolean;
-  loadingText: string;
-  totalChunks: number;
-  onLoadMore: () => void;
-}
-
-function RawStreamLoadMore({
-  hasMore,
-  loadedChunkCount,
-  loadingMore,
-  loadingText,
-  totalChunks,
-  onLoadMore,
-}: RawStreamLoadMoreProps) {
-  if (!loadingMore && !hasMore) return null;
-
-  if (loadingText) {
-    return (
-      <div className="flex justify-center pt-2 text-xs text-muted-foreground">
-        {loadingMore ? "正在加载更多流片段..." : loadingText}
-      </div>
-    );
-  }
-
-  return (
-    <button
-      className="mt-2 self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
-      onClick={onLoadMore}
-      disabled={loadingMore}
-    >
-      {loadingMore ? "正在加载..." : `加载更多 (${loadedChunkCount}/${totalChunks || loadedChunkCount})`}
-    </button>
-  );
-}
-
 interface RawStreamSelectedPanelProps {
   chunk: VisibleRawChunk | null;
   description: string;
@@ -196,18 +139,5 @@ export function RawStreamSelectedPanel({
       showOpenButton={chunk ? isRawStreamChunkTruncated(chunk.body, viewMode) : false}
       onOpen={() => chunk && onOpenChunk(chunk)}
     />
-  );
-}
-
-function RawDirectionBadge({ chunk, tone }: { chunk: VisibleRawChunk; tone: RawStreamTone }) {
-  return (
-    <span
-      className={cn(
-        "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-        chunk.direction === "client" ? tone.clientBadge : tone.serverBadge,
-      )}
-    >
-      {getRawDirectionLabel(chunk.direction)}
-    </span>
   );
 }

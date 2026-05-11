@@ -1546,8 +1546,23 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/RawStreamPayloadPanels.tsx",
-    maxLines: 215,
-    reason: "raw stream payload panels should own shared TCP/UDP chunk grid, tone, and selected chunk rendering",
+    maxLines: 150,
+    reason: "raw stream payload panels should own chunk grid and selected chunk rendering only",
+  },
+  {
+    path: "src/app/pages/RawStreamTone.ts",
+    maxLines: 25,
+    reason: "raw stream tone constants should stay isolated from panel rendering",
+  },
+  {
+    path: "src/app/pages/RawStreamLoadMore.tsx",
+    maxLines: 45,
+    reason: "raw stream load-more control should stay focused on incremental loading UI",
+  },
+  {
+    path: "src/app/pages/RawStreamDirectionBadge.tsx",
+    maxLines: 20,
+    reason: "raw stream direction badge should stay focused on direction tone rendering",
   },
   {
     path: "src/app/pages/RawStreamControlBar.tsx",
