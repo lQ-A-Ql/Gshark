@@ -1,5 +1,5 @@
-import { confidenceLabel } from "../../features/evidence/evidenceSchema";
-import type { EvidenceModule, UnifiedEvidenceRecord } from "../../features/evidence/evidenceSchema";
+import { confidenceLabel } from "../../core/types";
+import type { EvidenceModule, UnifiedEvidenceRecord } from "../../core/types";
 
 export function parseEvidenceRecords(payload: any): UnifiedEvidenceRecord[] {
   const records = Array.isArray(payload?.records) ? payload.records : [];

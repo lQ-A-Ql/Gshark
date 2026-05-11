@@ -8,7 +8,6 @@ import (
 
 	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
-	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 func (s *Server) handleImportMiscModulePackage(w http.ResponseWriter, r *http.Request) {
@@ -76,8 +75,8 @@ func (s *Server) handlePackagedMiscModuleRoute(w http.ResponseWriter, r *http.Re
 	if s.svc != nil {
 		runtime.CapturePath = s.svc.CurrentCapturePath()
 		runtime.PythonPath = s.svc.ToolRuntimeSnapshot().Config.PythonPath
+		runtime.TSharkPath = s.svc.TSharkStatusPath()
 	}
-	runtime.TSharkPath = tshark.CurrentStatus().Path
 	result, err := s.miscPkgMgr.Invoke(r.Context(), parts[0], req, runtime)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

@@ -20,7 +20,6 @@ import (
 	"github.com/gshark/sentinel/backend/internal/engine"
 	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
-	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 type apiError struct {
@@ -191,7 +190,7 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, tshark.CurrentStatus())
+		writeJSON(w, http.StatusOK, s.svc.TSharkStatus())
 	case http.MethodPost:
 		var payload struct {
 			Path string `json:"path"`
@@ -200,8 +199,7 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		tshark.SetBinaryPath(payload.Path)
-		writeJSON(w, http.StatusOK, tshark.CurrentStatus())
+		writeJSON(w, http.StatusOK, s.svc.SetTSharkPath(payload.Path))
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
@@ -331,15 +329,14 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "capture file path points to a directory")
 		return
 	}
-	tsharkStatus := tshark.CurrentStatus()
 	log.Printf(
 		"http: capture start requested file=%q size=%d filter=%q fast_list=%t tshark=%q custom=%t",
 		options.FilePath,
 		info.Size(),
 		options.DisplayFilter,
 		options.FastList,
-		tsharkStatus.Path,
-		tsharkStatus.UsingCustomPath,
+		s.svc.TSharkStatusPath(),
+		s.svc.TSharkUsingCustomPath(),
 	)
 	s.promoteUploadedFile(options.FilePath)
 	loadRunID, loadCtx := s.svc.BeginCaptureLoad(context.WithoutCancel(r.Context()))

@@ -20,9 +20,19 @@ jobs:
         with:
           go-version-file: backend/go.mod
 
+      - name: Root desktop dev-tag tests
+        working-directory: .
+        run: go test -tags dev ./...
+
       - name: Go fmt check
         run: |
           test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Backend boundary check
+        run: go test ./internal/architecture -run TestBackendArchitectureBoundaries -count=1 -v
+
+      - name: Backend focused contracts
+        run: go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
 
       - name: Go test
         run: go test ./...

@@ -213,6 +213,79 @@ func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
 	}
 }
 
+func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *testing.T) {
+	svc := NewService(nil, nil)
+	t.Cleanup(func() {
+		_ = svc.packetStore.Close()
+	})
+
+	svc.usbAnalysis = &model.USBAnalysis{
+		TotalUSBPackets:    4,
+		MassStoragePackets: 4,
+		MassStorage: model.USBMassStorageAnalysis{
+			WriteOperations: []model.USBMassStorageOperation{{
+				PacketID:       21,
+				Device:         "Disk A",
+				Endpoint:       "EP 0x02 (OUT)",
+				Command:        "WRITE(10)",
+				TransferLength: 4096,
+				Status:         "failed",
+				DataResidue:    512,
+			}},
+		},
+	}
+	svc.c2Analysis = &model.C2SampleAnalysis{
+		CS: model.C2FamilyAnalysis{
+			CandidateCount: 1,
+			Candidates: []model.C2IndicatorRecord{{
+				PacketID:       31,
+				StreamID:       7,
+				Family:         "cs",
+				IndicatorType:  "uri",
+				IndicatorValue: "/submit.php",
+				Confidence:     88,
+				Summary:        "C2 URI candidate",
+				Tags:           []string{"http"},
+			}},
+		},
+	}
+
+	evidence, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"usb", "c2"}})
+	if err != nil {
+		t.Fatalf("GatherEvidence() error = %v", err)
+	}
+	usbReport := buildUSBInvestigationReport(*svc.usbAnalysis)
+	c2Report := buildC2FamilyInvestigationReport("cs", svc.c2Analysis.CS)
+
+	usbEvidence := firstEvidenceByModule(evidence.Records, "usb")
+	if usbEvidence == nil || len(usbReport.Evidence) == 0 {
+		t.Fatalf("expected USB evidence and report items, got evidence=%+v report=%+v", evidence.Records, usbReport)
+	}
+	if usbEvidence.PacketID != usbReport.Evidence[0].PacketID || usbEvidence.Severity != usbReport.Evidence[0].Severity {
+		t.Fatalf("USB evidence/report mismatch: evidence=%+v report=%+v", *usbEvidence, usbReport.Evidence[0])
+	}
+
+	c2Evidence := firstEvidenceByModule(evidence.Records, "c2")
+	if c2Evidence == nil || len(c2Report.Evidence) == 0 {
+		t.Fatalf("expected C2 evidence and report items, got evidence=%+v report=%+v", evidence.Records, c2Report)
+	}
+	if c2Evidence.PacketID != c2Report.Evidence[0].PacketID ||
+		c2Evidence.StreamID != c2Report.Evidence[0].StreamID ||
+		c2Evidence.Severity != c2Report.Evidence[0].Severity {
+		t.Fatalf("C2 evidence/report mismatch: evidence=%+v report=%+v", *c2Evidence, c2Report.Evidence[0])
+	}
+}
+
+func firstEvidenceByModule(records []model.EvidenceRecord, module string) *model.EvidenceRecord {
+	for _, record := range records {
+		if record.Module == module {
+			copy := record
+			return &copy
+		}
+	}
+	return nil
+}
+
 func containsEvidenceString(items []string, want string) bool {
 	for _, item := range items {
 		if item == want {

@@ -38,8 +38,8 @@ import type {
   SMB3SessionCandidate,
   SMB3RandomSessionKeyRequest,
   SMB3RandomSessionKeyResult,
+  UnifiedEvidenceRecord,
 } from "../core/types";
-import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 import type { EventHandlers } from "./clients/eventClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";

@@ -70,6 +70,23 @@ func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
 	}
 }
 
+func (s *Service) TSharkStatus() any {
+	return tshark.CurrentStatus()
+}
+
+func (s *Service) SetTSharkPath(path string) any {
+	tshark.SetBinaryPath(strings.TrimSpace(path))
+	return tshark.CurrentStatus()
+}
+
+func (s *Service) TSharkStatusPath() string {
+	return tshark.CurrentStatus().Path
+}
+
+func (s *Service) TSharkUsingCustomPath() bool {
+	return tshark.CurrentStatus().UsingCustomPath
+}
+
 func (s *Service) YaraStatus() model.YaraToolStatus {
 	s.huntMu.RLock()
 	yc := s.yaraConf

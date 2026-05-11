@@ -2,6 +2,7 @@ export * from "./packet";
 export * from "./stream";
 export * from "./traffic";
 export * from "./report";
+export * from "./evidence";
 export * from "./c2";
 export * from "./apt";
 export * from "./industrial";

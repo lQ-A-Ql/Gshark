@@ -13,9 +13,9 @@ function Invoke-Step {
   & $Action
 }
 
-Invoke-Step "Desktop shell tests" {
+Invoke-Step "Desktop shell dev-tag tests" {
   Set-Location $root
-  go test ./...
+  go test -tags dev ./...
 }
 
 Invoke-Step "Backend fmt check" {
@@ -30,6 +30,16 @@ Invoke-Step "Backend fmt check" {
 Invoke-Step "Backend tests" {
   Set-Location (Join-Path $root "backend")
   go test ./...
+}
+
+Invoke-Step "Backend boundary check" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/architecture -run TestBackendArchitectureBoundaries -count=1 -v
+}
+
+Invoke-Step "Backend focused contracts" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
 }
 
 Invoke-Step "Frontend package manager check" {
@@ -60,6 +70,11 @@ Invoke-Step "Frontend format check" {
 Invoke-Step "Frontend size check" {
   Set-Location (Join-Path $root "frontend")
   pnpm run size:check
+}
+
+Invoke-Step "Frontend boundary check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run boundary:check
 }
 
 Invoke-Step "Frontend build" {

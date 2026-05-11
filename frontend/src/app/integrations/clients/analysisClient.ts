@@ -3,10 +3,10 @@ import type {
   C2SampleAnalysis,
   GlobalTrafficStats,
   IndustrialAnalysis,
+  UnifiedEvidenceRecord,
   USBAnalysis,
   VehicleAnalysis,
 } from "../../core/types";
-import type { UnifiedEvidenceRecord } from "../../features/evidence/evidenceSchema";
 import { asAPTAnalysis } from "../mappers/aptMapper";
 import { asC2SampleAnalysis } from "../mappers/c2SampleMapper";
 import { parseEvidenceRecords } from "../mappers/evidenceMapper";
