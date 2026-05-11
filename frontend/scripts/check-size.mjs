@@ -614,8 +614,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/useStreamDecoderWorkbench.ts",
-    maxLines: 295,
+    maxLines: 280,
     reason: "decoder workbench state hook should own workflow state while inspection and presentation stay separate",
+  },
+  {
+    path: "src/app/components/useDecoderSettingsState.ts",
+    maxLines: 30,
+    reason: "decoder settings hook should only own persistence and hint merging",
+  },
+  {
+    path: "src/app/components/useDecoderBatchRange.ts",
+    maxLines: 25,
+    reason: "decoder batch range hook should only derive selected ordinal and range inputs",
+  },
+  {
+    path: "src/app/components/useDecoderSettingsState.test.tsx",
+    maxLines: 35,
+    reason: "decoder settings hook tests should stay focused on hint merge behavior",
+  },
+  {
+    path: "src/app/components/useDecoderBatchRange.test.tsx",
+    maxLines: 35,
+    reason: "decoder batch range tests should stay focused on selected ordinal behavior",
   },
   {
     path: "src/app/components/useStreamPayloadInspection.ts",

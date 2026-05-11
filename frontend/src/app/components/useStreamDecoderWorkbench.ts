@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { StreamDecodeResult, StreamDecoderKind } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import type { DecoderSettingsKind } from "./StreamDecoderSettingsPanel";
+import { useDecoderBatchRange } from "./useDecoderBatchRange";
+import { useDecoderSettingsState } from "./useDecoderSettingsState";
 import {
   buildDecoderOptions,
   clampBatchOrdinal,
@@ -11,13 +13,10 @@ import {
   normalizeTransportPayload,
   prepareDecoderInput,
   isAbortError,
-  persistDecoderSettings,
-  readDecoderSettings,
   type BatchDecodeProgress,
   type BatchItem,
   type DecoderApplyMode,
   type DecoderHintSource,
-  type DecoderSettings,
 } from "./StreamDecoderWorkbenchUtils";
 import { useStreamPayloadInspection } from "./useStreamPayloadInspection";
 
@@ -43,7 +42,6 @@ export function useStreamDecoderWorkbench({
   onApplyDecodedBatch,
   sourceHint,
 }: StreamDecoderWorkbenchProps) {
-  const [settings, setSettings] = useState<DecoderSettings>(() => readDecoderSettings());
   const [activeSettings, setActiveSettings] = useState<DecoderSettingsKind | null>(null);
   const [result, setResult] = useState<StreamDecodeResult | null>(null);
   const [decodeError, setDecodeError] = useState("");
@@ -54,17 +52,6 @@ export function useStreamDecoderWorkbench({
   const [applyMode, setApplyMode] = useState<DecoderApplyMode>("derived");
   const activeDecodeAbortRef = useRef<AbortController | null>(null);
   const canOverwrite = Boolean(onApplyDecoded);
-  const selectedBatchOrdinal = useMemo(() => {
-    if (!batchItems || batchItems.length === 0) return 1;
-    const hit = batchItems.findIndex((item) => item.index === selectedBatchIndex);
-    return (hit >= 0 ? hit : 0) + 1;
-  }, [batchItems, selectedBatchIndex]);
-  const [rangeStart, setRangeStart] = useState(() => String(selectedBatchOrdinal));
-  const [rangeEnd, setRangeEnd] = useState(() => String(selectedBatchOrdinal));
-
-  useEffect(() => {
-    persistDecoderSettings(settings);
-  }, [settings]);
 
   useEffect(() => {
     activeDecodeAbortRef.current?.abort();
@@ -91,11 +78,6 @@ export function useStreamDecoderWorkbench({
     }
   }, [applyMode, canOverwrite]);
 
-  useEffect(() => {
-    setRangeStart(String(selectedBatchOrdinal));
-    setRangeEnd(String(selectedBatchOrdinal));
-  }, [selectedBatchOrdinal, batchItems?.length]);
-
   const preparedPayload = useMemo(() => normalizeTransportPayload(payload), [payload]);
   const {
     inspection,
@@ -107,6 +89,11 @@ export function useStreamDecoderWorkbench({
   const activeHintSource = useMemo<DecoderHintSource | undefined>(
     () => mergeDecoderHintSources(selectedCandidate, sourceHint),
     [selectedCandidate, sourceHint],
+  );
+  const { settings, setSettings } = useDecoderSettingsState(activeHintSource);
+  const { rangeEnd, rangeStart, selectedBatchOrdinal, setRangeEnd, setRangeStart } = useDecoderBatchRange(
+    batchItems,
+    selectedBatchIndex,
   );
   const effectivePayload = useMemo(() => {
     const candidateValue = selectedCandidate?.value?.trim();
@@ -122,10 +109,6 @@ export function useStreamDecoderWorkbench({
   const hasPayload = preparedPayload.trim().length > 0;
   const hasBatchMode = Boolean(batchItems && batchItems.length > 0 && onApplyDecodedBatch);
   const batchCount = batchItems?.length ?? 0;
-
-  useEffect(() => {
-    setSettings((prev) => mergeHintIntoSettings(prev, activeHintSource));
-  }, [activeHintSource]);
 
   async function decodeOne(decoder: StreamDecoderKind, rawPayload: string, signal?: AbortSignal) {
     const normalized = normalizeTransportPayload(rawPayload);
