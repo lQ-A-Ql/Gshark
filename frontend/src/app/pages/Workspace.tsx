@@ -14,13 +14,16 @@ import { useSentinel } from "../state/SentinelContext";
 import { useWorkspaceFilterAction } from "./useWorkspaceFilterAction";
 import { useWorkspaceStreamNavigation } from "./useWorkspaceStreamNavigation";
 import {
-  getWorkspaceFilterErrorMessage,
-  getWorkspaceFilterLoadingDetail,
-  getWorkspaceFilterLoadingTitle,
+  getWorkspaceFilterPanelState,
   shouldShowWorkspaceOpenFailure,
   shouldShowWorkspaceSwitchFailureBanner,
   shouldShowWorkspaceWelcome,
 } from "./workspaceStatus";
+import {
+  getWorkspacePagerItems,
+  getWorkspacePreloadPercent,
+  shouldShowWorkspaceFilterLoadingBlankState,
+} from "./workspaceViewRules";
 
 export default function Workspace() {
   const {
@@ -102,31 +105,21 @@ export default function Workspace() {
     return () => window.removeEventListener("gshark:focus-filter", handler);
   }, []);
 
-  const preloadPercent = useMemo(() => {
-    if (preloadTotal <= 0) return 0;
-    return Math.max(0, Math.min(100, Math.floor((preloadProcessed / preloadTotal) * 100)));
-  }, [preloadProcessed, preloadTotal]);
+  const preloadPercent = useMemo(
+    () => getWorkspacePreloadPercent(preloadProcessed, preloadTotal),
+    [preloadProcessed, preloadTotal],
+  );
   const hasDeterministicPreloadProgress = preloadTotal > 0;
   const hasOpenedCapture = Boolean(fileMeta.path);
   const showFilterLoadingBlankState = useMemo(
-    () => isFilterLoading && !isPreloadingCapture && filteredPackets.length === 0,
+    () => shouldShowWorkspaceFilterLoadingBlankState(filteredPackets.length, isFilterLoading, isPreloadingCapture),
     [filteredPackets.length, isFilterLoading, isPreloadingCapture],
   );
-  const filterLoadingTitle = useMemo(
-    () => getWorkspaceFilterLoadingTitle(backendStatus, displayFilter),
+  const filterPanelState = useMemo(
+    () => getWorkspaceFilterPanelState(backendStatus, displayFilter),
     [backendStatus, displayFilter],
   );
-  const filterLoadingDetail = useMemo(() => getWorkspaceFilterLoadingDetail(displayFilter), [displayFilter]);
-  const filterErrorMessage = useMemo(
-    () => getWorkspaceFilterErrorMessage(backendStatus, displayFilter),
-    [backendStatus, displayFilter],
-  );
-  const pagerItems = useMemo(() => {
-    const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-    return Array.from(pages)
-      .filter((p) => p >= 1 && p <= totalPages)
-      .sort((a, b) => a - b);
-  }, [currentPage, totalPages]);
+  const pagerItems = useMemo(() => getWorkspacePagerItems(currentPage, totalPages), [currentPage, totalPages]);
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
 
@@ -188,7 +181,7 @@ export default function Workspace() {
         suggestions={filterSuggestions}
         inputRef={filterInputRef}
         disabled={isPreloadingCapture || isPageLoading}
-        errorMessage={filterErrorMessage}
+        errorMessage={filterPanelState.errorMessage}
         onChange={setDisplayFilter}
         onApply={() => applyFilterWithHistory()}
         onClear={clearFilter}
@@ -216,8 +209,8 @@ export default function Workspace() {
 
       <WorkspacePanels
         showFilterLoadingBlankState={showFilterLoadingBlankState}
-        filterLoadingTitle={filterLoadingTitle}
-        filterLoadingDetail={filterLoadingDetail}
+        filterLoadingTitle={filterPanelState.loadingTitle}
+        filterLoadingDetail={filterPanelState.loadingDetail}
         filterLoadingProgress={filterLoadingProgress}
         packetPageError={packetPageError}
         captureName={fileMeta.name}

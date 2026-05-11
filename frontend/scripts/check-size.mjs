@@ -1390,8 +1390,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/Workspace.tsx",
-    maxLines: 250,
+    maxLines: 240,
     reason: "workspace page should stay focused on state wiring, navigation, and selection orchestration",
+  },
+  {
+    path: "src/app/pages/workspaceViewRules.ts",
+    maxLines: 35,
+    reason: "workspace view rules should stay as pure pagination and progress display helpers",
+  },
+  {
+    path: "src/app/pages/workspaceStatus.ts",
+    maxLines: 55,
+    reason: "workspace status helpers should stay as pure status and filter-panel display rules",
   },
   {
     path: "src/app/pages/useWorkspaceStreamNavigation.ts",
@@ -1412,6 +1422,16 @@ export const sourceSizeBudgets = [
     path: "src/app/pages/useWorkspaceFilterAction.test.tsx",
     maxLines: 45,
     reason: "workspace filter action tests should stay focused on apply and clear behavior",
+  },
+  {
+    path: "src/app/pages/workspaceViewRules.test.ts",
+    maxLines: 35,
+    reason: "workspace view rule tests should stay focused on progress, pager, and blank-state helpers",
+  },
+  {
+    path: "src/app/pages/workspaceStatus.test.ts",
+    maxLines: 25,
+    reason: "workspace status tests should stay focused on filter-panel state rules",
   },
   {
     path: "src/app/components/workspace/WorkspaceTitleActions.tsx",

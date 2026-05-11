@@ -40,3 +40,11 @@ export function getWorkspaceFilterErrorMessage(message: string, displayFilter: s
   }
   return "";
 }
+
+export function getWorkspaceFilterPanelState(message: string, displayFilter: string) {
+  return {
+    loadingTitle: getWorkspaceFilterLoadingTitle(message, displayFilter),
+    loadingDetail: getWorkspaceFilterLoadingDetail(displayFilter),
+    errorMessage: getWorkspaceFilterErrorMessage(message, displayFilter),
+  };
+}
