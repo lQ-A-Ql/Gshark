@@ -5879,3 +5879,39 @@ Author: Codex
   - MISC remains outside unified Evidence.
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
+
+---
+
+## Round 161 - Vehicle Analysis Hook Domain Client Migration
+
+Time: 2026-05-12 00:48:39 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration after the Round 160 self-audit confirmed alignment.
+- Moved the vehicle analysis hook request from the aggregate `bridge` to `backendClients.analysis`.
+- Kept vehicle cache keys, DBC-aware cache invalidation, preload gating, abort handling, loading state, and error behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/vehicle/useVehicleAnalysis.ts` to call `backendClients.analysis.getVehicleAnalysis(signal)`.
+- Left `frontend/src/app/pages/VehicleAnalysis.tsx` DBC operations on the aggregate bridge for now because the page mixes analysis, DBC profile persistence, and desktop file-pick behavior.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/pages/VehicleAnalysis.test.ts src/app/integrations/bridgeDomains.test.ts` passed, 2 files / 3 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round intentionally migrated only the vehicle hook's analysis call and did not mix in DBC page operations.
+- Vehicle analysis now declares an analysis-domain dependency without exposing unrelated bridge methods to the hook.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: begin mixed-domain migrations cautiously, starting with small pages/hooks where method ownership is clear (`VehicleAnalysis.tsx` DBC calls, media playback/transcription, or stream payload tools).

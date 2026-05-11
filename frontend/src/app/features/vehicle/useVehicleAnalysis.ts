@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export const EMPTY_VEHICLE_ANALYSIS: VehicleAnalysisData = {
   totalVehiclePackets: 0,
@@ -78,7 +78,7 @@ export function useVehicleAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => bridge.getVehicleAnalysis(signal),
+        request: (signal) => backendClients.analysis.getVehicleAnalysis(signal),
         onSuccess: (payload) => {
           if (cacheKey) {
             vehicleAnalysisCache.set(cacheKey, payload);
