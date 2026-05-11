@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 171 - Raw Stream Page Domain Client Migration
+
+Time: 2026-05-12 02:28:14 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with a single raw stream page dependency.
+- Kept raw stream pagination, route selection, search, export, and rendering behavior unchanged.
+
+### Changes
+
+- Updated `pages/RawStreamPage.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Passed `backendClients.stream.getRawStreamPage` into `useRawStreamPageLoader`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/useRawStreamPageLoader.test.tsx src/app/pages/useRawStreamRouteSelection.test.tsx src/app/pages/RawStreamUtils.test.ts src/app/pages/RawStreamProtocolConfig.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Raw stream page-level pagination no longer depends on the aggregate bridge.
+- Deeper stream state wiring in `SentinelContext` still has direct bridge usage and remains a later, higher-coupling migration candidate.
+
+---
+
 ## Round 170 - Bridge Domain Migration Self-Check
 
 Time: 2026-05-12 02:26:10 +08:00  

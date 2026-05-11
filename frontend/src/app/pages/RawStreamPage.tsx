@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
 import {
@@ -41,7 +41,7 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const streamList = protocol === "TCP" ? streamIds.tcp : streamIds.udp;
   const { enableScrollLoad, loadingText, selectedPanelClass, tone } = getRawStreamProtocolConfig(protocol);
   const { loadError, loadingMore, loadMore } = useRawStreamPageLoader({
-    fetchRawStreamPage: bridge.getRawStreamPage,
+    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
     pageSize: STREAM_PAGE_SIZE,
     protocol,
     setStreamView,
