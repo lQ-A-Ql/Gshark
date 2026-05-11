@@ -1,5 +1,37 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 168 - Capture Mission Overview Domain Clients
+
+Time: 2026-05-12 02:20:32 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal in the capture mission overview hook.
+- Kept overview fetch/cache/unavailable-state behavior unchanged.
+
+### Changes
+
+- Updated `components/useCaptureMissionOverviewBundle.ts` to import `backendClients` instead of aggregate `bridge`.
+- Routed traffic, industrial, vehicle, and USB overview requests through `backendClients.analysis`.
+- Routed media overview request through `backendClients.media`.
+- Updated the focused hook test mock to expose `backendClients.analysis` and `backendClients.media`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/components/useCaptureMissionOverviewBundle.test.tsx src/app/integrations/bridgeDomains.test.ts src/app/integrations/clients/analysisClient.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Capture mission overview no longer depends on the aggregate bridge for read-only summary analysis calls.
+- The hook now mirrors existing per-feature domain ownership: analysis data via `analysis`, media data via `media`.
+
+---
+
 ## Round 167 - MISC Analysis Domain Client Migration
 
 Time: 2026-05-12 02:16:12 +08:00  

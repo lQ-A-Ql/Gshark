@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { GlobalTrafficStats, IndustrialAnalysis, MediaAnalysis, USBAnalysis, VehicleAnalysis } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 
 export interface CaptureMissionOverviewBundle {
   stats: GlobalTrafficStats | null;
@@ -44,11 +44,11 @@ export function useCaptureMissionOverviewBundle({
     const abortController = new AbortController();
     setOverviewLoading(true);
     void Promise.all([
-      bridge.getGlobalTrafficStats(abortController.signal).catch(() => null),
-      bridge.getIndustrialAnalysis(abortController.signal).catch(() => null),
-      bridge.getVehicleAnalysis(abortController.signal).catch(() => null),
-      bridge.getMediaAnalysis(false, abortController.signal).catch(() => null),
-      bridge.getUSBAnalysis(abortController.signal).catch(() => null),
+      backendClients.analysis.getGlobalTrafficStats(abortController.signal).catch(() => null),
+      backendClients.analysis.getIndustrialAnalysis(abortController.signal).catch(() => null),
+      backendClients.analysis.getVehicleAnalysis(abortController.signal).catch(() => null),
+      backendClients.media.getMediaAnalysis(false, abortController.signal).catch(() => null),
+      backendClients.analysis.getUSBAnalysis(abortController.signal).catch(() => null),
     ])
       .then(([stats, industrial, vehicle, media, usb]) => {
         if (cancelled) return;

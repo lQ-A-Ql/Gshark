@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useCaptureMissionOverviewBundle } from "./useCaptureMissionOverviewBundle";
 
-const bridgeMocks = vi.hoisted(() => ({
+const clientMocks = vi.hoisted(() => ({
   getGlobalTrafficStats: vi.fn(),
   getIndustrialAnalysis: vi.fn(),
   getVehicleAnalysis: vi.fn(),
@@ -12,17 +12,25 @@ const bridgeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
-  bridge: bridgeMocks,
+  backendClients: {
+    analysis: {
+      getGlobalTrafficStats: clientMocks.getGlobalTrafficStats,
+      getIndustrialAnalysis: clientMocks.getIndustrialAnalysis,
+      getVehicleAnalysis: clientMocks.getVehicleAnalysis,
+      getUSBAnalysis: clientMocks.getUSBAnalysis,
+    },
+    media: { getMediaAnalysis: clientMocks.getMediaAnalysis },
+  },
 }));
 
 describe("useCaptureMissionOverviewBundle", () => {
   beforeEach(() => {
-    Object.values(bridgeMocks).forEach((mock) => mock.mockReset());
-    bridgeMocks.getGlobalTrafficStats.mockResolvedValue({ totalPackets: 10 });
-    bridgeMocks.getIndustrialAnalysis.mockResolvedValue({ transactions: [] });
-    bridgeMocks.getVehicleAnalysis.mockResolvedValue({ messages: [] });
-    bridgeMocks.getMediaAnalysis.mockResolvedValue({ sessions: [] });
-    bridgeMocks.getUSBAnalysis.mockResolvedValue({ devices: [] });
+    Object.values(clientMocks).forEach((mock) => mock.mockReset());
+    clientMocks.getGlobalTrafficStats.mockResolvedValue({ totalPackets: 10 });
+    clientMocks.getIndustrialAnalysis.mockResolvedValue({ transactions: [] });
+    clientMocks.getVehicleAnalysis.mockResolvedValue({ messages: [] });
+    clientMocks.getMediaAnalysis.mockResolvedValue({ sessions: [] });
+    clientMocks.getUSBAnalysis.mockResolvedValue({ devices: [] });
   });
 
   it("loads overview analysis once per capture key and reuses cache", async () => {
@@ -35,17 +43,15 @@ describe("useCaptureMissionOverviewBundle", () => {
     await waitFor(() => expect(result.current.overviewBundle?.stats).toEqual({ totalPackets: 10 }));
     expect(result.current.overviewLoading).toBe(false);
     expect(result.current.overviewBundle?.stats).toEqual({ totalPackets: 10 });
-    expect(bridgeMocks.getGlobalTrafficStats).toHaveBeenCalledTimes(1);
+    expect(clientMocks.getGlobalTrafficStats).toHaveBeenCalledTimes(1);
     unmount();
 
-    const cached = renderHook(() => useCaptureMissionOverviewBundle({
-      backendConnected: true,
-      captureKey: "sample.pcapng::10",
-      isPreloadingCapture: false,
-    }));
+    const cached = renderHook(() =>
+      useCaptureMissionOverviewBundle({ backendConnected: true, captureKey: "sample.pcapng::10", isPreloadingCapture: false }),
+    );
 
     expect(cached.result.current.overviewBundle?.stats).toEqual({ totalPackets: 10 });
-    expect(bridgeMocks.getGlobalTrafficStats).toHaveBeenCalledTimes(1);
+    expect(clientMocks.getGlobalTrafficStats).toHaveBeenCalledTimes(1);
   });
 
   it("clears overview state while capture is unavailable", async () => {
