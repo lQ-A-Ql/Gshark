@@ -1394,6 +1394,26 @@ export const sourceSizeBudgets = [
     reason: "workspace title actions should compose capture, paging, and packet locator controls only",
   },
   {
+    path: "src/app/components/workspace/WorkspaceTopControls.tsx",
+    maxLines: 10,
+    reason: "workspace top controls should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/workspace/WorkspaceCaptureFileControls.tsx",
+    maxLines: 70,
+    reason: "workspace capture file controls should own path input and open/stop actions only",
+  },
+  {
+    path: "src/app/components/workspace/WorkspacePacketPagingControls.tsx",
+    maxLines: 110,
+    reason: "workspace packet paging controls should own page input, prev/next, and page buttons only",
+  },
+  {
+    path: "src/app/components/workspace/WorkspacePacketLocatorControls.tsx",
+    maxLines: 50,
+    reason: "workspace packet locator controls should own packet id normalization and locate action only",
+  },
+  {
     path: "src/app/components/workspace/WorkspaceFilterSection.tsx",
     maxLines: 65,
     reason: "workspace filter section should compose filter bar, syntax hint, and filter error display only",
@@ -2133,6 +2153,11 @@ export const testSizeBudgets = [
     path: "src/app/components/workspace/WorkspacePanels.test.tsx",
     maxLines: 80,
     reason: "workspace panel tests should stay focused on table, loading, and diagnostic panel wiring",
+  },
+  {
+    path: "src/app/components/workspace/WorkspaceTopControls.test.tsx",
+    maxLines: 95,
+    reason: "workspace top controls tests should stay focused on capture, paging, and locator wiring",
   },
   {
     path: "src/app/state/packetPageStatus.test.ts",
