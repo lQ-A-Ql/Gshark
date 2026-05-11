@@ -157,11 +157,69 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 		t.Fatalf("expected 4 evidence records, got %d", result.Total)
 	}
 
+	var objectRecord *model.EvidenceRecord
 	for _, record := range result.Records {
 		if record.Module == "" || record.SourceType == "" || record.Summary == "" || record.Severity == "" {
 			t.Fatalf("expected populated core evidence fields, got %+v", record)
 		}
+		if record.Module == "object" {
+			copy := record
+			objectRecord = &copy
+		}
 	}
+	if objectRecord == nil {
+		t.Fatalf("expected object evidence record, got %+v", result.Records)
+	}
+	if objectRecord.SourceType != "object-file" || objectRecord.Severity != "medium" || objectRecord.Confidence == 0 {
+		t.Fatalf("expected calibrated executable object evidence, got %+v", *objectRecord)
+	}
+	if !containsEvidenceString(objectRecord.Tags, "executable") {
+		t.Fatalf("expected executable object tag, got %+v", objectRecord.Tags)
+	}
+}
+
+func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
+	svc := NewService(nil, nil)
+	t.Cleanup(func() {
+		_ = svc.packetStore.Close()
+	})
+
+	svc.objectsLoaded = true
+	svc.objects = []model.ObjectFile{
+		{
+			ID:        2,
+			PacketID:  41,
+			Name:      "image.jpg",
+			SizeBytes: 1024,
+			MIME:      "image/jpeg",
+			Magic:     "JPEG image",
+			Source:    "HTTP",
+		},
+	}
+
+	result, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"object"}})
+	if err != nil {
+		t.Fatalf("GatherEvidence(object) error = %v", err)
+	}
+	if result.Total != 1 {
+		t.Fatalf("expected 1 object evidence record, got %d", result.Total)
+	}
+	record := result.Records[0]
+	if record.Severity != "info" || record.Confidence != 0 {
+		t.Fatalf("expected benign image object to stay informational, got %+v", record)
+	}
+	if !containsEvidenceString(record.Tags, "image") {
+		t.Fatalf("expected image tag, got %+v", record.Tags)
+	}
+}
+
+func containsEvidenceString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestExtractObjectsDetectsMagicAndRefinesMIME(t *testing.T) {

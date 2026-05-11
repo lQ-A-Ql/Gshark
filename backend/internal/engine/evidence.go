@@ -264,16 +264,25 @@ func (s *Service) gatherObjectEvidence(ctx context.Context) ([]model.EvidenceRec
 	objects := s.ObjectsWithContext(ctx)
 	records := make([]model.EvidenceRecord, 0, len(objects))
 	for _, obj := range objects {
+		confidence, kind, severity := objectEvidenceProfile(obj)
+		caveats := []string{
+			"对象提取结果需要结合来源协议、文件扩展、magic 与上下文流量综合判断，单独出现文件对象不等于恶意投递。",
+		}
+		if confidence > 0 {
+			caveats = append(caveats, evidenceCaveats(confidence, "object-export")...)
+		}
 		records = append(records, model.EvidenceRecord{
 			ID:           fmt.Sprintf("object:%d", obj.ID),
 			Module:       "object",
 			SourceModule: "object-export",
 			PacketID:     obj.PacketID,
-			SourceType:   obj.Magic,
+			SourceType:   "object-file",
 			Summary:      obj.Name,
 			Value:        fmt.Sprintf("%s (%d bytes)", obj.MIME, obj.SizeBytes),
-			Severity:     "info",
-			Tags:         dedupeStrings([]string{obj.Magic, obj.MIME, obj.Source}),
+			Confidence:   confidence,
+			Severity:     severity,
+			Tags:         dedupeStrings(compactStrings([]string{kind, obj.Magic, obj.MIME, obj.Source})),
+			Caveats:      dedupeStrings(caveats),
 		})
 	}
 	return records, nil
@@ -411,6 +420,29 @@ func confidenceToSeverity(confidence int) string {
 		return "medium"
 	}
 	return "low"
+}
+
+func objectEvidenceProfile(obj model.ObjectFile) (confidence int, kind string, severity string) {
+	lowerMagic := strings.ToLower(strings.TrimSpace(obj.Magic))
+	lowerMime := strings.ToLower(strings.TrimSpace(obj.MIME))
+
+	switch {
+	case strings.Contains(lowerMagic, "pe") || strings.Contains(lowerMagic, "dos") || strings.Contains(lowerMagic, "mz") || strings.Contains(lowerMagic, "elf") ||
+		strings.Contains(lowerMime, "dosexec") || strings.Contains(lowerMime, "executable") || strings.Contains(lowerMime, "elf"):
+		return 58, "executable", "medium"
+	case strings.Contains(lowerMagic, "zip") || strings.Contains(lowerMagic, "gzip") || strings.Contains(lowerMagic, "rar") || strings.Contains(lowerMagic, "7z") ||
+		strings.Contains(lowerMime, "zip") || strings.Contains(lowerMime, "gzip") || strings.Contains(lowerMime, "rar") || strings.Contains(lowerMime, "7z"):
+		return 30, "archive", "info"
+	case strings.Contains(lowerMagic, "pdf") || strings.Contains(lowerMagic, "ole") || strings.Contains(lowerMagic, "doc") ||
+		strings.Contains(lowerMime, "pdf") || strings.Contains(lowerMime, "msword") || strings.Contains(lowerMime, "officedocument"):
+		return 28, "document", "info"
+	case strings.HasPrefix(lowerMime, "image/") || strings.Contains(lowerMagic, "png") || strings.Contains(lowerMagic, "jpeg") || strings.Contains(lowerMagic, "gif"):
+		return 0, "image", "info"
+	case strings.HasPrefix(lowerMime, "text/") || strings.Contains(lowerMagic, "text"):
+		return 0, "text", "info"
+	default:
+		return 12, "unknown", "info"
+	}
 }
 
 func evidenceCaveats(confidence int, sourceModule string) []string {
