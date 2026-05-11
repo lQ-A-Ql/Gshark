@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UnifiedEvidenceRecord } from "./evidenceSchema";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { LRUCache } from "../../utils/lruCache";
 
 const evidenceCache = new LRUCache<string, UnifiedEvidenceRecord[]>(10);
@@ -53,7 +53,7 @@ export function useEvidence({
       setLoading(true);
       setError("");
       return runRequest({
-        request: (signal) => bridge.getEvidenceWithFilter(modules, signal),
+        request: (signal) => backendClients.evidence.getEvidenceWithFilter(modules, signal),
         onSuccess: (payload) => {
           if (cacheKey) {
             evidenceCache.set(cacheKey, payload);

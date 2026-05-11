@@ -5612,3 +5612,39 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: start migrating one low-risk consumer to a domain client projection, likely runtime or evidence, before touching high-coupling workspace/capture flows.
+
+---
+
+## Round 154 - Evidence Hook Domain Client Migration
+
+Time: 2026-05-11 23:30:54 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with a low-risk evidence consumer.
+- Moved `useEvidence()` from the full compatibility `bridge` to the narrowed `backendClients.evidence` projection.
+- Kept the hook API, cache behavior, request cancellation behavior, and evidence endpoint contract unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/evidence/useEvidence.ts` to call `backendClients.evidence.getEvidenceWithFilter(...)`.
+- Updated `frontend/src/app/pages/EvidencePanel.test.tsx` to mock the narrowed evidence client instead of the aggregate bridge.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/pages/EvidencePanel.test.tsx src/app/integrations/bridgeDomains.test.ts` passed, 2 files / 3 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round intentionally migrates only one consumer to keep the dependency shift easy to inspect.
+- Evidence loading now depends on an explicit evidence-domain client, reducing accidental access to unrelated bridge methods.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: migrate another isolated feature hook or page to a narrow client, preferably one with a single-domain method set and existing tests.

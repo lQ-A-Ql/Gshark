@@ -26,8 +26,10 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
-  bridge: {
-    getEvidenceWithFilter: mocks.getEvidenceWithFilter,
+  backendClients: {
+    evidence: {
+      getEvidenceWithFilter: mocks.getEvidenceWithFilter,
+    },
   },
 }));
 
