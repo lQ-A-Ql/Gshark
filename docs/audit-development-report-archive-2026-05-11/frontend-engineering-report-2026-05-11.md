@@ -5684,3 +5684,38 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: continue migrating isolated feature hooks (`media`, `traffic`, or `analysis`) while avoiding high-coupling lifecycle paths until more domain consumers are narrowed.
+
+---
+
+## Round 156 - Media Analysis Domain Client Migration
+
+Time: 2026-05-12 00:00:27 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with the media analysis loading hook.
+- Moved the media analysis request from the aggregate `bridge` to `backendClients.media`.
+- Kept media cache keys, preload gating, abort handling, loading state, and error behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/media/useMediaAnalysis.ts` to call `backendClients.media.getMediaAnalysis(false, signal)`.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/features/media/MediaOverviewPanels.test.tsx src/app/features/media/MediaSessionCells.test.tsx src/app/features/media/MediaSessionTableUtils.test.ts src/app/integrations/bridgeDomains.test.ts` passed, 4 files / 13 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round intentionally migrated only the media analysis loader, not playback or transcription workflows, because those mix media calls with runtime dependency checks.
+- Media analysis now declares a media-domain dependency without exposing unrelated bridge methods to the hook.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: migrate another isolated analysis hook, or split mixed media workflows between `backendClients.media` and `backendClients.runtime` once the lower-risk single-domain hooks are complete.

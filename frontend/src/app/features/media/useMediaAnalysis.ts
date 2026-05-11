@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MediaAnalysis as MediaAnalysisData, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export const EMPTY_MEDIA_ANALYSIS: MediaAnalysisData = {
   totalMediaPackets: 0,
@@ -67,7 +67,7 @@ export function useMediaAnalysis({
     setLoading(true);
     setError("");
     return runAnalysisRequest({
-      request: (signal) => bridge.getMediaAnalysis(false, signal),
+      request: (signal) => backendClients.media.getMediaAnalysis(false, signal),
       onSuccess: (payload) => {
         if (cacheKey) {
           mediaAnalysisCache.set(cacheKey, payload);
