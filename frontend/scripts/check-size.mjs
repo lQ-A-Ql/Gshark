@@ -348,6 +348,11 @@ export const sourceSizeBudgets = [
     reason: "capture replacement prepare hook should only wire provider refs into the pure replacement helper",
   },
   {
+    path: "src/app/state/hooks/useCaptureStopWorkflow.ts",
+    maxLines: 45,
+    reason: "capture stop hook should only wire provider refs into the pure stop workflow",
+  },
+  {
     path: "src/app/state/hooks/useClearCaptureUiState.ts",
     maxLines: 90,
     reason: "clear capture UI state hook should only wire provider refs into the pure clear-state helper",
@@ -1593,6 +1598,11 @@ export const testSizeBudgets = [
     maxLines: 115,
     reason:
       "capture replacement prepare hook tests should stay focused on reset, backend cleanup, and fresh-ref behavior",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureStopWorkflow.test.tsx",
+    maxLines: 115,
+    reason: "capture stop hook tests should stay focused on stop wiring and fresh-ref behavior",
   },
   {
     path: "src/app/state/hooks/useClearCaptureUiState.test.tsx",

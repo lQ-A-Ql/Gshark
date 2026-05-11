@@ -25,7 +25,6 @@ import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
 import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
 import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
 import { createStreamSwitchSequences } from "./streamSwitchSequence";
-import { stopCaptureWorkflow } from "./captureStopWorkflow";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import { buildSentinelDerivedView } from "./sentinelDerivedView";
 import type { SentinelContextValue } from "./sentinelTypes";
@@ -51,6 +50,7 @@ import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset
 import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
 import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepare";
+import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -580,25 +580,23 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     [startCapture],
   );
 
-  const stopCapture = useCallback(async () => {
-    await stopCaptureWorkflow({
-      backendConnected,
-      captureSeqRef,
-      filterSeqRef,
-      threatAnalysisSeqRef,
-      parseFinishedRef,
-      parseErrorRef,
-      preloadingRef,
-      setIsPreloadingCapture,
-      setIsFilterLoading,
-      cancelAllFrontendCaptureTasks,
-      wakeCaptureWaiters,
-      clearCaptureUiState,
-      setBackendStatus,
-      cancelMediaBatchTranscription: bridge.cancelMediaBatchTranscription,
-      closeCapture: bridge.closeCapture,
-    });
-  }, [backendConnected, cancelAllFrontendCaptureTasks, clearCaptureUiState, setBackendStatus, wakeCaptureWaiters]);
+  const stopCapture = useCaptureStopWorkflow({
+    backendConnected,
+    captureSeqRef,
+    filterSeqRef,
+    threatAnalysisSeqRef,
+    parseFinishedRef,
+    parseErrorRef,
+    preloadingRef,
+    setIsPreloadingCapture,
+    setIsFilterLoading,
+    cancelAllFrontendCaptureTasks,
+    wakeCaptureWaiters,
+    clearCaptureUiState,
+    setBackendStatus,
+    cancelMediaBatchTranscription: bridge.cancelMediaBatchTranscription,
+    closeCapture: bridge.closeCapture,
+  });
 
   const value = useMemo<SentinelContextValue>(
     () => ({
