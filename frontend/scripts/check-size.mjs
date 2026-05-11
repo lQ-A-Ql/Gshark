@@ -824,6 +824,21 @@ export const sourceSizeBudgets = [
     reason: "analysis data table should keep generic table rendering separate from primitive cards and charts",
   },
   {
+    path: "src/app/pages/TrafficGraph.tsx",
+    maxLines: 115,
+    reason: "traffic graph page should orchestrate stats loading and panel composition only",
+  },
+  {
+    path: "src/app/features/traffic/TrafficSimpleBarChart.tsx",
+    maxLines: 55,
+    reason: "traffic simple bar chart should own only bucket bar presentation",
+  },
+  {
+    path: "src/app/features/traffic/trafficGraphFilters.ts",
+    maxLines: 80,
+    reason: "traffic graph filters should remain pure bucket-to-display-filter rules",
+  },
+  {
     path: "src/app/pages/C2Analysis.tsx",
     maxLines: 250,
     reason: "C2 page should only orchestrate analysis loading, tabs, and feature-section composition",
@@ -2083,6 +2098,11 @@ export const testSizeBudgets = [
     path: "src/app/features/hunting/ThreatHuntingMetricCards.test.tsx",
     maxLines: 45,
     reason: "threat hunting metric card tests should stay focused on count rendering",
+  },
+  {
+    path: "src/app/features/traffic/trafficGraphFilters.test.ts",
+    maxLines: 35,
+    reason: "traffic graph filter tests should cover protocol, IP, domain, and port display filters",
   },
   {
     path: "src/app/pages/HttpStreamUtils.test.ts",
