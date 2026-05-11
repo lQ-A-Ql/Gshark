@@ -1,9 +1,24 @@
 import { createBridge } from "./bridgeFactory";
+import { createBackendClients } from "./bridgeDomains";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 
 export { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 export type {
   BackendBridge,
+  BackendClients,
+  RuntimeClient,
+  CaptureClient,
+  PacketClient,
+  HuntingClient,
+  ObjectClient,
+  StreamClient,
+  AnalysisClient,
+  EvidenceClient,
+  MediaClient,
+  VehicleDBCClient,
+  PluginClient,
+  SecurityMaterialClient,
+  MiscModuleClient,
   DesktopTransportBinding,
   EventHandlers,
   EventType,
@@ -24,3 +39,5 @@ function getDesktopAppBinding(): DesktopTransportBinding | undefined {
 export const bridge: BackendBridge = createBridge({
   getDesktopAppBinding,
 });
+
+export const backendClients = createBackendClients(bridge);

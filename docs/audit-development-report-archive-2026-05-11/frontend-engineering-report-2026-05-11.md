@@ -5573,3 +5573,42 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: add explicit domain-client projection helpers so pages/hooks can start depending on narrowed clients without receiving the full `BackendBridge`.
+
+---
+
+## Round 153 - Bridge Domain Projection Helpers
+
+Time: 2026-05-11 22:11:47 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge-abstraction plan by adding a concrete projection layer over the compatibility bridge.
+- Introduced a `BackendClients` shape and a `createBackendClients()` helper so domain-facing code can consume narrowed clients instead of the full `BackendBridge` directly.
+- Kept all existing bridge behavior unchanged; the new helper is a pure projection over the same compatibility bridge object.
+
+### Changes
+
+- Added `frontend/src/app/integrations/bridgeDomains.ts` with `createBackendClients(bridge)`.
+- Exported a new `backendClients` projection from `frontend/src/app/integrations/wailsBridge.ts`.
+- Extended `frontend/src/app/integrations/bridgeTypes.ts` with `BackendClients` to make the domain projection explicit.
+- Added a focused regression test in `frontend/src/app/integrations/bridgeDomains.test.ts` to confirm the projection preserves object identity for each domain client.
+- Tightened `frontend/scripts/check-size.mjs` with a budget for the new projection helper.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/integrations/bridgeDomains.test.ts src/app/integrations/wailsBridge.test.ts src/app/integrations/bridgeFactory.test.ts` passed, 3 files / 11 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round does not migrate any page yet; it creates the seam that later page and hook migrations can use.
+- The aggregate bridge remains compatible, but the new projection layer makes the intended domain dependency model explicit and testable.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: start migrating one low-risk consumer to a domain client projection, likely runtime or evidence, before touching high-coupling workspace/capture flows.

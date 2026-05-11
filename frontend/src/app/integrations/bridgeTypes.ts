@@ -186,6 +186,22 @@ export interface BackendBridge
     SecurityMaterialClient,
     MiscModuleClient {}
 
+export interface BackendClients {
+  runtime: RuntimeClient;
+  capture: CaptureClient;
+  packet: PacketClient;
+  hunting: HuntingClient;
+  object: ObjectClient;
+  stream: StreamClient;
+  analysis: AnalysisClient;
+  evidence: EvidenceClient;
+  media: MediaClient;
+  vehicleDBC: VehicleDBCClient;
+  plugin: PluginClient;
+  securityMaterial: SecurityMaterialClient;
+  miscModule: MiscModuleClient;
+}
+
 export interface DesktopTransportBinding {
   BackendStatus?: () => Promise<string>;
   GetBackendAuthToken?: () => Promise<string | null | undefined>;
