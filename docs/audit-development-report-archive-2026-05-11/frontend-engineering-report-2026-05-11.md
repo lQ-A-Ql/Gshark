@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 170 - Bridge Domain Migration Self-Check
+
+Time: 2026-05-12 02:26:10 +08:00  
+Author: Codex
+
+### Scope
+
+- Performed the scheduled ten-round self-check before continuing further bridge-domain migrations.
+- Audited commit continuity, report continuity, remaining direct bridge imports, and baseline frontend gates.
+
+### Checks
+
+- Recent ten commits are sequential bridge-domain migration/audit commits from Round 160 through Round 169.
+- Report entries are present through Round 169 and match the committed migration sequence.
+- Remaining production direct `bridge` imports: 16 files, reduced from the Round 160 count of 28.
+- Worktree was clean before this report-only round began.
+
+### Validation
+
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+
+### Review
+
+- No migration drift found in the last ten rounds.
+- Remaining candidates are larger or mixed-domain areas: raw stream page/state, stream decoder/payload inspection, lifecycle/runtime controls, media playback/transcription, update center, TLS/security material, and remaining MISC utility modules.
+
+---
+
 ## Round 169 - Analysis Progress Domain Clients
 
 Time: 2026-05-12 02:24:08 +08:00  
