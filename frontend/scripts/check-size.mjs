@@ -695,8 +695,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/StreamDecoderSettingsSections.tsx",
-    maxLines: 240,
-    reason: "decoder settings sections should keep webshell-specific form fields and update rules local",
+    maxLines: 10,
+    reason: "decoder settings sections should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/StreamDecoderSettingsSectionTypes.ts",
+    maxLines: 15,
+    reason: "decoder settings shared section types should only contain props and numeric text helper",
+  },
+  {
+    path: "src/app/components/BehinderSettingsSection.tsx",
+    maxLines: 100,
+    reason: "Behinder decoder settings section should keep only Behinder form fields and update rules",
+  },
+  {
+    path: "src/app/components/AntSwordSettingsSection.tsx",
+    maxLines: 60,
+    reason: "AntSword decoder settings section should keep only AntSword form fields and update rules",
+  },
+  {
+    path: "src/app/components/GodzillaSettingsSection.tsx",
+    maxLines: 95,
+    reason: "Godzilla decoder settings section should keep only Godzilla form fields and update rules",
   },
   {
     path: "src/app/components/StreamDecoderWorkbenchParts.tsx",
@@ -2018,6 +2038,11 @@ export const testSizeBudgets = [
     path: "src/app/components/StreamDecoderToolbar.test.tsx",
     maxLines: 70,
     reason: "decoder toolbar tests should stay focused on action wiring and running state",
+  },
+  {
+    path: "src/app/components/StreamDecoderSettingsSections.test.tsx",
+    maxLines: 65,
+    reason: "decoder settings section tests should stay focused on form wiring and numeric clamping",
   },
   {
     path: "src/app/components/stream/StreamNavigationControls.test.tsx",
