@@ -317,6 +317,11 @@ export const sourceSizeBudgets = [
     reason: "capture signal waiters hook should only own waiter refs and wake/wait callbacks",
   },
   {
+    path: "src/app/state/hooks/useCaptureTaskScopeCleanup.ts",
+    maxLines: 20,
+    reason: "capture task scope cleanup hook should only invalidate scoped tasks on provider unmount",
+  },
+  {
     path: "src/app/state/hooks/useRecentCapturesState.ts",
     maxLines: 25,
     reason: "recent captures hook should only own localStorage-backed capture history state",
@@ -1572,6 +1577,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useCaptureSignalWaiters.test.tsx",
     maxLines: 35,
     reason: "capture signal waiters hook tests should stay focused on waiter wake behavior",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureTaskScopeCleanup.test.tsx",
+    maxLines: 35,
+    reason: "capture task scope cleanup tests should stay focused on unmount invalidation behavior",
   },
   {
     path: "src/app/state/hooks/useRecentCapturesState.test.tsx",

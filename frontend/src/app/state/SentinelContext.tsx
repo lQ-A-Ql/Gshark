@@ -1,13 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import type { BinaryStream, HttpStream, Packet } from "../core/types";
 import { bridge } from "../integrations/wailsBridge";
 import { isAbortLikeError } from "../utils/asyncControl";
@@ -51,6 +42,7 @@ import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
 import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepare";
 import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
 import { useSentinelDerivedView } from "./hooks/useSentinelDerivedView";
+import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -387,13 +379,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useSyncedRefValue(refreshAnalysisResultRef, refreshAnalysisResult);
   useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
   useSyncedRefValue(hasMorePacketsRef, hasMorePackets);
-
-  useEffect(
-    () => () => {
-      captureTaskScopeRef.current.invalidate();
-    },
-    [],
-  );
+  useCaptureTaskScopeCleanup(captureTaskScopeRef);
 
   useSelectedPacketResources({
     selectedPacketId,
