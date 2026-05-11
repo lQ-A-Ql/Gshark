@@ -895,8 +895,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/ui/sidebar.tsx",
-    maxLines: 230,
-    reason: "shared sidebar shell should keep desktop/mobile container, trigger, rail, and inset only",
+    maxLines: 120,
+    reason: "shared sidebar entry should re-export primitives and keep trigger, rail, and inset only",
+  },
+  {
+    path: "src/app/components/ui/sidebarShell.tsx",
+    maxLines: 130,
+    reason: "sidebar shell should own desktop/mobile container layout only",
   },
   {
     path: "src/app/components/ui/sidebarStructure.tsx",
