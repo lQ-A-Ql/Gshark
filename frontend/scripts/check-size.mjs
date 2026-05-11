@@ -750,8 +750,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/stream/StreamNavigationControls.tsx",
-    maxLines: 210,
-    reason: "stream navigation controls should stay focused on stream switching, view mode, and search UI",
+    maxLines: 10,
+    reason: "stream navigation controls should stay as a compatibility export layer",
+  },
+  {
+    path: "src/app/components/stream/StreamNavigator.tsx",
+    maxLines: 85,
+    reason: "stream navigator should keep stream id input and previous/next controls only",
+  },
+  {
+    path: "src/app/components/stream/ViewModeToggle.tsx",
+    maxLines: 50,
+    reason: "stream view mode toggle should keep segmented view switching only",
+  },
+  {
+    path: "src/app/components/stream/StreamControlBar.tsx",
+    maxLines: 20,
+    reason: "stream control bar should stay as a tiny layout primitive",
+  },
+  {
+    path: "src/app/components/stream/StreamSearchBar.tsx",
+    maxLines: 75,
+    reason: "stream search bar should keep search input, match summary, and result navigation only",
   },
   {
     path: "src/app/components/stream/StreamPayloadPanels.tsx",
