@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ExtractedObject, ThreatHit } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { isAbortLikeError } from "../../utils/asyncControl";
 import type { CaptureTaskScope } from "../../utils/captureTaskScope";
 
@@ -129,13 +129,13 @@ export function useAnalysisProgress(threatAnalysisSeqRef: React.MutableRefObject
         recent: ["准备威胁分析"],
       }));
       try {
-        const objects = await bridge.listObjects(task.signal);
+        const objects = await backendClients.object.listObjects(task.signal);
         if (!task.isCurrent() || threatAnalysisSeqRef.current !== seq || options.activeCapturePath !== capturePath) {
           return;
         }
         setExtractedObjects(objects);
 
-        const hits = await bridge.listThreatHits(["flag{", "ctf{"], task.signal);
+        const hits = await backendClients.hunting.listThreatHits(["flag{", "ctf{"], task.signal);
         if (!task.isCurrent() || threatAnalysisSeqRef.current !== seq || options.activeCapturePath !== capturePath) {
           return;
         }

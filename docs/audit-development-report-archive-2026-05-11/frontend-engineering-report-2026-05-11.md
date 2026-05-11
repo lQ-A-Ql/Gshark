@@ -1,5 +1,37 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 169 - Analysis Progress Domain Clients
+
+Time: 2026-05-12 02:24:08 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal inside threat-analysis refresh state.
+- Kept cancellation, sequence checks, status messages, and state updates unchanged.
+
+### Changes
+
+- Updated `state/hooks/useAnalysisProgress.ts` to import `backendClients` instead of aggregate `bridge`.
+- Replaced object refresh with `backendClients.object.listObjects(task.signal)`.
+- Replaced threat-hit refresh with `backendClients.hunting.listThreatHits(["flag{", "ctf{"], task.signal)`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/state/hooks/useRefreshAnalysisResult.test.tsx src/app/integrations/bridgeDomains.test.ts src/app/integrations/clients/huntingClient.test.ts src/app/integrations/clients/objectClient.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run format:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Threat-analysis refresh now uses the same narrow hunting/object clients as the migrated feature pages.
+- The next round is Round 170 and should include the scheduled ten-round self-check before continuing migration.
+
+---
+
 ## Round 168 - Capture Mission Overview Domain Clients
 
 Time: 2026-05-12 02:20:32 +08:00  
