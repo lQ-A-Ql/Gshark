@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Network } from "lucide-react";
-import { useNavigate } from "react-router";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { WorkbenchTitleBar } from "../components/DesignSystem";
 import { CaptureTransactionBanner } from "../components/workspace/CaptureTransactionBanner";
@@ -12,7 +11,8 @@ import { useWorkspaceFilterProgress } from "../components/workspace/useWorkspace
 import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
 import { useWorkspaceProtocolSelection } from "../components/workspace/useWorkspaceProtocolSelection";
 import { useSentinel } from "../state/SentinelContext";
-import type { Packet } from "../core/types";
+import { useWorkspaceFilterAction } from "./useWorkspaceFilterAction";
+import { useWorkspaceStreamNavigation } from "./useWorkspaceStreamNavigation";
 import {
   getWorkspaceFilterErrorMessage,
   getWorkspaceFilterLoadingDetail,
@@ -64,9 +64,15 @@ export default function Workspace() {
   const [pageInput, setPageInput] = useState("1");
   const [packetIdInput, setPacketIdInput] = useState("");
   const filterInputRef = useRef<HTMLInputElement | null>(null);
-  const navigate = useNavigate();
   const { filterSuggestions, rememberFilter, clearFilterHistory } = useWorkspaceFilterHistory();
   const filterLoadingProgress = useWorkspaceFilterProgress(isFilterLoading, isPreloadingCapture);
+  const applyFilterWithHistory = useWorkspaceFilterAction({
+    applyFilter,
+    displayFilter,
+    rememberFilter,
+    setDisplayFilter,
+  });
+  const { followStream, openHttpStream } = useWorkspaceStreamNavigation({ selectPacket, setActiveStream });
   const {
     selectedTreeNode,
     selectedByteOffset,
@@ -77,19 +83,6 @@ export default function Workspace() {
     handleSelectByte,
     registerNodeRef,
   } = useWorkspaceProtocolSelection(selectedPacket, selectedPacketRawHex, protocolTree);
-
-  const applyFilterWithHistory = (value?: string) => {
-    const next = (value ?? displayFilter).trim();
-    if (next) {
-      if (next !== displayFilter) {
-        setDisplayFilter(next);
-      }
-      rememberFilter(next);
-      applyFilter(next);
-      return;
-    }
-    applyFilter("");
-  };
 
   useEffect(() => {
     setCapturePath(fileMeta.name);
@@ -134,24 +127,6 @@ export default function Workspace() {
       .filter((p) => p >= 1 && p <= totalPages)
       .sort((a, b) => a - b);
   }, [currentPage, totalPages]);
-
-  const handleFollowStream = (packet: Packet, target: "http" | "tcp" | "udp") => {
-    if (packet.streamId == null) return;
-    selectPacket(packet.id);
-
-    if (target === "http") {
-      void setActiveStream("HTTP", packet.streamId);
-      navigate("/http-stream", { state: { streamId: packet.streamId } });
-      return;
-    }
-    if (target === "udp") {
-      void setActiveStream("UDP", packet.streamId);
-      navigate("/udp-stream", { state: { streamId: packet.streamId } });
-      return;
-    }
-    void setActiveStream("TCP", packet.streamId);
-    navigate("/tcp-stream", { state: { streamId: packet.streamId } });
-  };
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
 
@@ -258,8 +233,8 @@ export default function Workspace() {
         selectedByteOffset={selectedByteOffset}
         hexPanelRef={hexPanelRef}
         onSelectPacket={selectPacket}
-        onDoubleClickHttp={() => navigate("/http-stream")}
-        onFollowStream={handleFollowStream}
+        onDoubleClickHttp={openHttpStream}
+        onFollowStream={followStream}
         onRetryPacketPage={() => void retryPacketPage()}
         onLoadMorePackets={() => void loadMorePackets()}
         onSelectTreeNode={handleSelectTreeNode}

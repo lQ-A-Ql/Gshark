@@ -1305,8 +1305,28 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/Workspace.tsx",
-    maxLines: 275,
+    maxLines: 250,
     reason: "workspace page should stay focused on state wiring, navigation, and selection orchestration",
+  },
+  {
+    path: "src/app/pages/useWorkspaceStreamNavigation.ts",
+    maxLines: 55,
+    reason: "workspace stream navigation hook should only map packet stream ids to route changes",
+  },
+  {
+    path: "src/app/pages/useWorkspaceFilterAction.ts",
+    maxLines: 35,
+    reason: "workspace filter action hook should only trim, remember, and apply filters",
+  },
+  {
+    path: "src/app/pages/useWorkspaceStreamNavigation.test.tsx",
+    maxLines: 75,
+    reason: "workspace stream navigation tests should cover stream route mapping and no-stream guard",
+  },
+  {
+    path: "src/app/pages/useWorkspaceFilterAction.test.tsx",
+    maxLines: 45,
+    reason: "workspace filter action tests should stay focused on apply and clear behavior",
   },
   {
     path: "src/app/components/workspace/WorkspaceTitleActions.tsx",
