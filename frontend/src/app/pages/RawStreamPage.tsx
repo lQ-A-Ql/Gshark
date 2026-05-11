@@ -22,6 +22,7 @@ import {
   type VisibleRawChunk,
 } from "./RawStreamUtils";
 import { createEmptyRawStreamView, type RawStreamViewState } from "./RawStreamViewState";
+import { useRawStreamPageLoader } from "./useRawStreamPageLoader";
 import { useRawStreamRouteSelection, type RawStreamProtocol } from "./useRawStreamRouteSelection";
 
 const STREAM_PAGE_SIZE = 96;
@@ -29,11 +30,9 @@ const STREAM_PAGE_SIZE = 96;
 export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const [viewMode, setViewMode] = useState<RawViewMode>("ascii");
   const [streamInput, setStreamInput] = useState("");
-  const [loadError, setLoadError] = useState("");
   const [selectedChunkIndex, setSelectedChunkIndex] = useState(0);
   const [expandedChunk, setExpandedChunk] = useState<VisibleRawChunk | null>(null);
   const [search, setSearch] = useState("");
-  const [loadingMore, setLoadingMore] = useState(false);
   const [streamView, setStreamView] = useState<RawStreamViewState>(() => createEmptyRawStreamView(protocol));
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
@@ -46,6 +45,13 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const selectedPanelClass =
     protocol === "TCP" ? "min-h-0 min-w-0 space-y-4 overflow-auto pb-4 pr-1" : "space-y-4 xl:sticky xl:top-0";
   const loadingText = protocol === "TCP" ? "继续下滚可加载更多" : "";
+  const { loadError, loadingMore, loadMore } = useRawStreamPageLoader({
+    fetchRawStreamPage: bridge.getRawStreamPage,
+    pageSize: STREAM_PAGE_SIZE,
+    protocol,
+    setStreamView,
+    streamView,
+  });
 
   useEffect(() => {
     setStreamView({
@@ -63,7 +69,6 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
 
   useEffect(() => {
     setStreamInput(sourceStream.id >= 0 ? String(sourceStream.id) : "");
-    setLoadError("");
     setSearch("");
     setSelectedChunkIndex(0);
     setExpandedChunk(null);
@@ -109,37 +114,6 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
     }
     setSelectedChunkIndex((prev) => Math.min(prev, visibleChunks.length - 1));
   }, [visibleChunks.length]);
-
-  async function loadMore() {
-    if (loadingMore || !streamView.hasMore) return;
-    setLoadingMore(true);
-    setLoadError("");
-    try {
-      const page = await bridge.getRawStreamPage(
-        protocol,
-        streamView.id,
-        streamView.nextCursor ?? streamView.chunks.length,
-        STREAM_PAGE_SIZE,
-      );
-      setStreamView((prev) => {
-        if (prev.id !== page.id) return prev;
-        return {
-          ...prev,
-          from: page.from,
-          to: page.to,
-          chunks: [...prev.chunks, ...page.chunks],
-          loadMeta: page.loadMeta ?? prev.loadMeta,
-          nextCursor: page.nextCursor ?? prev.chunks.length + page.chunks.length,
-          totalChunks: page.totalChunks ?? prev.totalChunks,
-          hasMore: page.hasMore ?? false,
-        };
-      });
-    } catch (error) {
-      setLoadError(error instanceof Error && error.message ? error.message : "加载更多流片段失败");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   function exportAll() {
     downloadText(`${protocol.toLowerCase()}-stream-${streamView.id}.txt`, buildRawStreamExportContent(streamView.chunks));

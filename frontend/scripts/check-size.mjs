@@ -1426,8 +1426,18 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/RawStreamPage.tsx",
-    maxLines: 265,
+    maxLines: 235,
     reason: "shared raw stream page should own protocol-specific TCP/UDP orchestration without duplicating route pages",
+  },
+  {
+    path: "src/app/pages/useRawStreamPageLoader.ts",
+    maxLines: 85,
+    reason: "raw stream page loader hook should own incremental page fetch and append state only",
+  },
+  {
+    path: "src/app/pages/useRawStreamPageLoader.test.tsx",
+    maxLines: 95,
+    reason: "raw stream page loader tests should stay focused on append, stale page, and error reset behavior",
   },
   {
     path: "src/app/pages/useRawStreamRouteSelection.ts",
