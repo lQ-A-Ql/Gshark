@@ -11,7 +11,7 @@ import { VehicleOverviewPanel, VEHICLE_PROTOCOL_TAGS } from "../features/vehicle
 import { VehicleProtocolPanels } from "../features/vehicle/VehicleProtocolPanels";
 import { VehicleUdsTransactionsPanel } from "../features/vehicle/VehicleUdsTransactionsPanel";
 import { useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function VehicleAnalysis() {
@@ -44,7 +44,7 @@ export default function VehicleAnalysis() {
       setDBCProfiles([]);
       return;
     }
-    void bridge
+    void backendClients.vehicleDBC
       .listVehicleDBCProfiles()
       .then((items) => setDBCProfiles(items))
       .catch(() => setDBCProfiles([]));
@@ -55,7 +55,7 @@ export default function VehicleAnalysis() {
       const normalized = path.trim();
       if (!normalized) return;
       try {
-        const profiles = await bridge.addVehicleDBC(normalized);
+        const profiles = await backendClients.vehicleDBC.addVehicleDBC(normalized);
         setDBCProfiles(profiles);
         setDBCPathInput("");
         setPageError("");
@@ -70,7 +70,7 @@ export default function VehicleAnalysis() {
   const removeDBC = useCallback(
     async (path: string) => {
       try {
-        const profiles = await bridge.removeVehicleDBC(path);
+        const profiles = await backendClients.vehicleDBC.removeVehicleDBC(path);
         setDBCProfiles(profiles);
         setPageError("");
         refreshAnalysis(true);
@@ -82,7 +82,7 @@ export default function VehicleAnalysis() {
   );
 
   const importDBC = useCallback(() => {
-    void bridge
+    void backendClients.vehicleDBC
       .openDBCFile()
       .then((file) => addDBC(file.filePath))
       .catch((err) => {

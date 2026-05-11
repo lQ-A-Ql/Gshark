@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 166 - Vehicle DBC Domain Client Migration
+
+Time: 2026-05-12 02:06:22 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge domain migration on remaining Vehicle page DBC operations.
+- Kept vehicle analysis hook behavior unchanged; this round only moved DBC profile/file-picker calls to narrow client.
+
+### Changes
+
+- Updated `pages/VehicleAnalysis.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced `listVehicleDBCProfiles`, `addVehicleDBC`, `removeVehicleDBC`, and `openDBCFile` with `backendClients.vehicleDBC.*` calls.
+- Preserved existing DBC import/remove error handling and analysis refresh behavior.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/VehicleAnalysis.test.ts src/app/pages/analysisCacheKeys.test.ts src/app/integrations/bridgeDomains.test.ts src/app/integrations/mappers/vehicleMapper.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Vehicle page no longer directly imports aggregate bridge.
+- DBC operations now sit behind `vehicleDBC` domain client, matching earlier `useVehicleAnalysis` analysis-domain migration.
+
+---
+
 ## Round 165 - Threat Hunting Domain Client Migration
 
 Time: 2026-05-12 02:02:33 +08:00  
