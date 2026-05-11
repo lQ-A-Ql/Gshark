@@ -583,6 +583,31 @@ export const sourceSizeBudgets = [
     reason: "stream switch workflow should keep cache, fetch, metric, stale, and abort behavior outside the provider",
   },
   {
+    path: "src/app/core/packetColoring.ts",
+    maxLines: 40,
+    reason: "packet coloring entry should only apply parsed Wireshark color rules to packet rows",
+  },
+  {
+    path: "src/app/core/packetColoringColors.ts",
+    maxLines: 30,
+    reason: "packet coloring color helpers should only parse and convert RGB16 color values",
+  },
+  {
+    path: "src/app/core/packetColoringMatchers.ts",
+    maxLines: 125,
+    reason: "packet coloring matchers should only own rule-name to packet matcher mapping",
+  },
+  {
+    path: "src/app/core/packetColoringParser.ts",
+    maxLines: 45,
+    reason: "packet coloring parser should only parse Wireshark color rule lines",
+  },
+  {
+    path: "src/app/core/packetColoringRules.ts",
+    maxLines: 30,
+    reason: "packet coloring rules should remain a declarative Wireshark rule text snapshot",
+  },
+  {
     path: "src/app/components/StreamDecoderWorkbench.tsx",
     maxLines: 105,
     reason: "decoder workbench should stay as a composition shell around decoder panels and state hook",
@@ -1572,6 +1597,11 @@ export const testSizeBudgets = [
     path: "src/app/state/sentinelDerivedView.test.ts",
     maxLines: 65,
     reason: "sentinel derived view tests should cover selected packet, pagination, hex, and layer tree derivation only",
+  },
+  {
+    path: "src/app/core/packetColoring.test.ts",
+    maxLines: 45,
+    reason: "packet coloring tests should cover representative protocol and priority matches",
   },
   {
     path: "src/app/state/hooks/useSelectedPacketResources.test.tsx",
