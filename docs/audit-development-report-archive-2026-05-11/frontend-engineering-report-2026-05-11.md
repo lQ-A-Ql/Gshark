@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 163 - C2 Decrypt Domain Client Migration
+
+Time: 2026-05-12 01:54:52 +08:00  
+Author: Codex
+
+### Scope
+
+- Finished the C2 analysis-domain migration slice by moving the decrypt workbench off the aggregate bridge.
+- Kept the change limited to existing C2 analysis APIs already exposed by `AnalysisClient`.
+
+### Changes
+
+- Updated `features/c2/C2DecryptWorkbench.tsx` to call `backendClients.analysis.decryptC2Traffic(request)` instead of `bridge.decryptC2Traffic(request)`.
+- Updated all C2 page test mocks so both `getC2SampleAnalysis` and `decryptC2Traffic` are provided by `backendClients.analysis`.
+- Left `bridge: {}` in those mocks only as a compatibility shell for any unrelated imports, not as an active method surface.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/C2Analysis.test.tsx src/app/pages/C2Analysis.decrypt.test.tsx src/app/pages/C2Analysis.vshell.test.tsx src/app/pages/C2Analysis.candidates.test.tsx src/app/pages/analysisCacheKeys.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- C2 production analysis/decrypt flows no longer depend on direct aggregate `bridge` methods.
+- The next bridge migration should move to another narrow consumer rather than refactoring C2 UI internals further.
+
+---
+
 ## Round 162 - C2 Sample Analysis Domain Client Migration
 
 Time: 2026-05-12 00:56:19 +08:00  

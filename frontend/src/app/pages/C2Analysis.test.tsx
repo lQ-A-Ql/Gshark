@@ -30,11 +30,10 @@ vi.mock("../integrations/wailsBridge", () => ({
   backendClients: {
     analysis: {
       getC2SampleAnalysis: mocks.getC2SampleAnalysis,
+      decryptC2Traffic: mocks.decryptC2Traffic,
     },
   },
-  bridge: {
-    decryptC2Traffic: mocks.decryptC2Traffic,
-  },
+  bridge: {},
 }));
 
 vi.mock("react-router", async (importOriginal) => {

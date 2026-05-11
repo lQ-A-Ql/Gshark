@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { EmptyState } from "../../components/DesignSystem";
 import { Button } from "../../components/ui/button";
 import type { C2DecryptRequest, C2DecryptResult, C2FamilyAnalysis } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { CSDecryptForm, VShellDecryptForm } from "./C2DecryptFormControls";
 import { C2DecryptResultPanel } from "./C2DecryptResultPanel";
 
@@ -81,7 +81,7 @@ export function C2DecryptWorkbench({
     }
     setLoading(true);
     try {
-      const next = await bridge.decryptC2Traffic(request);
+      const next = await backendClients.analysis.decryptC2Traffic(request);
       setResult(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "C2 流量解密失败");
