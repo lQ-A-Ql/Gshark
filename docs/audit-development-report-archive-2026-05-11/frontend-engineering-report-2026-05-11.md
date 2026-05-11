@@ -5792,3 +5792,39 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: migrate APT or vehicle analysis hook, then reserve Round 160 for the required 10-round self-audit and drift check.
+
+---
+
+## Round 159 - APT Analysis Domain Client Migration
+
+Time: 2026-05-12 00:43:37 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with the APT analysis loading hook.
+- Moved the APT analysis request from the aggregate `bridge` to `backendClients.analysis`.
+- Kept APT cache keys, preload gating, abort handling, active actor selection, navigation helpers, and error behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/apt/useAPTAnalysis.ts` to call `backendClients.analysis.getAPTAnalysis(signal)`.
+- Updated `frontend/src/app/pages/AptAnalysis.test.tsx` to mock the narrowed analysis client instead of the aggregate bridge.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/pages/AptAnalysis.test.tsx src/app/integrations/bridgeDomains.test.ts` passed, 2 files / 3 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round keeps the analysis-hook migration sequence narrow and reversible.
+- APT analysis now declares an analysis-domain dependency without exposing unrelated bridge methods.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: Round 160 self-audit and drift check, then continue the remaining vehicle/mixed-domain bridge migrations if the audit confirms alignment.

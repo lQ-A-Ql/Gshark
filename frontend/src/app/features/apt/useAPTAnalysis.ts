@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { APTAnalysis } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { LRUCache } from "../../utils/lruCache";
 import { buildAPTDisplayProfiles } from "./actorRegistry";
 
@@ -65,7 +65,7 @@ export function useAPTAnalysis({
     setLoading(true);
     setError("");
     return runAnalysisRequest({
-      request: (signal) => bridge.getAPTAnalysis(signal),
+      request: (signal) => backendClients.analysis.getAPTAnalysis(signal),
       onSuccess: (payload) => {
         if (cacheKey) {
           aptAnalysisCache.set(cacheKey, payload);

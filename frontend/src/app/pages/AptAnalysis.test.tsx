@@ -25,8 +25,10 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
-  bridge: {
-    getAPTAnalysis: mocks.getAPTAnalysis,
+  backendClients: {
+    analysis: {
+      getAPTAnalysis: mocks.getAPTAnalysis,
+    },
   },
 }));
 
