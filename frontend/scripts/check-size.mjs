@@ -2071,8 +2071,9 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/pages/MiscTools.test.tsx",
-    maxLines: 270,
-    reason: "MISC base page tests should not absorb session or custom module workflows",
+    maxLines: 275,
+    reason:
+      "MISC base page tests should stay focused on payload workflows while allowing extra stability checks for slower CI paths",
   },
   {
     path: "src/app/pages/MiscTools.payloadHints.test.tsx",

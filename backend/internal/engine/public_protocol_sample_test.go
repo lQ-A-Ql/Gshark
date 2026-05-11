@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 func TestBundledPublicSMTPReportBuildsFromBaselineSample(t *testing.T) {
@@ -99,6 +101,28 @@ func TestBundledPublicUSBDeleteBaselineDoesNotInventHighRiskWriteReport(t *testi
 	}
 }
 
+func TestBundledPublicUSBMountBaselineKeepsWriteEvidenceBelowHighSeverity(t *testing.T) {
+	svc := loadBundledPublicSample(t, "usb", "usb_memory_stick.pcap")
+
+	analysis, err := svc.USBAnalysis()
+	if err != nil {
+		t.Fatalf("USBAnalysis() error = %v", err)
+	}
+	if len(analysis.MassStorage.WriteOperations) == 0 {
+		t.Fatalf("expected mount baseline to parse mass-storage operations")
+	}
+
+	evidence, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"usb"}})
+	if err != nil {
+		t.Fatalf("GatherEvidence(usb) error = %v", err)
+	}
+	for _, item := range evidence.Records {
+		if item.Severity == "high" || item.Severity == "critical" {
+			t.Fatalf("expected mount baseline writes to stay below high severity, got %+v", item)
+		}
+	}
+}
+
 func TestBundledPublicBenignHTTPThreatHuntStaysQuiet(t *testing.T) {
 	svc := loadBundledPublicSample(t, "benign", "http.cap")
 	packets, err := svc.packetStore.All(nil)
@@ -108,6 +132,69 @@ func TestBundledPublicBenignHTTPThreatHuntStaysQuiet(t *testing.T) {
 	hits := HuntThreats(packets, []string{"flag{", "ctf{"})
 	if len(hits) != 0 {
 		t.Fatalf("expected benign HTTP baseline to stay quiet, got %+v", hits)
+	}
+}
+
+func TestBundledPublicBenignSMTPThreatHuntStaysQuiet(t *testing.T) {
+	svc := loadBundledPublicSample(t, "benign", "smtp.pcap")
+	packets, err := svc.packetStore.All(nil)
+	if err != nil {
+		t.Fatalf("packetStore.All() error = %v", err)
+	}
+	hits := HuntThreats(packets, []string{"flag{", "ctf{"})
+	if len(hits) != 0 {
+		t.Fatalf("expected benign SMTP baseline to stay quiet, got %+v", hits)
+	}
+}
+
+func TestBundledPublicBenignMySQLThreatHuntStaysQuiet(t *testing.T) {
+	svc := loadBundledPublicSample(t, "benign", "mysql_complete.pcap")
+	packets, err := svc.packetStore.All(nil)
+	if err != nil {
+		t.Fatalf("packetStore.All() error = %v", err)
+	}
+	hits := HuntThreats(packets, []string{"flag{", "ctf{"})
+	if len(hits) != 0 {
+		t.Fatalf("expected benign MySQL baseline to stay quiet, got %+v", hits)
+	}
+}
+
+func TestBundledPublicObjectGzipBaselineAvoidsExecutableClassification(t *testing.T) {
+	svc := loadBundledPublicSample(t, "object", "http_gzip.cap")
+	objects := svc.ObjectsWithContext(context.Background())
+	if len(objects) == 0 {
+		t.Fatalf("expected object extraction on public gzip baseline")
+	}
+	for _, object := range objects {
+		if object.MIME == "application/x-dosexec" || object.Magic == "PE/DOS MZ" {
+			t.Fatalf("expected gzip baseline to avoid executable classification, got %+v", object)
+		}
+	}
+}
+
+func TestBundledPublicObjectJPEGBaselineKeepsEvidenceAtInfoSeverity(t *testing.T) {
+	svc := loadBundledPublicSample(t, "object", "http_with_jpegs.cap.gz")
+	evidence, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"object"}})
+	if err != nil {
+		t.Fatalf("GatherEvidence(object) error = %v", err)
+	}
+	if len(evidence.Records) == 0 {
+		t.Fatalf("expected object evidence on JPEG baseline")
+	}
+	for _, item := range evidence.Records {
+		if item.Severity != "info" {
+			t.Fatalf("expected JPEG object evidence to stay informational, got %+v", item)
+		}
+	}
+}
+
+func TestBundledPublicTFTPObjectBaselineDoesNotFabricateExecutableObjects(t *testing.T) {
+	svc := loadBundledPublicSample(t, "object", "tftp_wrq.pcap")
+	objects := svc.ObjectsWithContext(context.Background())
+	for _, object := range objects {
+		if object.MIME == "application/x-dosexec" || object.Magic == "PE/DOS MZ" {
+			t.Fatalf("expected TFTP baseline to avoid executable classification, got %+v", object)
+		}
 	}
 }
 

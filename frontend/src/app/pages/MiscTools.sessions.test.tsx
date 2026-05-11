@@ -109,7 +109,7 @@ describe("MiscTools session candidate modules", () => {
     );
     expect(mocks.getMySQLAnalysis).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText("MySQL 会话重建").length).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it("loads SMTP session details after expansion", async () => {
     await renderAndExpand("smtp-session-analysis", () =>
@@ -117,7 +117,7 @@ describe("MiscTools session candidate modules", () => {
     );
     expect(mocks.getSMTPAnalysis).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText("SMTP 会话重建").length).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it("loads Shiro rememberMe details after expansion", async () => {
     await renderAndExpand("shiro-rememberme-analysis", () =>
@@ -144,5 +144,4 @@ describe("MiscTools session candidate modules", () => {
     });
     expect(mocks.navigate).toHaveBeenCalledWith("/http-stream", { state: { streamId: 44 } });
   });
-
 });

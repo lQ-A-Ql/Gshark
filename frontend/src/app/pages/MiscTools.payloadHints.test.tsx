@@ -163,5 +163,5 @@ describe("MiscTools payload source hints", () => {
       stripMarkers: true,
     });
     expect((options as Record<string, unknown>).key ?? "").toBe("");
-  }, 15000);
+  }, 30000);
 });

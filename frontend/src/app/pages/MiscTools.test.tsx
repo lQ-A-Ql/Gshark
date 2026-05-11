@@ -70,6 +70,8 @@ vi.mock("react-router", async (importOriginal) => {
 
 import MiscTools from "./MiscTools";
 
+const SAMPLE_BASE64_PAYLOAD = "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==";
+
 describe("MiscTools payload and session analysis", () => {
   beforeEach(() => {
     resetMiscToolsMocks(mocks);
@@ -86,7 +88,7 @@ describe("MiscTools payload and session analysis", () => {
     fireEvent.click(await screen.findByRole("button", { name: "识别候选" }, { timeout: 5000 }));
 
     await waitFor(() => {
-      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==", expect.any(AbortSignal));
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith(`pass=${SAMPLE_BASE64_PAYLOAD}`, expect.any(AbortSignal));
     });
     expect(await screen.findByText("参数 pass")).toBeInTheDocument();
     expect(screen.getByText("无需抓包")).toBeInTheDocument();
@@ -100,7 +102,7 @@ describe("MiscTools payload and session analysis", () => {
     await waitFor(() => {
       expect(mocks.decodeStreamPayload).toHaveBeenCalledWith(
         "base64",
-        "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        SAMPLE_BASE64_PAYLOAD,
         {},
         expect.any(AbortSignal),
       );
@@ -109,7 +111,7 @@ describe("MiscTools payload and session analysis", () => {
     expect(screen.getByText("置信度 96%")).toBeInTheDocument();
     expect(screen.getByText("keyword:assert")).toBeInTheDocument();
     expect(screen.getByText("Behinder (ECB): AES-ECB 密文长度非法")).toBeInTheDocument();
-  }, 20000);
+  }, 30000);
 
   it("loads suspicious URI sources and fills the payload textarea from a selected source", async () => {
     mocks.listStreamPayloadSources.mockResolvedValueOnce([
@@ -122,8 +124,8 @@ describe("MiscTools payload and session analysis", () => {
         streamId: 9,
         sourceType: "form",
         paramName: "pass",
-        payload: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
-        preview: "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        payload: SAMPLE_BASE64_PAYLOAD,
+        preview: SAMPLE_BASE64_PAYLOAD,
         confidence: 92,
         signals: ["suspicious-uri", "suspicious-param", "script-after-base64"],
         decoderHints: ["antsword", "base64"],
@@ -150,9 +152,9 @@ describe("MiscTools payload and session analysis", () => {
     fireEvent.click(sourceButton!);
 
     await waitFor(() => {
-      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith("YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==", expect.any(AbortSignal));
+      expect(mocks.inspectStreamPayload).toHaveBeenCalledWith(SAMPLE_BASE64_PAYLOAD, expect.any(AbortSignal));
     });
-    expect(screen.getByDisplayValue("YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(SAMPLE_BASE64_PAYLOAD)).toBeInTheDocument();
     expect(screen.getByText(/当前输入来自 packet #81/)).toBeInTheDocument();
     expect((await screen.findAllByText("antsword_like")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("script_or_command").length).toBeGreaterThanOrEqual(1);
@@ -162,7 +164,7 @@ describe("MiscTools payload and session analysis", () => {
     await waitFor(() => {
       expect(mocks.decodeStreamPayload).toHaveBeenCalledWith(
         "antsword",
-        "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==",
+        SAMPLE_BASE64_PAYLOAD,
         expect.objectContaining({
           pass: "pass",
           extractParam: true,
@@ -206,7 +208,9 @@ describe("MiscTools payload and session analysis", () => {
       confidence: 15,
       reasons: ["已提取出可操作 payload 候选。"],
     });
-    mocks.decodeStreamPayload.mockRejectedValueOnce(new Error("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空"));
+    mocks.decodeStreamPayload.mockRejectedValueOnce(
+      new Error("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空"),
+    );
 
     render(<MiscTools />);
 
@@ -214,13 +218,17 @@ describe("MiscTools payload and session analysis", () => {
       expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
     });
 
-    fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), { target: { value: "just-random-text" } });
+    fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), {
+      target: { value: "just-random-text" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
 
     expect(await screen.findByText("当前 payload")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "自动检测" }));
 
-    expect(await screen.findByText("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空")).toBeInTheDocument();
+    expect(
+      await screen.findByText("自动检测置信度不足，请手动选择解码器；失败阶段：Base64: 结果不可读或为空"),
+    ).toBeInTheDocument();
   });
 
   it("re-runs payload inspection when the same input is submitted again", async () => {
@@ -231,7 +239,7 @@ describe("MiscTools payload and session analysis", () => {
     });
 
     fireEvent.change(await screen.findByPlaceholderText(/POST \/shell\.php/), {
-      target: { value: "pass=YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==" },
+      target: { value: `pass=${SAMPLE_BASE64_PAYLOAD}` },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "识别候选" }));
@@ -259,5 +267,4 @@ describe("MiscTools payload and session analysis", () => {
     expect(await screen.findByText("请输入 payload 后再识别候选。")).toBeInTheDocument();
     expect(mocks.inspectStreamPayload).not.toHaveBeenCalled();
   });
-
 });

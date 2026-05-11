@@ -55,6 +55,7 @@ function createFallbackBridge(overrides: Partial<BackendBridge> = {}): BackendBr
     getRawStreamPage: vi.fn(),
     getIndustrialAnalysis: vi.fn(),
     getHTTPLoginAnalysis: vi.fn(),
+    getEvidenceWithFilter: vi.fn(),
     subscribeEvents: vi.fn(() => vi.fn()),
     ...overrides,
   };
@@ -173,6 +174,18 @@ describe("createDesktopBridge", () => {
           recommendations: [],
         },
       })),
+      getEvidenceWithFilter: vi.fn(async () => [
+        {
+          id: "vehicle-1",
+          module: "vehicle" as const,
+          sourceType: "uds",
+          summary: "UDS 负响应",
+          confidenceLabel: "high" as const,
+          severity: "high" as const,
+          tags: ["UDS"],
+          caveats: [],
+        },
+      ]),
       subscribeEvents: vi.fn(() => unsubscribe),
     });
     const bridge = createDesktopBridge({
@@ -186,6 +199,9 @@ describe("createDesktopBridge", () => {
     await expect(bridge.getHTTPLoginAnalysis()).resolves.toMatchObject({
       report: { summary: [{ title: "候选端点", summary: "1 个端点 / 1 次尝试" }] },
     });
+    await expect(bridge.getEvidenceWithFilter(["vehicle"])).resolves.toMatchObject([
+      { id: "vehicle-1", module: "vehicle", summary: "UDS 负响应" },
+    ]);
     const stop = bridge.subscribeEvents({ status: vi.fn() });
     stop();
 
@@ -193,6 +209,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getRawStreamPage).toHaveBeenCalledWith("TCP", 3, 0, 4096);
     expect(fallbackBridge.getIndustrialAnalysis).toHaveBeenCalledWith();
     expect(fallbackBridge.getHTTPLoginAnalysis).toHaveBeenCalledWith();
+    expect(fallbackBridge.getEvidenceWithFilter).toHaveBeenCalledWith(["vehicle"]);
     expect(fallbackBridge.subscribeEvents).toHaveBeenCalled();
     expect(unsubscribe).toHaveBeenCalled();
   });
