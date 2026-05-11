@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { LRUCache } from "../../utils/lruCache";
 
 const EMPTY_FAMILY: C2FamilyAnalysis = {
@@ -78,7 +78,7 @@ export function useC2Analysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => bridge.getC2SampleAnalysis(signal),
+        request: (signal) => backendClients.analysis.getC2SampleAnalysis(signal),
         onSuccess: (payload) => {
           if (cacheKey) {
             c2AnalysisCache.set(cacheKey, payload);

@@ -25,8 +25,12 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
+  backendClients: {
+    analysis: {
+      getC2SampleAnalysis: mocks.getC2SampleAnalysis,
+    },
+  },
   bridge: {
-    getC2SampleAnalysis: mocks.getC2SampleAnalysis,
     decryptC2Traffic: mocks.decryptC2Traffic,
   },
 }));

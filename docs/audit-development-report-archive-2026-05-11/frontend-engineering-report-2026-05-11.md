@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 162 - C2 Sample Analysis Domain Client Migration
+
+Time: 2026-05-12 00:56:19 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the `BackendBridge` domain client migration with the C2 sample-analysis hook.
+- Kept C2 decrypt on the aggregate bridge for this round because `C2DecryptWorkbench` is a separate mixed workflow and will be migrated independently.
+
+### Changes
+
+- Updated `features/c2/useC2Analysis.ts` to call `backendClients.analysis.getC2SampleAnalysis(signal)` instead of `bridge.getC2SampleAnalysis(signal)`.
+- Updated the C2 page test mocks to expose `backendClients.analysis.getC2SampleAnalysis` while preserving `bridge.decryptC2Traffic` for the decrypt workbench path.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/C2Analysis.test.tsx src/app/pages/C2Analysis.decrypt.test.tsx src/app/pages/C2Analysis.vshell.test.tsx src/app/pages/C2Analysis.candidates.test.tsx src/app/pages/analysisCacheKeys.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- This removes another direct production dependency on the aggregate bridge without altering C2 cache keys, abort handling, or page behavior.
+- Remaining C2 bridge usage is now concentrated in `C2DecryptWorkbench`, which is a good later candidate for the `analysis.decryptC2Traffic` client path.
+
+---
+
 ## Round 41 - Backend Go Test Timeout Triage
 
 Time: 2026-05-11 00:03:51 +08:00  
