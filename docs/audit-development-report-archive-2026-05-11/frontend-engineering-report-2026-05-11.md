@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 165 - Threat Hunting Domain Client Migration
+
+Time: 2026-05-12 02:02:33 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with the Threat Hunting page.
+- Kept the page UI/state behavior unchanged and only swapped the API surface to the hunting domain client.
+
+### Changes
+
+- Updated `pages/ThreatHunting.tsx` to import `backendClients` instead of `bridge`.
+- Replaced `listThreatHits`, `getHuntingRuntimeConfig`, and `updateHuntingRuntimeConfig` calls with `backendClients.hunting.*` equivalents.
+
+### Validation
+
+- `pnpm exec vitest run src/app/features/hunting/threatHuntingInvestigationReport.test.ts src/app/features/hunting/ThreatHuntingMetricCards.test.tsx src/app/integrations/bridgeDomains.test.ts src/app/integrations/clients/huntingClient.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Threat Hunting page runtime/config calls now use the narrow hunting client.
+- Related state hook `useAnalysisProgress` still has hunting bridge usage and remains a later migration candidate.
+
+---
+
 ## Round 164 - Traffic Graph Domain Client Migration
 
 Time: 2026-05-12 01:58:28 +08:00  

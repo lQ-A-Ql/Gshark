@@ -16,7 +16,7 @@ import {
   parseThreatPrefixes,
   routeForPreparedStream,
 } from "../features/hunting/threatHuntingRules";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function ThreatHunting() {
@@ -45,7 +45,7 @@ export default function ThreatHunting() {
     if (!backendConnected) return;
     setHuntBusy(true);
     try {
-      const nextHits = await bridge.listThreatHits(prefixes);
+      const nextHits = await backendClients.hunting.listThreatHits(prefixes);
       setHits(nextHits);
       setSelectedHit(nextHits[0]?.id ?? null);
       setStatusText(`狩猎完成: ${nextHits.length} 条命中`);
@@ -60,7 +60,7 @@ export default function ThreatHunting() {
     if (!backendConnected) return;
     setConfigBusy(true);
     try {
-      const cfg = await bridge.getHuntingRuntimeConfig();
+      const cfg = await backendClients.hunting.getHuntingRuntimeConfig();
       setPrefixText((cfg.prefixes.length > 0 ? cfg.prefixes : ["flag{", "ctf{"]).join(","));
       setYaraEnabled(cfg.yaraEnabled);
       setYaraBin(cfg.yaraBin);
@@ -84,7 +84,7 @@ export default function ThreatHunting() {
 
     setConfigBusy(true);
     try {
-      const saved = await bridge.updateHuntingRuntimeConfig({
+      const saved = await backendClients.hunting.updateHuntingRuntimeConfig({
         prefixes,
         yaraEnabled,
         yaraBin: yaraBin.trim(),
