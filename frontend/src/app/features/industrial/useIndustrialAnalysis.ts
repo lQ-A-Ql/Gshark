@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 export const EMPTY_INDUSTRIAL_ANALYSIS: IndustrialAnalysisData = {
   totalIndustrialPackets: 0,
@@ -71,7 +71,7 @@ export function useIndustrialAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => bridge.getIndustrialAnalysis(signal),
+        request: (signal) => backendClients.analysis.getIndustrialAnalysis(signal),
         onSuccess: (payload) => {
           if (cacheKey) {
             industrialAnalysisCache.set(cacheKey, payload);

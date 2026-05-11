@@ -5719,3 +5719,40 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: migrate another isolated analysis hook, or split mixed media workflows between `backendClients.media` and `backendClients.runtime` once the lower-risk single-domain hooks are complete.
+
+---
+
+## Round 157 - Industrial Analysis Domain Client Migration
+
+Time: 2026-05-12 00:08:03 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued the bridge domain migration with the industrial analysis loading hook.
+- Moved the industrial analysis request from the aggregate `bridge` to `backendClients.analysis`.
+- Kept industrial cache keys, preload gating, abort handling, loading state, report data, and error behavior unchanged.
+
+### Changes
+
+- Updated `frontend/src/app/features/industrial/useIndustrialAnalysis.ts` to call `backendClients.analysis.getIndustrialAnalysis(signal)`.
+- Updated `frontend/src/app/pages/IndustrialAnalysis.test.tsx` to mock the narrowed analysis client instead of the aggregate bridge.
+
+### Validation
+
+- Initial targeted validation caught the old test mock shape, confirming the migration path needed test coverage updates.
+- `cd frontend && pnpm exec vitest run src/app/pages/IndustrialAnalysis.test.tsx src/app/integrations/bridgeDomains.test.ts` passed after updating the mock, 2 files / 2 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+
+### Review
+
+- This round intentionally migrated one analysis hook rather than all analysis hooks together, keeping any regression isolated to the industrial surface.
+- Industrial analysis now declares an analysis-domain dependency without exposing unrelated bridge methods.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend APIs and frontend response models are unchanged.
+  - Mapper files were not touched.
+- Next target: continue with another single-method analysis hook such as USB, APT, or vehicle, then reserve Round 160 for the required 10-round self-audit.
