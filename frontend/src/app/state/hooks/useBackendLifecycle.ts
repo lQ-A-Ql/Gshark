@@ -2,22 +2,23 @@ import {
   type Dispatch,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
   type SetStateAction,
 } from "react";
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import { bridge, type TSharkStatus } from "../../integrations/wailsBridge";
+import type { TSharkStatus } from "../../integrations/wailsBridge";
 import {
   type MediaAnalysisProgress,
   type ThreatAnalysisProgress,
 } from "./useAnalysisProgress";
 import { useToolRuntime } from "./useToolRuntime";
-import { createBackendLifecycleEventHandlers } from "./backendLifecycleEvents";
-import { getBackendUnavailableStatus, loadStartupTLSConfig, loadStartupToolRuntime } from "./backendLifecycleStartup";
+import { loadStartupTLSConfig } from "./backendLifecycleStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";
-import { wakeCaptureWaiters as wakeCaptureWaitersUtil } from "../captureSignal";
+import { useBackendLifecycleControls } from "./useBackendLifecycleControls";
+import { useBackendLifecycleStartupEffect } from "./useBackendLifecycleStartupEffect";
 
 interface UseBackendLifecycleOptions {
   readonly activeCapturePathRef: MutableRefObject<string>;
@@ -92,39 +93,35 @@ export function useBackendLifecycle({
   const refreshTimerRef = useRef<number | null>(null);
   const backendRetryTimerRef = useRef<number | null>(null);
 
-  const wakeCaptureWaiters = useCallback(() => {
-    wakeCaptureWaitersUtil(captureWaitersRef.current);
-  }, [captureWaitersRef]);
-
-  const setTSharkPath = useCallback(
-    async (path: string) => {
-      await setTSharkPathImpl(path, backendConnected, setBackendStatus);
-    },
-    [backendConnected, setTSharkPathImpl],
-  );
-
-  const refreshToolRuntimeSnapshot = useCallback(async () => {
-    return await refreshToolRuntimeSnapshotImpl(backendConnected);
-  }, [backendConnected, refreshToolRuntimeSnapshotImpl]);
-
-  const saveToolRuntimeConfig = useCallback(
-    async (patch: Partial<ToolRuntimeConfig>) => {
-      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatus);
-    },
-    [backendConnected, saveToolRuntimeConfigImpl],
-  );
-
-  const updateDecryptionConfig = useCallback(
-    (patch: Partial<DecryptionConfig>) => {
-      setDecryptionConfig((prev) => {
-        const next = { ...prev, ...patch };
-        if (backendConnected) {
-          void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
-        }
-        return next;
-      });
-    },
-    [backendConnected],
+  const { setTSharkPath, refreshToolRuntimeSnapshot, saveToolRuntimeConfig, updateDecryptionConfig } =
+    useBackendLifecycleControls({
+      backendConnected,
+      setBackendStatus,
+      setDecryptionConfig,
+      setTSharkPathImpl,
+      refreshToolRuntimeSnapshotImpl,
+      saveToolRuntimeConfigImpl,
+    });
+  const loadTLSConfig = useCallback(async () => {
+    await loadStartupTLSConfig(setDecryptionConfig, setBackendStatus);
+  }, []);
+  const startupToolRuntimeOptions = useMemo(
+    () => ({
+      setBackendStatus,
+      setIsTSharkChecking,
+      setIsToolRuntimeLoading,
+      setToolRuntimeCheckDegraded,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+    }),
+    [
+      setBackendStatus,
+      setIsTSharkChecking,
+      setIsToolRuntimeLoading,
+      setToolRuntimeCheckDegraded,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+    ],
   );
 
   useEffect(
@@ -135,88 +132,26 @@ export function useBackendLifecycle({
     [],
   );
 
-  useEffect(() => {
-    let dispose: (() => void) | null = null;
-    let cancelled = false;
-
-    const clearBackendRetryTimer = () => clearWindowTimer(backendRetryTimerRef);
-
-    const scheduleBackendRetry = (delayMs = 2000) => {
-      clearBackendRetryTimer();
-      backendRetryTimerRef.current = window.setTimeout(() => {
-        void setup();
-      }, delayMs);
-    };
-
-    const setup = async () => {
-      if (cancelled) return;
-      const available = await bridge.isAvailable();
-      if (cancelled) return;
-      if (!available) {
-        setBackendConnected(false);
-        setBackendStatus(await getBackendUnavailableStatus());
-        scheduleBackendRetry();
-        return;
-      }
-
-      clearBackendRetryTimer();
-      setBackendConnected(true);
-      setBackendStatus("后端已连接，等待打开文件");
-
-      await loadStartupToolRuntime({
-        isCancelled: () => cancelled,
-        setBackendStatus,
-        setIsTSharkChecking,
-        setIsToolRuntimeLoading,
-        setToolRuntimeCheckDegraded,
-        setToolRuntimeSnapshot,
-        setTsharkStatus,
-      });
-      await loadStartupTLSConfig(setDecryptionConfig, setBackendStatus);
-
-      dispose = bridge.subscribeEvents(
-        createBackendLifecycleEventHandlers({
-          activeCapturePathRef,
-          parseFinishedRef,
-          parseErrorRef,
-          preloadingRef,
-          refreshTimerRef,
-          scheduleLoadMoreRef,
-          refreshAnalysisResultRef,
-          updateProgressFromStatusRef,
-          wakeCaptureWaiters,
-          setSelectedPacketId,
-          setMediaAnalysisProgress,
-          setThreatAnalysisProgress,
-          setIsThreatAnalysisLoading,
-          setBackendStatus,
-        }),
-      );
-    };
-
-    void setup();
-
-    return () => {
-      cancelled = true;
-      clearBackendRetryTimer();
-      if (dispose) dispose();
-      clearWindowTimer(refreshTimerRef);
-    };
-  }, [
+  useBackendLifecycleStartupEffect({
     activeCapturePathRef,
+    backendRetryTimerRef,
     captureWaitersRef,
+    loadStartupTLSConfig: loadTLSConfig,
     parseErrorRef,
     parseFinishedRef,
     preloadingRef,
     refreshAnalysisResultRef,
+    refreshTimerRef,
     scheduleLoadMoreRef,
+    setBackendConnected,
+    setBackendStatus,
     setIsThreatAnalysisLoading,
     setMediaAnalysisProgress,
     setSelectedPacketId,
     setThreatAnalysisProgress,
+    startupToolRuntimeOptions,
     updateProgressFromStatusRef,
-    wakeCaptureWaiters,
-  ]);
+  });
 
   return {
     backendConnected,

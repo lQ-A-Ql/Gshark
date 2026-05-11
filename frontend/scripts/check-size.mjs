@@ -438,8 +438,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/hooks/useBackendLifecycle.ts",
-    maxLines: 240,
+    maxLines: 205,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
+  },
+  {
+    path: "src/app/state/hooks/useBackendLifecycleControls.ts",
+    maxLines: 70,
+    reason: "backend lifecycle controls should only bind TLS and tool runtime actions",
   },
   {
     path: "src/app/state/hooks/backendLifecycleEvents.ts",
@@ -1597,6 +1602,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useOpenCaptureAction.test.tsx",
     maxLines: 45,
     reason: "open capture action tests should stay focused on filter reset and start delegation",
+  },
+  {
+    path: "src/app/state/hooks/useBackendLifecycleControls.test.tsx",
+    maxLines: 85,
+    reason: "backend lifecycle controls tests should stay focused on TLS sync behavior",
   },
   {
     path: "src/app/state/hooks/useRecentCapturesState.test.tsx",
