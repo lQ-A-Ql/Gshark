@@ -9,8 +9,6 @@ import {
   RawStreamPayloadGrid,
   RawStreamSelectedPanel,
   RawStreamTitleBar,
-  TCP_RAW_STREAM_TONE,
-  UDP_RAW_STREAM_TONE,
 } from "./RawStreamSections";
 import {
   buildRawStreamExportContent,
@@ -21,6 +19,7 @@ import {
   type RawViewMode,
   type VisibleRawChunk,
 } from "./RawStreamUtils";
+import { getRawStreamProtocolConfig } from "./RawStreamProtocolConfig";
 import { createEmptyRawStreamView, type RawStreamViewState } from "./RawStreamViewState";
 import { useRawStreamPageLoader } from "./useRawStreamPageLoader";
 import { useRawStreamRouteSelection, type RawStreamProtocol } from "./useRawStreamRouteSelection";
@@ -40,11 +39,7 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const { tcpStream, udpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
   const sourceStream = protocol === "TCP" ? tcpStream : udpStream;
   const streamList = protocol === "TCP" ? streamIds.tcp : streamIds.udp;
-  const tone = protocol === "TCP" ? TCP_RAW_STREAM_TONE : UDP_RAW_STREAM_TONE;
-  const enableScrollLoad = protocol === "TCP";
-  const selectedPanelClass =
-    protocol === "TCP" ? "min-h-0 min-w-0 space-y-4 overflow-auto pb-4 pr-1" : "space-y-4 xl:sticky xl:top-0";
-  const loadingText = protocol === "TCP" ? "继续下滚可加载更多" : "";
+  const { enableScrollLoad, loadingText, selectedPanelClass, tone } = getRawStreamProtocolConfig(protocol);
   const { loadError, loadingMore, loadMore } = useRawStreamPageLoader({
     fetchRawStreamPage: bridge.getRawStreamPage,
     pageSize: STREAM_PAGE_SIZE,

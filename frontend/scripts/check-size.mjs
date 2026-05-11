@@ -1536,8 +1536,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/pages/RawStreamPage.tsx",
-    maxLines: 235,
+    maxLines: 220,
     reason: "shared raw stream page should own protocol-specific TCP/UDP orchestration without duplicating route pages",
+  },
+  {
+    path: "src/app/pages/RawStreamProtocolConfig.ts",
+    maxLines: 35,
+    reason: "raw stream protocol config should keep TCP/UDP presentation constants only",
   },
   {
     path: "src/app/pages/useRawStreamPageLoader.ts",
@@ -1563,6 +1568,11 @@ export const sourceSizeBudgets = [
     path: "src/app/pages/useRawStreamRouteSelection.test.tsx",
     maxLines: 85,
     reason: "raw stream route selection tests should stay focused on route and selected-packet selection",
+  },
+  {
+    path: "src/app/pages/RawStreamProtocolConfig.test.ts",
+    maxLines: 25,
+    reason: "raw stream protocol config tests should stay focused on TCP/UDP presentation switches",
   },
   {
     path: "src/app/pages/RawStreamUtils.ts",
