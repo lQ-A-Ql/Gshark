@@ -1,5 +1,37 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 200 - Backend Client Migration Audit
+
+Time: 2026-05-12 10:09:06 +08:00  
+Author: Codex
+
+### Scope
+
+- Performed the scheduled ten-round audit for Rounds 191-200.
+- Verified the completed production migration away from `wailsBridge` and aggregate `bridge` imports.
+
+### Changes
+
+- Documentation-only audit entry.
+
+### Validation
+
+- `git status --short` - clean before the audit entry.
+- Source scan found no `wailsBridge` references under `frontend/src`.
+- Source scan found no direct aggregate `bridge` named imports.
+- Source scan found 37 production `backendClients` imports, all from `integrations/backendClients`.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- The bridge domain client migration is complete for production consumers.
+- `wailsBridge.ts` remains only as a compatibility facade and is guarded by size and boundary checks.
+- Next work can focus on deeper domain-client organization or compatibility facade cleanup only where concrete import consumers require it.
+
+---
+
 ## Round 199 - Wails Bridge Facade Size Guard
 
 Time: 2026-05-12 10:07:22 +08:00  
