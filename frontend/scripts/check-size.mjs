@@ -11,6 +11,11 @@ export const sourceSizeBudgets = [
     reason: "bridge facade should keep shrinking as domain clients move out",
   },
   {
+    path: "src/app/integrations/backendClients.ts",
+    maxLines: 20,
+    reason: "backend client singleton should only compose the compatibility bridge into domain clients",
+  },
+  {
     path: "src/app/integrations/bridgeDomains.ts",
     maxLines: 25,
     reason: "bridge domain projection should only expose narrowed clients from the compatibility bridge",

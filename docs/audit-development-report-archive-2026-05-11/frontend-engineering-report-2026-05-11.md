@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 188 - Backend Client Singleton Split
+
+Time: 2026-05-12 09:16:39 +08:00  
+Author: Codex
+
+### Scope
+
+- Split backend client singleton construction out of the `wailsBridge` compatibility facade.
+- Preserved `wailsBridge` exports so existing consumers and compatibility tests remain stable.
+
+### Changes
+
+- Added `integrations/backendClients.ts` to own desktop binding lookup, aggregate bridge construction, and domain client projection.
+- Updated `integrations/wailsBridge.ts` to re-export `bridge` and `backendClients` from the new singleton module.
+- Added a size budget for `integrations/backendClients.ts` so the singleton remains a tiny composition layer.
+
+### Validation
+
+- `pnpm exec vitest run src/app/integrations/wailsBridge.test.ts src/app/integrations/bridgeDomains.test.ts src/app/integrations/desktopBridge.test.ts src/app/integrations/httpBridgeAggregation.test.ts scripts/check-size.test.mjs` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- `wailsBridge.ts` is now primarily a compatibility re-export facade.
+- Future production imports can move from `wailsBridge` to `backendClients` without changing runtime behavior.
+
+---
+
 ## Round 187 - Bridge Type Import Decoupling
 
 Time: 2026-05-12 09:13:11 +08:00  
