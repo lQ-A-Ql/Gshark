@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { APTAnalysis } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { LRUCache } from "../../utils/lruCache";
 import { buildAPTDisplayProfiles } from "./actorRegistry";
 

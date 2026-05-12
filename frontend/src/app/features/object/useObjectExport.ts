@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ExtractedObject } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 
 export interface UseObjectExportOptions {
   backendConnected: boolean;

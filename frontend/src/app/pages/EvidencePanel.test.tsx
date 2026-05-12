@@ -25,7 +25,7 @@ vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
 }));
 
-vi.mock("../integrations/wailsBridge", () => ({
+vi.mock("../integrations/backendClients", () => ({
   backendClients: {
     evidence: {
       getEvidenceWithFilter: mocks.getEvidenceWithFilter,

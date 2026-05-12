@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 193 - Analysis Feature Backend Client Entry Migration
+
+Time: 2026-05-12 09:42:20 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued replacing production `backendClients` imports from `wailsBridge` with the direct singleton entry.
+- Focused on analysis feature hooks and their page-level test mocks.
+
+### Changes
+
+- Updated evidence, object export, industrial, USB, APT, vehicle, and traffic feature hooks to import `backendClients` from `integrations/backendClients`.
+- Updated Evidence, Industrial, USB, and APT page tests to mock `integrations/backendClients` directly.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/EvidencePanel.test.tsx src/app/pages/IndustrialAnalysis.test.tsx src/app/pages/UsbAnalysis.test.tsx src/app/pages/AptAnalysis.test.tsx src/app/pages/TrafficGraph.test.ts src/app/pages/VehicleAnalysis.test.ts src/app/features/object/objectExportRules.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Core analysis feature hooks now use the direct backend client singleton.
+- Remaining `wailsBridge` imports are concentrated in MISC/stream decoder/C2/page shell consumers.
+
+---
+
 ## Round 192 - Media Backend Client Entry Migration
 
 Time: 2026-05-12 09:36:55 +08:00  

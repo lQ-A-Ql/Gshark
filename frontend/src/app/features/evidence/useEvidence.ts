@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UnifiedEvidenceRecord } from "./evidenceSchema";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { LRUCache } from "../../utils/lruCache";
 
 const evidenceCache = new LRUCache<string, UnifiedEvidenceRecord[]>(10);

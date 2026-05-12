@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GlobalTrafficStats, Packet } from "../../core/types";
 import { isAbortLikeError, useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
