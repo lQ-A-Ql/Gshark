@@ -312,8 +312,8 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 600,
-    reason: "provider remains oversized and should keep moving task reset and packet page domains out",
+    maxLines: 550,
+    reason: "provider remains oversized and should keep moving task reset and backend lifecycle domains out",
   },
   {
     path: "src/app/state/sentinelDerivedView.ts",
@@ -392,6 +392,12 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/usePacketPageCancellation.ts",
     maxLines: 30,
     reason: "packet page cancellation hook should only own sequence bump, task abort, and loading reset",
+  },
+  {
+    path: "src/app/state/hooks/usePacketPageState.ts",
+    maxLines: 185,
+    reason:
+      "packet page state owner should compose page state, load, commit, reset, navigation, locate, and scheduling",
   },
   {
     path: "src/app/state/hooks/useFrontendCaptureTaskReset.ts",
@@ -1938,6 +1944,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/usePacketPageCancellation.test.tsx",
     maxLines: 35,
     reason: "packet page cancellation tests should stay focused on sequence, task abort, and loading reset",
+  },
+  {
+    path: "src/app/state/hooks/usePacketPageState.test.tsx",
+    maxLines: 85,
+    reason: "packet page state owner tests should stay focused on load, navigation, retry, and locate wiring",
   },
   {
     path: "src/app/state/hooks/useFrontendCaptureTaskReset.test.tsx",

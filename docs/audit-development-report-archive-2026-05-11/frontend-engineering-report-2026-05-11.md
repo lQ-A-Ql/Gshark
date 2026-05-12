@@ -7456,3 +7456,51 @@ Author: Codex
 - Next engineering slice should either:
   - extract packet page state owner with very careful setter boundaries, or
   - switch tracks to TShark capability-aware field selection if state-owner work starts to require unsafe coupling.
+
+---
+
+## Round 166 - Packet Page State Owner Slice
+
+Time: 2026-05-12 17:17:00 +08:00
+Author: Codex
+
+### Scope
+
+- Continued `SentinelContext` internal state ownership extraction.
+- Extracted packet page ownership while preserving the public `useSentinel()` shape.
+- Kept this round limited to packet pagination/load/navigation/locate wiring and did not change backend APIs, mapper contracts, or user-visible behavior.
+
+### Changes
+
+- Added `usePacketPageState` as the packet page domain owner:
+  - owns packet list state, pagination cursors, page loading flags, filter loading flags, packet page errors, page refs, sequence refs, and scheduled load refs;
+  - composes existing packet page hooks for cancellation, commit, viewport reset, page loading, navigation, locate, and scheduled load;
+  - composes selected-packet state so page commits/resets still clear detail/raw/layers consistently.
+- Updated `SentinelContext.tsx` to consume the packet page owner instead of wiring packet page hooks inline.
+- Added `usePacketPageState.test.tsx` covering load, load-more, locate, retry, filter forwarding, and selected packet id propagation.
+- Tightened `SentinelContext.tsx` size budget from 600 lines to 550 lines and registered the new packet page owner hook/test in size budgets.
+- Ran Prettier on `check-size.mjs` after budget edits so scoped format remains clean.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/state/hooks/usePacketPageState.test.tsx src/app/state/hooks/usePacketPageCommit.test.tsx src/app/state/hooks/usePacketPageLoad.test.tsx src/app/state/hooks/usePacketPageNavigation.test.tsx src/app/state/hooks/usePacketViewportReset.test.tsx src/app/state/hooks/usePacketLocateById.test.tsx src/app/state/hooks/useScheduledPacketPageLoad.test.tsx src/app/state/hooks/useSelectedPacketState.test.tsx` passed, 8 files / 8 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run size:check` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run ci` passed, including 185 Vitest files / 506 tests and Vite build.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete. The packet page state owner is extracted, tested, budgeted, and validated.
+- Drift check: no drift detected. The work stayed on the current plan's `SentinelContext` ownership theme and did not move into unrelated UI polish, MISC integration, sample handling, or mapper expansion.
+- Quantitative progress:
+  - `SentinelContext.tsx` is now 515 lines, under the new 550-line budget and within the target 450-550 line range from the plan.
+  - `usePacketPageState.ts` is 184 lines under its 185-line budget.
+  - `usePacketPageState.test.tsx` is 83 lines under its 85-line budget.
+- Remaining risks:
+  - `SentinelContext` is much smaller, but backend lifecycle and runtime/analysis task ownership still coordinate several refs and setters.
+  - The next iteration should either extract backend lifecycle/runtime ownership further or switch to the planned TShark capability probing work if state extraction begins to produce tight coupling.
+  - `BackendBridge` compatibility facade remains intentionally in place; page-level aggregate bridge reduction is still a later boundary task.
