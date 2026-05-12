@@ -1,12 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { DecryptionConfig, ToolRuntimeSnapshot } from "../../core/types";
-import { bridge, type TSharkStatus } from "../../integrations/wailsBridge";
+import { backendClients, type TSharkStatus } from "../../integrations/wailsBridge";
 import { isOperationTimeoutError, withTimeout } from "../../utils/asyncControl";
 import { STARTUP_TLS_CONFIG_TIMEOUT_MS, STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
 import { readToolRuntimeConfig, writeToolRuntimeConfig } from "./useToolRuntime";
 
 export async function getBackendUnavailableStatus() {
-  const desktopStatus = await bridge.getDesktopBackendStatus().catch(() => "");
+  const desktopStatus = await backendClients.runtime.getDesktopBackendStatus().catch(() => "");
   const detail = desktopStatus.trim();
   return detail && detail !== "not-started" && detail !== "starting"
     ? detail
@@ -39,7 +39,7 @@ export async function loadStartupToolRuntime({
   try {
     const savedConfig = readToolRuntimeConfig();
     const snapshot = await withTimeout(
-      bridge.updateToolRuntimeConfig(savedConfig),
+      backendClients.runtime.updateToolRuntimeConfig(savedConfig),
       STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
       "startup tool runtime check timed out",
     );
@@ -82,7 +82,7 @@ export async function loadStartupTLSConfig(
 ) {
   try {
     const tls = await withTimeout(
-      bridge.getTLSConfig(),
+      backendClients.securityMaterial.getTLSConfig(),
       STARTUP_TLS_CONFIG_TIMEOUT_MS,
       "startup TLS config check timed out",
     );

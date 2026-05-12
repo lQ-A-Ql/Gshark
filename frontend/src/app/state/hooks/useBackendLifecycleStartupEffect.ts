@@ -1,5 +1,5 @@
 import { useEffect, type MutableRefObject } from "react";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { wakeCaptureWaiters as wakeCaptureWaitersUtil } from "../captureSignal";
 import { getBackendUnavailableStatus, loadStartupToolRuntime } from "./backendLifecycleStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";
@@ -45,7 +45,7 @@ export function useBackendLifecycleStartupEffect({
 
     const setup = async () => {
       if (cancelled) return;
-      const available = await bridge.isAvailable();
+      const available = await backendClients.runtime.isAvailable();
       if (cancelled) return;
       if (!available) {
         setBackendConnected(false);
@@ -59,7 +59,7 @@ export function useBackendLifecycleStartupEffect({
       setBackendStatus("后端已连接，等待打开文件");
       await loadStartupToolRuntime({ ...startupToolRuntimeOptions, isCancelled: () => cancelled });
       await loadTLSConfig();
-      dispose = bridge.subscribeEvents(
+      dispose = backendClients.runtime.subscribeEvents(
         createBackendLifecycleEventHandlers({
           activeCapturePathRef,
           parseFinishedRef,

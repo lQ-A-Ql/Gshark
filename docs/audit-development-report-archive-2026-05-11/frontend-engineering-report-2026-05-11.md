@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 183 - Lifecycle Startup Domain Migration
+
+Time: 2026-05-12 08:57:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal in backend lifecycle startup and event subscription wiring.
+- Kept retry scheduling, startup runtime checks, TLS bootstrap loading, and event handler behavior unchanged.
+
+### Changes
+
+- Updated `state/hooks/useBackendLifecycleStartupEffect.ts` to call `backendClients.runtime.isAvailable` and `backendClients.runtime.subscribeEvents`.
+- Updated `state/hooks/backendLifecycleStartup.ts` to call `backendClients.runtime.getDesktopBackendStatus`, `backendClients.runtime.updateToolRuntimeConfig`, and `backendClients.securityMaterial.getTLSConfig`.
+- Expanded lifecycle hook test mocks to expose runtime and security material domain clients.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Startup availability checks, desktop status reads, runtime configuration sync, TLS bootstrap, and event subscription now use domain clients.
+- Remaining direct bridge usage is concentrated in Sentinel context compatibility wiring and runtime settings helpers.
+
+---
+
 ## Round 182 - Lifecycle TLS Domain Migration
 
 Time: 2026-05-12 08:52:00 +08:00  
