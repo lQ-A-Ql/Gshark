@@ -7865,3 +7865,44 @@ Author: Codex
   - Optional-field degradation is still silent outside backend internals; runtime diagnostics/report notes should eventually surface per-analysis skipped fields.
   - `runner.go` packet-list builders still append planned fields internally; this is expected because the planner owns those `-e` additions.
   - Next iteration should shift from direct `-e` migration to either degradation reporting or another planned contract theme such as bridge dependency boundary enforcement.
+
+---
+
+## Round 175 - TShark Optional Field Degradation Notes Slice
+
+Time: 2026-05-12 18:19:55 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark external-dependency hardening.
+- Focused on making optional-field degradation visible to analysis consumers without changing API shapes.
+- Started with USB analysis because it has the broadest optional field footprint after Round 174.
+
+### Changes
+
+- Added shared helper `buildTSharkFieldDegradationNote` / `appendTSharkFieldDegradationNote`.
+- The helper:
+  - deduplicates and sorts missing optional fields;
+  - summarizes long missing-field lists;
+  - states that affected columns are degraded to empty values;
+  - gives operator guidance to upgrade or switch tshark path.
+- Appended USB per-analysis degradation notes from `plannedScan.MissingOptional`.
+- Added a focused test to verify deduplicated counts and user-facing degradation wording.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestBuildTSharkFieldDegradationNote|TestBuildPlannedFieldArgsForUSB|TestUSB" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: partial but intentionally scoped. USB now surfaces per-analysis optional-field degradation; other analyses still rely on global runtime capability status.
+- Drift check: no drift detected. This remains within the TShark capability/diagnostics plan and does not alter detection or evidence semantics.
+- Remaining risks:
+  - Similar per-analysis notes should be considered for industrial, vehicle, stream follow, traffic stats, and C2 where optional fields affect user-visible completeness.
+  - Notes are plain text; a structured degradation object would be stronger but would require model/API changes.
+  - This slice improves explainability but does not yet expose skipped fields in Investigation Report.

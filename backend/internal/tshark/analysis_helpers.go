@@ -318,6 +318,41 @@ func (scan PlannedFieldScan) ProjectRow(parts []string) []string {
 	return projectCapabilityFieldScanRow(normalizeFieldScanRow(parts, len(scan.plan.tsharkFields)), scan.plan)
 }
 
+func appendTSharkFieldDegradationNote(notes []string, scope string, missingOptional []string) []string {
+	note := buildTSharkFieldDegradationNote(scope, missingOptional)
+	if note == "" {
+		return notes
+	}
+	return append(notes, note)
+}
+
+func buildTSharkFieldDegradationNote(scope string, missingOptional []string) string {
+	fields := normalizeFieldScanFields(missingOptional)
+	if len(fields) == 0 {
+		return ""
+	}
+	sort.Strings(fields)
+	displayFields := fields
+	const maxDisplayedFields = 8
+	if len(displayFields) > maxDisplayedFields {
+		displayFields = displayFields[:maxDisplayedFields]
+	}
+	more := ""
+	if hidden := len(fields) - len(displayFields); hidden > 0 {
+		more = fmt.Sprintf(" 等，另有 %d 个字段", hidden)
+	}
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		scope = "TShark 字段扫描"
+	}
+	return fmt.Sprintf("%s：当前 tshark 缺少 %d 个可选字段（%s%s），相关列已按空值降级；如该页结果异常偏少，建议升级 Wireshark/tshark 或切换 tshark 路径。",
+		scope,
+		len(fields),
+		strings.Join(displayFields, ", "),
+		more,
+	)
+}
+
 func runDirectFieldScanWithPlan(args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
 	if len(plan.tsharkFields) == 0 {
 		return nil

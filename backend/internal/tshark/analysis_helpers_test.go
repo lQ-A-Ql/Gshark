@@ -123,6 +123,24 @@ func TestBuildPlannedFieldArgsPreservesBaseArgsBeforeFields(t *testing.T) {
 	}
 }
 
+func TestBuildTSharkFieldDegradationNoteSummarizesMissingOptionalFields(t *testing.T) {
+	note := buildTSharkFieldDegradationNote("USB 分析字段扫描", []string{
+		"usb.capdata",
+		"usbhid.data",
+		"usb.capdata",
+		"scsi.status",
+	})
+	if !strings.Contains(note, "USB 分析字段扫描") {
+		t.Fatalf("expected scope in note, got %q", note)
+	}
+	if !strings.Contains(note, "缺少 3 个可选字段") {
+		t.Fatalf("expected deduplicated field count, got %q", note)
+	}
+	if !strings.Contains(note, "相关列已按空值降级") {
+		t.Fatalf("expected degradation guidance, got %q", note)
+	}
+}
+
 func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	ClearFieldScanCache("")
 	t.Cleanup(func() {

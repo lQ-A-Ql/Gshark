@@ -456,6 +456,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	analysis.Other.SetupRequests = topBuckets(otherSetupMap, 0)
 	analysis.Other.Notes = buildUSBOtherNotes(analysis.Other)
 	analysis.Notes = buildUSBAnalysisNotes(analysis, statusMap)
+	analysis.Notes = appendTSharkFieldDegradationNote(analysis.Notes, "USB 分析字段扫描", plannedScan.MissingOptional)
 	return analysis, nil
 }
 
