@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamDecoderWorkbench } from "../../components/StreamDecoderWorkbench";
 import type { StreamPayloadSource } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { PayloadWebShellInputPanel } from "./PayloadWebShellInputPanel";
@@ -31,7 +31,7 @@ export function PayloadWebShellDecoderModule({ module, surfaceVariant = "card" }
     const controller = new AbortController();
     setSourcesLoading(true);
     setSourcesError("");
-    bridge
+    backendClients.stream
       .listStreamPayloadSources(controller.signal, 500)
       .then((rows) => {
         if (controller.signal.aborted) return;

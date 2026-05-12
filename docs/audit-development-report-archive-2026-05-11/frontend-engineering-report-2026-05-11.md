@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 178 - Payload WebShell Source Domain Migration
+
+Time: 2026-05-12 08:33:10 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal with the MISC payload webshell decoder module.
+- Kept source discovery, payload drafting, sample insertion, source selection, and decoded-workbench rendering unchanged.
+
+### Changes
+
+- Updated `misc/modules/PayloadWebShellDecoderModule.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced payload source loading with `backendClients.stream.listStreamPayloadSources`.
+- Updated MISC page tests to expose the stream domain client and compressed mock scaffolding to stay under size budgets.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.smb3.test.tsx src/app/pages/MiscTools.customModules.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed after removing one stale mock line.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Payload webshell source loading now uses the stream domain client.
+- Remaining direct bridge usage is concentrated in the shared stream decoder/inspection helpers and backend lifecycle/runtime control paths.
+
+---
+
 ## Round 177 - MISC Tools Page Domain Client Migration
 
 Time: 2026-05-12 08:27:35 +08:00  

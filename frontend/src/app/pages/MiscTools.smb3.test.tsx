@@ -51,6 +51,7 @@ vi.mock("../integrations/wailsBridge", () => ({
       getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
       exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
     },
+    stream: { listStreamPayloadSources: mocks.listStreamPayloadSources },
   },
   bridge: {
     listMiscModules: mocks.listMiscModules,
