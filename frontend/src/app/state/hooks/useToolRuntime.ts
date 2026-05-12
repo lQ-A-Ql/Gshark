@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import type { TSharkStatus } from "../../integrations/bridgeTypes";
+import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
 
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";

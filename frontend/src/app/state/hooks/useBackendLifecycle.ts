@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import type { TSharkStatus } from "../../integrations/bridgeTypes";
+import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import {
   type MediaAnalysisProgress,
   type ThreatAnalysisProgress,

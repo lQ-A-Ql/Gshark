@@ -1,4 +1,4 @@
-import type { CaptureStatus } from "../integrations/bridgeTypes";
+import type { CaptureStatus } from "../integrations/clients/captureClient";
 
 export function normalizeCapturePathForCompare(path: string): string {
   return path.trim().replace(/\\/g, "/").toLowerCase();

@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { DecryptionConfig, ToolRuntimeSnapshot } from "../../core/types";
-import type { TSharkStatus } from "../../integrations/bridgeTypes";
+import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
 import { isOperationTimeoutError, withTimeout } from "../../utils/asyncControl";
 import { STARTUP_TLS_CONFIG_TIMEOUT_MS, STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";

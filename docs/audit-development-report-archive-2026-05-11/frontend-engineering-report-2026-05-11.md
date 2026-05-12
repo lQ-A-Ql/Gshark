@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 202 - State Bridge Type Dependency Narrowing
+
+Time: 2026-05-12 11:45:15 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued reducing dependencies on the aggregate bridge type module after production value migration completed.
+- Focused on state-layer imports that only needed concrete client support types.
+
+### Changes
+
+- Updated state hooks and state helpers to import `TSharkStatus` from `clients/toolRuntimeClient`, `EventHandlers` from `clients/eventClient`, and `CaptureStatus` from `clients/captureClient`.
+- Removed remaining `integrations/bridgeTypes` imports from `frontend/src/app/state`.
+
+### Validation
+
+- State scan found no `integrations/bridgeTypes` imports under `frontend/src/app/state`.
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/state/hooks/useBackendLifecycleControls.test.tsx src/app/state/captureCommitStatus.test.ts src/app/state/hooks/useToolRuntime.test.ts` - passed for available matching files.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- State code now depends on concrete client type modules instead of the aggregate bridge type barrel.
+- `bridgeTypes` remains focused on bridge/domain composition and compatibility exports.
+
+---
+
 ## Round 201 - Wails Bridge Import Boundary Guard
 
 Time: 2026-05-12 11:14:28 +08:00  
