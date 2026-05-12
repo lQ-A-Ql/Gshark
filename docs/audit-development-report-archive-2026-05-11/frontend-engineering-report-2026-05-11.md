@@ -7404,3 +7404,55 @@ Author: Codex
   - real PCAP regression remains opt-in;
   - no mapper budgets were widened.
 - Next state target should be packet page ownership, but it should be split carefully because packet page commit/reset still coordinates selected-packet setters and capture finalization.
+
+---
+
+## Round 165 - Capture Start Workflow Owner Slice
+
+Time: 2026-05-12 16:58:31 +08:00
+Author: Codex
+
+### Scope
+
+- Continued internal `SentinelContext` ownership extraction with the capture start/open workflow.
+- Preserved public `useSentinel()` fields and all backend API contracts.
+- Avoided packet-page owner extraction in this round because packet page commit/reset still coordinates selected packet state and capture finalization.
+
+### Changes
+
+- Added `useCaptureStartWorkflow`:
+  - owns the provider-level open/start/preload/finalize/failure orchestration;
+  - composes existing pure helpers for capture start, preload probing, finalization, abort-like errors, failure transaction status, and preload shutdown;
+  - keeps the Provider responsible only for wiring state refs/setters and compatibility context output.
+- Updated `SentinelContext.tsx` so the large inline `startCapture` callback is replaced by the capture-start owner hook.
+- Added `useCaptureStartWorkflow.test.tsx` covering the happy path:
+  - replacement preparation;
+  - backend streaming start;
+  - first-page preload validation;
+  - stream index refresh;
+  - capture metadata and transaction finalization;
+  - quiet analysis refresh scheduling.
+- Tightened `SentinelContext.tsx` size budget from 700 lines to 600 lines and registered the new capture-start owner hook/test in size budgets.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/state/hooks/useCaptureStartWorkflow.test.tsx src/app/state/captureStartBackend.test.ts src/app/state/capturePreloadProbe.test.ts src/app/state/captureFinalizeWorkflow.test.ts src/app/state/hooks/useOpenCaptureAction.test.tsx` passed, 5 files / 14 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run ci` passed, including 184 Vitest files / 505 tests and Vite build.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Review
+
+- `SentinelContext.tsx` is now at 567 lines and guarded by a 600-line budget.
+- State ownership is now split for selected packet, stream, and capture start/open workflows.
+- Remaining state risks are narrower:
+  - packet page owner is still the largest remaining internal state target;
+  - backend lifecycle remains separate but still broad;
+  - capture stop/replacement/clear are already hook-backed and may not need another owner layer yet.
+- Next engineering slice should either:
+  - extract packet page state owner with very careful setter boundaries, or
+  - switch tracks to TShark capability-aware field selection if state-owner work starts to require unsafe coupling.

@@ -1,19 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import type { Packet } from "../core/types";
 import { backendClients } from "../integrations/backendClients";
-import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
-import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
-import { buildOpenedCaptureFromPath, createInitialCaptureFileMeta } from "./captureOpenState";
-import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureStartBackend";
-import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
-import { stopCapturePreloading } from "./captureParseRuntimeState";
-import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
+import { createInitialCaptureFileMeta } from "./captureOpenState";
+import { createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { PAGE_SIZE } from "./captureConstants";
-import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import type { SentinelContextValue } from "./sentinelTypes";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
@@ -36,6 +30,7 @@ import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
 import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
 import { useSelectedPacketState } from "./hooks/useSelectedPacketState";
 import { useStreamState } from "./hooks/useStreamState";
+import { useCaptureStartWorkflow } from "./hooks/useCaptureStartWorkflow";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -346,146 +341,61 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useSyncedRefValue(hasMorePacketsRef, hasMorePackets);
   useCaptureTaskScopeCleanup(captureTaskScopeRef);
 
-  const startCapture = useCallback(
-    async (filePath?: string, filterOverride?: string) => {
-      if (!backendConnected) {
-        setBackendStatus(getCaptureOpenDisconnectedStatus());
-        return false;
-      }
-
-      const captureSeq = ++captureSeqRef.current;
-      filterSeqRef.current += 1;
-      const effectiveFilter = filterOverride ?? displayFilter;
-      const hadActiveCapture = Boolean(activeCapturePathRef.current);
-      let pendingCapture = buildOpenedCaptureFromPath(filePath ?? "");
-
-      try {
-        const opened = await resolveOpenedCapture({
-          filePath,
-          openPcapFile: backendClients.capture.openPcapFile,
-        });
-        pendingCapture = opened;
-
-        const started = await prepareAndStartOpenedCapture({
-          opened,
-          openedAt: new Date().toISOString(),
-          hadActiveCapture,
-          preloadProcessedRef,
-          preloadTotalRef,
-          parseFinishedRef,
-          parseErrorRef,
-          preloadingRef,
-          setIsFilterLoading,
-          setPacketPageError,
-          setPreloadProcessed,
-          setPreloadTotal,
-          setIsPreloadingCapture,
-          setCaptureTransaction,
-          setBackendStatus,
-          rememberRecentCapture,
-          captureSeq,
-          captureSeqRef,
-          captureTaskScopeRef,
-          prepareForCaptureReplacement,
-          startStreamingPackets: backendClients.capture.startStreamingPackets,
-        });
-        if (!started) return false;
-
-        const validatedFirstPage = await resolveCapturePreloadFirstPage({
-          opened,
-          filter: effectiveFilter,
-          captureSeq,
-          captureSeqRef,
-          captureTaskScopeRef,
-          parseFinishedRef,
-          parseErrorRef,
-          preloadProcessedRef,
-          preloadTotalRef,
-          listPacketsPage: backendClients.packet.listPacketsPage,
-          getCaptureStatus: backendClients.capture.getCaptureStatus,
-          waitForCaptureSignal,
-          setTotalPackets,
-          setPreloadProcessed,
-        });
-        if (!validatedFirstPage) return false;
-        const finalized = await finalizeOpenedCapture({
-          opened,
-          validatedFirstPage,
-          captureSeq,
-          captureSeqRef,
-          pageStartRef,
-          hasMorePacketsRef,
-          activeCapturePathRef,
-          httpCache: httpStreamCacheRef.current,
-          tcpCache: tcpStreamCacheRef.current,
-          udpCache: udpStreamCacheRef.current,
-          httpPrefetchInFlight: httpPrefetchInFlightRef.current,
-          tcpPrefetchInFlight: tcpPrefetchInFlightRef.current,
-          udpPrefetchInFlight: udpPrefetchInFlightRef.current,
-          switchSequences: streamSwitchSequencesRef.current,
-          switchDurationsRef: streamSwitchDurationsRef,
-          switchHitsRef: streamSwitchHitsRef,
-          setPackets,
-          setTotalPackets,
-          setPageStart,
-          setHasPrevPackets,
-          setHasMorePackets,
-          setSelectedPacketId,
-          setSelectedPacketDetail,
-          setSelectedPacketRawHex,
-          setSelectedPacketLayers,
-          setStreamSwitchMetrics,
-          resetAnalysisState,
-          setFileMeta,
-          setCaptureRevision,
-          commitPacketPage,
-          refreshStreamIndex,
-          setCaptureTransaction,
-          setBackendStatus,
-          refreshAnalysisResult,
-        });
-        return finalized;
-      } catch (error) {
-        if (isAbortLikeError(error)) {
-          return false;
-        }
-        if (captureSeq === captureSeqRef.current) {
-          const failedTransaction = buildFailedCaptureTransactionStatus({
-            error,
-            parseError: parseErrorRef.current,
-            hadActiveCapture,
-            fallbackName: filePath?.trim() || "",
-            fallbackPath: filePath?.trim() || "",
-            pendingCaptureName: pendingCapture?.fileName,
-            pendingCapturePath: pendingCapture?.filePath,
-          });
-          setCaptureTransaction(failedTransaction);
-          setBackendStatus(failedTransaction.message);
-        }
-        return false;
-      } finally {
-        if (captureSeq === captureSeqRef.current) {
-          stopCapturePreloading({
-            preloadingRef,
-            setIsPreloadingCapture,
-          });
-          wakeCaptureWaiters();
-        }
-      }
-    },
-    [
-      backendConnected,
-      commitPacketPage,
-      displayFilter,
-      prepareForCaptureReplacement,
-      resetAnalysisState,
-      refreshAnalysisResult,
-      refreshStreamIndex,
-      rememberRecentCapture,
-      waitForCaptureSignal,
-      wakeCaptureWaiters,
-    ],
-  );
+  const startCapture = useCaptureStartWorkflow({
+    backendConnected,
+    displayFilter,
+    activeCapturePathRef,
+    captureSeqRef,
+    captureTaskScopeRef,
+    filterSeqRef,
+    hasMorePacketsRef,
+    httpCacheRef: httpStreamCacheRef,
+    httpPrefetchInFlightRef,
+    pageStartRef,
+    parseErrorRef,
+    parseFinishedRef,
+    preloadingRef,
+    preloadProcessedRef,
+    preloadTotalRef,
+    streamSwitchDurationsRef,
+    streamSwitchHitsRef,
+    streamSwitchSequencesRef,
+    tcpCacheRef: tcpStreamCacheRef,
+    tcpPrefetchInFlightRef,
+    udpCacheRef: udpStreamCacheRef,
+    udpPrefetchInFlightRef,
+    commitPacketPage,
+    getCaptureStatus: backendClients.capture.getCaptureStatus,
+    listPacketsPage: backendClients.packet.listPacketsPage,
+    openPcapFile: backendClients.capture.openPcapFile,
+    prepareForCaptureReplacement,
+    refreshAnalysisResult,
+    refreshStreamIndex,
+    rememberRecentCapture,
+    resetAnalysisState,
+    setBackendStatus,
+    setCaptureRevision,
+    setCaptureTransaction,
+    setFileMeta,
+    setHasMorePackets,
+    setHasPrevPackets,
+    setIsFilterLoading,
+    setIsPreloadingCapture,
+    setPacketPageError,
+    setPackets,
+    setPageStart,
+    setPreloadProcessed,
+    setPreloadTotal,
+    setSelectedPacketDetail,
+    setSelectedPacketId,
+    setSelectedPacketLayers,
+    setSelectedPacketRawHex,
+    setStreamSwitchMetrics,
+    setTotalPackets,
+    startStreamingPackets: backendClients.capture.startStreamingPackets,
+    waitForCaptureSignal,
+    wakeCaptureWaiters,
+  });
 
   const { applyFilter, clearFilter } = useDisplayFilterWorkflow({
     activeCapturePathRef,

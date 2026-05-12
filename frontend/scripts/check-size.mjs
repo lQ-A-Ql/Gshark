@@ -312,8 +312,8 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 700,
-    reason: "provider remains oversized and should keep moving task reset, packet, and capture domains out",
+    maxLines: 600,
+    reason: "provider remains oversized and should keep moving task reset and packet page domains out",
   },
   {
     path: "src/app/state/sentinelDerivedView.ts",
@@ -350,6 +350,11 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/useCaptureTaskScopeCleanup.ts",
     maxLines: 20,
     reason: "capture task scope cleanup hook should only invalidate scoped tasks on provider unmount",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureStartWorkflow.ts",
+    maxLines: 220,
+    reason: "capture start hook should only wire open, preload, finalize, and failure status workflow",
   },
   {
     path: "src/app/state/hooks/useOpenCaptureAction.ts",
@@ -1888,6 +1893,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useCaptureTaskScopeCleanup.test.tsx",
     maxLines: 35,
     reason: "capture task scope cleanup tests should stay focused on unmount invalidation behavior",
+  },
+  {
+    path: "src/app/state/hooks/useCaptureStartWorkflow.test.tsx",
+    maxLines: 145,
+    reason: "capture start workflow tests should cover owner hook wiring without duplicating all pure helper tests",
   },
   {
     path: "src/app/state/hooks/useOpenCaptureAction.test.tsx",
