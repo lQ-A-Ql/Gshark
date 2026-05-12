@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 189 - State Backend Client Entry Migration
+
+Time: 2026-05-12 09:19:51 +08:00  
+Author: Codex
+
+### Scope
+
+- Began moving production `backendClients` imports from the `wailsBridge` compatibility facade to the new singleton entry.
+- Limited the first import-entry migration to state and lifecycle code to keep the change easy to validate.
+
+### Changes
+
+- Updated Sentinel state, lifecycle startup/control/effect hooks, tool runtime, and analysis progress hooks to import `backendClients` from `integrations/backendClients`.
+- Updated state hook tests to mock `integrations/backendClients` directly.
+- Removed all `wailsBridge` imports from `src/app/state`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/state/hooks/useBackendLifecycleControls.test.tsx src/app/state/hooks/useAnalysisProgress.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- State/lifecycle production code now depends on the direct backend client singleton instead of the compatibility facade.
+- Remaining production `backendClients` imports from `wailsBridge` are in component, feature, page, and MISC modules and can be migrated in follow-up rounds.
+
+---
+
 ## Round 188 - Backend Client Singleton Split
 
 Time: 2026-05-12 09:16:39 +08:00  

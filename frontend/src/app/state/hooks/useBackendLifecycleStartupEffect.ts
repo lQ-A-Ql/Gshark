@@ -1,5 +1,5 @@
 import { useEffect, type MutableRefObject } from "react";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { wakeCaptureWaiters as wakeCaptureWaitersUtil } from "../captureSignal";
 import { getBackendUnavailableStatus, loadStartupToolRuntime } from "./backendLifecycleStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";

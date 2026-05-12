@@ -34,7 +34,7 @@ const bridgeMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../integrations/wailsBridge", () => ({
+vi.mock("../../integrations/backendClients", () => ({
   backendClients: {
     runtime: {
       isAvailable: bridgeMocks.isAvailable,
@@ -45,16 +45,6 @@ vi.mock("../../integrations/wailsBridge", () => ({
       subscribeEvents: bridgeMocks.subscribeEvents,
     },
     securityMaterial: { getTLSConfig: bridgeMocks.getTLSConfig, updateTLSConfig: bridgeMocks.updateTLSConfig },
-  },
-  bridge: {
-    isAvailable: bridgeMocks.isAvailable,
-    getDesktopBackendStatus: bridgeMocks.getDesktopBackendStatus,
-    updateToolRuntimeConfig: bridgeMocks.updateToolRuntimeConfig,
-    getTLSConfig: bridgeMocks.getTLSConfig,
-    updateTLSConfig: bridgeMocks.updateTLSConfig,
-    subscribeEvents: bridgeMocks.subscribeEvents,
-    setTSharkPath: bridgeMocks.setTSharkPath,
-    getToolRuntimeSnapshot: bridgeMocks.getToolRuntimeSnapshot,
   },
 }));
 

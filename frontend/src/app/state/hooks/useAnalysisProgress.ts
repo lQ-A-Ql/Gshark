@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ExtractedObject, ThreatHit } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { isAbortLikeError } from "../../utils/asyncControl";
 import type { CaptureTaskScope } from "../../utils/captureTaskScope";
 
