@@ -80,6 +80,71 @@ const (
 
 const usbFieldCount = usbFieldSCSIStatus + 1
 
+var usbAnalysisFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"_ws.col.Protocol",
+	"usb.bus_id",
+	"usb.device_address",
+	"usb.endpoint_address",
+	"usb.endpoint_address.direction",
+	"usb.irp_info.direction",
+	"usb.transfer_type",
+	"usb.urb_type",
+	"usb.urb_status",
+	"usb.data_len",
+	"usb.setup.bRequest",
+	"usb.setup.wValue",
+	"usb.setup.wIndex",
+	"usb.setup.wLength",
+	"usb.frame.data",
+	"usb.control.Response",
+	"usb.capdata",
+	"usbhid.data",
+	"usbhid.boot_report.keyboard.keycode_1",
+	"usbhid.boot_report.keyboard.keycode_2",
+	"usbhid.boot_report.keyboard.keycode_3",
+	"usbhid.boot_report.keyboard.keycode_4",
+	"usbhid.boot_report.keyboard.keycode_5",
+	"usbhid.boot_report.keyboard.keycode_6",
+	"usbhid.boot_report.keyboard.modifier.left_ctrl",
+	"usbhid.boot_report.keyboard.modifier.left_shift",
+	"usbhid.boot_report.keyboard.modifier.left_alt",
+	"usbhid.boot_report.keyboard.modifier.left_gui",
+	"usbhid.boot_report.keyboard.modifier.right_ctrl",
+	"usbhid.boot_report.keyboard.modifier.right_shift",
+	"usbhid.boot_report.keyboard.modifier.right_alt",
+	"usbhid.boot_report.keyboard.modifier.right_gui",
+	"usbhid.boot_report.mouse.button.left",
+	"usbhid.boot_report.mouse.button.right",
+	"usbhid.boot_report.mouse.button.middle",
+	"usbhid.boot_report.mouse.button.4",
+	"usbhid.boot_report.mouse.button.5",
+	"usbhid.boot_report.mouse.button.6",
+	"usbhid.boot_report.mouse.button.7",
+	"usbhid.boot_report.mouse.button.8",
+	"usbhid.boot_report.mouse.x_displacement",
+	"usbhid.boot_report.mouse.y_displacement",
+	"usbhid.boot_report.mouse.scroll_wheel.vertical",
+	"usbhid.boot_report.mouse.scroll_wheel.horizontal",
+	"_ws.col.Info",
+	"usbms.dCBWSignature",
+	"usbms.dCBWTag",
+	"usbms.dCBWDataTransferLength",
+	"usbms.dCBWFlags",
+	"usbms.dCBWLUN",
+	"usbms.dCBWCBLength",
+	"usbms.dCSWSignature",
+	"usbms.dCSWStatus",
+	"usbms.dCSWDataResidue",
+	"scsi.spc.opcode",
+	"scsi.lun",
+	"scsi.request_frame",
+	"scsi.response_frame",
+	"scsi.time",
+	"scsi.status",
+}
+
 type usbKeyboardState struct {
 	Modifiers []string
 	Keys      []string
@@ -153,71 +218,13 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		"-E", "separator=\t",
 		"-E", "occurrence=f",
 		"-E", "quote=n",
-		"-e", "frame.number",
-		"-e", "frame.time_epoch",
-		"-e", "_ws.col.Protocol",
-		"-e", "usb.bus_id",
-		"-e", "usb.device_address",
-		"-e", "usb.endpoint_address",
-		"-e", "usb.endpoint_address.direction",
-		"-e", "usb.irp_info.direction",
-		"-e", "usb.transfer_type",
-		"-e", "usb.urb_type",
-		"-e", "usb.urb_status",
-		"-e", "usb.data_len",
-		"-e", "usb.setup.bRequest",
-		"-e", "usb.setup.wValue",
-		"-e", "usb.setup.wIndex",
-		"-e", "usb.setup.wLength",
-		"-e", "usb.frame.data",
-		"-e", "usb.control.Response",
-		"-e", "usb.capdata",
-		"-e", "usbhid.data",
-		"-e", "usbhid.boot_report.keyboard.keycode_1",
-		"-e", "usbhid.boot_report.keyboard.keycode_2",
-		"-e", "usbhid.boot_report.keyboard.keycode_3",
-		"-e", "usbhid.boot_report.keyboard.keycode_4",
-		"-e", "usbhid.boot_report.keyboard.keycode_5",
-		"-e", "usbhid.boot_report.keyboard.keycode_6",
-		"-e", "usbhid.boot_report.keyboard.modifier.left_ctrl",
-		"-e", "usbhid.boot_report.keyboard.modifier.left_shift",
-		"-e", "usbhid.boot_report.keyboard.modifier.left_alt",
-		"-e", "usbhid.boot_report.keyboard.modifier.left_gui",
-		"-e", "usbhid.boot_report.keyboard.modifier.right_ctrl",
-		"-e", "usbhid.boot_report.keyboard.modifier.right_shift",
-		"-e", "usbhid.boot_report.keyboard.modifier.right_alt",
-		"-e", "usbhid.boot_report.keyboard.modifier.right_gui",
-		"-e", "usbhid.boot_report.mouse.button.left",
-		"-e", "usbhid.boot_report.mouse.button.right",
-		"-e", "usbhid.boot_report.mouse.button.middle",
-		"-e", "usbhid.boot_report.mouse.button.4",
-		"-e", "usbhid.boot_report.mouse.button.5",
-		"-e", "usbhid.boot_report.mouse.button.6",
-		"-e", "usbhid.boot_report.mouse.button.7",
-		"-e", "usbhid.boot_report.mouse.button.8",
-		"-e", "usbhid.boot_report.mouse.x_displacement",
-		"-e", "usbhid.boot_report.mouse.y_displacement",
-		"-e", "usbhid.boot_report.mouse.scroll_wheel.vertical",
-		"-e", "usbhid.boot_report.mouse.scroll_wheel.horizontal",
-		"-e", "_ws.col.Info",
-		"-e", "usbms.dCBWSignature",
-		"-e", "usbms.dCBWTag",
-		"-e", "usbms.dCBWDataTransferLength",
-		"-e", "usbms.dCBWFlags",
-		"-e", "usbms.dCBWLUN",
-		"-e", "usbms.dCBWCBLength",
-		"-e", "usbms.dCSWSignature",
-		"-e", "usbms.dCSWStatus",
-		"-e", "usbms.dCSWDataResidue",
-		"-e", "scsi.spc.opcode",
-		"-e", "scsi.lun",
-		"-e", "scsi.request_frame",
-		"-e", "scsi.response_frame",
-		"-e", "scsi.time",
-		"-e", "scsi.status",
+	}
+	plannedScan, err := BuildPlannedFieldArgs(args, usbAnalysisFields)
+	if err != nil {
+		return analysis, fmt.Errorf("plan tshark USB fields: %w", err)
 	}
 
-	cmd, err := Command(args...)
+	cmd, err := Command(plannedScan.Args...)
 	if err != nil {
 		return analysis, fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -259,7 +266,7 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 			continue
 		}
 
-		parts := strings.Split(line, "\t")
+		parts := plannedScan.ProjectRow(strings.Split(line, "\t"))
 		if len(parts) < usbFieldCount {
 			continue
 		}

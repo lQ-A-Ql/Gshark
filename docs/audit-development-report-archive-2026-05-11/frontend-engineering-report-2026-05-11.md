@@ -7824,3 +7824,44 @@ Author: Codex
   - A fresh fixed-field audit is still required to confirm whether any direct `-e` lists remain outside the planner.
   - Optional-field skip/degradation notes are still not surfaced to the UI or investigation report.
   - Capability planning is now broad across packet list, stream follow, traffic stats, C2 HTTP candidates, direct scans, frame IDs, and estimate paths; the next step should be residual audit rather than more blind rewrites.
+
+---
+
+## Round 174 - USB Analysis Field Planning Slice
+
+Time: 2026-05-12 18:13:56 +08:00
+Author: Codex
+
+### Scope
+
+- Continued the TShark capability-aware field hardening after the residual fixed-field audit.
+- Focused on `BuildUSBAnalysisFromFile`, the largest remaining direct `-e` list and one of the planned high-risk drift modules.
+- Preserved USB HID, Mass Storage, and Other USB parsing behavior.
+
+### Changes
+
+- Extracted `usbAnalysisFields` as the canonical USB parser field list.
+- Replaced direct fixed `-e` construction in USB analysis with `BuildPlannedFieldArgs`.
+- Projected TShark output rows through `PlannedFieldScan.ProjectRow` before existing USB index-based parsing.
+- Added USB-focused tests:
+  - `TestUSBAnalysisFieldsMatchParserWidth` guards field-list/index alignment;
+  - `TestBuildPlannedFieldArgsForUSBAnalysisSkipsMissingOptionalFields` guards optional-field omission and empty-column projection.
+- Re-ran fixed-field audit: remaining `"-e"` references are planner internals and tests, not independent business scan lists.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestUSB|TestBuildPlannedFieldArgsForUSB|TestPlanFieldScan" -count=1 -v` passed.
+- `rg -n '"-e"' backend\internal\tshark backend\internal\engine` confirmed no remaining independent business fixed-field list outside planner internals/tests.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for USB analysis field planning and residual fixed-field audit.
+- Drift check: no drift detected. Work stayed on TShark external-dependency hardening and did not alter USB evidence/report semantics.
+- Remaining risks:
+  - Optional-field degradation is still silent outside backend internals; runtime diagnostics/report notes should eventually surface per-analysis skipped fields.
+  - `runner.go` packet-list builders still append planned fields internally; this is expected because the planner owns those `-e` additions.
+  - Next iteration should shift from direct `-e` migration to either degradation reporting or another planned contract theme such as bridge dependency boundary enforcement.

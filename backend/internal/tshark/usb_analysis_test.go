@@ -3,11 +3,78 @@ package tshark
 import (
 	"encoding/binary"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+func TestUSBAnalysisFieldsMatchParserWidth(t *testing.T) {
+	if len(usbAnalysisFields) != usbFieldCount {
+		t.Fatalf("usbAnalysisFields len = %d, want %d", len(usbAnalysisFields), usbFieldCount)
+	}
+	if usbAnalysisFields[usbFieldFrameNumber] != "frame.number" {
+		t.Fatalf("unexpected frame number field: %q", usbAnalysisFields[usbFieldFrameNumber])
+	}
+	if usbAnalysisFields[usbFieldProtocol] != "_ws.col.Protocol" {
+		t.Fatalf("unexpected protocol field: %q", usbAnalysisFields[usbFieldProtocol])
+	}
+	if usbAnalysisFields[usbFieldInfo] != "_ws.col.Info" {
+		t.Fatalf("unexpected info field: %q", usbAnalysisFields[usbFieldInfo])
+	}
+	if usbAnalysisFields[usbFieldSCSIStatus] != "scsi.status" {
+		t.Fatalf("unexpected final field: %q", usbAnalysisFields[usbFieldSCSIStatus])
+	}
+}
+
+func TestBuildPlannedFieldArgsForUSBAnalysisSkipsMissingOptionalFields(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := append([]string{}, requiredCapabilityFields...)
+	fields = append(fields,
+		"usb.bus_id",
+		"usb.device_address",
+		"usbms.dCBWTag",
+		"scsi.status",
+	)
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	planned, err := BuildPlannedFieldArgs([]string{"-n", "-r", "usb.pcap", "-T", "fields"}, usbAnalysisFields)
+	if err != nil {
+		t.Fatalf("BuildPlannedFieldArgs() error = %v", err)
+	}
+	if !slices.Contains(planned.MissingOptional, "usbhid.data") {
+		t.Fatalf("expected usbhid.data to be optional missing, got %#v", planned.MissingOptional)
+	}
+	if slices.Contains(planned.TSharkFields, "usbhid.data") {
+		t.Fatalf("missing optional field should not be emitted to tshark args: %#v", planned.TSharkFields)
+	}
+
+	scanned := make([]string, len(planned.TSharkFields))
+	for idx, field := range planned.TSharkFields {
+		scanned[idx] = field
+	}
+	projected := planned.ProjectRow(scanned)
+	if len(projected) != usbFieldCount {
+		t.Fatalf("projected len = %d, want %d", len(projected), usbFieldCount)
+	}
+	if projected[usbFieldBusID] != "usb.bus_id" {
+		t.Fatalf("expected usb.bus_id projection, got %q", projected[usbFieldBusID])
+	}
+	if projected[usbFieldHIDData] != "" {
+		t.Fatalf("missing HID data should project empty column, got %q", projected[usbFieldHIDData])
+	}
+	if projected[usbFieldSCSIStatus] != "scsi.status" {
+		t.Fatalf("expected scsi.status projection, got %q", projected[usbFieldSCSIStatus])
+	}
+}
 
 func TestBuildUSBKeyboardEventStateDiff(t *testing.T) {
 	record := model.USBPacketRecord{PacketID: 1, Time: "1.000000", BusID: "1", DeviceAddress: "2", Endpoint: "EP 0x81 (IN)"}
