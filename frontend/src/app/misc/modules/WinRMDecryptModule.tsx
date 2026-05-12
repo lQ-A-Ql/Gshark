@@ -1,6 +1,6 @@
 import { Terminal } from "lucide-react";
 import { useState } from "react";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { WinRMDecryptResult } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
@@ -44,7 +44,7 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
     setWinrmLoading(true);
     setWinrmError("");
     try {
-      const result = await bridge.runWinRMDecrypt(
+      const result = await backendClients.securityMaterial.runWinRMDecrypt(
         buildWinRMDecryptRequest({
           authMode: winrmAuthMode,
           hash: winrmHash,
@@ -70,7 +70,7 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
     if (!force && winrmPreviewDialogText) {
       return winrmPreviewDialogText;
     }
-    const text = await bridge.getWinRMDecryptResultText(winrmResult.resultId);
+    const text = await backendClients.securityMaterial.getWinRMDecryptResultText(winrmResult.resultId);
     setWinrmPreviewDialogText(text);
     return text;
   }
@@ -92,7 +92,7 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
   async function exportWinRM() {
     if (!winrmResult) return;
     try {
-      await bridge.exportWinRMDecryptResult(winrmResult.resultId, winrmResult.exportFilename);
+      await backendClients.securityMaterial.exportWinRMDecryptResult(winrmResult.resultId, winrmResult.exportFilename);
     } catch (error) {
       setWinrmError(error instanceof Error ? error.message : "导出失败");
     }

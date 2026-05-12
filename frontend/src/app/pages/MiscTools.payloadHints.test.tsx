@@ -46,9 +46,7 @@ vi.mock("../integrations/wailsBridge", () => ({
       getSMTPAnalysis: mocks.getSMTPAnalysis,
       getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
     },
-    securityMaterial: {
-      listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
-    },
+    securityMaterial: { listNTLMSessionMaterials: mocks.listNTLMSessionMaterials, runWinRMDecrypt: mocks.runWinRMDecrypt, getWinRMDecryptResultText: mocks.getWinRMDecryptResultText, exportWinRMDecryptResult: mocks.exportWinRMDecryptResult },
   },
   bridge: {
     listMiscModules: mocks.listMiscModules,

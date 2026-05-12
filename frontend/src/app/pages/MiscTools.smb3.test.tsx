@@ -43,6 +43,9 @@ vi.mock("../integrations/wailsBridge", () => ({
     securityMaterial: {
       listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
       generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
+      runWinRMDecrypt: mocks.runWinRMDecrypt,
+      getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
+      exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
     },
   },
   bridge: {

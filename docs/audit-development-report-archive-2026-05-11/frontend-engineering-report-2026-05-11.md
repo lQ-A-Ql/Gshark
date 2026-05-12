@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 175 - WinRM Decrypt Domain Client Migration
+
+Time: 2026-05-12 08:19:05 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued MISC security-material migration with the WinRM decrypt module.
+- Kept decrypt execution, full-text preview loading, export behavior, and copy behavior unchanged.
+
+### Changes
+
+- Updated `misc/modules/WinRMDecryptModule.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced WinRM decrypt, result text, and export calls with `backendClients.securityMaterial.*` equivalents.
+- Updated MISC page test mocks to expose the WinRM security-material domain methods anywhere the lazy module can be imported.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.smb3.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.customModules.test.tsx src/app/misc/modules/WinRMDecryptUtils.test.ts src/app/misc/modules/WinRMPreviewUtils.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed after compressing the payload-hints mock shape back under budget.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- WinRM decrypt flows no longer depend on the aggregate bridge.
+- Remaining MISC direct bridge candidates are now centered on custom module management, payload webshell decoding, and MISC package list/import flows.
+
+---
+
 ## Round 174 - SMB3 Session Key Domain Client Migration
 
 Time: 2026-05-12 08:14:30 +08:00  

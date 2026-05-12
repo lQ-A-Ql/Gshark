@@ -48,6 +48,9 @@ vi.mock("../integrations/wailsBridge", () => ({
     },
     securityMaterial: {
       listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
+      runWinRMDecrypt: mocks.runWinRMDecrypt,
+      getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
+      exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
     },
   },
   bridge: {

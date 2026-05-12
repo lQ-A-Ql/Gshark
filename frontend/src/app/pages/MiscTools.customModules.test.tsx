@@ -39,6 +39,13 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
+  backendClients: {
+    securityMaterial: {
+      runWinRMDecrypt: mocks.runWinRMDecrypt,
+      getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
+      exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
+    },
+  },
   bridge: {
     listMiscModules: mocks.listMiscModules,
     importMiscModulePackage: mocks.importMiscModulePackage,
