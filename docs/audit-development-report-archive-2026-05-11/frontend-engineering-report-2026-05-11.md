@@ -7244,3 +7244,66 @@ Author: Codex
   - Backend APIs and frontend response models are unchanged.
   - Mapper files were not touched.
 - Next target: begin mixed-domain migrations cautiously, starting with small pages/hooks where method ownership is clear (`VehicleAnalysis.tsx` DBC calls, media playback/transcription, or stream payload tools).
+
+---
+
+## Round 162 - Contract Guardrails and Tool Capability Slice
+
+Time: 2026-05-12 15:34:54 +08:00
+Author: Codex
+
+### Scope
+
+- Began the next engineering phase: move from file-splitting toward enforceable contracts and explainable ownership.
+- Kept `BackendBridge` as a compatibility facade, but tightened frontend boundary checks so app code cannot route around `backendClients` through bridge composition internals.
+- Added the first backend TShark capability probe layer without rewriting existing parser flows.
+- Added additive report explainability fields so high-risk evidence is not displayed as an unexplained conclusion.
+
+### Changes
+
+- Extended `frontend/scripts/check-boundaries.mjs`:
+  - app code outside `integrations` may use `backendClients`, but cannot import `bridgeFactory`, `httpBridge`, `desktopBridge`, or `bridgeDomains`;
+  - state code cannot import pages/components UI layers;
+  - fixture tests now guard these second-layer boundary rules.
+- Extended `InvestigationReportItem` with `rule_id`, `reason`, `confidence`, and `caveats`.
+- Added rule metadata for the main report evidence surfaces touched in this round:
+  - `usb.mass_storage.write.failed`
+  - `industrial.rule.hit`
+  - `industrial.modbus.write`
+  - `vehicle.uds.security_access`
+  - `c2.cs.high_confidence`
+  - `c2.vshell.decrypt.hit`
+- Updated the shared report panel and mapper so rule id, confidence, reason, and caveats are visible in the UI.
+- Added `backend/internal/tshark/capabilities.go`:
+  - probes `tshark -v`;
+  - probes `tshark -G fields`;
+  - caches capabilities by binary path and version;
+  - reports field profile, missing required fields, missing optional fields, and degraded capability status through runtime status.
+- Added `tsharkStatusMapper.ts` and kept mapper size budgets strict; no mapper budget was widened for this slice.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run scripts/check-boundaries.test.mjs src/app/integrations/mappers/runtimeMapper.test.ts src/app/integrations/mappers/investigationReportMapper.test.ts` passed, 3 files / 9 tests.
+- `cd frontend && pnpm run ci` passed, including package-manager check, typecheck, lint, format, size, boundary, 181 Vitest files / 502 tests, and Vite build.
+- `cd backend && go test ./internal/tshark -run "TestCurrentCapabilities|TestParseFieldRegistryName|TestCurrentStatus" -count=1 -v` passed.
+- `cd backend && go test ./internal/engine -run "TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned|TestBuildUSBInvestigationReport|TestBuildC2FamilyInvestigationReport" -count=1 -v` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Review
+
+- This round closes the first piece of the new plan:
+  - aggregate bridge bypasses are now blocked by an automated boundary rule;
+  - report evidence carries explainability metadata;
+  - TShark is now treated as a capability-bearing external dependency rather than only a path.
+- Remaining open work:
+  - `SentinelContext` still needs state-owner extraction in a dedicated round;
+  - TShark capability data is surfaced, but parser field selection is not yet fully capability-aware;
+  - report/evidence rules still live under `engine`; package boundary migration should wait until DTO seams are stable;
+  - mapper DTO typing remains partial, though the report mapper has moved away from raw `any` input in this slice.
+- Mainline boundaries stayed intact:
+  - `useSentinel()` public shape is unchanged.
+  - MISC remains outside unified Evidence.
+  - Backend API changes are additive and backward compatible.
+  - Real PCAP regression remains opt-in.

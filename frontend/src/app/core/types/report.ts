@@ -7,6 +7,10 @@ export interface InvestigationReportItem {
   packetId?: number;
   streamId?: number;
   tags?: string[];
+  ruleId?: string;
+  reason?: string;
+  confidence?: number;
+  caveats?: string[];
 }
 
 export interface InvestigationReport {

@@ -26,6 +26,27 @@ func reportItem(title, summary, severity string, packetID, streamID int64, tags 
 	}
 }
 
+func withReportRule(item model.InvestigationReportItem, ruleID, reason string, confidence int, caveats ...string) model.InvestigationReportItem {
+	item.RuleID = strings.TrimSpace(ruleID)
+	item.Reason = strings.TrimSpace(reason)
+	if confidence > 0 {
+		item.Confidence = clampReportConfidence(confidence)
+	}
+	item.Caveats = dedupeNonEmpty(caveats)
+	return item
+}
+
+func clampReportConfidence(value int) int {
+	switch {
+	case value < 0:
+		return 0
+	case value > 100:
+		return 100
+	default:
+		return value
+	}
+}
+
 func trimReport(report model.InvestigationReport, summaryLimit, evidenceLimit, detailLimit int) model.InvestigationReport {
 	report.Summary = trimReportItems(report.Summary, summaryLimit)
 	report.Evidence = trimReportItems(report.Evidence, evidenceLimit)

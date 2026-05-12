@@ -8,10 +8,14 @@ type InvestigationReport struct {
 }
 
 type InvestigationReportItem struct {
-	Title    string   `json:"title"`
-	Summary  string   `json:"summary,omitempty"`
-	Severity string   `json:"severity,omitempty"`
-	PacketID int64    `json:"packet_id,omitempty"`
-	StreamID int64    `json:"stream_id,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
+	Title      string   `json:"title"`
+	Summary    string   `json:"summary,omitempty"`
+	Severity   string   `json:"severity,omitempty"`
+	PacketID   int64    `json:"packet_id,omitempty"`
+	StreamID   int64    `json:"stream_id,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	RuleID     string   `json:"rule_id,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Confidence int      `json:"confidence,omitempty"`
+	Caveats    []string `json:"caveats,omitempty"`
 }

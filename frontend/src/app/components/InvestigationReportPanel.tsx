@@ -91,6 +91,16 @@ function ReportSection({
                 )}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                {item.ruleId ? (
+                  <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 font-mono text-[10px] text-indigo-700">
+                    {item.ruleId}
+                  </span>
+                ) : null}
+                {typeof item.confidence === "number" && item.confidence > 0 ? (
+                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    conf {item.confidence}%
+                  </span>
+                ) : null}
                 {item.packetId ? <span>packet #{item.packetId}</span> : null}
                 {item.streamId ? <span>stream #{item.streamId}</span> : null}
                 {item.tags?.map((tag) => (
@@ -102,6 +112,19 @@ function ReportSection({
                   </span>
                 ))}
               </div>
+              {item.reason ? <div className="mt-2 text-[11px] leading-5 text-slate-600">{item.reason}</div> : null}
+              {item.caveats && item.caveats.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {item.caveats.map((caveat) => (
+                    <span
+                      key={caveat}
+                      className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] leading-4 text-amber-800"
+                    >
+                      {caveat}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {item.packetId ? (
                 <EvidenceActions className="mt-3" packetId={item.packetId} preferredProtocol={preferredProtocol} />
               ) : null}

@@ -221,6 +221,11 @@ export const sourceSizeBudgets = [
     reason: "runtime mapper should keep tool runtime snapshot conversion local and re-export speech batch mapping",
   },
   {
+    path: "src/app/integrations/mappers/tsharkStatusMapper.ts",
+    maxLines: 35,
+    reason: "TShark status mapper should keep capability status normalization reusable and isolated",
+  },
+  {
     path: "src/app/integrations/mappers/pluginMapper.ts",
     maxLines: 45,
     reason: "plugin mapper should keep plugin item and DBC profile conversion local",

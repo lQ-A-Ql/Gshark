@@ -94,6 +94,27 @@ function normalizeIfSource(frontendRoot, appRoot, pathWithoutExt) {
 }
 
 function recordViolation(violations, source, specifier, target) {
+  if (!source.startsWith("src/app/integrations/")) {
+    if (target === "src/app/integrations/backendClients.ts") {
+      return;
+    }
+    if (
+      target === "src/app/integrations/bridgeFactory.ts" ||
+      target === "src/app/integrations/httpBridge.ts" ||
+      target === "src/app/integrations/desktopBridge.ts" ||
+      target === "src/app/integrations/bridgeDomains.ts"
+    ) {
+      violations.push(`${source} imports ${specifier}; app code must depend on backendClients domain projections`);
+    }
+  }
+
+  if (
+    source.startsWith("src/app/state/") &&
+    (target.startsWith("src/app/pages/") || target.startsWith("src/app/components/"))
+  ) {
+    violations.push(`${source} imports UI layer ${specifier}; state code must stay UI-free`);
+  }
+
   if (source.startsWith("src/app/pages/") && target.startsWith("src/app/integrations/mappers/")) {
     violations.push(`${source} imports mapper ${specifier}; pages must consume feature/core view models instead`);
   }

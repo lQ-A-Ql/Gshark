@@ -23,14 +23,18 @@ func buildUSBInvestigationReport(analysis model.USBAnalysis) model.Investigation
 		if op.DataResidue > 0 {
 			severity = "high"
 		}
-		report.Evidence = append(report.Evidence, reportItem(
+		confidence := 60
+		if severity == "high" {
+			confidence = 78
+		}
+		report.Evidence = append(report.Evidence, withReportRule(reportItem(
 			buildUSBEvidenceSummary(op),
 			fmt.Sprintf("设备 %s / %s / 长度 %d / status=%s", orDash(op.Device), orDash(op.LUN), op.TransferLength, orDash(op.Status)),
 			severity,
 			op.PacketID,
 			0,
 			"usb", "mass-storage", "write",
-		))
+		), "usb.mass_storage.write.failed", "USB Mass Storage 写操作存在失败状态或非零 Data Residue，需要回到 packet 复核写入是否成功。", confidence, "普通挂载流量也可能出现写类操作，需结合状态码、残留长度和上下文判断。"))
 	}
 	for _, event := range limitUSBKeyboardEvents(analysis.HID.KeyboardEvents, 3) {
 		report.Details = append(report.Details, reportItem(
@@ -73,14 +77,14 @@ func buildC2FamilyInvestigationReport(family string, analysis model.C2FamilyAnal
 	)
 
 	for _, candidate := range limitC2Candidates(analysis.Candidates, 4) {
-		report.Evidence = append(report.Evidence, reportItem(
+		report.Evidence = append(report.Evidence, withReportRule(reportItem(
 			firstNonEmptyText(candidate.Summary, fmt.Sprintf("%s candidate", label)),
 			fmt.Sprintf("%s -> %s / %s / %s", orDash(candidate.Source), orDash(candidate.Destination), orDash(candidate.IndicatorType), firstNonEmptyText(candidate.Evidence, candidate.IndicatorValue)),
 			severityFromConfidence(candidate.Confidence),
 			candidate.PacketID,
 			candidate.StreamID,
 			append([]string{"c2", family}, candidate.Tags...)...,
-		))
+		), c2ReportRuleID(family), "C2 候选由 family-specific 规则、通信形态或解密结果聚合产生，需回到 packet/stream 复核。", candidate.Confidence, c2ReportCaveat(family)))
 	}
 	for _, aggregate := range limitC2HTTPEndpoints(analysis.HostURIAggregates, 2) {
 		report.Details = append(report.Details, reportItem(
@@ -122,6 +126,24 @@ func buildC2FamilyInvestigationReport(family string, analysis model.C2FamilyAnal
 	}
 	report.Recommendations = appendRecommendations(recommendations, analysis.Notes, 4)
 	return trimReport(report, 4, 6, 6)
+}
+
+func c2ReportRuleID(family string) string {
+	switch strings.ToLower(strings.TrimSpace(family)) {
+	case "vshell":
+		return "c2.vshell.decrypt.hit"
+	case "cs":
+		return "c2.cs.high_confidence"
+	default:
+		return "c2.family.candidate"
+	}
+}
+
+func c2ReportCaveat(family string) string {
+	if strings.EqualFold(strings.TrimSpace(family), "vshell") {
+		return "VShell 弱信号和解密命中仍需结合密钥来源、stream 方向和明文语义复核。"
+	}
+	return "CS raw key 通常不能仅从 PCAP 推出；解密结论需结合 TeamServer key 或 RSA 私钥来源。"
 }
 
 func limitUSBKeyboardEvents(items []model.USBKeyboardEvent, limit int) []model.USBKeyboardEvent {

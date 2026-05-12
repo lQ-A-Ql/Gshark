@@ -264,6 +264,9 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 	if usbEvidence.PacketID != usbReport.Evidence[0].PacketID || usbEvidence.Severity != usbReport.Evidence[0].Severity {
 		t.Fatalf("USB evidence/report mismatch: evidence=%+v report=%+v", *usbEvidence, usbReport.Evidence[0])
 	}
+	if usbReport.Evidence[0].RuleID == "" || usbReport.Evidence[0].Reason == "" || usbReport.Evidence[0].Confidence == 0 || len(usbReport.Evidence[0].Caveats) == 0 {
+		t.Fatalf("expected USB report explainability metadata, got %+v", usbReport.Evidence[0])
+	}
 
 	c2Evidence := firstEvidenceByModule(evidence.Records, "c2")
 	if c2Evidence == nil || len(c2Report.Evidence) == 0 {
@@ -273,6 +276,9 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 		c2Evidence.StreamID != c2Report.Evidence[0].StreamID ||
 		c2Evidence.Severity != c2Report.Evidence[0].Severity {
 		t.Fatalf("C2 evidence/report mismatch: evidence=%+v report=%+v", *c2Evidence, c2Report.Evidence[0])
+	}
+	if c2Report.Evidence[0].RuleID == "" || c2Report.Evidence[0].Reason == "" || c2Report.Evidence[0].Confidence != c2Evidence.Confidence || len(c2Report.Evidence[0].Caveats) == 0 {
+		t.Fatalf("expected C2 report explainability metadata aligned with evidence, got evidence=%+v report=%+v", *c2Evidence, c2Report.Evidence[0])
 	}
 }
 

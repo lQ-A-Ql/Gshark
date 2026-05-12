@@ -16,6 +16,7 @@ type Status struct {
 	Message         string `json:"message"`
 	CustomPath      string `json:"custom_path,omitempty"`
 	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
+	Capabilities
 }
 
 var (
@@ -70,6 +71,7 @@ func CurrentStatus() Status {
 				Message:         "ok",
 				CustomPath:      custom,
 				UsingCustomPath: true,
+				Capabilities:    CurrentCapabilities(context.Background(), resolved),
 			}
 		}
 
@@ -81,6 +83,7 @@ func CurrentStatus() Status {
 				Message:         fmt.Sprintf("custom tshark path is invalid; falling back to PATH (%s)", err),
 				CustomPath:      custom,
 				UsingCustomPath: false,
+				Capabilities:    CurrentCapabilities(context.Background(), fallback),
 			}
 		}
 
@@ -90,6 +93,11 @@ func CurrentStatus() Status {
 			Message:         err.Error(),
 			CustomPath:      custom,
 			UsingCustomPath: true,
+			Capabilities: Capabilities{
+				FieldProfile:            "unavailable",
+				CapabilityMessage:       err.Error(),
+				CapabilityCheckDegraded: true,
+			},
 		}
 	}
 
@@ -99,12 +107,18 @@ func CurrentStatus() Status {
 			Available: false,
 			Path:      "",
 			Message:   "找不到 tshark QAQ ，需要自行配置正确的路径OVO",
+			Capabilities: Capabilities{
+				FieldProfile:            "unavailable",
+				CapabilityMessage:       "tshark binary is unavailable",
+				CapabilityCheckDegraded: true,
+			},
 		}
 	}
 	return Status{
-		Available: true,
-		Path:      resolved,
-		Message:   "ok",
+		Available:    true,
+		Path:         resolved,
+		Message:      "ok",
+		Capabilities: CurrentCapabilities(context.Background(), resolved),
 	}
 }
 

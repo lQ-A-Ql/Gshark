@@ -1,4 +1,5 @@
 import type { ToolRuntimeSnapshot } from "../../core/types";
+import { asTSharkStatus } from "./tsharkStatusMapper";
 
 export { asSpeechBatchTaskStatus } from "./speechBatchMapper";
 
@@ -14,13 +15,7 @@ export function asToolRuntimeSnapshot(input: any): ToolRuntimeSnapshot {
       yaraRules: String(input?.config?.yara_rules ?? ""),
       yaraTimeoutMs: Number(input?.config?.yara_timeout_ms ?? 0) || 25000,
     },
-    tshark: {
-      available: Boolean(input?.tshark?.available),
-      path: String(input?.tshark?.path ?? ""),
-      message: String(input?.tshark?.message ?? ""),
-      customPath: String(input?.tshark?.custom_path ?? "") || undefined,
-      usingCustomPath: Boolean(input?.tshark?.using_custom_path),
-    },
+    tshark: asTSharkStatus(input?.tshark),
     ffmpeg: {
       available: Boolean(input?.ffmpeg?.available),
       path: String(input?.ffmpeg?.path ?? ""),

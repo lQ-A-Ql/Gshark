@@ -1,5 +1,6 @@
 import type { SpeechToTextStatus, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import { asToolRuntimeSnapshot } from "../mappers/runtimeMapper";
+import { asTSharkStatus } from "../mappers/tsharkStatusMapper";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -9,6 +10,13 @@ export interface TSharkStatus {
   message: string;
   customPath: string;
   usingCustomPath: boolean;
+  version?: string;
+  fieldProfile?: string;
+  fieldCount?: number;
+  missingRequiredFields?: string[];
+  missingOptionalFields?: string[];
+  capabilityMessage?: string;
+  capabilityCheckDegraded?: boolean;
 }
 
 export interface FFmpegStatus {
@@ -30,13 +38,7 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
   return {
     async checkTShark() {
       const payload = await request<any>("/api/tools/tshark");
-      return {
-        available: Boolean(payload.available),
-        path: String(payload.path ?? ""),
-        message: String(payload.message ?? ""),
-        customPath: String(payload.custom_path ?? ""),
-        usingCustomPath: Boolean(payload.using_custom_path),
-      };
+      return asTSharkStatus(payload);
     },
 
     async checkFFmpeg() {
@@ -91,13 +93,7 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
         method: "POST",
         body: JSON.stringify({ path }),
       });
-      return {
-        available: Boolean(payload.available),
-        path: String(payload.path ?? ""),
-        message: String(payload.message ?? ""),
-        customPath: String(payload.custom_path ?? ""),
-        usingCustomPath: Boolean(payload.using_custom_path),
-      };
+      return asTSharkStatus(payload);
     },
   };
 }

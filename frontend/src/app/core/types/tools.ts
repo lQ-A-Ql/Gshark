@@ -33,6 +33,13 @@ export interface ToolRuntimeSnapshot {
     message: string;
     customPath?: string;
     usingCustomPath: boolean;
+    version?: string;
+    fieldProfile?: string;
+    fieldCount?: number;
+    missingRequiredFields?: string[];
+    missingOptionalFields?: string[];
+    capabilityMessage?: string;
+    capabilityCheckDegraded?: boolean;
   };
   ffmpeg: {
     available: boolean;
