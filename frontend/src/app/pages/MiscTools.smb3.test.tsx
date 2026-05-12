@@ -38,8 +38,14 @@ vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
 }));
 
-vi.mock("../integrations/wailsBridge", () => ({
+vi.mock("../integrations/backendClients", () => ({
   backendClients: {
+    analysis: {
+      getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis,
+      getMySQLAnalysis: mocks.getMySQLAnalysis,
+      getSMTPAnalysis: mocks.getSMTPAnalysis,
+      getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
+    },
     miscModule: {
       listMiscModules: mocks.listMiscModules,
       importMiscModulePackage: mocks.importMiscModulePackage,
@@ -52,25 +58,6 @@ vi.mock("../integrations/wailsBridge", () => ({
       exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
     },
     stream: { decodeStreamPayload: mocks.decodeStreamPayload, inspectStreamPayload: mocks.inspectStreamPayload, listStreamPayloadSources: mocks.listStreamPayloadSources },
-  },
-  bridge: {
-    listMiscModules: mocks.listMiscModules,
-    importMiscModulePackage: mocks.importMiscModulePackage,
-    deleteMiscModule: mocks.deleteMiscModule,
-    runMiscModule: mocks.runMiscModule,
-    getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis,
-    getMySQLAnalysis: mocks.getMySQLAnalysis,
-    getSMTPAnalysis: mocks.getSMTPAnalysis,
-    getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
-    decodeStreamPayload: mocks.decodeStreamPayload,
-    inspectStreamPayload: mocks.inspectStreamPayload,
-    listStreamPayloadSources: mocks.listStreamPayloadSources,
-    listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
-    listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
-    generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
-    runWinRMDecrypt: mocks.runWinRMDecrypt,
-    getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
-    exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
   },
 }));
 

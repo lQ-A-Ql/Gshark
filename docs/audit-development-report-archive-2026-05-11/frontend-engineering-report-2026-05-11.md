@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 196 - MISC Backend Client Entry Migration
+
+Time: 2026-05-12 09:53:31 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued backend client singleton migration for the remaining MISC and stream decoder consumers.
+- Shifted MISC page shell and module hooks off the `wailsBridge` compatibility facade.
+
+### Changes
+
+- Updated `useStreamPayloadInspection`, `useStreamDecoderWorkbench`, `MiscTools`, and the MISC module renderers to import `backendClients` from `integrations/backendClients`.
+- Switched the MISC page tests to mock `integrations/backendClients` directly instead of `wailsBridge`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.smb3.test.tsx src/app/pages/MiscTools.customModules.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- No production `wailsBridge` imports remain under `frontend/src/app`.
+- Remaining `wailsBridge` references are confined to compatibility or test coverage paths.
+
+---
+
 ## Round 195 - Page Backend Client Entry Migration
 
 Time: 2026-05-12 09:50:01 +08:00  

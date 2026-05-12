@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { MiscModuleManifest } from "../core/types";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { MiscToolsShell, type MiscCategory } from "../misc/MiscToolsShell";
 
 export default function MiscTools() {

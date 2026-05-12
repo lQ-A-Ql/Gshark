@@ -2,7 +2,7 @@ import { Loader2, Play } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import type { MiscModuleTableResult } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import type { MiscModuleRendererProps } from "../types";
 import { ErrorBlock } from "../ui";
 import { buildInitialValues, GenericMiscFormFields } from "./GenericMiscFormFields";

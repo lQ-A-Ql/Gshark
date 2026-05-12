@@ -1,6 +1,6 @@
 import { Terminal } from "lucide-react";
 import { useState } from "react";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { WinRMDecryptResult } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";

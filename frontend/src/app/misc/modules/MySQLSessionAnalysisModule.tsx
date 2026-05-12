@@ -1,7 +1,7 @@
 import { Database, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { MySQLAnalysis } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";

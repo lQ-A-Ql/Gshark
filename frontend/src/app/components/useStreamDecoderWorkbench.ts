@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StreamDecodeResult, StreamDecoderKind } from "../core/types";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import type { DecoderSettingsKind } from "./StreamDecoderSettingsPanel";
 import { useDecoderBatchRange } from "./useDecoderBatchRange";
 import { useDecoderSettingsState } from "./useDecoderSettingsState";

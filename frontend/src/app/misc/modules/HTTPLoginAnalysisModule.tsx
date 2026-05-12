@@ -1,7 +1,7 @@
 import { KeyRound, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { HTTPLoginAnalysis } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";

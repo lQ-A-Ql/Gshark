@@ -1,6 +1,6 @@
 import { Key } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { SMB3RandomSessionKeyResult, SMB3SessionCandidate } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";

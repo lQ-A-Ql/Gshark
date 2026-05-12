@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamDecoderWorkbench } from "../../components/StreamDecoderWorkbench";
 import type { StreamPayloadSource } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
 import { PayloadWebShellInputPanel } from "./PayloadWebShellInputPanel";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { StreamPayloadInspection } from "../core/types";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { isAbortError } from "./StreamDecoderWorkbenchUtils";
 
 export function useStreamPayloadInspection({
