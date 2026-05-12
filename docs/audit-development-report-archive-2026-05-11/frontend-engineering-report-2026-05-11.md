@@ -7307,3 +7307,49 @@ Author: Codex
   - MISC remains outside unified Evidence.
   - Backend API changes are additive and backward compatible.
   - Real PCAP regression remains opt-in.
+
+---
+
+## Round 163 - Selected Packet State Owner Slice
+
+Time: 2026-05-12 16:36:03 +08:00
+Author: Codex
+
+### Scope
+
+- Continued the state-ownership phase without changing the public `useSentinel()` shape.
+- Extracted the selected-packet domain from `SentinelContext` into a dedicated owner hook.
+- Kept the round intentionally narrow: no backend API changes, no mapper changes, no MISC/Evidence scope changes.
+
+### Changes
+
+- Added `useSelectedPacketState`:
+  - owns `selectedPacketId`, selected detail, raw hex, and decoded layer state;
+  - composes selected packet resource loading and derived packet view calculation;
+  - exposes the same setters/actions needed by the existing provider workflows.
+- Updated `SentinelContext.tsx` so the provider consumes selected-packet state through the owner hook rather than directly wiring selection state, resource effects, and derived view effects inline.
+- Added `useSelectedPacketState.test.tsx` to cover selection, detail load, raw hex load, layer load, and derived selected packet behavior.
+- Registered the new hook and test in `frontend/scripts/check-size.mjs` so this owner boundary remains size-budgeted.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/state/hooks/useSelectedPacketState.test.tsx src/app/state/hooks/useSelectedPacketAction.test.tsx src/app/state/hooks/useSelectedPacketResources.test.tsx src/app/state/hooks/useSentinelDerivedView.test.tsx src/app/state/sentinelDerivedView.test.ts` passed, 5 files / 6 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run size:check` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run ci` passed, including 182 Vitest files / 503 tests and Vite build.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Review
+
+- This round improves state ownership rather than chasing line count alone.
+- `SentinelContext` remains the compatibility provider, but selected-packet state now has a named internal owner with focused tests and a budget.
+- Remaining open state domains:
+  - packet page state;
+  - stream cache/switch state;
+  - capture transaction/open state;
+  - runtime/backend lifecycle state.
+- Next target should continue the same pattern with one state domain per round, preferably packet page owner or stream owner depending on the smallest stable dependency boundary.

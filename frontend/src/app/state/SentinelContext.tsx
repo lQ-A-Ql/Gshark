@@ -4,7 +4,6 @@ import { backendClients } from "../integrations/backendClients";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
-import { useSelectedPacketResources } from "./hooks/useSelectedPacketResources";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
 import { getCaptureOpenDisconnectedStatus } from "./capturePreloadStatus";
@@ -21,7 +20,6 @@ import type { SentinelContextValue } from "./sentinelTypes";
 import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
-import { useSelectedPacketAction } from "./hooks/useSelectedPacketAction";
 import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
 import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
 import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
@@ -41,9 +39,9 @@ import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
 import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepare";
 import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
-import { useSentinelDerivedView } from "./hooks/useSentinelDerivedView";
 import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
 import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
+import { useSelectedPacketState } from "./hooks/useSelectedPacketState";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -61,10 +59,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const [packetPageError, setPacketPageError] = useState("");
   const [captureTransaction, setCaptureTransaction] = useState(createIdleCaptureTransactionStatus(false));
   const [displayFilter, setDisplayFilter] = useState("");
-  const [selectedPacketId, setSelectedPacketId] = useState<number | null>(null);
-  const [selectedPacketDetail, setSelectedPacketDetail] = useState<Packet | null>(null);
-  const [selectedPacketRawHex, setSelectedPacketRawHex] = useState("");
-  const [selectedPacketLayers, setSelectedPacketLayers] = useState<Record<string, unknown> | null>(null);
   const threatAnalysisSeqRef = useRef(0);
   const {
     threatHits,
@@ -112,6 +106,30 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
   const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
+  const {
+    filteredPackets,
+    selectedPacket,
+    protocolTree,
+    hexDump,
+    currentPage,
+    totalPages,
+    selectedPacketId,
+    selectedPacketRawHex,
+    selectPacket,
+    setSelectedPacketId,
+    setSelectedPacketDetail,
+    setSelectedPacketRawHex,
+    setSelectedPacketLayers,
+  } = useSelectedPacketState({
+    packets,
+    pageStart,
+    totalPackets,
+    pageSize: PAGE_SIZE,
+    captureTaskScopeRef,
+    loadPacket: backendClients.packet.getPacket,
+    loadRawHex: backendClients.packet.getPacketRawHex,
+    loadLayers: backendClients.packet.getPacketLayers,
+  });
   const {
     streamSwitchMetrics,
     setStreamSwitchMetrics,
@@ -299,16 +317,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     prepareCaptureReplacement: backendClients.capture.prepareCaptureReplacement,
   });
 
-  const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useSentinelDerivedView({
-    packets,
-    selectedPacketId,
-    selectedPacketDetail,
-    selectedPacketLayers,
-    pageStart,
-    totalPackets,
-    pageSize: PAGE_SIZE,
-  });
-
   const refreshAnalysisResult = useRefreshAnalysisResult({
     activeCapturePathRef,
     backendConnected,
@@ -381,19 +389,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useSyncedRefValue(updateProgressFromStatusRef, updateProgressFromStatus);
   useSyncedRefValue(hasMorePacketsRef, hasMorePackets);
   useCaptureTaskScopeCleanup(captureTaskScopeRef);
-
-  useSelectedPacketResources({
-    selectedPacketId,
-    selectedPacket,
-    selectedPacketDetail,
-    captureTaskScopeRef,
-    loadPacket: (packetId, signal) => backendClients.packet.getPacket(packetId, signal),
-    loadRawHex: (packetId, signal) => backendClients.packet.getPacketRawHex(packetId, signal),
-    loadLayers: (packetId, signal) => backendClients.packet.getPacketLayers(packetId, signal),
-    setSelectedPacketDetail,
-    setSelectedPacketRawHex,
-    setSelectedPacketLayers,
-  });
 
   const startCapture = useCallback(
     async (filePath?: string, filterOverride?: string) => {
@@ -549,8 +544,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setPacketPageError,
     setBackendStatus,
   });
-
-  const selectPacket = useSelectedPacketAction({ setSelectedPacketDetail, setSelectedPacketId });
 
   const openCapture = useOpenCaptureAction({ setDisplayFilter, startCapture });
 

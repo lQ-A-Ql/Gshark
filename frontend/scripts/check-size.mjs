@@ -362,6 +362,12 @@ export const sourceSizeBudgets = [
     reason: "selected packet action hook should only own id selection and stale detail pruning",
   },
   {
+    path: "src/app/state/hooks/useSelectedPacketState.ts",
+    maxLines: 75,
+    reason:
+      "selected packet state owner should only compose selection state, selected resources, and derived packet view",
+  },
+  {
     path: "src/app/state/hooks/usePreparePacketStream.ts",
     maxLines: 45,
     reason: "packet stream prepare hook should only bind locate and stream activation callbacks to pure workflow",
@@ -1892,6 +1898,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useSelectedPacketAction.test.tsx",
     maxLines: 35,
     reason: "selected packet action tests should stay focused on id selection and stale detail pruning",
+  },
+  {
+    path: "src/app/state/hooks/useSelectedPacketState.test.tsx",
+    maxLines: 55,
+    reason: "selected packet state tests should stay focused on owner hook selection and artifact loading",
   },
   {
     path: "src/app/state/hooks/usePreparePacketStream.test.tsx",
