@@ -169,6 +169,54 @@ func TestParseFastListLine_PreservesDisplayProtocol(t *testing.T) {
 	}
 }
 
+func TestBuildFastListScanArgsUsesCapabilityAliases(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := append([]string{}, fastListFields...)
+	for idx, field := range fields {
+		switch field {
+		case "_ws.col.Protocol":
+			fields[idx] = "_ws.col.protocol"
+		case "_ws.col.Info":
+			fields[idx] = "_ws.col.info"
+		}
+	}
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	args, plan, err := buildFastListScanArgs(model.ParseOptions{FilePath: "demo.pcap"})
+	if err != nil {
+		t.Fatalf("buildFastListScanArgs() error = %v", err)
+	}
+	if len(plan.projection) != len(fastListFields) {
+		t.Fatalf("expected fixed projection width, got %#v", plan.projection)
+	}
+	if !argsContain(args, "_ws.col.info") || !argsContain(args, "_ws.col.protocol") {
+		t.Fatalf("expected registered aliases in args: %#v", args)
+	}
+	if argsContain(args, "_ws.col.Info") || argsContain(args, "_ws.col.Protocol") {
+		t.Fatalf("expected canonical fields to be replaced by aliases: %#v", args)
+	}
+}
+
+func TestProjectPacketListLineRestoresMissingOptionalColumns(t *testing.T) {
+	plan := fieldScanCapabilityPlan{
+		requestedFields: []string{"frame.number", "ip.src", "udp.payload", "_ws.col.Info"},
+		tsharkFields:    []string{"frame.number", "ip.src", "_ws.col.info"},
+		projection:      []int{0, 1, -1, 2},
+	}
+	line := strings.Join([]string{"7", "192.0.2.10", "GET /"}, packetListFieldSeparator)
+	projected := strings.Split(projectPacketListLine(line, plan), packetListFieldSeparator)
+	if len(projected) != 4 || projected[0] != "7" || projected[1] != "192.0.2.10" || projected[2] != "" || projected[3] != "GET /" {
+		t.Fatalf("unexpected projected line: %#v", projected)
+	}
+}
+
 func TestParseCompatListLine_PreservesDisplayProtocol(t *testing.T) {
 	parts := make([]string, 20)
 	parts[0] = "5"
@@ -192,6 +240,15 @@ func TestParseCompatListLine_PreservesDisplayProtocol(t *testing.T) {
 	if pkt.DisplayProtocol != "TLSv1.3" {
 		t.Fatalf("expected display protocol TLSv1.3, got %s", pkt.DisplayProtocol)
 	}
+}
+
+func argsContain(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestNormalizeProto(t *testing.T) {

@@ -26,91 +26,124 @@ func BuildArgs(opts model.ParseOptions) []string {
 	return args
 }
 
-func BuildFastListArgs(opts model.ParseOptions) []string {
-	const sep = "\x1f"
-	args := []string{"-n", "-r", opts.FilePath}
-	if opts.DisplayFilter != "" {
-		args = append(args, "-Y", opts.DisplayFilter)
-	}
-	args = appendTLSArgs(args, opts.TLS)
+const packetListFieldSeparator = "\x1f"
 
-	args = append(args,
-		"-T", "fields",
-		"-E", "header=n",
-		"-E", "occurrence=f",
-		"-E", "separator="+sep,
-		"-E", "quote=n",
-		"-e", "frame.number",
-		"-e", "frame.time_epoch",
-		"-e", "ip.src",
-		"-e", "ipv6.src",
-		"-e", "arp.src.proto_ipv4",
-		"-e", "ip.dst",
-		"-e", "ipv6.dst",
-		"-e", "arp.dst.proto_ipv4",
-		"-e", "tcp.srcport",
-		"-e", "udp.srcport",
-		"-e", "tcp.dstport",
-		"-e", "udp.dstport",
-		"-e", "_ws.col.Protocol",
-		"-e", "frame.len",
-		"-e", "_ws.col.Info",
-		"-e", "tcp.stream",
-		"-e", "udp.stream",
-		"-e", "udp.payload",
-		"-e", "ip.hdr_len",
-		"-e", "tcp.hdr_len",
-		"-e", "tcp.analysis.flags",
-		"-e", "tcp.analysis.window_update",
-		"-e", "tcp.analysis.keep_alive",
-		"-e", "tcp.analysis.keep_alive_ack",
-		"-e", "tcp.flags.reset",
-		"-e", "tcp.flags.syn",
-		"-e", "tcp.flags.fin",
-		"-e", "hsrp.state",
-		"-e", "ospf.msg",
-		"-e", "stp.type",
-		"-e", "icmp.type",
-		"-e", "icmpv6.type",
-		"-e", "ip.ttl",
-		"-e", "ipv6.hlim",
-		"-e", "eth.dst",
-		"-e", "eth.fcs.status",
-		"-e", "ip.checksum.status",
-		"-e", "tcp.checksum.status",
-		"-e", "udp.checksum.status",
-		"-e", "sctp.checksum.status",
-		"-e", "mstp.checksum.status",
-		"-e", "cdp.checksum.status",
-		"-e", "edp.checksum.status",
-		"-e", "wlan.fcs.status",
-		"-e", "stt.checksum.status",
-		"-e", "systemd_journal",
-		"-e", "sysdig",
-		"-e", "smb",
-		"-e", "nbss",
-		"-e", "nbns",
-		"-e", "netbios",
-		"-e", "dcerpc",
-		"-e", "hsrp",
-		"-e", "eigrp",
-		"-e", "ospf",
-		"-e", "bgp",
-		"-e", "cdp",
-		"-e", "vrrp",
-		"-e", "carp",
-		"-e", "gvrp",
-		"-e", "igmp",
-		"-e", "ismp",
-		"-e", "rip",
-		"-e", "glbp",
-		"-e", "pim",
-	)
-	return args
+var fastListFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"tcp.srcport",
+	"udp.srcport",
+	"tcp.dstport",
+	"udp.dstport",
+	"_ws.col.Protocol",
+	"frame.len",
+	"_ws.col.Info",
+	"tcp.stream",
+	"udp.stream",
+	"udp.payload",
+	"ip.hdr_len",
+	"tcp.hdr_len",
+	"tcp.analysis.flags",
+	"tcp.analysis.window_update",
+	"tcp.analysis.keep_alive",
+	"tcp.analysis.keep_alive_ack",
+	"tcp.flags.reset",
+	"tcp.flags.syn",
+	"tcp.flags.fin",
+	"hsrp.state",
+	"ospf.msg",
+	"stp.type",
+	"icmp.type",
+	"icmpv6.type",
+	"ip.ttl",
+	"ipv6.hlim",
+	"eth.dst",
+	"eth.fcs.status",
+	"ip.checksum.status",
+	"tcp.checksum.status",
+	"udp.checksum.status",
+	"sctp.checksum.status",
+	"mstp.checksum.status",
+	"cdp.checksum.status",
+	"edp.checksum.status",
+	"wlan.fcs.status",
+	"stt.checksum.status",
+	"systemd_journal",
+	"sysdig",
+	"smb",
+	"nbss",
+	"nbns",
+	"netbios",
+	"dcerpc",
+	"hsrp",
+	"eigrp",
+	"ospf",
+	"bgp",
+	"cdp",
+	"vrrp",
+	"carp",
+	"gvrp",
+	"igmp",
+	"ismp",
+	"rip",
+	"glbp",
+	"pim",
+}
+
+var compatListFields = []string{
+	"frame.number",
+	"frame.time_epoch",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"tcp.srcport",
+	"udp.srcport",
+	"tcp.dstport",
+	"udp.dstport",
+	"_ws.col.Protocol",
+	"frame.protocols",
+	"frame.len",
+	"_ws.col.Info",
+	"tcp.stream",
+	"udp.stream",
+	"ip.hdr_len",
+	"tcp.hdr_len",
+}
+
+func BuildFastListArgs(opts model.ParseOptions) []string {
+	return buildPacketListArgs(opts, fastListFields)
 }
 
 func BuildCompatListArgs(opts model.ParseOptions) []string {
-	const sep = "\x1f"
+	return buildPacketListArgs(opts, compatListFields)
+}
+
+func buildFastListScanArgs(opts model.ParseOptions) ([]string, fieldScanCapabilityPlan, error) {
+	return buildCapabilityPlannedPacketListArgs(opts, fastListFields)
+}
+
+func buildCompatListScanArgs(opts model.ParseOptions) ([]string, fieldScanCapabilityPlan, error) {
+	return buildCapabilityPlannedPacketListArgs(opts, compatListFields)
+}
+
+func buildCapabilityPlannedPacketListArgs(opts model.ParseOptions, fields []string) ([]string, fieldScanCapabilityPlan, error) {
+	plan, err := planFieldScanByCapabilities(fields)
+	if err != nil {
+		return nil, plan, err
+	}
+	return buildPacketListArgs(opts, plan.tsharkFields), plan, nil
+}
+
+func buildPacketListArgs(opts model.ParseOptions, fields []string) []string {
 	args := []string{"-n", "-r", opts.FilePath}
 	if opts.DisplayFilter != "" {
 		args = append(args, "-Y", opts.DisplayFilter)
@@ -120,29 +153,12 @@ func BuildCompatListArgs(opts model.ParseOptions) []string {
 		"-T", "fields",
 		"-E", "header=n",
 		"-E", "occurrence=f",
-		"-E", "separator="+sep,
+		"-E", "separator="+packetListFieldSeparator,
 		"-E", "quote=n",
-		"-e", "frame.number",
-		"-e", "frame.time_epoch",
-		"-e", "ip.src",
-		"-e", "ipv6.src",
-		"-e", "arp.src.proto_ipv4",
-		"-e", "ip.dst",
-		"-e", "ipv6.dst",
-		"-e", "arp.dst.proto_ipv4",
-		"-e", "tcp.srcport",
-		"-e", "udp.srcport",
-		"-e", "tcp.dstport",
-		"-e", "udp.dstport",
-		"-e", "_ws.col.Protocol",
-		"-e", "frame.protocols",
-		"-e", "frame.len",
-		"-e", "_ws.col.Info",
-		"-e", "tcp.stream",
-		"-e", "udp.stream",
-		"-e", "ip.hdr_len",
-		"-e", "tcp.hdr_len",
 	)
+	for _, field := range fields {
+		args = append(args, "-e", field)
+	}
 	return args
 }
 
@@ -501,7 +517,11 @@ func StreamPackets(ctx context.Context, opts model.ParseOptions, onPacket func(m
 
 func StreamPacketsFast(ctx context.Context, opts model.ParseOptions, onPacket func(model.Packet) error, onProgress func(processed int)) error {
 	maxPackets := opts.MaxPackets
-	cmd, err := CommandContext(ctx, BuildFastListArgs(opts)...)
+	args, plan, err := buildFastListScanArgs(opts)
+	if err != nil {
+		return fmt.Errorf("plan tshark fast fields: %w", err)
+	}
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -551,6 +571,7 @@ func StreamPacketsFast(ctx context.Context, opts model.ParseOptions, onPacket fu
 			onProgress(processed)
 		}
 
+		line = projectPacketListLine(line, plan)
 		packet, parseErr := parseFastListLine(line)
 		if parseErr == nil {
 			if err := onPacket(packet); err != nil {
@@ -586,7 +607,11 @@ func StreamPacketsFast(ctx context.Context, opts model.ParseOptions, onPacket fu
 
 func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket func(model.Packet) error, onProgress func(processed int)) error {
 	maxPackets := opts.MaxPackets
-	cmd, err := CommandContext(ctx, BuildCompatListArgs(opts)...)
+	args, plan, err := buildCompatListScanArgs(opts)
+	if err != nil {
+		return fmt.Errorf("plan tshark compat fields: %w", err)
+	}
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -636,6 +661,7 @@ func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket 
 			onProgress(processed)
 		}
 
+		line = projectPacketListLine(line, plan)
 		packet, parseErr := parseCompatListLine(line)
 		if parseErr == nil {
 			if err := onPacket(packet); err != nil {
@@ -669,8 +695,14 @@ func StreamPacketsCompat(ctx context.Context, opts model.ParseOptions, onPacket 
 	return nil
 }
 
+func projectPacketListLine(line string, plan fieldScanCapabilityPlan) string {
+	row := normalizeFieldScanRow(strings.Split(line, packetListFieldSeparator), len(plan.tsharkFields))
+	projected := projectCapabilityFieldScanRow(row, plan)
+	return strings.Join(projected, packetListFieldSeparator)
+}
+
 func parseFastListLine(line string) (model.Packet, error) {
-	parts := strings.Split(line, "\x1f")
+	parts := strings.Split(line, packetListFieldSeparator)
 	if len(parts) < 65 {
 		return model.Packet{}, errors.New("invalid fast list line")
 	}
@@ -752,7 +784,7 @@ func parseFastListLine(line string) (model.Packet, error) {
 }
 
 func parseCompatListLine(line string) (model.Packet, error) {
-	parts := strings.Split(line, "\x1f")
+	parts := strings.Split(line, packetListFieldSeparator)
 	if len(parts) < 20 {
 		return model.Packet{}, errors.New("invalid compat list line")
 	}

@@ -7555,3 +7555,55 @@ Author: Codex
   - Direct field scans outside `scanFieldRows` and `runDirectFieldScan` are not all capability-planned yet.
   - Fast packet list args in `runner.go` still construct a fixed field list; this should be the next TShark hardening target.
   - Runtime diagnostics expose profile and missing fields, but UI copy can still be improved for optional-field degradation summaries.
+
+---
+
+## Round 168 - TShark Fast List Capability Planning Slice
+
+Time: 2026-05-12 17:38:08 +08:00
+Author: Codex
+
+### Scope
+
+- Continued the TShark external-dependency hardening path.
+- Focused on the packet fast-list and compat-list field paths in `runner.go`.
+- Preserved existing `BuildFastListArgs` / `BuildCompatListArgs` compatibility behavior while changing the actual streaming path to use capability-planned field lists.
+
+### Changes
+
+- Extracted fixed packet list field definitions:
+  - `fastListFields` for the 65-column fast list parser;
+  - `compatListFields` for the 20-column fallback parser.
+- Added capability-planned scan args for actual streaming:
+  - `buildFastListScanArgs`;
+  - `buildCompatListScanArgs`;
+  - shared `buildCapabilityPlannedPacketListArgs`.
+- `StreamPacketsFast` and `StreamPacketsCompat` now:
+  - plan fields before invoking TShark;
+  - pass registered aliases such as `_ws.col.info` / `_ws.col.protocol` when required by the installed TShark;
+  - skip unavailable optional fields;
+  - project stdout rows back to the original fixed parser width before calling `parseFastListLine` / `parseCompatListLine`.
+- Added focused tests for:
+  - alias-aware fast-list command construction;
+  - optional field projection back into fixed columns;
+  - existing fast/compat parser behavior.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestBuildFastListScanArgs|TestProjectPacketListLine|TestParseFastListLine|TestParseCompatListLine|Test.*Capabilit|TestPlanFieldScan" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for fast-list and compat-list packet page paths. The highest-volume packet streaming field path is now capability-aware.
+- Drift check: no drift detected. Work stayed on the planned TShark field compatibility thread and did not alter parsing semantics, UI behavior, or Evidence/MISC boundaries.
+- Compatibility posture:
+  - Existing public arg builders remain stable for tests/callers that inspect canonical requested fields.
+  - Runtime streaming uses planned args and then restores the historical parser column shape.
+- Remaining risks:
+  - Direct `runDirectFieldScan` callers still bypass capability planning.
+  - C2 decrypt and tool-specific direct TShark field invocations remain fixed-list paths.
+  - Runtime/UI diagnostics do not yet explain which optional fields were skipped during a specific analysis run.
