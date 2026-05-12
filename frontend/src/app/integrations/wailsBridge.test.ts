@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { C2DecryptResult } from "../core/types";
-import { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./wailsBridge";
+import { isLikelyVShellLowInfoControlRecord, normalizeC2DecryptResultForDisplay } from "./mappers/c2DecryptDisplayMapper";
 
 describe("VShell decrypt result display normalization", () => {
   it("hides short low-information control frames without touching meaningful plaintext", () => {

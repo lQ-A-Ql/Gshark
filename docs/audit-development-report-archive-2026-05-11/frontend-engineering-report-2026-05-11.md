@@ -1,5 +1,32 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 198 - Wails Bridge Mapper Test Decoupling
+
+Time: 2026-05-12 10:04:57 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued shrinking direct `wailsBridge` references after production migration completed.
+- Focused on test-only coupling to mapper re-exports from the compatibility facade.
+
+### Changes
+
+- Updated `wailsBridge.test.ts` to import VShell display normalization helpers from `mappers/c2DecryptDisplayMapper` directly.
+- Left `wailsBridge.ts` as a compatibility facade for bridge exports and existing external import shape.
+
+### Validation
+
+- `pnpm exec vitest run src/app/integrations/wailsBridge.test.ts src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- No `wailsBridge` string references remain under `frontend/src` outside the facade file name itself.
+- Mapper behavior is now tested at the mapper module instead of through the compatibility facade.
+
+---
+
 ## Round 197 - Backend Client Facade Boundary Guard
 
 Time: 2026-05-12 10:02:01 +08:00  
