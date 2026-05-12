@@ -1,5 +1,34 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 205 - Boundary Script Regression Guard
+
+Time: 2026-05-12 12:07:18 +08:00  
+Author: Codex
+
+### Scope
+
+- Hardened the frontend boundary checker itself so its new `wailsBridge` and `bridgeTypes` rules are test-covered.
+- Kept the CLI behavior intact while making the guard importable in tests.
+
+### Changes
+
+- Refactored `check-boundaries.mjs` to export `findBoundaryViolations()`.
+- Added `check-boundaries.test.mjs` with fixtures for the two new regression rules and the allowed integration-layer case.
+
+### Validation
+
+- `pnpm exec vitest run scripts/check-boundaries.test.mjs` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run ci` - passed, including 180 test files / 498 tests and production build.
+
+### Review
+
+- The production `wailsBridge` import ban is now covered by a direct script test.
+- The `bridgeTypes` import restriction is now covered by a direct script test.
+- Integration-layer bridge type composition remains allowed.
+
+---
+
 ## Round 204 - Bridge Types Size Guard
 
 Time: 2026-05-12 12:03:13 +08:00  

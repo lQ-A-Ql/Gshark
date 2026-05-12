@@ -1,34 +1,42 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const appRoot = resolve(root, "src/app");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
 
-const violations = [];
+export function findBoundaryViolations({ frontendRoot = root } = {}) {
+  const appRoot = resolve(frontendRoot, "src/app");
+  const violations = [];
 
-for (const file of sourceFiles(appRoot)) {
-  const source = relative(root, file).replaceAll("\\", "/");
-  const body = readFileSync(file, "utf8");
-  for (const specifier of importSpecifiers(body)) {
-    recordWailsBridgeImport(source, specifier);
-    recordBridgeTypesImport(source, specifier);
-    const target = resolveSourceImport(file, specifier);
-    recordViolation(source, specifier, target);
+  for (const file of sourceFiles(appRoot)) {
+    const source = relative(frontendRoot, file).replaceAll("\\", "/");
+    const body = readFileSync(file, "utf8");
+    for (const specifier of importSpecifiers(body)) {
+      recordWailsBridgeImport(violations, source, specifier);
+      recordBridgeTypesImport(violations, source, specifier);
+      const target = resolveSourceImport(frontendRoot, appRoot, file, specifier);
+      recordViolation(violations, source, specifier, target);
+    }
   }
+
+  return violations;
 }
 
-if (violations.length > 0) {
+function runCli() {
+  const violations = findBoundaryViolations();
+  if (violations.length === 0) {
+    console.log("Frontend boundary check passed.");
+    return;
+  }
+
   console.error("Frontend boundary violations:");
   for (const violation of violations) {
     console.error(`- ${violation}`);
   }
   process.exit(1);
 }
-
-console.log("Frontend boundary check passed.");
 
 function sourceFiles(dir) {
   const files = [];
@@ -57,20 +65,20 @@ function importSpecifiers(body) {
   return specifiers;
 }
 
-function resolveSourceImport(file, specifier) {
+function resolveSourceImport(frontendRoot, appRoot, file, specifier) {
   if (specifier === "react") {
     return "react";
   }
   if (specifier.startsWith("@/")) {
-    return normalizeIfSource(resolve(root, "src", specifier.slice(2)));
+    return normalizeIfSource(frontendRoot, appRoot, resolve(frontendRoot, "src", specifier.slice(2)));
   }
   if (specifier.startsWith(".")) {
-    return normalizeIfSource(resolve(dirname(file), specifier));
+    return normalizeIfSource(frontendRoot, appRoot, resolve(dirname(file), specifier));
   }
   return "";
 }
 
-function normalizeIfSource(pathWithoutExt) {
+function normalizeIfSource(frontendRoot, appRoot, pathWithoutExt) {
   const candidates = [
     pathWithoutExt,
     `${pathWithoutExt}.ts`,
@@ -82,10 +90,10 @@ function normalizeIfSource(pathWithoutExt) {
   if (!target || !target.startsWith(appRoot)) {
     return "";
   }
-  return relative(root, target).replaceAll("\\", "/");
+  return relative(frontendRoot, target).replaceAll("\\", "/");
 }
 
-function recordViolation(source, specifier, target) {
+function recordViolation(violations, source, specifier, target) {
   if (source.startsWith("src/app/pages/") && target.startsWith("src/app/integrations/mappers/")) {
     violations.push(`${source} imports mapper ${specifier}; pages must consume feature/core view models instead`);
   }
@@ -124,7 +132,7 @@ function recordViolation(source, specifier, target) {
   }
 }
 
-function recordWailsBridgeImport(source, specifier) {
+function recordWailsBridgeImport(violations, source, specifier) {
   if (specifier.includes("wailsBridge")) {
     violations.push(
       `${source} imports ${specifier}; production code must use integrations/backendClients or bridgeTypes`,
@@ -132,8 +140,12 @@ function recordWailsBridgeImport(source, specifier) {
   }
 }
 
-function recordBridgeTypesImport(source, specifier) {
+function recordBridgeTypesImport(violations, source, specifier) {
   if (!source.startsWith("src/app/integrations/") && specifier.includes("integrations/bridgeTypes")) {
     violations.push(`${source} imports ${specifier}; use concrete client type modules instead`);
   }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  runCli();
 }
