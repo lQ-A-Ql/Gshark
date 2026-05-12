@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 176 - Generic MISC Module Domain Client Migration
+
+Time: 2026-05-12 08:23:05 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with custom MISC module execution and deletion.
+- Kept schema-driven form rendering, result rendering, delete confirmation, and module-list refresh behavior unchanged.
+
+### Changes
+
+- Updated `misc/modules/GenericMiscModule.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced generic module invoke and delete calls with `backendClients.miscModule.runMiscModule` and `backendClients.miscModule.deleteMiscModule`.
+- Updated custom MISC module tests to expose the misc-module domain client.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.customModules.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Generic custom module execution and deletion no longer depend on the aggregate bridge.
+- `pages/MiscTools.tsx` still owns misc-module list/import through the aggregate bridge and remains the next small MISC domain migration candidate.
+
+---
+
 ## Round 175 - WinRM Decrypt Domain Client Migration
 
 Time: 2026-05-12 08:19:05 +08:00  

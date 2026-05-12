@@ -2,7 +2,7 @@ import { Loader2, Play } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import type { MiscModuleTableResult } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import type { MiscModuleRendererProps } from "../types";
 import { ErrorBlock } from "../ui";
 import { buildInitialValues, GenericMiscFormFields } from "./GenericMiscFormFields";
@@ -31,7 +31,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
     setResultJSON("");
     setResultTable(undefined);
     try {
-      const payload = await bridge.runMiscModule(module.id, values);
+      const payload = await backendClients.miscModule.runMiscModule(module.id, values);
       setResultText(payload.text ?? "");
       setResultJSON(payload.output === undefined ? "" : JSON.stringify(payload.output, null, 2));
       setResultTable(payload.table);
@@ -49,7 +49,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
     setDeleting(true);
     setError("");
     try {
-      await bridge.deleteMiscModule(module.id);
+      await backendClients.miscModule.deleteMiscModule(module.id);
       await onModuleDeleted?.(module.id);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "删除模块失败");

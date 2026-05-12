@@ -40,6 +40,10 @@ vi.mock("../state/SentinelContext", () => ({
 
 vi.mock("../integrations/wailsBridge", () => ({
   backendClients: {
+    miscModule: {
+      deleteMiscModule: mocks.deleteMiscModule,
+      runMiscModule: mocks.runMiscModule,
+    },
     securityMaterial: {
       runWinRMDecrypt: mocks.runWinRMDecrypt,
       getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
