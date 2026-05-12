@@ -9,9 +9,7 @@ const bridgeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../integrations/wailsBridge", () => ({
-  bridge: {
-    updateTLSConfig: bridgeMocks.updateTLSConfig,
-  },
+  backendClients: { securityMaterial: { updateTLSConfig: bridgeMocks.updateTLSConfig } },
 }));
 
 function renderControls(backendConnected: boolean) {

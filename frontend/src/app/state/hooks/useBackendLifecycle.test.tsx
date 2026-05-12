@@ -35,6 +35,7 @@ const bridgeMocks = vi.hoisted(() => {
 });
 
 vi.mock("../../integrations/wailsBridge", () => ({
+  backendClients: { securityMaterial: { updateTLSConfig: bridgeMocks.updateTLSConfig } },
   bridge: {
     isAvailable: bridgeMocks.isAvailable,
     getDesktopBackendStatus: bridgeMocks.getDesktopBackendStatus,

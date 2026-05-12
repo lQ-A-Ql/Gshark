@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 
 interface UseBackendLifecycleControlsOptions {
   readonly backendConnected: boolean;
@@ -52,7 +52,7 @@ export function useBackendLifecycleControls({
       setDecryptionConfig((prev) => {
         const next = { ...prev, ...patch };
         if (backendConnected) {
-          void bridge.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
+          void backendClients.securityMaterial.updateTLSConfig(next).catch(() => setBackendStatus("TLS 配置更新失败"));
         }
         return next;
       });

@@ -1,5 +1,34 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 182 - Lifecycle TLS Domain Migration
+
+Time: 2026-05-12 08:52:00 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal inside backend lifecycle controls.
+- Kept local TLS config merge behavior and connected-backend sync behavior unchanged.
+
+### Changes
+
+- Updated `state/hooks/useBackendLifecycleControls.ts` to call `backendClients.securityMaterial.updateTLSConfig`.
+- Updated both lifecycle control and full lifecycle hook test mocks to expose the security material domain client.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycleControls.test.tsx src/app/state/hooks/useBackendLifecycle.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed after adding the missing lifecycle harness mock export; final run included 179 test files / 495 tests and production build.
+
+### Review
+
+- Lifecycle TLS writes now use the security material domain client.
+- Remaining direct `bridge` imports are limited to lifecycle startup wiring and Sentinel context compatibility wiring.
+
+---
+
 ## Round 181 - TLS Dialog Domain Migration
 
 Time: 2026-05-12 08:46:30 +08:00  
