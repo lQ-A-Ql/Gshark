@@ -7650,3 +7650,53 @@ Author: Codex
   - Engine-level direct TShark invocations still build fixed `-e` lists, especially C2 HTTP candidate extraction.
   - Tool-specific direct field calls outside `backend/internal/tshark` should either move through exported planned helpers or be wrapped with a small local adapter.
   - Runtime/UI diagnostics still show global capability status, not per-analysis skipped optional fields.
+
+---
+
+## Round 170 - C2 HTTP Field Candidate Capability Planning Slice
+
+Time: 2026-05-12 17:49:49 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark capability hardening outside the `tshark` package.
+- Focused on the Cobalt Strike HTTP field candidate extraction path in `backend/internal/engine/c2_decrypt.go`.
+- Preserved C2 decrypt request/response models and candidate semantics.
+
+### Changes
+
+- Exported a narrow planned field scan contract from `backend/internal/tshark`:
+  - `BuildPlannedFieldArgs`;
+  - `PlannedFieldScan.ProjectRow`;
+  - caller-visible requested/TShark/missing optional field metadata.
+- Kept the internal field capability planner as the single source of truth for:
+  - required field failure;
+  - optional field skip;
+  - `_ws.col.*` alias resolution;
+  - fixed row-shape projection.
+- Reworked CS HTTP candidate collection:
+  - centralized its 14 requested fields in `csHTTPFieldDecryptFields`;
+  - builds TShark command args through `tshark.BuildPlannedFieldArgs`;
+  - projects each output row back into the original 14-column parser shape before extracting `http.file_data`, `data.data`, cookies, authorization, and URI metadata.
+- Added tests covering:
+  - zero-value `PlannedFieldScan` row compatibility;
+  - C2 HTTP candidate extraction through a planned field projection.
+
+### Validation
+
+- `cd backend && go test ./internal/engine -run "TestAppendCSHTTPFieldCandidatesUsesPlannedProjection|TestC2DecryptCS" -count=1 -v` passed.
+- `cd backend && go test ./internal/tshark -run "TestAppendPlannedFieldArgs|TestPlannedFieldScanZeroValue|TestPlanFieldScan" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for C2 HTTP field candidates. The engine no longer duplicates TShark field capability decisions for this path.
+- Drift check: no drift detected. The change directly serves the planned TShark external dependency stability goal and keeps C2 behavior unchanged.
+- Remaining risks:
+  - Other engine/tool direct field paths should be audited, but many already call `tshark.ScanFieldRowsWithDisplayFilter` and are therefore covered.
+  - `filter_ids.go`, `traffic_stats.go`, and stream-follow paths still have direct field lists in the TShark package; they should be assessed next.
+  - Per-analysis user-facing notes for skipped optional fields are still not surfaced.

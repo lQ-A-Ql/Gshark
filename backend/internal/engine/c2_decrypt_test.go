@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 func TestC2DecryptVShellAESGCMWithSaltAndVKey(t *testing.T) {
@@ -747,6 +748,47 @@ func TestC2DecryptCSMetadataExplainsRawKeyRequirement(t *testing.T) {
 	}
 	if !noteContains(result.Notes, "metadata 密文候选") || !noteContains(result.Notes, "无法直接算出 Raw key") {
 		t.Fatalf("expected metadata/raw-key notes, got %+v", result.Notes)
+	}
+}
+
+func TestAppendCSHTTPFieldCandidatesUsesPlannedProjection(t *testing.T) {
+	plannedScan, err := tshark.BuildPlannedFieldArgs(nil, csHTTPFieldDecryptFields)
+	if err != nil {
+		t.Fatalf("BuildPlannedFieldArgs() error = %v", err)
+	}
+
+	fields := make([]string, len(plannedScan.TSharkFields))
+	fieldIndex := map[string]int{}
+	for idx, field := range plannedScan.TSharkFields {
+		fieldIndex[field] = idx
+	}
+	setField := func(name string, value string) {
+		if idx, ok := fieldIndex[name]; ok {
+			fields[idx] = value
+		}
+	}
+	setField("frame.number", "88")
+	setField("tcp.stream", "5")
+	setField("frame.time_epoch", "2026-05-12T09:00:00Z")
+	setField("ip.src", "10.0.0.1")
+	setField("tcp.srcport", "4444")
+	setField("ip.dst", "10.0.0.2")
+	setField("tcp.dstport", "80")
+	setField("http.response.code", "200")
+	setField("http.file_data", "4142434445464748")
+
+	seen := map[string]struct{}{}
+	out := []c2DecryptCandidate{}
+	appendCSHTTPFieldCandidatesFromLine(strings.Join(fields, "\t"), plannedScan, seen, &out)
+
+	if len(out) != 1 {
+		t.Fatalf("expected one candidate, got %#v", out)
+	}
+	if out[0].packet.ID != 88 || out[0].packet.StreamID != 5 || out[0].direction != "server_to_client" {
+		t.Fatalf("unexpected candidate metadata: %#v", out[0])
+	}
+	if string(out[0].raw) != "ABCDEFGH" {
+		t.Fatalf("unexpected raw candidate: %x", out[0].raw)
 	}
 }
 

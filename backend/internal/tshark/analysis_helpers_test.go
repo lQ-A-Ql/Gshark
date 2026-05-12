@@ -96,6 +96,13 @@ func TestAppendPlannedFieldArgsUsesAliasesAndSkipsOptional(t *testing.T) {
 	}
 }
 
+func TestPlannedFieldScanZeroValuePreservesRows(t *testing.T) {
+	row := (PlannedFieldScan{}).ProjectRow([]string{"a", "b"})
+	if len(row) != 2 || row[0] != "a" || row[1] != "b" {
+		t.Fatalf("unexpected zero-value projection: %#v", row)
+	}
+}
+
 func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	ClearFieldScanCache("")
 	t.Cleanup(func() {

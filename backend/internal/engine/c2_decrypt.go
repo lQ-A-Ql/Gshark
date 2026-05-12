@@ -412,6 +412,23 @@ func isLikelyCSPacketLevelDecryptSource(packet model.Packet) bool {
 	return isLikelyCSHTTPDecryptPacket(packet, payload)
 }
 
+var csHTTPFieldDecryptFields = []string{
+	"frame.number",
+	"tcp.stream",
+	"frame.time_epoch",
+	"ip.src",
+	"tcp.srcport",
+	"ip.dst",
+	"tcp.dstport",
+	"http.request.method",
+	"http.request.uri",
+	"http.response.code",
+	"http.cookie",
+	"http.authorization",
+	"http.file_data",
+	"data.data",
+}
+
 func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
 	s.mu.RLock()
 	pcap := strings.TrimSpace(s.pcap)
@@ -419,26 +436,16 @@ func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen 
 	if pcap == "" || len(*out) >= c2DecryptMaxRecords {
 		return nil
 	}
-	cmd, err := tshark.CommandContext(ctx,
+	plannedScan, err := tshark.BuildPlannedFieldArgs([]string{
 		"-r", pcap,
 		"-Y", `http && (http.request.method == POST || (http.response.code == 200 && http.content_length < 100000) || http.cookie || http.authorization)`,
 		"-T", "fields",
 		"-E", "separator=/t",
-		"-e", "frame.number",
-		"-e", "tcp.stream",
-		"-e", "frame.time_epoch",
-		"-e", "ip.src",
-		"-e", "tcp.srcport",
-		"-e", "ip.dst",
-		"-e", "tcp.dstport",
-		"-e", "http.request.method",
-		"-e", "http.request.uri",
-		"-e", "http.response.code",
-		"-e", "http.cookie",
-		"-e", "http.authorization",
-		"-e", "http.file_data",
-		"-e", "data.data",
-	)
+	}, csHTTPFieldDecryptFields)
+	if err != nil {
+		return err
+	}
+	cmd, err := tshark.CommandContext(ctx, plannedScan.Args...)
 	if err != nil {
 		return err
 	}
@@ -449,7 +456,7 @@ func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen 
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	readErr := readCSHTTPFieldCandidates(ctx, stdout, seen, out)
+	readErr := readCSHTTPFieldCandidates(ctx, stdout, plannedScan, seen, out)
 	waitErr := cmd.Wait()
 	if readErr != nil {
 		return readErr
@@ -460,7 +467,7 @@ func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen 
 	return nil
 }
 
-func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
+func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, plannedScan tshark.PlannedFieldScan, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
 	buf := bufio.NewReaderSize(reader, 1024*1024)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -468,7 +475,7 @@ func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, seen map[s
 		}
 		line, err := buf.ReadString('\n')
 		if len(*out) < c2DecryptMaxRecords && len(strings.TrimSpace(line)) > 0 {
-			appendCSHTTPFieldCandidatesFromLine(line, seen, out)
+			appendCSHTTPFieldCandidatesFromLine(line, plannedScan, seen, out)
 		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -480,8 +487,9 @@ func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, seen map[s
 	return nil
 }
 
-func appendCSHTTPFieldCandidatesFromLine(line string, seen map[string]struct{}, out *[]c2DecryptCandidate) {
+func appendCSHTTPFieldCandidatesFromLine(line string, plannedScan tshark.PlannedFieldScan, seen map[string]struct{}, out *[]c2DecryptCandidate) {
 	fields := strings.Split(strings.TrimRight(line, "\r\n"), "\t")
+	fields = plannedScan.ProjectRow(fields)
 	for len(fields) < 14 {
 		fields = append(fields, "")
 	}

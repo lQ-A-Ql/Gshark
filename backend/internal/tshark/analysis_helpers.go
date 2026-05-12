@@ -50,6 +50,15 @@ type fieldScanCapabilityPlan struct {
 	missingOptional []string
 }
 
+type PlannedFieldScan struct {
+	Args             []string
+	RequestedFields  []string
+	TSharkFields     []string
+	MissingOptional  []string
+	CapabilityActive bool
+	plan             fieldScanCapabilityPlan
+}
+
 var fieldScanCache = struct {
 	mu      sync.RWMutex
 	entries map[fieldScanCacheKey][]*fieldScanCacheEntry
@@ -285,6 +294,28 @@ func appendPlannedFieldArgs(args []string, fields []string) ([]string, fieldScan
 		args = append(args, "-e", field)
 	}
 	return args, plan, nil
+}
+
+func BuildPlannedFieldArgs(baseArgs []string, fields []string) (PlannedFieldScan, error) {
+	args, plan, err := appendPlannedFieldArgs(append([]string(nil), baseArgs...), fields)
+	if err != nil {
+		return PlannedFieldScan{}, err
+	}
+	return PlannedFieldScan{
+		Args:             args,
+		RequestedFields:  append([]string(nil), plan.requestedFields...),
+		TSharkFields:     append([]string(nil), plan.tsharkFields...),
+		MissingOptional:  append([]string(nil), plan.missingOptional...),
+		CapabilityActive: !sameFieldScanFields(plan.requestedFields, plan.tsharkFields) || len(plan.missingOptional) > 0,
+		plan:             plan,
+	}, nil
+}
+
+func (scan PlannedFieldScan) ProjectRow(parts []string) []string {
+	if len(scan.plan.requestedFields) == 0 {
+		return append([]string(nil), parts...)
+	}
+	return projectCapabilityFieldScanRow(normalizeFieldScanRow(parts, len(scan.plan.tsharkFields)), scan.plan)
 }
 
 func runDirectFieldScanWithPlan(args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
