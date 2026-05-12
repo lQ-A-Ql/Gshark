@@ -1,5 +1,33 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 197 - Backend Client Facade Boundary Guard
+
+Time: 2026-05-12 10:02:01 +08:00  
+Author: Codex
+
+### Scope
+
+- Locked in the completed production migration away from the `wailsBridge` backend client facade.
+- Added a boundary rule so future production code imports `backendClients` only from `integrations/backendClients`.
+
+### Changes
+
+- Extended `scripts/check-boundaries.mjs` to reject production named imports of `backendClients` from `wailsBridge`.
+- Kept compatibility tests for `wailsBridge` unchanged.
+
+### Validation
+
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Production code is now guarded against reintroducing `backendClients` through the old facade.
+- The compatibility facade remains available for existing aggregate bridge tests and external import compatibility.
+
+---
+
 ## Round 196 - MISC Backend Client Entry Migration
 
 Time: 2026-05-12 09:53:31 +08:00  

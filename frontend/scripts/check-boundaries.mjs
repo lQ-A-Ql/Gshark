@@ -7,6 +7,8 @@ const appRoot = resolve(root, "src/app");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
 const aggregateBridgeImportPattern = /import\s*\{[^}]*\bbridge\b[^}]*\}\s*from\s*["'][^"']*wailsBridge["']/;
+const backendClientsFacadeImportPattern =
+  /import\s*\{[^}]*\bbackendClients\b[^}]*\}\s*from\s*["'][^"']*wailsBridge["']/;
 
 const violations = [];
 
@@ -14,6 +16,7 @@ for (const file of sourceFiles(appRoot)) {
   const source = relative(root, file).replaceAll("\\", "/");
   const body = readFileSync(file, "utf8");
   recordAggregateBridgeImport(source, body);
+  recordBackendClientsFacadeImport(source, body);
   for (const specifier of importSpecifiers(body)) {
     const target = resolveSourceImport(file, specifier);
     recordViolation(source, specifier, target);
@@ -127,5 +130,11 @@ function recordViolation(source, specifier, target) {
 function recordAggregateBridgeImport(source, body) {
   if (aggregateBridgeImportPattern.test(body)) {
     violations.push(`${source} imports aggregate bridge; production code must use backendClients domain clients`);
+  }
+}
+
+function recordBackendClientsFacadeImport(source, body) {
+  if (backendClientsFacadeImportPattern.test(body)) {
+    violations.push(`${source} imports backendClients from wailsBridge; use integrations/backendClients instead`);
   }
 }
