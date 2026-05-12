@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { mergeBatchTranscriptions, routeMediaWorkflowError } from "./mediaTranscriptionRules";
 import { EMPTY_BATCH_STATUS } from "./useMediaAnalysis";

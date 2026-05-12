@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 192 - Media Backend Client Entry Migration
+
+Time: 2026-05-12 09:36:55 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued replacing `wailsBridge` compatibility-facade imports with the direct backend client singleton entry.
+- Focused this round on media feature hooks.
+
+### Changes
+
+- Updated media analysis loading to import `backendClients` from `integrations/backendClients`.
+- Updated media playback workflow to import `backendClients` from `integrations/backendClients`.
+- Updated media transcription workflow to import `backendClients` from `integrations/backendClients`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/features/media/useMediaTranscriptionWorkflow.test.ts src/app/features/media/MediaOverviewPanels.test.tsx src/app/pages/MediaAnalysis.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed for the discovered test files.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Media domain calls now depend on the direct backend client singleton instead of the compatibility facade.
+- No media-specific test mock updates were required because the directly touched media hook tests exercise helper logic or UI composition rather than mocking the bridge entry.
+
+---
+
 ## Round 191 - Component Backend Client Entry Migration
 
 Time: 2026-05-12 09:30:51 +08:00  

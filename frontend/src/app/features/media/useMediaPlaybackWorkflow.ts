@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MediaSession } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { isMediaDependencyError } from "./mediaTranscriptionRules";
 
 interface UseMediaPlaybackWorkflowOptions {
