@@ -28,9 +28,7 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
-  bridge: {
-    updateTLSConfig: mocks.updateTLSConfig,
-  },
+  backendClients: { securityMaterial: { updateTLSConfig: mocks.updateTLSConfig } },
 }));
 
 import { TLSDecryptionDialog } from "./TLSDecryptionDialog";

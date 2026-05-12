@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { useSentinel } from "../state/SentinelContext";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 
 interface TLSDecryptionDialogProps {
   open: boolean;
@@ -35,7 +35,7 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
     setIsApplying(true);
     setErrorMessage("");
     try {
-      await bridge.updateTLSConfig(decryptionConfig);
+      await backendClients.securityMaterial.updateTLSConfig(decryptionConfig);
       if (fileMeta.path) {
         const currentFilter = displayFilter;
         await openCapture(fileMeta.path);

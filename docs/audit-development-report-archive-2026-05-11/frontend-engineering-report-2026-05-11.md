@@ -1,5 +1,34 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 181 - TLS Dialog Domain Migration
+
+Time: 2026-05-12 08:46:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal with the TLS / HTTPS decryption dialog.
+- Kept TLS config saving, capture reload, and display-filter restore behavior unchanged.
+
+### Changes
+
+- Updated `components/TLSDecryptionDialog.tsx` to call `backendClients.securityMaterial.updateTLSConfig` instead of aggregate `bridge.updateTLSConfig`.
+- Updated the TLS dialog test mock to expose `backendClients.securityMaterial.updateTLSConfig`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/components/TLSDecryptionDialog.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- TLS dialog config writes now use the security material domain client.
+- Remaining direct `bridge` imports are limited to backend lifecycle controls and Sentinel context wiring.
+
+---
+
 ## Round 180 - Media Workflow Domain Migration
 
 Time: 2026-05-12 08:41:50 +08:00  
