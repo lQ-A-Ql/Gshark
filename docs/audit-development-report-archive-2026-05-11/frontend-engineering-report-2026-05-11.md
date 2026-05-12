@@ -7739,3 +7739,49 @@ Author: Codex
   - `traffic_stats.go` still has a broad fixed field list that should be moved to the common scan planner.
   - `filter_ids.go` and packet estimate only request `frame.number`; they are low risk but can still use the exported planner for consistency.
   - Per-analysis optional-field skip notes remain future work.
+
+---
+
+## Round 172 - Global Traffic Stats Field Planning Slice
+
+Time: 2026-05-12 17:59:55 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark fixed-field hardening.
+- Focused on global traffic statistics because it used a broad hand-built `-e` list.
+- Kept `model.GlobalTrafficStats` output semantics unchanged.
+
+### Changes
+
+- Extracted `globalTrafficStatsFields` as the single requested field list.
+- Replaced custom stdout scanning in `BuildGlobalTrafficStatsFromFile` with `scanFieldRows`, so it now inherits:
+  - capability-aware field selection;
+  - `_ws.col.*` alias resolution;
+  - optional field skip and empty-column projection;
+  - existing field scan cache behavior.
+- Added `globalTrafficStatsAccumulator` to keep aggregation logic pure and testable.
+- Added `traffic_stats_test.go` covering:
+  - packet total;
+  - protocol distribution;
+  - domain normalization;
+  - computer name normalization;
+  - source/destination port aggregation.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestGlobalTrafficStats|TestScanFieldRows|TestPlanFieldScan|TestCurrentCapabilities" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for global traffic stats.
+- Drift check: no drift detected. The work stayed on TShark field capability hardening and reduced custom scanning code rather than expanding feature scope.
+- Remaining risks:
+  - `ScanFrameIDs` and packet estimate still use direct `frame.number` command construction.
+  - Stream-follow, packet list, direct scan, traffic stats, and C2 HTTP candidates are now covered by the shared planning layer.
+  - Optional-field skip details are still internal; UI/reporting does not yet surface per-analysis degradation.

@@ -1,8 +1,6 @@
 package tshark
 
 import (
-	"bufio"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,178 +9,156 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+var globalTrafficStatsFields = []string{
+	"frame.time_epoch",
+	"_ws.col.Protocol",
+	"ip.src",
+	"ipv6.src",
+	"arp.src.proto_ipv4",
+	"ip.dst",
+	"ipv6.dst",
+	"arp.dst.proto_ipv4",
+	"http.host",
+	"tls.handshake.extensions_server_name",
+	"dns.qry.name",
+	"nbns.name",
+	"nbns.netbios_name",
+	"dhcp.option.hostname",
+	"browser.server",
+	"browser.response_computer_name",
+	"browser.backup.server",
+	"smb_netlogon.computer_name",
+	"smb_netlogon.unicode_computer_name",
+	"netlogon.secchan.nl_auth_message.nb_host",
+	"netlogon.secchan.nl_auth_message.nb_host_utf8",
+	"tcp.dstport",
+	"udp.dstport",
+	"tcp.srcport",
+	"udp.srcport",
+}
+
+type globalTrafficStatsAccumulator struct {
+	stats           model.GlobalTrafficStats
+	timelineMap     map[string]int
+	protocolMap     map[string]int
+	talkerMap       map[string]int
+	domainMap       map[string]int
+	srcIPMap        map[string]int
+	dstIPMap        map[string]int
+	computerNameMap map[string]int
+	destPortMap     map[string]int
+	srcPortMap      map[string]int
+}
+
 func BuildGlobalTrafficStatsFromFile(filePath string) (model.GlobalTrafficStats, error) {
-	stats := model.GlobalTrafficStats{}
-
-	args := []string{
-		"-n",
-		"-r", filePath,
-		"-T", "fields",
-		"-E", "separator=\t",
-		"-E", "occurrence=f",
-		"-E", "quote=n",
-		"-e", "frame.time_epoch",
-		"-e", "_ws.col.Protocol",
-		"-e", "ip.src",
-		"-e", "ipv6.src",
-		"-e", "arp.src.proto_ipv4",
-		"-e", "ip.dst",
-		"-e", "ipv6.dst",
-		"-e", "arp.dst.proto_ipv4",
-		"-e", "http.host",
-		"-e", "tls.handshake.extensions_server_name",
-		"-e", "dns.qry.name",
-		"-e", "nbns.name",
-		"-e", "nbns.netbios_name",
-		"-e", "dhcp.option.hostname",
-		"-e", "browser.server",
-		"-e", "browser.response_computer_name",
-		"-e", "browser.backup.server",
-		"-e", "smb_netlogon.computer_name",
-		"-e", "smb_netlogon.unicode_computer_name",
-		"-e", "netlogon.secchan.nl_auth_message.nb_host",
-		"-e", "netlogon.secchan.nl_auth_message.nb_host_utf8",
-		"-e", "tcp.dstport",
-		"-e", "udp.dstport",
-		"-e", "tcp.srcport",
-		"-e", "udp.srcport",
-	}
-
-	cmd, err := Command(args...)
+	acc := newGlobalTrafficStatsAccumulator()
+	err := scanFieldRows(filePath, globalTrafficStatsFields, acc.consumeRow)
 	if err != nil {
-		return stats, fmt.Errorf("resolve tshark: %w", err)
+		return model.GlobalTrafficStats{}, err
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return stats, fmt.Errorf("create stdout pipe: %w", err)
+	return acc.finish(), nil
+}
+
+func newGlobalTrafficStatsAccumulator() *globalTrafficStatsAccumulator {
+	return &globalTrafficStatsAccumulator{
+		timelineMap:     map[string]int{},
+		protocolMap:     map[string]int{},
+		talkerMap:       map[string]int{},
+		domainMap:       map[string]int{},
+		srcIPMap:        map[string]int{},
+		dstIPMap:        map[string]int{},
+		computerNameMap: map[string]int{},
+		destPortMap:     map[string]int{},
+		srcPortMap:      map[string]int{},
+	}
+}
+
+func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
+	if len(parts) < 2 {
+		return
+	}
+	a.stats.TotalPackets++
+
+	epochText := strings.TrimSpace(parts[0])
+	if secLabel := toSecondLabel(epochText); secLabel != "" {
+		a.timelineMap[secLabel]++
 	}
 
-	if err := cmd.Start(); err != nil {
-		return stats, fmt.Errorf("start tshark: %w", err)
+	protocol := strings.ToUpper(strings.TrimSpace(parts[1]))
+	if protocol == "" {
+		protocol = "OTHER"
 	}
+	a.protocolMap[protocol]++
 
-	timelineMap := make(map[string]int)
-	protocolMap := make(map[string]int)
-	talkerMap := make(map[string]int)
-	domainMap := make(map[string]int)
-	srcIPMap := make(map[string]int)
-	dstIPMap := make(map[string]int)
-	computerNameMap := make(map[string]int)
-	destPortMap := make(map[string]int)
-	srcPortMap := make(map[string]int)
-
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		parts := strings.Split(line, "\t")
-		if len(parts) < 2 {
-			continue
-		}
-
-		stats.TotalPackets++
-
-		epochText := strings.TrimSpace(parts[0])
-		if secLabel := toSecondLabel(epochText); secLabel != "" {
-			timelineMap[secLabel]++
-		}
-
-		protocol := strings.ToUpper(strings.TrimSpace(parts[1]))
-		if protocol == "" {
-			protocol = "OTHER"
-		}
-		protocolMap[protocol]++
-
-		src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-		dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
-		if src == "" && dst == "" {
-			talkerMap["unknown"]++
-		} else {
-			if src != "" {
-				talkerMap[src]++
-			}
-			if dst != "" {
-				talkerMap[dst]++
-			}
-		}
+	src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
+	dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+	if src == "" && dst == "" {
+		a.talkerMap["unknown"]++
+	} else {
 		if src != "" {
-			srcIPMap[src]++
+			a.talkerMap[src]++
 		}
 		if dst != "" {
-			dstIPMap[dst]++
-		}
-
-		// 收集域名 (HTTP Host, TLS SNI, DNS Query)
-		domain := normalizeDomain(FirstNonEmpty(
-			safeTrim(parts, 8),  // http.host
-			safeTrim(parts, 9),  // tls.handshake.extensions_server_name
-			safeTrim(parts, 10), // dns.qry.name
-		))
-		if domain != "" {
-			domainMap[domain]++
-		}
-
-		computerName := normalizeComputerName(FirstNonEmpty(
-			safeTrim(parts, 11), // nbns.name
-			safeTrim(parts, 12), // nbns.netbios_name
-			safeTrim(parts, 13), // dhcp.option.hostname
-			safeTrim(parts, 14), // browser.server
-			safeTrim(parts, 15), // browser.response_computer_name
-			safeTrim(parts, 16), // browser.backup.server
-			safeTrim(parts, 17), // smb_netlogon.computer_name
-			safeTrim(parts, 18), // smb_netlogon.unicode_computer_name
-			safeTrim(parts, 19), // netlogon.secchan.nl_auth_message.nb_host
-			safeTrim(parts, 20), // netlogon.secchan.nl_auth_message.nb_host_utf8
-		))
-		if computerName != "" {
-			computerNameMap[computerName]++
-		}
-
-		// 收集目标端口
-		dstPort := safeTrim(parts, 21) // tcp.dstport
-		if dstPort == "" {
-			dstPort = safeTrim(parts, 22) // udp.dstport
-		}
-		if dstPort != "" {
-			destPortMap[dstPort]++
-		}
-
-		// 收集源端口
-		srcPort := safeTrim(parts, 23) // tcp.srcport
-		if srcPort == "" {
-			srcPort = safeTrim(parts, 24) // udp.srcport
-		}
-		if srcPort != "" {
-			srcPortMap[srcPort]++
+			a.talkerMap[dst]++
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		_ = cmd.Wait()
-		return stats, fmt.Errorf("scan tshark output: %w", err)
+	if src != "" {
+		a.srcIPMap[src]++
+	}
+	if dst != "" {
+		a.dstIPMap[dst]++
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return stats, fmt.Errorf("wait tshark: %w", err)
+	domain := normalizeDomain(FirstNonEmpty(
+		safeTrim(parts, 8),
+		safeTrim(parts, 9),
+		safeTrim(parts, 10),
+	))
+	if domain != "" {
+		a.domainMap[domain]++
 	}
 
-	stats.ProtocolKinds = len(protocolMap)
-	stats.Timeline = sortTimelineBuckets(timelineMap, 0)
-	stats.ProtocolDist = topBuckets(protocolMap, 0)
-	stats.TopTalkers = topBuckets(talkerMap, 0)
-	stats.TopHostnames = topBuckets(domainMap, 0)
-	stats.TopDomains = topBuckets(domainMap, 0)
-	stats.TopSrcIPs = topBuckets(srcIPMap, 0)
-	stats.TopDstIPs = topBuckets(dstIPMap, 0)
-	stats.TopComputerNames = topBuckets(computerNameMap, 0)
-	stats.TopDestPorts = topBuckets(destPortMap, 0)
-	stats.TopSrcPorts = topBuckets(srcPortMap, 0)
-	return stats, nil
+	computerName := normalizeComputerName(FirstNonEmpty(
+		safeTrim(parts, 11),
+		safeTrim(parts, 12),
+		safeTrim(parts, 13),
+		safeTrim(parts, 14),
+		safeTrim(parts, 15),
+		safeTrim(parts, 16),
+		safeTrim(parts, 17),
+		safeTrim(parts, 18),
+		safeTrim(parts, 19),
+		safeTrim(parts, 20),
+	))
+	if computerName != "" {
+		a.computerNameMap[computerName]++
+	}
+
+	dstPort := FirstNonEmpty(safeTrim(parts, 21), safeTrim(parts, 22))
+	if dstPort != "" {
+		a.destPortMap[dstPort]++
+	}
+
+	srcPort := FirstNonEmpty(safeTrim(parts, 23), safeTrim(parts, 24))
+	if srcPort != "" {
+		a.srcPortMap[srcPort]++
+	}
+}
+
+func (a *globalTrafficStatsAccumulator) finish() model.GlobalTrafficStats {
+	stats := a.stats
+	stats.ProtocolKinds = len(a.protocolMap)
+	stats.Timeline = sortTimelineBuckets(a.timelineMap, 0)
+	stats.ProtocolDist = topBuckets(a.protocolMap, 0)
+	stats.TopTalkers = topBuckets(a.talkerMap, 0)
+	stats.TopHostnames = topBuckets(a.domainMap, 0)
+	stats.TopDomains = topBuckets(a.domainMap, 0)
+	stats.TopSrcIPs = topBuckets(a.srcIPMap, 0)
+	stats.TopDstIPs = topBuckets(a.dstIPMap, 0)
+	stats.TopComputerNames = topBuckets(a.computerNameMap, 0)
+	stats.TopDestPorts = topBuckets(a.destPortMap, 0)
+	stats.TopSrcPorts = topBuckets(a.srcPortMap, 0)
+	return stats
 }
 
 func toSecondLabel(epochText string) string {
