@@ -1,5 +1,32 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 201 - Wails Bridge Import Boundary Guard
+
+Time: 2026-05-12 11:14:28 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued hardening the completed bridge-client migration.
+- Promoted the prior narrow facade guard into a general production import ban for `wailsBridge`.
+
+### Changes
+
+- Simplified `scripts/check-boundaries.mjs` to reject any production import specifier containing `wailsBridge`.
+- Updated the diagnostic to direct code toward `integrations/backendClients` or `bridgeTypes` instead.
+
+### Validation
+
+- `pnpm run boundary:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- New production code can no longer depend on the legacy facade for values or types.
+- Compatibility facade remains present but isolated from the production source graph.
+
+---
+
 ## Round 200 - Backend Client Migration Audit
 
 Time: 2026-05-12 10:09:06 +08:00  
