@@ -1,5 +1,33 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 203 - Bridge Types Import Boundary Guard
+
+Time: 2026-05-12 11:53:21 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued hardening aggregate bridge type boundaries after state type imports were narrowed.
+- Prevented non-integration production code from reintroducing `bridgeTypes` as a broad type barrel.
+
+### Changes
+
+- Extended `scripts/check-boundaries.mjs` to reject `integrations/bridgeTypes` imports outside `src/app/integrations`.
+- Added a diagnostic directing callers to concrete client type modules instead.
+
+### Validation
+
+- `pnpm exec prettier --write scripts/check-boundaries.mjs` - unchanged after formatting.
+- `pnpm run boundary:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Aggregate bridge types remain available to integration-layer composition and compatibility modules.
+- App/state/feature/page code is now guarded toward specific client type modules.
+
+---
+
 ## Round 202 - State Bridge Type Dependency Narrowing
 
 Time: 2026-05-12 11:45:15 +08:00  

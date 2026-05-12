@@ -14,6 +14,7 @@ for (const file of sourceFiles(appRoot)) {
   const body = readFileSync(file, "utf8");
   for (const specifier of importSpecifiers(body)) {
     recordWailsBridgeImport(source, specifier);
+    recordBridgeTypesImport(source, specifier);
     const target = resolveSourceImport(file, specifier);
     recordViolation(source, specifier, target);
   }
@@ -128,5 +129,11 @@ function recordWailsBridgeImport(source, specifier) {
     violations.push(
       `${source} imports ${specifier}; production code must use integrations/backendClients or bridgeTypes`,
     );
+  }
+}
+
+function recordBridgeTypesImport(source, specifier) {
+  if (!source.startsWith("src/app/integrations/") && specifier.includes("integrations/bridgeTypes")) {
+    violations.push(`${source} imports ${specifier}; use concrete client type modules instead`);
   }
 }
