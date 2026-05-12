@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { Packet } from "../../core/types";
-import type { EventHandlers } from "../../integrations/wailsBridge";
+import type { EventHandlers } from "../../integrations/bridgeTypes";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
   EMPTY_THREAT_ANALYSIS_PROGRESS,

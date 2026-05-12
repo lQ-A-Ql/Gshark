@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 187 - Bridge Type Import Decoupling
+
+Time: 2026-05-12 09:13:11 +08:00  
+Author: Codex
+
+### Scope
+
+- Reduced state-layer coupling to the `wailsBridge` aggregate module for shared types.
+- Kept runtime `backendClients` imports unchanged where domain calls still originate from the active integration seam.
+
+### Changes
+
+- Moved `TSharkStatus` type imports in lifecycle/runtime state files from `wailsBridge` to `bridgeTypes`.
+- Moved `EventHandlers` type imports in lifecycle event wiring and tests from `wailsBridge` to `bridgeTypes`.
+- Split mixed value/type imports in `useToolRuntime.ts` and `backendLifecycleStartup.ts` so types come from `bridgeTypes`.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- No production type-only imports from `wailsBridge` remain.
+- The remaining production `wailsBridge` imports are value imports of `backendClients` only.
+
+---
+
 ## Round 186 - Aggregate Bridge Boundary Guard
 
 Time: 2026-05-12 09:09:39 +08:00  

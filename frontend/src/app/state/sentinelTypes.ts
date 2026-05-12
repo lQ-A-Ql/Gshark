@@ -11,7 +11,7 @@ import type {
   ToolRuntimeConfig,
   ToolRuntimeSnapshot,
 } from "../core/types";
-import type { TSharkStatus } from "../integrations/wailsBridge";
+import type { TSharkStatus } from "../integrations/bridgeTypes";
 import type { MediaAnalysisProgress, ThreatAnalysisProgress } from "./hooks/useAnalysisProgress";
 import type { CaptureFileMeta } from "./captureOpenState";
 import type { StreamIds } from "./streamState";

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DecryptionConfig, Packet, ToolRuntimeSnapshot } from "../../core/types";
-import type { EventHandlers } from "../../integrations/wailsBridge";
+import type { EventHandlers } from "../../integrations/bridgeTypes";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
   EMPTY_THREAT_ANALYSIS_PROGRESS,
