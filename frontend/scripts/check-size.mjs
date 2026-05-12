@@ -16,6 +16,16 @@ export const sourceSizeBudgets = [
     reason: "backend client singleton should only compose the compatibility bridge into domain clients",
   },
   {
+    path: "src/app/core/evidenceTypes.ts",
+    maxLines: 60,
+    reason: "evidence core types should stay as neutral contracts shared across features",
+  },
+  {
+    path: "src/app/core/evidenceSchema.ts",
+    maxLines: 180,
+    reason: "evidence core schema should stay focused on neutral evidence normalization helpers",
+  },
+  {
     path: "src/app/integrations/bridgeDomains.ts",
     maxLines: 25,
     reason: "bridge domain projection should only expose narrowed clients from the compatibility bridge",
@@ -1264,6 +1274,16 @@ export const sourceSizeBudgets = [
     path: "src/app/features/apt/APTEvidenceTimeline.tsx",
     maxLines: 80,
     reason: "APT evidence timeline should stay focused on ordering and compact evidence rendering",
+  },
+  {
+    path: "src/app/features/apt/APTEvidenceSourceTabs.tsx",
+    maxLines: 60,
+    reason: "APT evidence source tabs should stay as a small presentational selector",
+  },
+  {
+    path: "src/app/features/apt/APTEvidenceBadges.tsx",
+    maxLines: 60,
+    reason: "APT evidence badges should stay as small presentational helpers",
   },
   {
     path: "src/app/features/apt/APTEvidencePanel.tsx",

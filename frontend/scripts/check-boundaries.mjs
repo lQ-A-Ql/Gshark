@@ -5,9 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
-const allowedFeatureCrossImports = new Set([
-  "src/app/features/apt/APTEvidencePanel.tsx -> src/app/features/evidence/evidenceSchema.ts",
-]);
+const allowedFeatureCrossImports = new Set([]);
 
 export function findBoundaryViolations({ frontendRoot = root } = {}) {
   const appRoot = resolve(frontendRoot, "src/app");

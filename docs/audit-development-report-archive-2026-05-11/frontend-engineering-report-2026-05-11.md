@@ -7951,3 +7951,46 @@ Author: Codex
   - The APT-to-Evidence schema baseline should be removed later by moving shared evidence types to `core` or a neutral contract module.
   - Pages are still allowed to import feature modules by design; this remains acceptable because pages compose feature views.
   - State-domain split is still not fully expressed in boundary rules; `SentinelContext` ownership remains a separate planned theme.
+
+---
+
+## Round 177 - Evidence Core Contract Slice
+
+Time: 2026-05-12 18:36:25 +08:00
+Author: Codex
+
+### Scope
+
+- Reduced the cross-feature boundary baseline introduced in Round 176.
+- Moved evidence contracts/adapters to neutral `core` ownership.
+- Kept `features/evidence/evidenceSchema.ts` as compatibility re-export.
+
+### Changes
+
+- Added `core/evidenceTypes.ts` for neutral Evidence contracts.
+- Moved evidence normalization helpers to `core/evidenceSchema.ts`.
+- Updated APT evidence panel to import `fromAPTEvidence` and `confidenceLabelText` from `core`.
+- Removed the explicit APT-to-Evidence boundary baseline.
+- Split APT evidence presentational helpers:
+  - `APTEvidenceSourceTabs.tsx`;
+  - `APTEvidenceBadges.tsx`.
+- Added size budgets for new core and APT helper files.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run scripts/check-boundaries.test.mjs scripts/check-size.test.mjs src/app/features/evidence/evidenceSchema.test.ts src/app/pages/EvidencePanel.test.tsx` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run size:check` passed.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run format:check` passed.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for removing the APT/Evidence cross-feature baseline.
+- Drift check: no drift detected. Work stayed on boundary ownership and shared contract placement.
+- Remaining risks:
+  - `features/evidence/evidenceSchema.ts` is still a compatibility shim; future code should prefer `core/evidenceSchema` or `core/evidenceTypes`.
+  - Pages still import some Evidence types from the feature shim; this is compatible but can be migrated gradually.
+  - Larger state ownership work remains untouched.

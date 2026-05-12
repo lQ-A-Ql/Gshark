@@ -113,22 +113,6 @@ describe("check-boundaries script", () => {
     ]);
   });
 
-  it("keeps the existing APT evidence schema baseline explicit", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
-    writeFixtureFile(
-      frontendRoot,
-      "src/app/features/apt/APTEvidencePanel.tsx",
-      'import type { UnifiedEvidenceRecord } from "../evidence/evidenceSchema";',
-    );
-    writeFixtureFile(
-      frontendRoot,
-      "src/app/features/evidence/evidenceSchema.ts",
-      "export type UnifiedEvidenceRecord = {};",
-    );
-
-    expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
-  });
-
   it("rejects shared analysis component imports from feature layers", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(
