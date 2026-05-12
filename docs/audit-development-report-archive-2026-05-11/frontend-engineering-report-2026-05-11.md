@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 177 - MISC Tools Page Domain Client Migration
+
+Time: 2026-05-12 08:27:35 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with the MISC tools page shell.
+- Kept module list loading, default expansion/mounting, package import, category selection, and reload-after-import behavior unchanged.
+
+### Changes
+
+- Updated `pages/MiscTools.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced module list and package import calls with `backendClients.miscModule.listMiscModules` and `backendClients.miscModule.importMiscModulePackage`.
+- Updated MISC page test mocks to expose the misc-module domain client and compressed mocks to stay under size budgets.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.smb3.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.customModules.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed after mock compression.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- MISC module list/import, custom execution, and custom deletion are now on the misc-module domain client.
+- Remaining MISC aggregate bridge usage is concentrated in payload webshell decoding and shared stream decoder/payload inspection helpers.
+
+---
+
 ## Round 176 - Generic MISC Module Domain Client Migration
 
 Time: 2026-05-12 08:23:05 +08:00  

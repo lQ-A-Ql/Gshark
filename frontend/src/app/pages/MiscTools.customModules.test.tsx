@@ -41,6 +41,8 @@ vi.mock("../state/SentinelContext", () => ({
 vi.mock("../integrations/wailsBridge", () => ({
   backendClients: {
     miscModule: {
+      listMiscModules: mocks.listMiscModules,
+      importMiscModulePackage: mocks.importMiscModulePackage,
       deleteMiscModule: mocks.deleteMiscModule,
       runMiscModule: mocks.runMiscModule,
     },

@@ -37,10 +37,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
 }));
-
 vi.mock("../integrations/wailsBridge", () => ({
   backendClients: {
     analysis: { getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis, getMySQLAnalysis: mocks.getMySQLAnalysis, getSMTPAnalysis: mocks.getSMTPAnalysis, getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis },
+    miscModule: { listMiscModules: mocks.listMiscModules },
     securityMaterial: { listNTLMSessionMaterials: mocks.listNTLMSessionMaterials, runWinRMDecrypt: mocks.runWinRMDecrypt, getWinRMDecryptResultText: mocks.getWinRMDecryptResultText, exportWinRMDecryptResult: mocks.exportWinRMDecryptResult },
   },
   bridge: {

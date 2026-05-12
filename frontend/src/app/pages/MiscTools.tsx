@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { MiscModuleManifest } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { MiscToolsShell, type MiscCategory } from "../misc/MiscToolsShell";
 
 export default function MiscTools() {
@@ -16,7 +16,7 @@ export default function MiscTools() {
     setLoading(true);
     setError("");
     try {
-      const rows = await bridge.listMiscModules();
+      const rows = await backendClients.miscModule.listMiscModules();
       if (isCancelled()) return;
       setModules(rows);
       setExpandedModules((current) => {
@@ -60,7 +60,7 @@ export default function MiscTools() {
     setImporting(true);
     setError("");
     try {
-      await bridge.importMiscModulePackage(file);
+      await backendClients.miscModule.importMiscModulePackage(file);
       await loadModules();
       setActiveCategory("Misc");
     } catch (importError) {
