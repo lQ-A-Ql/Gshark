@@ -1,5 +1,34 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 184 - Tool Runtime Domain Migration
+
+Time: 2026-05-12 09:00:40 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal in the tool runtime hook.
+- Kept offline fallback behavior and runtime snapshot shaping intact.
+
+### Changes
+
+- Updated `state/hooks/useToolRuntime.ts` to call `backendClients.runtime.setTSharkPath`, `backendClients.runtime.getToolRuntimeSnapshot`, and `backendClients.runtime.updateToolRuntimeConfig`.
+- Expanded `state/hooks/useBackendLifecycle.test.tsx` mocks to expose `setTSharkPath` and `getToolRuntimeSnapshot` on the runtime client.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Tool runtime reads and writes now go through the runtime domain client.
+- `SentinelContext` still holds the aggregate bridge integration and is the next likely migration boundary.
+
+---
+
 ## Round 183 - Lifecycle Startup Domain Migration
 
 Time: 2026-05-12 08:57:30 +08:00  

@@ -40,6 +40,8 @@ vi.mock("../../integrations/wailsBridge", () => ({
       isAvailable: bridgeMocks.isAvailable,
       getDesktopBackendStatus: bridgeMocks.getDesktopBackendStatus,
       updateToolRuntimeConfig: bridgeMocks.updateToolRuntimeConfig,
+      setTSharkPath: bridgeMocks.setTSharkPath,
+      getToolRuntimeSnapshot: bridgeMocks.getToolRuntimeSnapshot,
       subscribeEvents: bridgeMocks.subscribeEvents,
     },
     securityMaterial: { getTLSConfig: bridgeMocks.getTLSConfig, updateTLSConfig: bridgeMocks.updateTLSConfig },

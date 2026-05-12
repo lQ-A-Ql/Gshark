@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import { bridge, type TSharkStatus } from "../../integrations/wailsBridge";
+import { backendClients, type TSharkStatus } from "../../integrations/wailsBridge";
 
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
 const TOOL_RUNTIME_STORAGE_KEY = "gshark.tool-runtime.v1";
@@ -82,7 +82,7 @@ export function useToolRuntime() {
       return;
     }
 
-    const status = await bridge.setTSharkPath(nextPath);
+    const status = await backendClients.runtime.setTSharkPath(nextPath);
     setToolRuntimeCheckDegraded(false);
     setTsharkStatus(status);
     setToolRuntimeSnapshot((prev) => prev ? ({
@@ -116,7 +116,7 @@ export function useToolRuntime() {
     }
     setIsToolRuntimeLoading(true);
     try {
-      const snapshot = await bridge.getToolRuntimeSnapshot();
+      const snapshot = await backendClients.runtime.getToolRuntimeSnapshot();
       setToolRuntimeCheckDegraded(false);
       setToolRuntimeSnapshot(snapshot);
       setTsharkStatus({
@@ -198,7 +198,7 @@ export function useToolRuntime() {
 
     setIsToolRuntimeLoading(true);
     try {
-      const snapshot = await bridge.updateToolRuntimeConfig(nextConfig);
+      const snapshot = await backendClients.runtime.updateToolRuntimeConfig(nextConfig);
       setToolRuntimeCheckDegraded(false);
       setToolRuntimeSnapshot(snapshot);
       setTsharkStatus({
