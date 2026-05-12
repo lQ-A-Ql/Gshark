@@ -7353,3 +7353,54 @@ Author: Codex
   - capture transaction/open state;
   - runtime/backend lifecycle state.
 - Next target should continue the same pattern with one state domain per round, preferably packet page owner or stream owner depending on the smallest stable dependency boundary.
+
+---
+
+## Round 164 - Stream State Owner Slice
+
+Time: 2026-05-12 16:46:31 +08:00
+Author: Codex
+
+### Scope
+
+- Continued internal `SentinelContext` ownership extraction with the stream domain.
+- Kept `useSentinel()` public shape unchanged and preserved existing stream fields/actions exposed to pages.
+- Did not change backend APIs, stream payload models, mapper behavior, or MISC/Evidence boundaries.
+
+### Changes
+
+- Added `useStreamState`:
+  - owns active HTTP/TCP/UDP stream state;
+  - owns stream id state;
+  - owns stream caches and prefetch in-flight sets;
+  - owns stream switch sequences and switch metrics;
+  - composes stream index refresh, adjacent prefetch, active stream switching, and stream payload persistence.
+- Updated `SentinelContext.tsx` so the provider consumes stream state through the owner hook instead of directly wiring stream state, refs, cache, metrics, and callbacks inline.
+- Added `useStreamState.test.tsx` covering:
+  - stream id refresh;
+  - active stream switch;
+  - switch metric update;
+  - stream payload persistence and local patching.
+- Tightened `SentinelContext.tsx` size budget from 790 lines to 700 lines and registered the new stream owner hook/test in the size budget.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/state/hooks/useStreamState.test.tsx src/app/state/hooks/useActiveStreamSwitch.test.tsx src/app/state/hooks/useStreamIndexRefresh.test.tsx src/app/state/hooks/useStreamPayloadPersistence.test.tsx src/app/state/hooks/useStreamAdjacentPrefetch.test.tsx` passed, 5 files / 5 tests.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run size:check` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run ci` passed, including 183 Vitest files / 504 tests and Vite build.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Review
+
+- `SentinelContext.tsx` is now at 657 lines, under the newly tightened 700-line budget.
+- The stream domain now has an explicit state owner and focused regression test instead of being spread across the provider.
+- Mainline constraints stayed intact:
+  - `useSentinel()` remains compatible;
+  - MISC remains a separate workbench;
+  - real PCAP regression remains opt-in;
+  - no mapper budgets were widened.
+- Next state target should be packet page ownership, but it should be split carefully because packet page commit/reset still coordinates selected-packet setters and capture finalization.

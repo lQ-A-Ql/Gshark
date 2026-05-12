@@ -312,8 +312,8 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/SentinelContext.tsx",
-    maxLines: 790,
-    reason: "provider remains oversized and should keep moving task reset, packet, stream, and capture domains out",
+    maxLines: 700,
+    reason: "provider remains oversized and should keep moving task reset, packet, and capture domains out",
   },
   {
     path: "src/app/state/sentinelDerivedView.ts",
@@ -335,6 +335,11 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/useStreamSwitchMetrics.ts",
     maxLines: 45,
     reason: "stream switch metrics hook should only own metric state, refs, and sample recording",
+  },
+  {
+    path: "src/app/state/hooks/useStreamState.ts",
+    maxLines: 155,
+    reason: "stream state owner should compose stream state, caches, switching, prefetch, index, and persistence only",
   },
   {
     path: "src/app/state/hooks/useCaptureSignalWaiters.ts",
@@ -1868,6 +1873,11 @@ export const testSizeBudgets = [
     path: "src/app/state/hooks/useStreamSwitchMetrics.test.tsx",
     maxLines: 35,
     reason: "stream switch metrics hook tests should stay focused on state, refs, and record behavior",
+  },
+  {
+    path: "src/app/state/hooks/useStreamState.test.tsx",
+    maxLines: 70,
+    reason: "stream state owner tests should stay focused on index, switch, metric, and persistence wiring",
   },
   {
     path: "src/app/state/hooks/useCaptureSignalWaiters.test.tsx",

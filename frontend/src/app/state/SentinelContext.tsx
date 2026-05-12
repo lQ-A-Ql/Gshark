@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import type { BinaryStream, HttpStream, Packet } from "../core/types";
+import type { Packet } from "../core/types";
 import { backendClients } from "../integrations/backendClients";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
@@ -12,19 +12,14 @@ import { prepareAndStartOpenedCapture, resolveOpenedCapture } from "./captureSta
 import { buildFailedCaptureTransactionStatus, createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
 import { stopCapturePreloading } from "./captureParseRuntimeState";
 import { finalizeOpenedCapture } from "./captureFinalizeWorkflow";
-import { PAGE_SIZE, STREAM_PREFETCH_LIMIT } from "./captureConstants";
-import { EMPTY_BINARY_STREAM, EMPTY_HTTP_STREAM, createEmptyStreamIds, createEmptyUdpStream } from "./streamState";
-import { createStreamSwitchSequences } from "./streamSwitchSequence";
+import { PAGE_SIZE } from "./captureConstants";
 import { resolveCapturePreloadFirstPage } from "./capturePreloadProbe";
 import type { SentinelContextValue } from "./sentinelTypes";
-import { useStreamSwitchMetrics } from "./hooks/useStreamSwitchMetrics";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 import { usePacketPageCancellation } from "./hooks/usePacketPageCancellation";
 import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
 import { useScheduledPacketPageLoad } from "./hooks/useScheduledPacketPageLoad";
-import { useStreamIndexRefresh } from "./hooks/useStreamIndexRefresh";
-import { useStreamPayloadPersistence } from "./hooks/useStreamPayloadPersistence";
 import { useRefreshAnalysisResult } from "./hooks/useRefreshAnalysisResult";
 import { usePacketPageCommit } from "./hooks/usePacketPageCommit";
 import { usePreparePacketStream } from "./hooks/usePreparePacketStream";
@@ -32,8 +27,6 @@ import { usePacketViewportReset } from "./hooks/usePacketViewportReset";
 import { usePacketPageLoad } from "./hooks/usePacketPageLoad";
 import { usePacketLocateById } from "./hooks/usePacketLocateById";
 import { usePacketPageNavigation } from "./hooks/usePacketPageNavigation";
-import { useStreamAdjacentPrefetch } from "./hooks/useStreamAdjacentPrefetch";
-import { useActiveStreamSwitch } from "./hooks/useActiveStreamSwitch";
 import { useFrontendCaptureTaskReset } from "./hooks/useFrontendCaptureTaskReset";
 import { useClearCaptureUiState } from "./hooks/useClearCaptureUiState";
 import { useDisplayFilterWorkflow } from "./hooks/useDisplayFilterWorkflow";
@@ -42,6 +35,7 @@ import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
 import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
 import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
 import { useSelectedPacketState } from "./hooks/useSelectedPacketState";
+import { useStreamState } from "./hooks/useStreamState";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -72,10 +66,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     refreshAnalysisResult: refreshAnalysisResultImpl,
     resetAnalysisState,
   } = useAnalysisProgress(threatAnalysisSeqRef);
-  const [httpStream, setHttpStream] = useState<HttpStream>(EMPTY_HTTP_STREAM);
-  const [tcpStream, setTcpStream] = useState<BinaryStream>(EMPTY_BINARY_STREAM);
-  const [udpStream, setUdpStream] = useState<BinaryStream>(createEmptyUdpStream);
-  const [streamIds, setStreamIds] = useState(createEmptyStreamIds);
   const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
   const [captureRevision, setCaptureRevision] = useState(0);
   const { recentCaptures, rememberRecentCapture } = useRecentCapturesState();
@@ -94,18 +84,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const preloadProcessedRef = useRef(0);
   const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
-  const httpStreamCacheRef = useRef<Map<number, HttpStream>>(new Map());
-  const tcpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
-  const udpStreamCacheRef = useRef<Map<number, BinaryStream>>(new Map());
   const scheduleLoadMoreRef = useRef<() => void>(() => undefined);
   const refreshAnalysisResultRef = useRef<
     (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>
   >(async () => {});
   const updateProgressFromStatusRef = useRef<(message: string) => boolean>(() => false);
-  const httpPrefetchInFlightRef = useRef<Set<number>>(new Set());
-  const tcpPrefetchInFlightRef = useRef<Set<number>>(new Set());
-  const udpPrefetchInFlightRef = useRef<Set<number>>(new Set());
-  const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
   const {
     filteredPackets,
     selectedPacket,
@@ -130,13 +113,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     loadRawHex: backendClients.packet.getPacketRawHex,
     loadLayers: backendClients.packet.getPacketLayers,
   });
-  const {
-    streamSwitchMetrics,
-    setStreamSwitchMetrics,
-    streamSwitchDurationsRef,
-    streamSwitchHitsRef,
-    recordStreamSwitchMetric,
-  } = useStreamSwitchMetrics();
   const {
     backendConnected,
     backendStatus,
@@ -164,6 +140,40 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setMediaAnalysisProgress,
     setThreatAnalysisProgress,
     setIsThreatAnalysisLoading,
+  });
+
+  const {
+    httpStream,
+    setHttpStream,
+    tcpStream,
+    setTcpStream,
+    udpStream,
+    setUdpStream,
+    streamIds,
+    setStreamIds,
+    httpStreamCacheRef,
+    tcpStreamCacheRef,
+    udpStreamCacheRef,
+    httpPrefetchInFlightRef,
+    tcpPrefetchInFlightRef,
+    udpPrefetchInFlightRef,
+    streamSwitchSequencesRef,
+    streamSwitchMetrics,
+    setStreamSwitchMetrics,
+    streamSwitchDurationsRef,
+    streamSwitchHitsRef,
+    refreshStreamIndex,
+    setActiveStream,
+    persistStreamPayloads,
+  } = useStreamState({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    fetchHttpStream: backendClients.stream.getHttpStream,
+    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
+    listStreamIds: backendClients.stream.listStreamIds,
+    setBackendStatus,
+    updateStreamPayloads: backendClients.stream.updateStreamPayloads,
   });
 
   const cancelAllFrontendCaptureTasks = useFrontendCaptureTaskReset({
@@ -325,63 +335,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setBackendStatus,
   });
 
-  const refreshStreamIndex = useStreamIndexRefresh({
-    activeCapturePathRef,
-    backendConnected,
-    captureTaskScopeRef,
-    listStreamIds: backendClients.stream.listStreamIds,
-    setBackendStatus,
-    setStreamIds,
-  });
-
-  const prefetchAdjacentStreams = useStreamAdjacentPrefetch({
-    activeCapturePathRef,
-    backendConnected,
-    captureTaskScopeRef,
-    fetchHttpStream: backendClients.stream.getHttpStream,
-    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
-    httpCacheRef: httpStreamCacheRef,
-    httpPrefetchInFlightRef,
-    prefetchLimit: STREAM_PREFETCH_LIMIT,
-    streamIds,
-    tcpCacheRef: tcpStreamCacheRef,
-    tcpPrefetchInFlightRef,
-    udpCacheRef: udpStreamCacheRef,
-    udpPrefetchInFlightRef,
-  });
-
-  const setActiveStream = useActiveStreamSwitch({
-    activeCapturePathRef,
-    backendConnected,
-    captureTaskScopeRef,
-    fetchHttpStream: backendClients.stream.getHttpStream,
-    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
-    httpCacheRef: httpStreamCacheRef,
-    prefetchAdjacentStreams,
-    recordStreamSwitchMetric,
-    setBackendStatus,
-    setHttpStream,
-    setTcpStream,
-    setUdpStream,
-    streamSwitchSequencesRef,
-    tcpCacheRef: tcpStreamCacheRef,
-    udpCacheRef: udpStreamCacheRef,
-  });
-
   const preparePacketStream = usePreparePacketStream({
     locatePacketById,
     setActiveStream,
-  });
-
-  const persistStreamPayloads = useStreamPayloadPersistence({
-    backendConnected,
-    httpCacheRef: httpStreamCacheRef,
-    setHttpStream,
-    setTcpStream,
-    setUdpStream,
-    tcpCacheRef: tcpStreamCacheRef,
-    udpCacheRef: udpStreamCacheRef,
-    updateStreamPayloads: backendClients.stream.updateStreamPayloads,
   });
 
   useSyncedRefValue(scheduleLoadMoreRef, scheduleLoadMore);
