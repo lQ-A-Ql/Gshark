@@ -1,6 +1,76 @@
 package tshark
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestPlanFieldScanByCapabilitiesSkipsMissingOptionalFields(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := append([]string{}, requiredCapabilityFields...)
+	fields = append(fields, "ip.src")
+	binary := writeFakeTShark(t, "TShark 4.2.0", fields)
+	SetBinaryPath(binary)
+
+	plan, err := planFieldScanByCapabilities([]string{"frame.number", "ip.src", "modbus.func_code", "_ws.col.Info"})
+	if err != nil {
+		t.Fatalf("planFieldScanByCapabilities() error = %v", err)
+	}
+	if len(plan.tsharkFields) != 3 {
+		t.Fatalf("expected optional field to be skipped, got %#v", plan.tsharkFields)
+	}
+	row := projectCapabilityFieldScanRow([]string{"7", "192.0.2.10", "GET /index"}, plan)
+	if len(row) != 4 || row[0] != "7" || row[1] != "192.0.2.10" || row[2] != "" || row[3] != "GET /index" {
+		t.Fatalf("unexpected projected row: %#v", row)
+	}
+}
+
+func TestPlanFieldScanByCapabilitiesRejectsMissingRequiredFields(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	binary := writeFakeTShark(t, "TShark 3.2.0", []string{"frame.number"})
+	SetBinaryPath(binary)
+
+	_, err := planFieldScanByCapabilities([]string{"frame.number", "_ws.col.Info"})
+	if err == nil {
+		t.Fatal("expected missing required field error")
+	}
+	if got := err.Error(); got == "" || !stringContainsAll(got, "_ws.col.Info", "TShark 3.2.0") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPlanFieldScanByCapabilitiesUsesRegisteredAliases(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := []string{"frame.number", "frame.time_epoch", "frame.protocols", "_ws.col.protocol", "_ws.col.info"}
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	plan, err := planFieldScanByCapabilities([]string{"_ws.col.Info", "_ws.col.Protocol"})
+	if err != nil {
+		t.Fatalf("planFieldScanByCapabilities() error = %v", err)
+	}
+	if len(plan.tsharkFields) != 2 || plan.tsharkFields[0] != "_ws.col.info" || plan.tsharkFields[1] != "_ws.col.protocol" {
+		t.Fatalf("unexpected tshark fields: %#v", plan.tsharkFields)
+	}
+}
 
 func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	ClearFieldScanCache("")
@@ -26,4 +96,13 @@ func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	if rows[0][0] != "GET /index" || rows[0][1] != "7" {
 		t.Fatalf("unexpected projected row: %#v", rows[0])
 	}
+}
+
+func stringContainsAll(value string, parts ...string) bool {
+	for _, part := range parts {
+		if !strings.Contains(value, part) {
+			return false
+		}
+	}
+	return true
 }

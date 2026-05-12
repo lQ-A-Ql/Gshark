@@ -3,6 +3,7 @@ package tshark
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -42,6 +43,13 @@ type fieldScanWarmPlan struct {
 	opts   fieldScanOptions
 }
 
+type fieldScanCapabilityPlan struct {
+	requestedFields []string
+	tsharkFields    []string
+	projection      []int
+	missingOptional []string
+}
+
 var fieldScanCache = struct {
 	mu      sync.RWMutex
 	entries map[fieldScanCacheKey][]*fieldScanCacheEntry
@@ -66,11 +74,18 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 	if len(normalizedFields) == 0 {
 		return nil
 	}
+	plan, err := planFieldScanByCapabilities(normalizedFields)
+	if err != nil {
+		return err
+	}
 	normalizedOpts := normalizeFieldScanOptions(opts)
 	cacheKey := buildFieldScanCacheKey(filePath, normalizedOpts)
 
-	if entry, indices, ok := findFieldScanCacheEntry(cacheKey, normalizedFields); ok {
+	if entry, indices, ok := findFieldScanCacheEntry(cacheKey, plan.requestedFields); ok {
 		replayCachedFieldRows(entry, indices, onRow)
+		return nil
+	}
+	if len(plan.tsharkFields) == 0 {
 		return nil
 	}
 
@@ -88,7 +103,7 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		"-E", "aggregator="+cacheKey.Aggregator,
 		"-E", "quote=n",
 	)
-	for _, field := range normalizedFields {
+	for _, field := range plan.tsharkFields {
 		args = append(args, "-e", field)
 	}
 
@@ -116,8 +131,9 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		row := normalizeFieldScanRow(strings.Split(line, "\t"), len(normalizedFields))
-		rows = append(rows, append([]string(nil), row...))
+		scannedRow := normalizeFieldScanRow(strings.Split(line, "\t"), len(plan.tsharkFields))
+		row := projectCapabilityFieldScanRow(scannedRow, plan)
+		rows = append(rows, row)
 		if onRow != nil {
 			onRow(append([]string(nil), row...))
 		}
@@ -136,8 +152,78 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		return fmt.Errorf("wait tshark: %w", err)
 	}
 
-	storeFieldScanCacheEntry(cacheKey, normalizedFields, rows)
+	storeFieldScanCacheEntry(cacheKey, plan.requestedFields, rows)
 	return nil
+}
+
+func planFieldScanByCapabilities(fields []string) (fieldScanCapabilityPlan, error) {
+	plan := fieldScanCapabilityPlan{
+		requestedFields: append([]string(nil), fields...),
+		tsharkFields:    append([]string(nil), fields...),
+		projection:      make([]int, len(fields)),
+	}
+	for idx := range plan.projection {
+		plan.projection[idx] = idx
+	}
+
+	binary, err := ResolveBinary()
+	if err != nil {
+		return plan, nil
+	}
+	fieldSet, capabilities, ok := CurrentFieldSet(context.Background(), binary)
+	if !ok {
+		return plan, nil
+	}
+
+	tsharkFields := make([]string, 0, len(fields))
+	projection := make([]int, len(fields))
+	missingRequired := []string{}
+	missingOptional := []string{}
+	for idx, field := range fields {
+		if resolvedField, exists := resolveCapabilityField(fieldSet, field); exists {
+			projection[idx] = len(tsharkFields)
+			tsharkFields = append(tsharkFields, resolvedField)
+			continue
+		}
+		projection[idx] = -1
+		if isRequiredCapabilityField(field) {
+			missingRequired = append(missingRequired, field)
+			continue
+		}
+		missingOptional = append(missingOptional, field)
+	}
+	if len(missingRequired) > 0 {
+		sort.Strings(missingRequired)
+		version := strings.TrimSpace(capabilities.Version)
+		if version == "" {
+			version = "unknown"
+		}
+		return plan, fmt.Errorf("tshark field capability check failed: missing required fields %s (version: %s)", strings.Join(missingRequired, ", "), version)
+	}
+
+	plan.tsharkFields = tsharkFields
+	plan.projection = projection
+	plan.missingOptional = missingOptional
+	return plan, nil
+}
+
+func projectCapabilityFieldScanRow(row []string, plan fieldScanCapabilityPlan) []string {
+	out := make([]string, len(plan.requestedFields))
+	for idx, projected := range plan.projection {
+		if projected >= 0 && projected < len(row) {
+			out[idx] = row[projected]
+		}
+	}
+	return out
+}
+
+func isRequiredCapabilityField(field string) bool {
+	for _, required := range requiredCapabilityFields {
+		if field == required {
+			return true
+		}
+	}
+	return false
 }
 
 func runDirectFieldScan(args []string, width int, onRow func([]string)) error {

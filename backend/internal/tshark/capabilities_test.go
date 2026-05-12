@@ -45,6 +45,20 @@ func TestCurrentCapabilitiesReportsMissingRequiredAndOptionalFields(t *testing.T
 	}
 }
 
+func TestCurrentCapabilitiesAcceptsColumnFieldAliases(t *testing.T) {
+	ClearCapabilityCache()
+	t.Cleanup(ClearCapabilityCache)
+
+	fields := []string{"frame.number", "frame.time_epoch", "frame.protocols", "_ws.col.protocol", "_ws.col.info"}
+	fields = append(fields, optionalCapabilityFields...)
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	capabilities := CurrentCapabilities(context.Background(), binary)
+
+	if capabilities.FieldProfile != "full" || capabilities.CapabilityCheckDegraded {
+		t.Fatalf("expected aliases to satisfy required fields, got %+v", capabilities)
+	}
+}
+
 func TestParseFieldRegistryName(t *testing.T) {
 	tests := map[string]string{
 		"F\tFrame number\tframe.number\tFT_UINT32\tframe\tBASE_DEC\t0x0\tFrame number": "frame.number",

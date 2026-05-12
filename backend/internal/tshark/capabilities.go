@@ -21,8 +21,9 @@ type Capabilities struct {
 }
 
 var (
-	capabilityMu    sync.RWMutex
-	capabilityCache = map[string]Capabilities{}
+	capabilityMu         sync.RWMutex
+	capabilityCache      = map[string]Capabilities{}
+	capabilityFieldCache = map[string]map[string]struct{}{}
 )
 
 var requiredCapabilityFields = []string{
@@ -43,6 +44,11 @@ var optionalCapabilityFields = []string{
 	"uds.sid",
 	"usb.capdata",
 	"usbms.scsi.opcode",
+}
+
+var capabilityFieldAliases = map[string][]string{
+	"_ws.col.Protocol": {"_ws.col.protocol"},
+	"_ws.col.Info":     {"_ws.col.info"},
 }
 
 func CurrentCapabilities(ctx context.Context, binary string) Capabilities {
@@ -69,19 +75,27 @@ func CurrentCapabilities(ctx context.Context, binary string) Capabilities {
 			CapabilityMessage:       err.Error(),
 			CapabilityCheckDegraded: true,
 		}
-		storeCapabilityCache(cacheKey, capabilities)
+		storeCapabilityCache(cacheKey, capabilities, nil)
 		return capabilities
 	}
 
 	capabilities := buildCapabilities(version, fields)
-	storeCapabilityCache(cacheKey, capabilities)
+	storeCapabilityCache(cacheKey, capabilities, fields)
 	return capabilities
+}
+
+func CurrentFieldSet(ctx context.Context, binary string) (map[string]struct{}, Capabilities, bool) {
+	capabilities := CurrentCapabilities(ctx, binary)
+	cacheKey := strings.TrimSpace(binary) + "\x00" + capabilities.Version
+	fields, ok := getCapabilityFieldCache(cacheKey)
+	return fields, capabilities, ok
 }
 
 func ClearCapabilityCache() {
 	capabilityMu.Lock()
 	defer capabilityMu.Unlock()
 	capabilityCache = map[string]Capabilities{}
+	capabilityFieldCache = map[string]map[string]struct{}{}
 }
 
 func getCapabilityCache(key string) (Capabilities, bool) {
@@ -91,10 +105,33 @@ func getCapabilityCache(key string) (Capabilities, bool) {
 	return capabilities, ok
 }
 
-func storeCapabilityCache(key string, capabilities Capabilities) {
+func getCapabilityFieldCache(key string) (map[string]struct{}, bool) {
+	capabilityMu.RLock()
+	defer capabilityMu.RUnlock()
+	fields, ok := capabilityFieldCache[key]
+	if !ok {
+		return nil, false
+	}
+	out := make(map[string]struct{}, len(fields))
+	for field := range fields {
+		out[field] = struct{}{}
+	}
+	return out, true
+}
+
+func storeCapabilityCache(key string, capabilities Capabilities, fields map[string]struct{}) {
 	capabilityMu.Lock()
 	defer capabilityMu.Unlock()
 	capabilityCache[key] = capabilities
+	if fields == nil {
+		delete(capabilityFieldCache, key)
+		return
+	}
+	copied := make(map[string]struct{}, len(fields))
+	for field := range fields {
+		copied[field] = struct{}{}
+	}
+	capabilityFieldCache[key] = copied
 }
 
 func probeTSharkVersion(ctx context.Context, binary string) string {
@@ -199,10 +236,22 @@ func buildCapabilities(version string, fields map[string]struct{}) Capabilities 
 func missingFields(fields map[string]struct{}, names []string) []string {
 	out := []string{}
 	for _, name := range names {
-		if _, ok := fields[name]; !ok {
+		if _, ok := resolveCapabilityField(fields, name); !ok {
 			out = append(out, name)
 		}
 	}
 	sort.Strings(out)
 	return out
+}
+
+func resolveCapabilityField(fields map[string]struct{}, requested string) (string, bool) {
+	if _, ok := fields[requested]; ok {
+		return requested, true
+	}
+	for _, alias := range capabilityFieldAliases[requested] {
+		if _, ok := fields[alias]; ok {
+			return alias, true
+		}
+	}
+	return "", false
 }

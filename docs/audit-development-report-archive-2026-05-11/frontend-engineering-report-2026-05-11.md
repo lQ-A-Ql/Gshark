@@ -7504,3 +7504,54 @@ Author: Codex
   - `SentinelContext` is much smaller, but backend lifecycle and runtime/analysis task ownership still coordinate several refs and setters.
   - The next iteration should either extract backend lifecycle/runtime ownership further or switch to the planned TShark capability probing work if state extraction begins to produce tight coupling.
   - `BackendBridge` compatibility facade remains intentionally in place; page-level aggregate bridge reduction is still a later boundary task.
+
+---
+
+## Round 167 - TShark Field Capability Planning Slice
+
+Time: 2026-05-12 17:30:43 +08:00
+Author: Codex
+
+### Scope
+
+- Switched from frontend state extraction to the planned TShark external-dependency hardening path.
+- Reused the existing `CurrentCapabilities` layer instead of reimplementing version/field probing.
+- Added field planning at the shared `scanFieldRows` layer used by Industrial, Vehicle, USB, media, and related protocol scanners.
+
+### Changes
+
+- Extended TShark capability caching to expose a defensive copy of the probed field set via `CurrentFieldSet`.
+- Added explicit field alias support for Wireshark column fields:
+  - `_ws.col.Protocol` can resolve to `_ws.col.protocol`;
+  - `_ws.col.Info` can resolve to `_ws.col.info`.
+- Added `planFieldScanByCapabilities` before direct `-T fields` scans:
+  - requested fields are preserved as the caller-facing row shape;
+  - registered alias fields are passed to TShark;
+  - missing optional fields are omitted from the TShark command and projected back as empty output columns;
+  - missing required fields produce a readable error with field names and TShark version.
+- Kept existing cache projection behavior so callers that reuse cached superset rows still receive the requested column order.
+- Added focused tests for:
+  - optional field skip and empty-column projection;
+  - required field failure with version context;
+  - registered `_ws.col.*` alias resolution;
+  - alias-aware capability profiles.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "Test.*Capabilit|Test.*Field|TestScanFieldRows|TestPlanFieldScan" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: partial but meaningful. Existing TShark version/field probing was already present, so this round filled the missing execution contract: scans now consult the field registry before constructing `-e` lists.
+- Drift check: no drift detected. The work stayed on the planned TShark capability-aware field selection path and did not touch UI, MISC, sample ingestion, or unrelated backend rules.
+- Real compatibility finding:
+  - The local TShark registry exposes `_ws.col.info` and `_ws.col.protocol` in lowercase, while the code historically requested `_ws.col.Info` and `_ws.col.Protocol`.
+  - The new alias resolver prevents false incompatible status for that version drift.
+- Remaining risks:
+  - Direct field scans outside `scanFieldRows` and `runDirectFieldScan` are not all capability-planned yet.
+  - Fast packet list args in `runner.go` still construct a fixed field list; this should be the next TShark hardening target.
+  - Runtime diagnostics expose profile and missing fields, but UI copy can still be improved for optional-field degradation summaries.
