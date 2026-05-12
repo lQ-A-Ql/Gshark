@@ -103,6 +103,26 @@ func TestPlannedFieldScanZeroValuePreservesRows(t *testing.T) {
 	}
 }
 
+func TestBuildPlannedFieldArgsPreservesBaseArgsBeforeFields(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	binary := writeFakeTShark(t, "TShark 4.6.5", requiredCapabilityFields)
+	SetBinaryPath(binary)
+
+	planned, err := BuildPlannedFieldArgs([]string{"-n", "-r", "demo.pcap", "-T", "fields"}, []string{"frame.number"})
+	if err != nil {
+		t.Fatalf("BuildPlannedFieldArgs() error = %v", err)
+	}
+	if len(planned.Args) < 7 || planned.Args[0] != "-n" || planned.Args[3] != "-T" || planned.Args[len(planned.Args)-2] != "-e" || planned.Args[len(planned.Args)-1] != "frame.number" {
+		t.Fatalf("unexpected planned args ordering: %#v", planned.Args)
+	}
+}
+
 func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	ClearFieldScanCache("")
 	t.Cleanup(func() {

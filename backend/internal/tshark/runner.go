@@ -915,9 +915,12 @@ func EstimatePackets(ctx context.Context, opts model.ParseOptions) (int, error) 
 	if opts.DisplayFilter != "" {
 		args = append(args, "-Y", opts.DisplayFilter)
 	}
-	args = append(args, "-T", "fields", "-e", "frame.number")
+	plannedScan, err := BuildPlannedFieldArgs(append(args, "-T", "fields"), []string{"frame.number"})
+	if err != nil {
+		return 0, fmt.Errorf("plan tshark estimate fields: %w", err)
+	}
 
-	cmd, err := CommandContext(ctx, args...)
+	cmd, err := CommandContext(ctx, plannedScan.Args...)
 	if err != nil {
 		return 0, fmt.Errorf("resolve tshark for estimate: %w", err)
 	}
@@ -936,7 +939,8 @@ func EstimatePackets(ctx context.Context, opts model.ParseOptions) (int, error) 
 	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
 	count := 0
 	for scanner.Scan() {
-		if strings.TrimSpace(scanner.Text()) == "" {
+		parts := plannedScan.ProjectRow(strings.Split(scanner.Text(), "\t"))
+		if strings.TrimSpace(safeTrim(parts, 0)) == "" {
 			continue
 		}
 		count++

@@ -7785,3 +7785,42 @@ Author: Codex
   - `ScanFrameIDs` and packet estimate still use direct `frame.number` command construction.
   - Stream-follow, packet list, direct scan, traffic stats, and C2 HTTP candidates are now covered by the shared planning layer.
   - Optional-field skip details are still internal; UI/reporting does not yet surface per-analysis degradation.
+
+---
+
+## Round 173 - Frame ID Field Planning Slice
+
+Time: 2026-05-12 18:07:21 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark fixed-field hardening.
+- Focused on the remaining low-risk `frame.number` paths:
+  - `ScanFrameIDs`;
+  - packet count estimation in `EstimatePackets`.
+- Preserved callback behavior and packet count semantics.
+
+### Changes
+
+- Updated `ScanFrameIDs` to build `frame.number` through `BuildPlannedFieldArgs` instead of appending a fixed `-e frame.number` directly.
+- Updated `EstimatePackets` to use the same capability-aware planner for packet count scans.
+- Projected TShark stdout rows through `PlannedFieldScan.ProjectRow` before parsing, preserving parser shape if aliases or skipped fields are introduced later.
+- Added `TestBuildPlannedFieldArgsPreservesBaseArgsBeforeFields` to guard argument ordering when callers pass base flags before planned `-e` fields.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestBuildPlannedFieldArgsPreservesBaseArgs|TestStreamPacketsFast_WithCustom|TestScanFrame|TestFilterFrame|TestPlanFieldScan" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for direct `frame.number` scan consistency.
+- Drift check: no drift detected. Work stayed on the planned TShark capability-hardening line and did not change user-facing analysis behavior.
+- Remaining risks:
+  - A fresh fixed-field audit is still required to confirm whether any direct `-e` lists remain outside the planner.
+  - Optional-field skip/degradation notes are still not surfaced to the UI or investigation report.
+  - Capability planning is now broad across packet list, stream follow, traffic stats, C2 HTTP candidates, direct scans, frame IDs, and estimate paths; the next step should be residual audit rather than more blind rewrites.

@@ -23,10 +23,13 @@ func ScanFrameIDs(ctx context.Context, opts model.ParseOptions, onID func(int64)
 		"-E", "occurrence=f",
 		"-E", "separator=\t",
 		"-E", "quote=n",
-		"-e", "frame.number",
 	)
+	plannedScan, err := BuildPlannedFieldArgs(args, []string{"frame.number"})
+	if err != nil {
+		return fmt.Errorf("plan tshark frame id fields: %w", err)
+	}
 
-	cmd, err := CommandContext(ctx, args...)
+	cmd, err := CommandContext(ctx, plannedScan.Args...)
 	if err != nil {
 		return fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -45,7 +48,8 @@ func ScanFrameIDs(ctx context.Context, opts model.ParseOptions, onID func(int64)
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
 	for scanner.Scan() {
-		value := strings.TrimSpace(scanner.Text())
+		parts := plannedScan.ProjectRow(strings.Split(scanner.Text(), "\t"))
+		value := strings.TrimSpace(safeTrim(parts, 0))
 		if value == "" {
 			continue
 		}
