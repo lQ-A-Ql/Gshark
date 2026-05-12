@@ -1,6 +1,6 @@
 import { Key } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { useSentinel } from "../../state/SentinelContext";
 import type { SMB3RandomSessionKeyResult, SMB3SessionCandidate } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
@@ -50,7 +50,7 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
     setSmbCandidatesLoading(true);
     setSmbCandidatesError("");
     try {
-      const rows = await bridge.listSMB3SessionCandidates();
+      const rows = await backendClients.securityMaterial.listSMB3SessionCandidates();
       setSmbCandidates(rows);
       setSmbSelectedCandidateFrame("");
     } catch (error) {
@@ -76,7 +76,7 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
         }
         setSmbCandidatesLoading(true);
         setSmbCandidatesError("");
-        const rows = await bridge.listSMB3SessionCandidates();
+        const rows = await backendClients.securityMaterial.listSMB3SessionCandidates();
         if (cancelled) return;
         setSmbCandidates(rows);
         setSmbSelectedCandidateFrame("");
@@ -102,7 +102,7 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
     setSmbLoading(true);
     setSmbError("");
     try {
-      const result = await bridge.generateSMB3RandomSessionKey(
+      const result = await backendClients.securityMaterial.generateSMB3RandomSessionKey(
         createSMB3KeyRequest({
           domain: smbDomain,
           encryptedSessionKey: smbKey,

@@ -39,6 +39,12 @@ vi.mock("../state/SentinelContext", () => ({
 }));
 
 vi.mock("../integrations/wailsBridge", () => ({
+  backendClients: {
+    securityMaterial: {
+      listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
+      generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
+    },
+  },
   bridge: {
     listMiscModules: mocks.listMiscModules,
     importMiscModulePackage: mocks.importMiscModulePackage,

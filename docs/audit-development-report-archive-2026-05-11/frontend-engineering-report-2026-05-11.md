@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 174 - SMB3 Session Key Domain Client Migration
+
+Time: 2026-05-12 08:14:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued MISC security-material migration with the SMB3 session key module.
+- Kept candidate lazy loading, refresh behavior, autofill behavior, and random session key generation unchanged.
+
+### Changes
+
+- Updated `misc/modules/SMB3SessionKeyModule.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced SMB3 candidate listing and random session key generation calls with `backendClients.securityMaterial.*` equivalents.
+- Updated the SMB3 MISC test mock to expose the security material domain client.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.smb3.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- SMB3 session candidate and key-generation flows no longer depend on the aggregate bridge.
+- WinRM decrypt remains the next small security-material direct bridge candidate.
+
+---
+
 ## Round 173 - NTLM Session Materials Domain Client Migration
 
 Time: 2026-05-12 08:11:30 +08:00  
