@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 186 - Aggregate Bridge Boundary Guard
+
+Time: 2026-05-12 09:09:39 +08:00  
+Author: Codex
+
+### Scope
+
+- Added a CI guard to prevent production code from regressing back to direct aggregate `bridge` imports.
+- Kept compatibility tests free to exercise the aggregate bridge implementation.
+
+### Changes
+
+- Updated `scripts/check-boundaries.mjs` with an aggregate bridge import detector.
+- Non-test source files now fail `pnpm run boundary:check` if they import named `bridge` from `wailsBridge`.
+- Domain client imports from `wailsBridge` remain allowed while `backendClients` is the active migration seam.
+
+### Validation
+
+- `pnpm run boundary:check` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Production direct aggregate bridge usage is now both removed and guarded by CI.
+- Remaining `bridge.*` references are expected compatibility test coverage in `desktopBridge.test.ts` and `httpBridgeAggregation.test.ts`.
+
+---
+
 ## Round 185 - Sentinel Context Domain Migration
 
 Time: 2026-05-12 09:04:44 +08:00  

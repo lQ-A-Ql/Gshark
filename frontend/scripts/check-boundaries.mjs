@@ -6,12 +6,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appRoot = resolve(root, "src/app");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
+const aggregateBridgeImportPattern = /import\s*\{[^}]*\bbridge\b[^}]*\}\s*from\s*["'][^"']*wailsBridge["']/;
 
 const violations = [];
 
 for (const file of sourceFiles(appRoot)) {
   const source = relative(root, file).replaceAll("\\", "/");
   const body = readFileSync(file, "utf8");
+  recordAggregateBridgeImport(source, body);
   for (const specifier of importSpecifiers(body)) {
     const target = resolveSourceImport(file, specifier);
     recordViolation(source, specifier, target);
@@ -119,5 +121,11 @@ function recordViolation(source, specifier, target) {
     ) {
       violations.push(`${source} imports domain layer ${specifier}; ui primitives must stay domain-free`);
     }
+  }
+}
+
+function recordAggregateBridgeImport(source, body) {
+  if (aggregateBridgeImportPattern.test(body)) {
+    violations.push(`${source} imports aggregate bridge; production code must use backendClients domain clients`);
   }
 }
