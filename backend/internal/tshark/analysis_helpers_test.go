@@ -72,6 +72,30 @@ func TestPlanFieldScanByCapabilitiesUsesRegisteredAliases(t *testing.T) {
 	}
 }
 
+func TestAppendPlannedFieldArgsUsesAliasesAndSkipsOptional(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := []string{"frame.number", "frame.time_epoch", "frame.protocols", "_ws.col.protocol", "_ws.col.info"}
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	args, plan, err := appendPlannedFieldArgs([]string{"-T", "fields"}, []string{"_ws.col.Info", "udp.payload", "frame.number"})
+	if err != nil {
+		t.Fatalf("appendPlannedFieldArgs() error = %v", err)
+	}
+	if len(plan.tsharkFields) != 2 || plan.tsharkFields[0] != "_ws.col.info" || plan.tsharkFields[1] != "frame.number" {
+		t.Fatalf("unexpected planned fields: %#v", plan.tsharkFields)
+	}
+	if !stringSliceHas(args, "_ws.col.info") || !stringSliceHas(args, "frame.number") || stringSliceHas(args, "udp.payload") {
+		t.Fatalf("unexpected args: %#v", args)
+	}
+}
+
 func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	ClearFieldScanCache("")
 	t.Cleanup(func() {

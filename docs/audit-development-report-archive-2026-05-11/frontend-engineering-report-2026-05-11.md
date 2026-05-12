@@ -7607,3 +7607,46 @@ Author: Codex
   - Direct `runDirectFieldScan` callers still bypass capability planning.
   - C2 decrypt and tool-specific direct TShark field invocations remain fixed-list paths.
   - Runtime/UI diagnostics do not yet explain which optional fields were skipped during a specific analysis run.
+
+---
+
+## Round 169 - Direct Field Scan Capability Planning Slice
+
+Time: 2026-05-12 17:43:09 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark field capability hardening.
+- Covered the remaining `runDirectFieldScan` callers in `backend/internal/tshark`.
+- Kept parsing semantics and media analysis output shape unchanged.
+
+### Changes
+
+- Added direct scan helpers:
+  - `appendPlannedFieldArgs` to append only capability-supported `-e` fields and alias fields;
+  - `runDirectFieldScanWithPlan` to project stdout rows back to the requested caller-facing shape.
+- Updated media direct field scans:
+  - non-standard RTP decode-as scanning now uses capability-planned fields;
+  - likely RTP port probing now skips missing optional `udp.payload` cleanly instead of invoking TShark with an unsupported field.
+- Added focused tests proving planned direct args:
+  - use registered `_ws.col.*` aliases;
+  - omit missing optional fields;
+  - keep projection metadata for caller-facing rows.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestAppendPlannedFieldArgs|TestPlanFieldScan|TestDetectLikelyRTPPorts|TestBuildMediaAnalysis" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for `backend/internal/tshark` direct field scans. The high-risk TShark package paths now share one capability planning model for field scans.
+- Drift check: no drift detected. Work stayed on TShark dependency hardening and did not change analysis rules, frontend behavior, or Evidence/MISC scope.
+- Remaining risks:
+  - Engine-level direct TShark invocations still build fixed `-e` lists, especially C2 HTTP candidate extraction.
+  - Tool-specific direct field calls outside `backend/internal/tshark` should either move through exported planned helpers or be wrapped with a small local adapter.
+  - Runtime/UI diagnostics still show global capability status, not per-analysis skipped optional fields.

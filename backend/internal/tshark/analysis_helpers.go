@@ -275,6 +275,30 @@ func runDirectFieldScan(args []string, width int, onRow func([]string)) error {
 	return nil
 }
 
+func appendPlannedFieldArgs(args []string, fields []string) ([]string, fieldScanCapabilityPlan, error) {
+	normalizedFields := normalizeFieldScanFields(fields)
+	plan, err := planFieldScanByCapabilities(normalizedFields)
+	if err != nil {
+		return nil, plan, err
+	}
+	for _, field := range plan.tsharkFields {
+		args = append(args, "-e", field)
+	}
+	return args, plan, nil
+}
+
+func runDirectFieldScanWithPlan(args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
+	if len(plan.tsharkFields) == 0 {
+		return nil
+	}
+	return runDirectFieldScan(args, len(plan.tsharkFields), func(parts []string) {
+		row := projectCapabilityFieldScanRow(parts, plan)
+		if onRow != nil {
+			onRow(row)
+		}
+	})
+}
+
 func WarmFieldScanCache(filePath string, fields []string, opts fieldScanOptions) error {
 	return scanFieldRowsWithOptions(filePath, fields, opts, nil)
 }

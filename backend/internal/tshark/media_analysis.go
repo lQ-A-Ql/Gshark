@@ -584,11 +584,12 @@ func scanRTPMediaSessionsWithDecodeAs(filePath string, decodeAsPorts []int, cont
 		"-E", "aggregator=,",
 		"-E", "quote=n",
 	)
-	for _, field := range fields {
-		args = append(args, "-e", field)
+	args, plan, err := appendPlannedFieldArgs(args, fields)
+	if err != nil {
+		return 0, err
 	}
 	count := 0
-	err := runDirectFieldScan(args, len(fields), func(parts []string) {
+	err = runDirectFieldScanWithPlan(args, plan, func(parts []string) {
 		if consumeRTPMediaRow(parts, controlHints, sessions, protocolMap, applicationMap, []string{"非标准端口 RTP decode-as"}) {
 			count++
 		}
@@ -620,9 +621,12 @@ func DetectLikelyRTPPorts(filePath string, candidatePorts []int, sampleLimit int
 			"-E", "occurrence=f",
 			"-E", "aggregator=,",
 			"-E", "quote=n",
-			"-e", "udp.payload",
 		}
-		err := runDirectFieldScan(args, 1, func(parts []string) {
+		args, plan, err := appendPlannedFieldArgs(args, []string{"udp.payload"})
+		if err != nil {
+			return matched, err
+		}
+		err = runDirectFieldScanWithPlan(args, plan, func(parts []string) {
 			samples++
 			if isLikelyRTPPayload(parseHexPayload(safeTrim(parts, 0))) {
 				hits++
