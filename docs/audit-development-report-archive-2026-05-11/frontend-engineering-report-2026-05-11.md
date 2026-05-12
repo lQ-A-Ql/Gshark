@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 191 - Component Backend Client Entry Migration
+
+Time: 2026-05-12 09:30:51 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued migrating production `backendClients` imports away from the `wailsBridge` compatibility facade.
+- Limited this round to two component-level consumers with small, direct test coverage.
+
+### Changes
+
+- Updated `TLSDecryptionDialog` to import `backendClients` from `integrations/backendClients`.
+- Updated `useCaptureMissionOverviewBundle` to import `backendClients` from `integrations/backendClients`.
+- Updated both component tests to mock `integrations/backendClients` directly.
+
+### Validation
+
+- `pnpm exec vitest run src/app/components/TLSDecryptionDialog.test.tsx src/app/components/useCaptureMissionOverviewBundle.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Component-level TLS config updates and capture overview preload now use the new backend client singleton entry.
+- Larger stream decoder hooks still route through `wailsBridge` because they are covered through MISC page tests and should be migrated with that group.
+
+---
+
 ## Round 190 - State Import Boundary Audit
 
 Time: 2026-05-12 09:24:42 +08:00  

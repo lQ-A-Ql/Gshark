@@ -11,7 +11,7 @@ const clientMocks = vi.hoisted(() => ({
   getUSBAnalysis: vi.fn(),
 }));
 
-vi.mock("../integrations/wailsBridge", () => ({
+vi.mock("../integrations/backendClients", () => ({
   backendClients: {
     analysis: {
       getGlobalTrafficStats: clientMocks.getGlobalTrafficStats,

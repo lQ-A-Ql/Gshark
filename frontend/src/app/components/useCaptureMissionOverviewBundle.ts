@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { GlobalTrafficStats, IndustrialAnalysis, MediaAnalysis, USBAnalysis, VehicleAnalysis } from "../core/types";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 
 export interface CaptureMissionOverviewBundle {
   stats: GlobalTrafficStats | null;

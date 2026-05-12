@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { useSentinel } from "../state/SentinelContext";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 
 interface TLSDecryptionDialogProps {
   open: boolean;
