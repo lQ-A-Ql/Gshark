@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 172 - Update Center Domain Client Migration
+
+Time: 2026-05-12 08:04:46 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with the standalone Update Center page.
+- Kept update status refresh, install progress, and error handling unchanged.
+
+### Changes
+
+- Updated `pages/UpdateCenter.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced `checkAppUpdate` and `installAppUpdate` calls with `backendClients.runtime.*` equivalents.
+
+### Validation
+
+- `pnpm exec vitest run src/app/features/update/updateCenterUtils.test.ts src/app/integrations/bridgeDomains.test.ts src/app/integrations/wailsBridge.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Update Center no longer imports the aggregate bridge directly.
+- Runtime update operations now align with the existing runtime domain client surface.
+
+---
+
 ## Round 171 - Raw Stream Page Domain Client Migration
 
 Time: 2026-05-12 02:28:14 +08:00  

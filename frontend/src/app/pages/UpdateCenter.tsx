@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { AppUpdateStatus } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -22,7 +22,7 @@ export default function UpdateCenter() {
     setLoading(true);
     setError("");
     try {
-      const next = await bridge.checkAppUpdate();
+      const next = await backendClients.runtime.checkAppUpdate();
       setStatus(next);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "检查更新失败");
@@ -36,7 +36,7 @@ export default function UpdateCenter() {
     setError("");
     setInstallProgress(12);
     try {
-      await bridge.installAppUpdate();
+      await backendClients.runtime.installAppUpdate();
       setInstallProgress(100);
     } catch (nextError) {
       setInstalling(false);
