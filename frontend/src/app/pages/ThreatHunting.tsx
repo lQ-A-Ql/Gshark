@@ -16,7 +16,7 @@ import {
   parseThreatPrefixes,
   routeForPreparedStream,
 } from "../features/hunting/threatHuntingRules";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function ThreatHunting() {

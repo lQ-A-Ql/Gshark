@@ -11,7 +11,7 @@ import { VehicleOverviewPanel, VEHICLE_PROTOCOL_TAGS } from "../features/vehicle
 import { VehicleProtocolPanels } from "../features/vehicle/VehicleProtocolPanels";
 import { VehicleUdsTransactionsPanel } from "../features/vehicle/VehicleUdsTransactionsPanel";
 import { useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function VehicleAnalysis() {

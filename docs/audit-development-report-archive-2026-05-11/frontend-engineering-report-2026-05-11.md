@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 195 - Page Backend Client Entry Migration
+
+Time: 2026-05-12 09:50:01 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct backend client singleton migration for page-level consumers.
+- Focused on non-MISC page shells and page-local backend actions.
+
+### Changes
+
+- Updated Update Center, Raw Stream, Vehicle Analysis, Threat Hunting, and Object Export pages to import `backendClients` from `integrations/backendClients`.
+- Left MISC and stream decoder consumers for a dedicated grouped migration because their tests share larger bridge mocks.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/useRawStreamPageLoader.test.tsx src/app/pages/useRawStreamRouteSelection.test.tsx src/app/pages/RawStreamUtils.test.ts src/app/pages/RawStreamProtocolConfig.test.ts src/app/pages/VehicleAnalysis.test.ts src/app/features/object/objectExportRules.test.ts src/app/features/update/updateCenterUtils.test.ts src/app/features/hunting/ThreatHuntingMetricCards.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Page-level direct backend client consumers now bypass the compatibility facade.
+- Remaining production `wailsBridge` imports are concentrated in MISC modules and shared stream decoder hooks.
+
+---
+
 ## Round 194 - C2 Backend Client Entry Migration
 
 Time: 2026-05-12 09:46:30 +08:00  

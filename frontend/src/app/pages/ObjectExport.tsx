@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
 import { useSentinel } from "../state/SentinelContext";
 import {

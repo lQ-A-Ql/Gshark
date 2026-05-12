@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
 import {

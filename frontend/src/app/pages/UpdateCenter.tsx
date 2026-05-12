@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { AppUpdateStatus } from "../core/types";
-import { backendClients } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/backendClients";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
