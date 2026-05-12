@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 179 - Stream Decoder Domain Migration
+
+Time: 2026-05-12 08:37:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal in the shared stream payload decoder workbench hooks.
+- Kept decoder settings, candidate inspection, batch decode, and payload overwrite behavior unchanged.
+
+### Changes
+
+- Updated `components/useStreamDecoderWorkbench.ts` to call `backendClients.stream.decodeStreamPayload`.
+- Updated `components/useStreamPayloadInspection.ts` to call `backendClients.stream.inspectStreamPayload`.
+- Moved MISC page test mocks for decode/inspect into `backendClients.stream` while preserving remaining legacy bridge mocks for unmigrated consumers.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.smb3.test.tsx src/app/pages/MiscTools.customModules.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Stream payload decode, inspection, and source loading now all use the stream domain client.
+- Remaining direct bridge usage is now mostly lifecycle/runtime, media workflow, TLS config, and Sentinel context wiring.
+
+---
+
 ## Round 178 - Payload WebShell Source Domain Migration
 
 Time: 2026-05-12 08:33:10 +08:00  

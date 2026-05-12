@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StreamDecodeResult, StreamDecoderKind } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import type { DecoderSettingsKind } from "./StreamDecoderSettingsPanel";
 import { useDecoderBatchRange } from "./useDecoderBatchRange";
 import { useDecoderSettingsState } from "./useDecoderSettingsState";
@@ -116,7 +116,7 @@ export function useStreamDecoderWorkbench({
       throw new Error("当前 payload 为空，无法解码");
     }
     const options = buildDecoderOptions(decoder, settings, activeHintSource);
-    return bridge.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options, signal);
+    return backendClients.stream.decodeStreamPayload(decoder, prepareDecoderInput(decoder, normalized), options, signal);
   }
 
   function cancelDecode() {

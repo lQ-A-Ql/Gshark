@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { StreamPayloadInspection } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { isAbortError } from "./StreamDecoderWorkbenchUtils";
 
 export function useStreamPayloadInspection({
@@ -34,7 +34,7 @@ export function useStreamPayloadInspection({
     }
     setInspectionLoading(true);
     setInspectionError("");
-    void bridge
+    void backendClients.stream
       .inspectStreamPayload(payload, controller.signal)
       .then((next) => {
         if (cancelled) return;

@@ -48,7 +48,7 @@ vi.mock("../integrations/wailsBridge", () => ({
     },
     miscModule: { listMiscModules: mocks.listMiscModules, importMiscModulePackage: mocks.importMiscModulePackage },
     securityMaterial: { listNTLMSessionMaterials: mocks.listNTLMSessionMaterials, runWinRMDecrypt: mocks.runWinRMDecrypt, getWinRMDecryptResultText: mocks.getWinRMDecryptResultText, exportWinRMDecryptResult: mocks.exportWinRMDecryptResult },
-    stream: { listStreamPayloadSources: mocks.listStreamPayloadSources },
+    stream: { decodeStreamPayload: mocks.decodeStreamPayload, inspectStreamPayload: mocks.inspectStreamPayload, listStreamPayloadSources: mocks.listStreamPayloadSources },
   },
   bridge: {
     listMiscModules: mocks.listMiscModules,

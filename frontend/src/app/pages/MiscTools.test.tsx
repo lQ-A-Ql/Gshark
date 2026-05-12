@@ -42,7 +42,7 @@ vi.mock("../integrations/wailsBridge", () => ({
     analysis: { getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis, getMySQLAnalysis: mocks.getMySQLAnalysis, getSMTPAnalysis: mocks.getSMTPAnalysis, getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis },
     miscModule: { listMiscModules: mocks.listMiscModules },
     securityMaterial: { listNTLMSessionMaterials: mocks.listNTLMSessionMaterials, runWinRMDecrypt: mocks.runWinRMDecrypt, getWinRMDecryptResultText: mocks.getWinRMDecryptResultText, exportWinRMDecryptResult: mocks.exportWinRMDecryptResult },
-    stream: { listStreamPayloadSources: mocks.listStreamPayloadSources },
+    stream: { decodeStreamPayload: mocks.decodeStreamPayload, inspectStreamPayload: mocks.inspectStreamPayload, listStreamPayloadSources: mocks.listStreamPayloadSources },
   },
   bridge: {
     listMiscModules: mocks.listMiscModules,
@@ -53,8 +53,6 @@ vi.mock("../integrations/wailsBridge", () => ({
     getMySQLAnalysis: mocks.getMySQLAnalysis,
     getSMTPAnalysis: mocks.getSMTPAnalysis,
     getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
-    decodeStreamPayload: mocks.decodeStreamPayload,
-    inspectStreamPayload: mocks.inspectStreamPayload,
     listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
     listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
     generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
