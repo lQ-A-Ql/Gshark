@@ -5,6 +5,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
+const allowedFeatureCrossImports = new Set([
+  "src/app/features/apt/APTEvidencePanel.tsx -> src/app/features/evidence/evidenceSchema.ts",
+]);
 
 export function findBoundaryViolations({ frontendRoot = root } = {}) {
   const appRoot = resolve(frontendRoot, "src/app");
@@ -119,6 +122,8 @@ function recordViolation(violations, source, specifier, target) {
     violations.push(`${source} imports mapper ${specifier}; pages must consume feature/core view models instead`);
   }
 
+  recordFeatureBoundaryViolation(violations, source, specifier, target);
+
   if (source.startsWith("src/app/integrations/mappers/")) {
     if (specifier === "react") {
       violations.push(`${source} imports React; mappers must stay UI-free`);
@@ -151,6 +156,32 @@ function recordViolation(violations, source, specifier, target) {
       violations.push(`${source} imports domain layer ${specifier}; ui primitives must stay domain-free`);
     }
   }
+
+  if (source.startsWith("src/app/components/analysis/") && target.startsWith("src/app/features/")) {
+    violations.push(
+      `${source} imports feature layer ${specifier}; shared analysis components must stay domain-neutral`,
+    );
+  }
+}
+
+function recordFeatureBoundaryViolation(violations, source, specifier, target) {
+  const sourceDomain = featureDomain(source);
+  const targetDomain = featureDomain(target);
+  if (!sourceDomain || !targetDomain || sourceDomain === targetDomain) {
+    return;
+  }
+  const baselineKey = `${source} -> ${target}`;
+  if (allowedFeatureCrossImports.has(baselineKey)) {
+    return;
+  }
+  violations.push(
+    `${source} imports feature domain ${targetDomain} via ${specifier}; cross-domain feature logic must move to core or shared analysis modules`,
+  );
+}
+
+function featureDomain(path) {
+  const match = path.match(/^src\/app\/features\/([^/]+)\//);
+  return match?.[1] ?? "";
 }
 
 function recordWailsBridgeImport(violations, source, specifier) {

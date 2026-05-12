@@ -7906,3 +7906,48 @@ Author: Codex
   - Similar per-analysis notes should be considered for industrial, vehicle, stream follow, traffic stats, and C2 where optional fields affect user-visible completeness.
   - Notes are plain text; a structured degradation object would be stronger but would require model/API changes.
   - This slice improves explainability but does not yet expose skipped fields in Investigation Report.
+
+---
+
+## Round 176 - Frontend Boundary Depth Slice
+
+Time: 2026-05-12 18:25:54 +08:00
+Author: Codex
+
+### Scope
+
+- Shifted from TShark hardening to the next planned engineering theme: frontend boundary enforcement.
+- Focused on second-layer boundary rules, not more presentation splitting.
+- Preserved existing production imports except for one explicit historical baseline.
+
+### Changes
+
+- Extended `frontend/scripts/check-boundaries.mjs`:
+  - feature domains cannot import other feature domains by default;
+  - cross-domain feature logic must move to `core` or shared analysis modules;
+  - `components/analysis` cannot import feature-layer code and must stay domain-neutral.
+- Added an explicit baseline for the existing `APT` evidence schema dependency:
+  - `src/app/features/apt/APTEvidencePanel.tsx -> src/app/features/evidence/evidenceSchema.ts`.
+- Extended `check-boundaries.test.mjs` with fixture tests covering:
+  - cross-domain feature import rejection;
+  - explicit baseline preservation;
+  - shared analysis component rejection of feature imports.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run scripts/check-boundaries.test.mjs` passed.
+- `cd frontend && pnpm run boundary:check` passed against the real tree.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run format:check` passed after formatting the touched script files.
+- `cd frontend && pnpm run size:check` passed.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for second-layer feature/shared-analysis boundary enforcement.
+- Drift check: no drift detected. The slice directly supports the plan item that frontend boundary checks should move beyond mapper/UI primitive rules.
+- Remaining risks:
+  - The APT-to-Evidence schema baseline should be removed later by moving shared evidence types to `core` or a neutral contract module.
+  - Pages are still allowed to import feature modules by design; this remains acceptable because pages compose feature views.
+  - State-domain split is still not fully expressed in boundary rules; `SentinelContext` ownership remains a separate planned theme.

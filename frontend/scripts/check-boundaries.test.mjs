@@ -94,4 +94,52 @@ describe("check-boundaries script", () => {
       "src/app/state/useDemo.ts imports UI layer ../components/DemoPanel; state code must stay UI-free",
     ]);
   });
+
+  it("rejects cross-domain feature imports", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/c2/C2Panel.tsx",
+      'import { evidenceRules } from "../evidence/evidencePanelRules";',
+    );
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/evidence/evidencePanelRules.ts",
+      "export const evidenceRules = {};",
+    );
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([
+      "src/app/features/c2/C2Panel.tsx imports feature domain evidence via ../evidence/evidencePanelRules; cross-domain feature logic must move to core or shared analysis modules",
+    ]);
+  });
+
+  it("keeps the existing APT evidence schema baseline explicit", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/apt/APTEvidencePanel.tsx",
+      'import type { UnifiedEvidenceRecord } from "../evidence/evidenceSchema";',
+    );
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/evidence/evidenceSchema.ts",
+      "export type UnifiedEvidenceRecord = {};",
+    );
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
+  });
+
+  it("rejects shared analysis component imports from feature layers", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/components/analysis/SharedPanel.tsx",
+      'import { c2Rules } from "../../features/c2/C2CandidateTableRules";',
+    );
+    writeFixtureFile(frontendRoot, "src/app/features/c2/C2CandidateTableRules.ts", "export const c2Rules = {};");
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([
+      "src/app/components/analysis/SharedPanel.tsx imports feature layer ../../features/c2/C2CandidateTableRules; shared analysis components must stay domain-neutral",
+    ]);
+  });
 });
