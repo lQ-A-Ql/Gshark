@@ -1,5 +1,33 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 199 - Wails Bridge Facade Size Guard
+
+Time: 2026-05-12 10:07:22 +08:00  
+Author: Codex
+
+### Scope
+
+- Locked in the reduced `wailsBridge.ts` compatibility facade footprint.
+- Prevented the old bridge facade from growing back into a broad implementation module.
+
+### Changes
+
+- Tightened the `wailsBridge.ts` size budget from 380 lines to 30 lines.
+- Updated the budget rationale to describe it as a compatibility facade that should only re-export stable entry points and types.
+
+### Validation
+
+- `pnpm run size:check` - passed.
+- `pnpm exec vitest run scripts/check-size.test.mjs` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- The facade is now protected against accidental implementation creep.
+- Backend client singleton and domain projection remain the active production entry points.
+
+---
+
 ## Round 198 - Wails Bridge Mapper Test Decoupling
 
 Time: 2026-05-12 10:04:57 +08:00  
