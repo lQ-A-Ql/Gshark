@@ -7994,3 +7994,38 @@ Author: Codex
   - `features/evidence/evidenceSchema.ts` is still a compatibility shim; future code should prefer `core/evidenceSchema` or `core/evidenceTypes`.
   - Pages still import some Evidence types from the feature shim; this is compatible but can be migrated gradually.
   - Larger state ownership work remains untouched.
+
+---
+
+## Round 178 - Evidence Page Contract Import Slice
+
+Time: 2026-05-12 18:40:13 +08:00
+Author: Codex
+
+### Scope
+
+- Continued Evidence contract ownership cleanup.
+- Removed page-level dependency on the Evidence feature schema compatibility shim.
+- Added a guard against reintroducing that dependency.
+
+### Changes
+
+- Updated `EvidencePanel.tsx` and `EvidencePanel.test.tsx` to import Evidence contracts from `core/evidenceTypes`.
+- Extended `check-boundaries.mjs` to reject page imports from `features/evidence/evidenceSchema.ts`.
+- Added a boundary fixture test for the new page-level evidence shim rule.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run scripts/check-boundaries.test.mjs src/app/pages/EvidencePanel.test.tsx` passed.
+- `cd frontend && pnpm run boundary:check` passed.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run format:check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for page-level Evidence contract import cleanup.
+- Drift check: no drift detected. Work stayed on contract ownership and automatic boundary enforcement.
+- Remaining risks:
+  - Feature-internal Evidence files still use the shim; acceptable short-term because it is same-domain compatibility.
+  - New pages are now blocked from using the shim, but hooks/features can still migrate gradually to `core` imports.

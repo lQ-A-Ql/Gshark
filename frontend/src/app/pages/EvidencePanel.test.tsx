@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";
+import type { UnifiedEvidenceRecord } from "../core/evidenceTypes";
 
 const mocks = vi.hoisted(() => ({
   getEvidenceWithFilter: vi.fn(),

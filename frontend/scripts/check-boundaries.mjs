@@ -119,6 +119,9 @@ function recordViolation(violations, source, specifier, target) {
   if (source.startsWith("src/app/pages/") && target.startsWith("src/app/integrations/mappers/")) {
     violations.push(`${source} imports mapper ${specifier}; pages must consume feature/core view models instead`);
   }
+  if (source.startsWith("src/app/pages/") && target === "src/app/features/evidence/evidenceSchema.ts") {
+    violations.push(`${source} imports evidence schema shim ${specifier}; pages must use core evidence contracts`);
+  }
 
   recordFeatureBoundaryViolation(violations, source, specifier, target);
 

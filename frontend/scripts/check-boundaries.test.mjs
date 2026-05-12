@@ -85,6 +85,24 @@ describe("check-boundaries script", () => {
     ]);
   });
 
+  it("rejects page imports from the evidence feature schema shim", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/pages/EvidencePanel.tsx",
+      'import type { UnifiedEvidenceRecord } from "../features/evidence/evidenceSchema";',
+    );
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/evidence/evidenceSchema.ts",
+      'export type { UnifiedEvidenceRecord } from "../../core/evidenceTypes";',
+    );
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([
+      "src/app/pages/EvidencePanel.tsx imports evidence schema shim ../features/evidence/evidenceSchema; pages must use core evidence contracts",
+    ]);
+  });
+
   it("rejects state imports from UI layers", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(frontendRoot, "src/app/state/useDemo.ts", 'import { DemoPanel } from "../components/DemoPanel";');

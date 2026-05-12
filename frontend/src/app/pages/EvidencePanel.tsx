@@ -9,7 +9,7 @@ import {
   EvidenceTable,
   EvidenceToolbar,
 } from "../features/evidence/EvidencePanelSections";
-import type { EvidenceSeverity } from "../features/evidence/evidenceSchema";
+import type { EvidenceSeverity } from "../core/evidenceTypes";
 import { useEvidencePanelModel } from "../features/evidence/useEvidencePanelModel";
 import { useEvidence } from "../features/evidence/useEvidence";
 import { useSentinel } from "../state/SentinelContext";
