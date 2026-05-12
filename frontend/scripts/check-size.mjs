@@ -326,6 +326,16 @@ export const sourceSizeBudgets = [
     reason: "provider remains oversized and should keep moving task reset and backend lifecycle domains out",
   },
   {
+    path: "src/app/state/toolRuntimeStorage.ts",
+    maxLines: 60,
+    reason: "tool runtime storage should only normalize and persist runtime config",
+  },
+  {
+    path: "src/app/state/toolRuntimeOfflineSnapshot.ts",
+    maxLines: 60,
+    reason: "tool runtime offline snapshot helper should only build disconnected tool status defaults",
+  },
+  {
     path: "src/app/state/sentinelDerivedView.ts",
     maxLines: 45,
     reason:
@@ -497,6 +507,11 @@ export const sourceSizeBudgets = [
     path: "src/app/state/hooks/useBackendLifecycle.ts",
     maxLines: 205,
     reason: "backend lifecycle hook should keep startup, retry, and cleanup orchestration separate from event handlers",
+  },
+  {
+    path: "src/app/state/hooks/useToolRuntime.ts",
+    maxLines: 190,
+    reason: "tool runtime hook should keep persistence and status helpers outside the hook",
   },
   {
     path: "src/app/state/hooks/useBackendLifecycleControls.ts",

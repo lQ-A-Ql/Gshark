@@ -8029,3 +8029,42 @@ Author: Codex
 - Remaining risks:
   - Feature-internal Evidence files still use the shim; acceptable short-term because it is same-domain compatibility.
   - New pages are now blocked from using the shim, but hooks/features can still migrate gradually to `core` imports.
+
+---
+
+## Round 179 - Tool Runtime State Helper Slice
+
+Time: 2026-05-12 19:35:17 +08:00
+Author: Codex
+
+### Scope
+
+- Continued state ownership cleanup.
+- Focused on `useToolRuntime`, keeping persistence and offline snapshot construction outside the hook.
+
+### Changes
+
+- Added `state/toolRuntimeStorage.ts`:
+  - runtime config defaults;
+  - legacy tshark path fallback;
+  - localStorage read/write normalization.
+- Added `state/toolRuntimeOfflineSnapshot.ts` for disconnected runtime status construction.
+- Updated `useToolRuntime.ts` and `backendLifecycleStartup.ts` to consume the new helpers.
+- Added `toolRuntimeStorage.test.ts` for legacy fallback, normalization, and write behavior.
+- Added size budgets for new helper files and `useToolRuntime.ts`.
+
+### Validation
+
+- `cd frontend && pnpm exec vitest run src/app/state/toolRuntimeStorage.test.ts src/app/state/hooks/useBackendLifecycle.test.tsx` passed.
+- `cd frontend && pnpm run size:check` passed.
+- `cd frontend && pnpm run typecheck` passed.
+- `cd frontend && pnpm run lint` passed.
+- `cd frontend && pnpm run format:check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for tool runtime persistence/offline snapshot extraction.
+- Drift check: no drift detected. Work stayed on state ownership and hook size governance.
+- Remaining risks:
+  - `useToolRuntime` still owns async backend calls and status mutation; future split can extract status update helpers if needed.
+  - `useBackendLifecycle` remains a broad coordinator but is within current budget.

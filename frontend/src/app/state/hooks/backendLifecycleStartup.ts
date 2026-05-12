@@ -4,14 +4,12 @@ import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient"
 import { backendClients } from "../../integrations/backendClients";
 import { isOperationTimeoutError, withTimeout } from "../../utils/asyncControl";
 import { STARTUP_TLS_CONFIG_TIMEOUT_MS, STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
-import { readToolRuntimeConfig, writeToolRuntimeConfig } from "./useToolRuntime";
+import { readToolRuntimeConfig, writeToolRuntimeConfig } from "../toolRuntimeStorage";
 
 export async function getBackendUnavailableStatus() {
   const desktopStatus = await backendClients.runtime.getDesktopBackendStatus().catch(() => "");
   const detail = desktopStatus.trim();
-  return detail && detail !== "not-started" && detail !== "starting"
-    ? detail
-    : "桌面后端未连接，请启动或重启桌面应用";
+  return detail && detail !== "not-started" && detail !== "starting" ? detail : "桌面后端未连接，请启动或重启桌面应用";
 }
 
 interface StartupToolRuntimeOptions {
