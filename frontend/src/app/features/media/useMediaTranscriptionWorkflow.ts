@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../../core/types";
-import { bridge } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/wailsBridge";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { mergeBatchTranscriptions, routeMediaWorkflowError } from "./mediaTranscriptionRules";
 import { EMPTY_BATCH_STATUS } from "./useMediaAnalysis";
@@ -49,7 +49,7 @@ export function useMediaTranscriptionWorkflow({
       return;
     }
     try {
-      const status = await bridge.getMediaBatchTranscriptionStatus();
+      const status = await backendClients.media.getMediaBatchTranscriptionStatus();
       setBatchStatus(status);
       if (status.items.length > 0) {
         setTranscriptions((prev) => mergeBatchTranscriptions(prev, status, speechStatus));
@@ -60,7 +60,7 @@ export function useMediaTranscriptionWorkflow({
   }, [backendConnected, setBatchStatus, setTranscriptions, speechStatus]);
 
   const ensureSpeechReady = useCallback(async () => {
-    const nextStatus = await bridge.checkSpeechToText();
+    const nextStatus = await backendClients.runtime.checkSpeechToText();
     setSpeechStatus(nextStatus);
     if (!nextStatus.available) {
       const message = nextStatus.message || "语音转写依赖未就绪。";
@@ -78,7 +78,7 @@ export function useMediaTranscriptionWorkflow({
       setError("");
       try {
         await ensureSpeechReady();
-        const result = await bridge.transcribeMediaArtifact(session.artifact.token, force);
+        const result = await backendClients.media.transcribeMediaArtifact(session.artifact.token, force);
         setTranscriptions((prev) => ({ ...prev, [result.token]: result }));
         await loadBatchStatus();
       } catch (err) {
@@ -97,7 +97,7 @@ export function useMediaTranscriptionWorkflow({
       setError("");
       try {
         await ensureSpeechReady();
-        const status = await bridge.startMediaBatchTranscription(force);
+        const status = await backendClients.media.startMediaBatchTranscription(force);
         setBatchStatus(status);
       } catch (err) {
         routeMediaWorkflowError(err, setError, setSpeechDialogMessage, "批量转写启动失败");
@@ -110,7 +110,7 @@ export function useMediaTranscriptionWorkflow({
 
   const cancelBatchTranscription = useCallback(async () => {
     try {
-      const status = await bridge.cancelMediaBatchTranscription();
+      const status = await backendClients.media.cancelMediaBatchTranscription();
       setBatchStatus(status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "取消批量转写失败");
@@ -127,7 +127,7 @@ export function useMediaTranscriptionWorkflow({
 
   const exportBatchTranscription = useCallback(async (format: "txt" | "json") => {
     try {
-      await bridge.exportMediaBatchTranscription(format);
+      await backendClients.media.exportMediaBatchTranscription(format);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "批量转写导出失败");

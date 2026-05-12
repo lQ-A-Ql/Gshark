@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 180 - Media Workflow Domain Migration
+
+Time: 2026-05-12 08:41:50 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued bridge removal across media playback and transcription workflows.
+- Kept media session rendering, transcription batching, playback dialogs, and error routing unchanged.
+
+### Changes
+
+- Updated `features/media/useMediaPlaybackWorkflow.ts` to call `backendClients.media.downloadMediaArtifact`, `backendClients.runtime.checkFFmpeg`, and `backendClients.media.getMediaPlaybackBlob`.
+- Updated `features/media/useMediaTranscriptionWorkflow.ts` to call `backendClients.media.getMediaBatchTranscriptionStatus`, `backendClients.runtime.checkSpeechToText`, `backendClients.media.transcribeMediaArtifact`, `backendClients.media.startMediaBatchTranscription`, `backendClients.media.cancelMediaBatchTranscription`, and `backendClients.media.exportMediaBatchTranscription`.
+- No media-specific tests needed mock changes beyond the existing integration coverage.
+
+### Validation
+
+- `pnpm exec vitest run src/app/features/media/useMediaTranscriptionWorkflow.test.ts src/app/features/media/MediaOverviewPanels.test.tsx src/app/features/media/MediaSessionTableUtils.test.ts src/app/features/media/MediaSessionCells.test.tsx` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Media playback and transcription workflows now use the media and runtime domain clients.
+- Remaining direct `bridge` imports are now concentrated in lifecycle controls, sentinel context wiring, and TLS dialog handling.
+
+---
+
 ## Round 179 - Stream Decoder Domain Migration
 
 Time: 2026-05-12 08:37:30 +08:00  
