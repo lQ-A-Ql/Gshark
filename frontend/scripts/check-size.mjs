@@ -21,6 +21,11 @@ export const sourceSizeBudgets = [
     reason: "bridge domain projection should only expose narrowed clients from the compatibility bridge",
   },
   {
+    path: "src/app/integrations/bridgeTypes.ts",
+    maxLines: 230,
+    reason: "bridge type composition should stay focused on client interfaces and compatibility transport binding",
+  },
+  {
     path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",
     maxLines: 110,
     reason: "C2 decrypt display mapper should stay focused on result-level record filtering and notes",

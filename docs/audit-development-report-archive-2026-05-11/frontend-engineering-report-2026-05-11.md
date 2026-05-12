@@ -1,5 +1,33 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 204 - Bridge Types Size Guard
+
+Time: 2026-05-12 12:03:13 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued guarding the aggregate bridge type module after consumer imports were narrowed.
+- Preserved compatibility exports while preventing implementation creep.
+
+### Changes
+
+- Added a `bridgeTypes.ts` size budget capped at 230 lines.
+- Documented that the module should stay focused on client interfaces and compatibility transport binding.
+
+### Validation
+
+- `pnpm run size:check` - passed.
+- `pnpm exec vitest run scripts/check-size.test.mjs` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- `bridgeTypes` remains available to the integration layer and compatibility facade.
+- Future growth in aggregate bridge type composition now requires explicit budget adjustment.
+
+---
+
 ## Round 203 - Bridge Types Import Boundary Guard
 
 Time: 2026-05-12 11:53:21 +08:00  
