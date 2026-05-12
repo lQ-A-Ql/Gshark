@@ -7700,3 +7700,42 @@ Author: Codex
   - Other engine/tool direct field paths should be audited, but many already call `tshark.ScanFieldRowsWithDisplayFilter` and are therefore covered.
   - `filter_ids.go`, `traffic_stats.go`, and stream-follow paths still have direct field lists in the TShark package; they should be assessed next.
   - Per-analysis user-facing notes for skipped optional fields are still not surfaced.
+
+---
+
+## Round 171 - Stream Follow Capability Planning Slice
+
+Time: 2026-05-12 17:54:44 +08:00
+Author: Codex
+
+### Scope
+
+- Continued TShark fixed-field hardening inside `backend/internal/tshark`.
+- Focused on HTTP/raw stream reassembly, which is a packet/stream traceability mainline path.
+- Preserved stream chunk semantics and reassembly response shape.
+
+### Changes
+
+- Updated `ReassembleHTTPStreamFromFileContext`:
+  - builds its six requested fields through `BuildPlannedFieldArgs`;
+  - invokes TShark with alias-aware/planned args;
+  - projects stdout rows back to the original six-column parser layout.
+- Updated `ReassembleRawStreamFromFileContext` similarly for TCP/UDP stream payload reassembly.
+- Added a focused stream-follow planning test verifying fixed field projection for stream rows under a capability-aware TShark registry.
+
+### Validation
+
+- `cd backend && go test ./internal/tshark -run "TestBuildPlannedFieldArgsForStreamFollow|TestBuildFastListScanArgs|TestProjectPacketListLine|TestStreamPacketsFast|TestStreamPacketsFast_WithCustom" -count=1 -v` passed.
+- `cd backend && gofmt -l .` passed.
+- `cd backend && go test ./...` passed.
+- `go test -tags dev ./...` passed at repo root.
+- `git diff --check` passed.
+
+### Self-check
+
+- Plan completion for this slice: complete for stream-follow reassembly field planning.
+- Drift check: no drift detected. Work stayed on TShark capability-aware field selection and directly supports packet/stream traceability.
+- Remaining risks:
+  - `traffic_stats.go` still has a broad fixed field list that should be moved to the common scan planner.
+  - `filter_ids.go` and packet estimate only request `frame.number`; they are low risk but can still use the exported planner for consistency.
+  - Per-analysis optional-field skip notes remain future work.

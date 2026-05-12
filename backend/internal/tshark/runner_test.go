@@ -204,6 +204,28 @@ func TestBuildFastListScanArgsUsesCapabilityAliases(t *testing.T) {
 	}
 }
 
+func TestBuildPlannedFieldArgsForStreamFollowUsesAliases(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := []string{"frame.number", "frame.time_epoch", "frame.protocols", "_ws.col.protocol", "_ws.col.info", "ip.src", "ip.dst", "tcp.srcport", "tcp.dstport", "tcp.payload"}
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	planned, err := BuildPlannedFieldArgs(nil, []string{"frame.number", "ip.src", "tcp.srcport", "ip.dst", "tcp.dstport", "tcp.payload"})
+	if err != nil {
+		t.Fatalf("BuildPlannedFieldArgs() error = %v", err)
+	}
+	row := planned.ProjectRow([]string{"9", "10.0.0.1", "4444", "10.0.0.2", "80", "474554"})
+	if len(row) != 6 || row[0] != "9" || row[5] != "474554" {
+		t.Fatalf("unexpected stream follow projection: %#v", row)
+	}
+}
+
 func TestProjectPacketListLineRestoresMissingOptionalColumns(t *testing.T) {
 	plan := fieldScanCapabilityPlan{
 		requestedFields: []string{"frame.number", "ip.src", "udp.payload", "_ws.col.Info"},

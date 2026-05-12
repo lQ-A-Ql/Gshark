@@ -18,22 +18,19 @@ func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, s
 	log.Printf("tshark: follow http stream start file=%q stream=%d", filePath, streamID)
 
 	filter := fmt.Sprintf("tcp.stream==%d && tcp.payload", streamID)
-	args := []string{
+	plannedScan, err := BuildPlannedFieldArgs([]string{
 		"-n",
 		"-r", filePath,
 		"-Y", filter,
 		"-T", "fields",
 		"-E", "separator=\t",
 		"-E", "occurrence=f",
-		"-e", "frame.number",
-		"-e", "ip.src",
-		"-e", "tcp.srcport",
-		"-e", "ip.dst",
-		"-e", "tcp.dstport",
-		"-e", "tcp.payload",
+	}, []string{"frame.number", "ip.src", "tcp.srcport", "ip.dst", "tcp.dstport", "tcp.payload"})
+	if err != nil {
+		return stream, fmt.Errorf("plan tshark http stream fields: %w", err)
 	}
 
-	cmd, err := CommandContext(ctx, args...)
+	cmd, err := CommandContext(ctx, plannedScan.Args...)
 	if err != nil {
 		return stream, fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -60,7 +57,7 @@ func ReassembleHTTPStreamFromFileContext(ctx context.Context, filePath string, s
 			continue
 		}
 
-		parts := strings.Split(line, "\t")
+		parts := plannedScan.ProjectRow(strings.Split(line, "\t"))
 		if len(parts) < 6 {
 			continue
 		}
@@ -186,22 +183,20 @@ func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol 
 	}
 
 	filter := fmt.Sprintf("%s==%d && %s", streamField, streamID, payloadField)
-	args := []string{
+	fields := []string{"frame.number", "ip.src", srcPortField, "ip.dst", dstPortField, payloadField}
+	plannedScan, err := BuildPlannedFieldArgs([]string{
 		"-n",
 		"-r", filePath,
 		"-Y", filter,
 		"-T", "fields",
 		"-E", "separator=\t",
 		"-E", "occurrence=f",
-		"-e", "frame.number",
-		"-e", "ip.src",
-		"-e", srcPortField,
-		"-e", "ip.dst",
-		"-e", dstPortField,
-		"-e", payloadField,
+	}, fields)
+	if err != nil {
+		return stream, fmt.Errorf("plan tshark raw stream fields: %w", err)
 	}
 
-	cmd, err := CommandContext(ctx, args...)
+	cmd, err := CommandContext(ctx, plannedScan.Args...)
 	if err != nil {
 		return stream, fmt.Errorf("resolve tshark: %w", err)
 	}
@@ -228,7 +223,7 @@ func ReassembleRawStreamFromFileContext(ctx context.Context, filePath, protocol 
 			continue
 		}
 
-		parts := strings.Split(line, "\t")
+		parts := plannedScan.ProjectRow(strings.Split(line, "\t"))
 		if len(parts) < 6 {
 			continue
 		}
