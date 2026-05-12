@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 173 - NTLM Session Materials Domain Client Migration
+
+Time: 2026-05-12 08:11:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued direct aggregate bridge removal with the NTLM session materials MISC module.
+- Kept deferred loading, refresh-after-selection behavior, and session-material rendering unchanged.
+
+### Changes
+
+- Updated `misc/modules/NTLMSessionMaterialsModule.tsx` to import `backendClients` instead of aggregate `bridge`.
+- Replaced NTLM material listing calls with `backendClients.securityMaterial.listNTLMSessionMaterials()`.
+- Updated MISC test mocks to expose the security material domain client while preserving older aggregate bridge mocks for unmigrated modules.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/MiscTools.sessions.test.tsx src/app/pages/MiscTools.test.tsx src/app/pages/MiscTools.payloadHints.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- NTLM session material loading no longer depends on the aggregate bridge.
+- Remaining MISC direct bridge candidates include SMB3 session key, WinRM decrypt, generic custom module operations, payload webshell decoding, and MISC module package list/import flows.
+
+---
+
 ## Round 172 - Update Center Domain Client Migration
 
 Time: 2026-05-12 08:04:46 +08:00  
