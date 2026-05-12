@@ -1,5 +1,38 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 185 - Sentinel Context Domain Migration
+
+Time: 2026-05-12 09:04:44 +08:00  
+Author: Codex
+
+### Scope
+
+- Removed the final production `bridge` import from the Sentinel provider.
+- Preserved the public `useSentinel()` context shape and existing capture/stream workflows.
+
+### Changes
+
+- Updated `state/SentinelContext.tsx` to inject domain clients into existing hooks:
+  - `backendClients.packet` for packet page loading, packet locate, and packet detail resources.
+  - `backendClients.capture` for open/start/status/stop/close/replacement capture operations.
+  - `backendClients.stream` for stream index, stream fetch, raw stream pages, and payload persistence.
+  - `backendClients.media` for batch transcription cancellation during capture stop.
+- Confirmed remaining direct aggregate `bridge` usages are limited to bridge compatibility tests.
+
+### Validation
+
+- `pnpm exec vitest run src/app/state/hooks/useBackendLifecycle.test.tsx src/app/state/hooks/useCaptureStopWorkflow.test.tsx src/app/state/hooks/useCaptureReplacementPrepare.test.tsx src/app/state/hooks/useOpenCaptureAction.test.tsx src/app/state/hooks/usePacketPageLoad.test.tsx src/app/state/hooks/useSelectedPacketResources.test.tsx src/app/state/hooks/useStreamPayloadPersistence.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- Production frontend code no longer imports the aggregate `bridge` directly.
+- The aggregate bridge remains intentionally exercised by bridge compatibility tests and remains exported for compatibility.
+
+---
+
 ## Round 184 - Tool Runtime Domain Migration
 
 Time: 2026-05-12 09:00:40 +08:00  

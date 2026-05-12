@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import type { BinaryStream, HttpStream, Packet } from "../core/types";
-import { bridge } from "../integrations/wailsBridge";
+import { backendClients } from "../integrations/wailsBridge";
 import { isAbortLikeError } from "../utils/asyncControl";
 import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
@@ -240,7 +240,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     captureTaskScopeRef,
     commitPacketPage,
     displayFilter,
-    listPacketsPage: bridge.listPacketsPage,
+    listPacketsPage: backendClients.packet.listPacketsPage,
     packetPageSeqRef,
     pageSize: PAGE_SIZE,
     setBackendStatus,
@@ -263,7 +263,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     captureTaskScopeRef,
     displayFilter,
     loadPacketPage,
-    locatePacketPage: bridge.locatePacketPage,
+    locatePacketPage: backendClients.packet.locatePacketPage,
     pageSize: PAGE_SIZE,
     setBackendStatus,
     setDisplayFilter,
@@ -295,8 +295,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsFilterLoading,
     setPreloadProcessed,
     setPreloadTotal,
-    stopStreamingPackets: bridge.stopStreamingPackets,
-    prepareCaptureReplacement: bridge.prepareCaptureReplacement,
+    stopStreamingPackets: backendClients.capture.stopStreamingPackets,
+    prepareCaptureReplacement: backendClients.capture.prepareCaptureReplacement,
   });
 
   const { filteredPackets, selectedPacket, protocolTree, hexDump, currentPage, totalPages } = useSentinelDerivedView({
@@ -321,7 +321,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     activeCapturePathRef,
     backendConnected,
     captureTaskScopeRef,
-    listStreamIds: bridge.listStreamIds,
+    listStreamIds: backendClients.stream.listStreamIds,
     setBackendStatus,
     setStreamIds,
   });
@@ -330,8 +330,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     activeCapturePathRef,
     backendConnected,
     captureTaskScopeRef,
-    fetchHttpStream: bridge.getHttpStream,
-    fetchRawStreamPage: bridge.getRawStreamPage,
+    fetchHttpStream: backendClients.stream.getHttpStream,
+    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
     httpCacheRef: httpStreamCacheRef,
     httpPrefetchInFlightRef,
     prefetchLimit: STREAM_PREFETCH_LIMIT,
@@ -346,8 +346,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     activeCapturePathRef,
     backendConnected,
     captureTaskScopeRef,
-    fetchHttpStream: bridge.getHttpStream,
-    fetchRawStreamPage: bridge.getRawStreamPage,
+    fetchHttpStream: backendClients.stream.getHttpStream,
+    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
     httpCacheRef: httpStreamCacheRef,
     prefetchAdjacentStreams,
     recordStreamSwitchMetric,
@@ -373,7 +373,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setUdpStream,
     tcpCacheRef: tcpStreamCacheRef,
     udpCacheRef: udpStreamCacheRef,
-    updateStreamPayloads: bridge.updateStreamPayloads,
+    updateStreamPayloads: backendClients.stream.updateStreamPayloads,
   });
 
   useSyncedRefValue(scheduleLoadMoreRef, scheduleLoadMore);
@@ -387,9 +387,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     selectedPacket,
     selectedPacketDetail,
     captureTaskScopeRef,
-    loadPacket: (packetId, signal) => bridge.getPacket(packetId, signal),
-    loadRawHex: (packetId, signal) => bridge.getPacketRawHex(packetId, signal),
-    loadLayers: (packetId, signal) => bridge.getPacketLayers(packetId, signal),
+    loadPacket: (packetId, signal) => backendClients.packet.getPacket(packetId, signal),
+    loadRawHex: (packetId, signal) => backendClients.packet.getPacketRawHex(packetId, signal),
+    loadLayers: (packetId, signal) => backendClients.packet.getPacketLayers(packetId, signal),
     setSelectedPacketDetail,
     setSelectedPacketRawHex,
     setSelectedPacketLayers,
@@ -411,7 +411,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       try {
         const opened = await resolveOpenedCapture({
           filePath,
-          openPcapFile: bridge.openPcapFile,
+          openPcapFile: backendClients.capture.openPcapFile,
         });
         pendingCapture = opened;
 
@@ -436,7 +436,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           captureSeqRef,
           captureTaskScopeRef,
           prepareForCaptureReplacement,
-          startStreamingPackets: bridge.startStreamingPackets,
+          startStreamingPackets: backendClients.capture.startStreamingPackets,
         });
         if (!started) return false;
 
@@ -450,8 +450,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
           parseErrorRef,
           preloadProcessedRef,
           preloadTotalRef,
-          listPacketsPage: bridge.listPacketsPage,
-          getCaptureStatus: bridge.getCaptureStatus,
+          listPacketsPage: backendClients.packet.listPacketsPage,
+          getCaptureStatus: backendClients.capture.getCaptureStatus,
           waitForCaptureSignal,
           setTotalPackets,
           setPreloadProcessed,
@@ -568,8 +568,8 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     wakeCaptureWaiters,
     clearCaptureUiState,
     setBackendStatus,
-    cancelMediaBatchTranscription: bridge.cancelMediaBatchTranscription,
-    closeCapture: bridge.closeCapture,
+    cancelMediaBatchTranscription: backendClients.media.cancelMediaBatchTranscription,
+    closeCapture: backendClients.capture.closeCapture,
   });
 
   const value = useMemo<SentinelContextValue>(
