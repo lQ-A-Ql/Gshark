@@ -1,5 +1,35 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 190 - State Import Boundary Audit
+
+Time: 2026-05-12 09:24:42 +08:00  
+Author: Codex
+
+### Scope
+
+- Audited the frontend for remaining production imports that still route `backendClients` through the `wailsBridge` compatibility facade.
+- Verified the state layer no longer depends on `wailsBridge` and that aggregate `bridge` imports remain absent from production code.
+
+### Findings
+
+- `frontend/src/app/state` contains no `wailsBridge` imports.
+- Production code contains no direct aggregate `bridge` imports from `wailsBridge`.
+- There are still 31 production `backendClients` imports that use `wailsBridge` as the entry point, concentrated in components, features, pages, and MISC modules.
+
+### Validation
+
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- The new `backendClients` singleton entry is stable.
+- The next migration rounds can continue replacing `wailsBridge` imports module by module without touching the compatibility facade yet.
+
+---
+
 ## Round 189 - State Backend Client Entry Migration
 
 Time: 2026-05-12 09:19:51 +08:00  
