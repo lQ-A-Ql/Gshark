@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { EmptyState } from "../../components/DesignSystem";
 import { Button } from "../../components/ui/button";
 import type { C2DecryptRequest, C2DecryptResult, C2FamilyAnalysis } from "../../core/types";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { CSDecryptForm, VShellDecryptForm } from "./C2DecryptFormControls";
 import { C2DecryptResultPanel } from "./C2DecryptResultPanel";
 

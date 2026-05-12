@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
-import { backendClients } from "../../integrations/wailsBridge";
+import { backendClients } from "../../integrations/backendClients";
 import { LRUCache } from "../../utils/lruCache";
 
 const EMPTY_FAMILY: C2FamilyAnalysis = {

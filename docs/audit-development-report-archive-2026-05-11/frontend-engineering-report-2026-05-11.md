@@ -1,5 +1,36 @@
 # Frontend Engineering Report - 2026-05-11
 
+## Round 194 - C2 Backend Client Entry Migration
+
+Time: 2026-05-12 09:46:30 +08:00  
+Author: Codex
+
+### Scope
+
+- Continued moving production `backendClients` imports from the `wailsBridge` compatibility facade to the direct singleton entry.
+- Focused on C2 analysis and decrypt workflow consumers.
+
+### Changes
+
+- Updated C2 analysis loading and C2 decrypt workbench to import `backendClients` from `integrations/backendClients`.
+- Updated all C2 page test mocks to mock `integrations/backendClients` directly.
+- Removed unused aggregate `bridge` mock stubs from C2 tests.
+
+### Validation
+
+- `pnpm exec vitest run src/app/pages/C2Analysis.test.tsx src/app/pages/C2Analysis.candidates.test.tsx src/app/pages/C2Analysis.vshell.test.tsx src/app/pages/C2Analysis.decrypt.test.tsx src/app/features/c2/CSHostURIAggregates.test.tsx src/app/integrations/bridgeDomains.test.ts` - passed.
+- `pnpm run typecheck` - passed.
+- `pnpm run boundary:check` - passed.
+- `pnpm run size:check` - passed.
+- `pnpm run ci` - passed, including 179 test files / 495 tests and production build.
+
+### Review
+
+- C2 feature consumers now use the direct backend client singleton.
+- Remaining `wailsBridge` imports are page shell and MISC/stream decoder related.
+
+---
+
 ## Round 193 - Analysis Feature Backend Client Entry Migration
 
 Time: 2026-05-12 09:42:20 +08:00  

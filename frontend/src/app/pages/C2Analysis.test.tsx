@@ -26,14 +26,13 @@ vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
 }));
 
-vi.mock("../integrations/wailsBridge", () => ({
+vi.mock("../integrations/backendClients", () => ({
   backendClients: {
     analysis: {
       getC2SampleAnalysis: mocks.getC2SampleAnalysis,
       decryptC2Traffic: mocks.decryptC2Traffic,
     },
   },
-  bridge: {},
 }));
 
 vi.mock("react-router", async (importOriginal) => {
