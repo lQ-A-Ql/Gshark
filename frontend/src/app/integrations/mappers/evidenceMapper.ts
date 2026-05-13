@@ -1,18 +1,15 @@
 import { confidenceLabel } from "../../core/types";
 import type { EvidenceModule, UnifiedEvidenceRecord } from "../../core/types";
+import type { EvidenceListWireDTO, UnifiedEvidenceRecordWireDTO } from "../wire/evidenceWireDtos";
 import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
 
-interface EvidenceListWire {
-  records?: unknown;
-}
-
 export function parseEvidenceRecords(input: unknown): UnifiedEvidenceRecord[] {
-  const payload = asPlainObject(input) as EvidenceListWire | undefined;
+  const payload: EvidenceListWireDTO | undefined = asPlainObject(input);
   return asArray(payload?.records).map(asEvidenceRecord);
 }
 
 function asEvidenceRecord(input: unknown): UnifiedEvidenceRecord {
-  const item = asPlainObject(input);
+  const item: UnifiedEvidenceRecordWireDTO | undefined = asPlainObject(input);
   const confidence = typeof item?.confidence === "number" ? item.confidence : undefined;
   return {
     id: String(item?.id ?? ""),

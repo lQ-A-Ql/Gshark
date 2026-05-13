@@ -1,12 +1,9 @@
 import type { ExtractedObject } from "../../core/types";
+import type { ExtractedObjectWireDTO } from "../wire/evidenceWireDtos";
 import { asArray, asPlainObject } from "./mapperPrimitives";
 
-type ExtractedObjectWire = Partial<
-  Record<"id" | "packet_id" | "name" | "size_bytes" | "mime" | "magic" | "source", unknown>
->;
-
 export function asObject(input: unknown): ExtractedObject {
-  const payload = asPlainObject(input) as ExtractedObjectWire | undefined;
+  const payload: ExtractedObjectWireDTO | undefined = asPlainObject(input);
   const source = String(payload?.source ?? "HTTP");
   return {
     id: Number(payload?.id ?? 0),
