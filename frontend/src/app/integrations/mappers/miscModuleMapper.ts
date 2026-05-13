@@ -1,43 +1,46 @@
 import type { MiscModuleImportResult, MiscModuleManifest, MiscModuleRunResult } from "../../core/types";
-import { asStringList, optionalString } from "./mapperPrimitives";
+import { asArray, asPlainObject, asStringList, optionalString } from "./mapperPrimitives";
 import { asMiscModuleFormSchema, asMiscModuleInterfaceSchema, asMiscModuleTable } from "./miscModuleSchemaMapper";
 
-export function asMiscModuleManifest(input: any): MiscModuleManifest {
+export function asMiscModuleManifest(input: unknown): MiscModuleManifest {
+  const payload = asPlainObject(input) ?? {};
   return {
-    id: String(input.id ?? ""),
-    kind: String(input.kind ?? ""),
-    title: String(input.title ?? ""),
-    summary: String(input.summary ?? ""),
-    tags: asStringList(input.tags),
-    apiPrefix: String(input.api_prefix ?? ""),
-    docsPath: optionalString(input.docs_path),
-    requiresCapture: Boolean(input.requires_capture),
-    protocolDomain: optionalString(input.protocol_domain),
-    supportsExport: Boolean(input.supports_export),
-    cancellable: Boolean(input.cancellable),
-    dependsOn: Array.isArray(input.depends_on) ? asStringList(input.depends_on) : undefined,
-    formSchema: asMiscModuleFormSchema(input.form_schema),
-    interfaceSchema: asMiscModuleInterfaceSchema(input.interface_schema),
+    id: String(payload.id ?? ""),
+    kind: String(payload.kind ?? ""),
+    title: String(payload.title ?? ""),
+    summary: String(payload.summary ?? ""),
+    tags: asStringList(payload.tags),
+    apiPrefix: String(payload.api_prefix ?? ""),
+    docsPath: optionalString(payload.docs_path),
+    requiresCapture: Boolean(payload.requires_capture),
+    protocolDomain: optionalString(payload.protocol_domain),
+    supportsExport: Boolean(payload.supports_export),
+    cancellable: Boolean(payload.cancellable),
+    dependsOn: Array.isArray(payload.depends_on) ? asStringList(payload.depends_on) : undefined,
+    formSchema: asMiscModuleFormSchema(payload.form_schema),
+    interfaceSchema: asMiscModuleInterfaceSchema(payload.interface_schema),
   };
 }
 
-export function asMiscModuleManifests(input: any): MiscModuleManifest[] {
-  return Array.isArray(input) ? input.map(asMiscModuleManifest) : [];
+export function asMiscModuleManifests(input: unknown): MiscModuleManifest[] {
+  return asArray(input).map(asMiscModuleManifest);
 }
 
-export function asMiscModuleImportResult(input: any): MiscModuleImportResult {
+export function asMiscModuleImportResult(input: unknown): MiscModuleImportResult {
+  const payload = asPlainObject(input) ?? {};
   return {
-    module: asMiscModuleManifest(input.module ?? {}),
-    installedPath: String(input.installed_path ?? ""),
-    message: String(input.message ?? ""),
+    module: asMiscModuleManifest(payload.module),
+    installedPath: String(payload.installed_path ?? ""),
+    message: String(payload.message ?? ""),
   };
 }
 
-export function asMiscModuleRunResult(input: any): MiscModuleRunResult {
+export function asMiscModuleRunResult(input: unknown): MiscModuleRunResult {
+  const payload = asPlainObject(input) ?? {};
   return {
-    message: String(input.message ?? ""),
-    text: optionalString(input.text),
-    output: input.output,
-    table: asMiscModuleTable(input.table),
+    message: String(payload.message ?? ""),
+    text: optionalString(payload.text),
+    output: payload.output,
+    table: asMiscModuleTable(payload.table),
   };
 }

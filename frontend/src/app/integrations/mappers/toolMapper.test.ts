@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { asC2DecryptedRecord } from "./c2DecryptMapper";
 import {
   asMiscModuleImportResult,
+  asMiscModuleManifest,
   asMiscModuleManifests,
   asMiscModuleRunResult,
   asNTLMSessionMaterials,
@@ -162,6 +163,29 @@ describe("toolMapper", () => {
     expect(asMiscModuleManifests(null)).toEqual([]);
     expect(asSMB3SessionCandidates(null)).toEqual([]);
     expect(asNTLMSessionMaterials(null)).toEqual([]);
+  });
+
+  it("coerces malformed misc module payloads to safe defaults", () => {
+    expect(asMiscModuleManifest("bad")).toMatchObject({
+      id: "",
+      tags: [],
+      formSchema: undefined,
+      interfaceSchema: undefined,
+    });
+    expect(asMiscModuleManifests(["bad"])[0]).toMatchObject({ id: "", tags: [] });
+    expect(asMiscModuleImportResult("bad")).toMatchObject({ module: { id: "" }, installedPath: "" });
+    expect(
+      asMiscModuleRunResult({
+        output: { ok: true },
+        table: {
+          columns: ["bad"],
+          rows: ["bad", { k: 2 }],
+        },
+      }),
+    ).toMatchObject({
+      output: { ok: true },
+      table: { columns: [{ key: "", label: "" }], rows: [{}, { k: "2" }] },
+    });
   });
 
   it("coerces malformed session material payloads to safe defaults", () => {
