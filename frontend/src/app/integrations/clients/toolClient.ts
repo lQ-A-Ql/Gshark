@@ -29,6 +29,7 @@ import {
   asSMB3SessionCandidates,
   asWinRMDecryptResult,
 } from "../mappers/toolMapper";
+import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 type BuildHeaders = (path: string, headersInit?: HeadersInit, body?: BodyInit | null) => Promise<Headers>;
@@ -53,7 +54,7 @@ export interface ToolClient {
 export function createToolClient(request: JsonRequest, apiBase: string, buildHeaders: BuildHeaders): ToolClient {
   return {
     async runWinRMDecrypt(req: WinRMDecryptRequest) {
-      const payload = await request<any>("/api/tools/winrm-decrypt", {
+      const payload = await request<WinRMDecryptResultWireDTO>("/api/tools/winrm-decrypt", {
         method: "POST",
         body: JSON.stringify({
           port: req.port,
