@@ -152,6 +152,11 @@ export const sourceSizeBudgets = [
     reason: "runtime wire DTOs should only describe raw tool status and capability payload fields",
   },
   {
+    path: "src/app/integrations/wire/mediaWireDtos.ts",
+    maxLines: 40,
+    reason: "media wire DTOs should only describe raw media analysis and transcription payload fields",
+  },
+  {
     path: "src/app/integrations/mappers/packetStreamMapper.ts",
     maxLines: 10,
     reason: "packet stream mapper should stay as a compatibility export layer",

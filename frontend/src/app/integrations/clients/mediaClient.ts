@@ -1,6 +1,11 @@
 import type { MediaAnalysis, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
 import { downloadBlob } from "../../utils/browserFile";
 import { asMediaAnalysis, asMediaTranscription, asSpeechBatchTaskStatus } from "../mappers/mediaMapper";
+import type {
+  MediaAnalysisWireDTO,
+  MediaTranscriptionWireDTO,
+  SpeechBatchTaskStatusWireDTO,
+} from "../wire/mediaWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 type BlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
@@ -19,14 +24,15 @@ export interface MediaClient {
 export function createMediaClient(request: JsonRequest, requestBlob: BlobRequest): MediaClient {
   return {
     async getMediaAnalysis(forceRefresh = false, signal?: AbortSignal) {
-      const payload = await request<any>(forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media", {
-        signal,
-      });
+      const payload = await request<MediaAnalysisWireDTO>(
+        forceRefresh ? "/api/analysis/media?refresh=1" : "/api/analysis/media",
+        { signal },
+      );
       return asMediaAnalysis(payload);
     },
 
     async transcribeMediaArtifact(token: string, force = false) {
-      const payload = await request<any>("/api/analysis/media/transcribe", {
+      const payload = await request<MediaTranscriptionWireDTO>("/api/analysis/media/transcribe", {
         method: "POST",
         body: JSON.stringify({ token, force }),
       });
@@ -34,7 +40,7 @@ export function createMediaClient(request: JsonRequest, requestBlob: BlobRequest
     },
 
     async startMediaBatchTranscription(force = false) {
-      const payload = await request<any>("/api/analysis/media/transcribe/batch", {
+      const payload = await request<SpeechBatchTaskStatusWireDTO>("/api/analysis/media/transcribe/batch", {
         method: "POST",
         body: JSON.stringify({ force }),
       });
@@ -42,12 +48,12 @@ export function createMediaClient(request: JsonRequest, requestBlob: BlobRequest
     },
 
     async getMediaBatchTranscriptionStatus() {
-      const payload = await request<any>("/api/analysis/media/transcribe/batch");
+      const payload = await request<SpeechBatchTaskStatusWireDTO>("/api/analysis/media/transcribe/batch");
       return asSpeechBatchTaskStatus(payload);
     },
 
     async cancelMediaBatchTranscription() {
-      const payload = await request<any>("/api/analysis/media/transcribe/batch/cancel", {
+      const payload = await request<SpeechBatchTaskStatusWireDTO>("/api/analysis/media/transcribe/batch/cancel", {
         method: "POST",
         body: JSON.stringify({}),
       });
