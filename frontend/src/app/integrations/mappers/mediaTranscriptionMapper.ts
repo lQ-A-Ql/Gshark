@@ -1,6 +1,8 @@
 import type { MediaTranscription } from "../../core/types";
+import { asArray, asPlainObject } from "./mapperPrimitives";
 
-export function asMediaTranscription(payload: any): MediaTranscription {
+export function asMediaTranscription(input: unknown): MediaTranscription {
+  const payload = asPlainObject(input);
   return {
     token: String(payload?.token ?? ""),
     sessionId: String(payload?.session_id ?? ""),
@@ -12,12 +14,13 @@ export function asMediaTranscription(payload: any): MediaTranscription {
     error: String(payload?.error ?? "") || undefined,
     cached: Boolean(payload?.cached),
     durationSeconds: Number(payload?.duration_seconds ?? 0),
-    segments: Array.isArray(payload?.segments)
-      ? payload.segments.map((item: any) => ({
-          startSeconds: Number(item.start_seconds ?? 0),
-          endSeconds: Number(item.end_seconds ?? 0),
-          text: String(item.text ?? ""),
-        }))
-      : [],
+    segments: asArray(payload?.segments).map((value) => {
+      const item = asPlainObject(value);
+      return {
+        startSeconds: Number(item?.start_seconds ?? 0),
+        endSeconds: Number(item?.end_seconds ?? 0),
+        text: String(item?.text ?? ""),
+      };
+    }),
   };
 }

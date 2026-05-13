@@ -60,10 +60,11 @@ describe("mediaMapper", () => {
   });
 
   it("returns empty defaults for missing sections", () => {
-    const result = asMediaAnalysis({});
-    expect(result.sessions).toEqual([]);
+    const result = asMediaAnalysis({ sessions: [null], protocols: "bad" });
+    expect(result.sessions[0]).toMatchObject({ id: "", packetCount: 0, tags: [] });
     expect(result.protocols).toEqual([]);
     expect(result.notes).toEqual([]);
+    expect(asMediaAnalysis(null).totalMediaPackets).toBe(0);
   });
 
   it("maps transcription payloads", () => {
@@ -94,6 +95,12 @@ describe("mediaMapper", () => {
       segments: [{ startSeconds: 0.1, endSeconds: 1.2, text: "hello" }],
     });
     expect(result.error).toBeUndefined();
+  });
+
+  it("defaults malformed transcription segments", () => {
+    const result = asMediaTranscription({ segments: [null] });
+    expect(result.segments[0]).toEqual({ startSeconds: 0, endSeconds: 0, text: "" });
+    expect(asMediaTranscription(null).token).toBe("");
   });
 
   it("maps batch transcription status", () => {
@@ -143,5 +150,11 @@ describe("mediaMapper", () => {
     });
     expect(result.items[0]?.error).toBeUndefined();
     expect(result.items[0]?.text).toBeUndefined();
+  });
+
+  it("defaults malformed batch status items", () => {
+    const result = asSpeechBatchTaskStatus({ items: [null] });
+    expect(result.items[0]).toMatchObject({ token: "", status: "queued", cached: false });
+    expect(asSpeechBatchTaskStatus(null).items).toEqual([]);
   });
 });

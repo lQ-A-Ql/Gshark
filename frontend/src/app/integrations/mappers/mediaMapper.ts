@@ -1,15 +1,16 @@
 import type { MediaAnalysis } from "../../core/types";
-import { asBucket, asStringList } from "./mapperPrimitives";
+import { asArray, asBucket, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asMediaSession } from "./mediaSessionMapper";
 export { asMediaTranscription } from "./mediaTranscriptionMapper";
 export { asSpeechBatchTaskStatus } from "./speechBatchMapper";
 
-export function asMediaAnalysis(payload: any): MediaAnalysis {
+export function asMediaAnalysis(input: unknown): MediaAnalysis {
+  const payload = asPlainObject(input);
   return {
     totalMediaPackets: Number(payload?.total_media_packets ?? 0),
-    protocols: Array.isArray(payload?.protocols) ? payload.protocols.map(asBucket) : [],
-    applications: Array.isArray(payload?.applications) ? payload.applications.map(asBucket) : [],
-    sessions: Array.isArray(payload?.sessions) ? payload.sessions.map(asMediaSession) : [],
+    protocols: asArray(payload?.protocols).map(asBucket),
+    applications: asArray(payload?.applications).map(asBucket),
+    sessions: asArray(payload?.sessions).map(asMediaSession),
     notes: asStringList(payload?.notes),
   };
 }
