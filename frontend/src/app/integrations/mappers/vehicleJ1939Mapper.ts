@@ -1,16 +1,18 @@
-import { asBucket, optionalString } from "./mapperPrimitives";
+import { asArray, asBucket, asPlainObject, optionalString } from "./mapperPrimitives";
 
-export function asJ1939Section(input: any) {
+export function asJ1939Section(input: unknown) {
+  const payload = asPlainObject(input) ?? {};
   return {
-    totalMessages: Number(input?.total_messages ?? 0),
-    pgns: Array.isArray(input?.pgns) ? input.pgns.map(asBucket) : [],
-    sourceAddrs: Array.isArray(input?.source_addrs) ? input.source_addrs.map(asBucket) : [],
-    targetAddrs: Array.isArray(input?.target_addrs) ? input.target_addrs.map(asBucket) : [],
-    messages: Array.isArray(input?.messages) ? input.messages.map(asJ1939Message) : [],
+    totalMessages: Number(payload.total_messages ?? 0),
+    pgns: asArray(payload.pgns).map(asBucket),
+    sourceAddrs: asArray(payload.source_addrs).map(asBucket),
+    targetAddrs: asArray(payload.target_addrs).map(asBucket),
+    messages: asArray(payload.messages).map(asJ1939Message),
   };
 }
 
-function asJ1939Message(item: any) {
+function asJ1939Message(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),

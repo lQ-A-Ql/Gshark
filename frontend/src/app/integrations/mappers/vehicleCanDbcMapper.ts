@@ -1,6 +1,7 @@
-import { optionalString } from "./mapperPrimitives";
+import { asArray, asPlainObject, optionalString } from "./mapperPrimitives";
 
-export function asDBCProfile(item: any) {
+export function asDBCProfile(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     path: String(item.path ?? ""),
     name: String(item.name ?? ""),
@@ -9,7 +10,8 @@ export function asDBCProfile(item: any) {
   };
 }
 
-export function asCANDBCMessage(item: any) {
+export function asCANDBCMessage(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
@@ -18,28 +20,31 @@ export function asCANDBCMessage(item: any) {
     database: String(item.database ?? ""),
     messageName: String(item.message_name ?? ""),
     sender: optionalString(item.sender),
-    signals: Array.isArray(item.signals)
-      ? item.signals.map((signal: any) => ({
-          name: String(signal.name ?? ""),
-          value: String(signal.value ?? ""),
-          unit: optionalString(signal.unit),
-        }))
-      : [],
+    signals: asArray(item.signals).map(asCANSignalValue),
     summary: String(item.summary ?? ""),
   };
 }
 
-export function asCANSignalTimeline(item: any) {
+export function asCANSignalTimeline(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     name: String(item.name ?? ""),
-    samples: Array.isArray(item.samples)
-      ? item.samples.map((sample: any) => ({
-          packetId: Number(sample.packet_id ?? 0),
-          time: String(sample.time ?? ""),
-          value: Number(sample.value ?? 0),
-          unit: optionalString(sample.unit),
-          messageName: optionalString(sample.message_name),
-        }))
-      : [],
+    samples: asArray(item.samples).map(asCANSignalSample),
+  };
+}
+
+function asCANSignalValue(input: unknown) {
+  const signal = asPlainObject(input) ?? {};
+  return { name: String(signal.name ?? ""), value: String(signal.value ?? ""), unit: optionalString(signal.unit) };
+}
+
+function asCANSignalSample(input: unknown) {
+  const sample = asPlainObject(input) ?? {};
+  return {
+    packetId: Number(sample.packet_id ?? 0),
+    time: String(sample.time ?? ""),
+    value: Number(sample.value ?? 0),
+    unit: optionalString(sample.unit),
+    messageName: optionalString(sample.message_name),
   };
 }

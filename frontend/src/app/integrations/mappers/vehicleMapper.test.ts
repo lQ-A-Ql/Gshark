@@ -204,10 +204,31 @@ describe("vehicleMapper", () => {
   });
 
   it("defaults malformed wire payloads without trusting nested shapes", () => {
-    const result = asVehicleAnalysis({ protocols: "bad", conversations: [null], recommendations: 7 });
+    const result = asVehicleAnalysis({
+      protocols: "bad",
+      conversations: [null],
+      can: {
+        payload_records: ["bad"],
+        decoded_messages: [{ signals: ["bad"] }],
+        signal_timelines: [{ samples: ["bad"] }],
+        frames: ["bad"],
+      },
+      j1939: { messages: ["bad"] },
+      doip: { messages: ["bad"] },
+      uds: { messages: ["bad"], transactions: ["bad"] },
+      recommendations: 7,
+    });
 
     expect(result.protocols).toEqual([]);
     expect(result.conversations).toEqual([{ label: "", count: 0 }]);
+    expect(result.can.payloadRecords[0]).toMatchObject({ packetId: 0, identifier: "" });
+    expect(result.can.decodedMessages[0].signals[0]).toEqual({ name: "", value: "", unit: undefined });
+    expect(result.can.signalTimelines[0].samples[0]).toMatchObject({ packetId: 0, value: 0 });
+    expect(result.can.frames[0]).toMatchObject({ packetId: 0, isError: false });
+    expect(result.j1939.messages[0]).toMatchObject({ packetId: 0, canId: "" });
+    expect(result.doip.messages[0]).toMatchObject({ packetId: 0, type: "" });
+    expect(result.uds.messages[0]).toMatchObject({ packetId: 0, serviceId: "" });
+    expect(result.uds.transactions[0]).toMatchObject({ requestPacketId: 0, status: "" });
     expect(result.recommendations).toEqual([]);
     expect(asVehicleAnalysis(null).totalVehiclePackets).toBe(0);
   });

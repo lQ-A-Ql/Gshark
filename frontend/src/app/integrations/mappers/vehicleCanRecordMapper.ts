@@ -1,6 +1,7 @@
-import { optionalString } from "./mapperPrimitives";
+import { asPlainObject, optionalString } from "./mapperPrimitives";
 
-export function asCANPayloadRecord(item: any) {
+export function asCANPayloadRecord(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
@@ -18,7 +19,8 @@ export function asCANPayloadRecord(item: any) {
   };
 }
 
-export function asCANFrameSummary(item: any) {
+export function asCANFrameSummary(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),

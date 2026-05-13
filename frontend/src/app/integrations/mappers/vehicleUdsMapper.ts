@@ -1,18 +1,20 @@
-import { asBucket, optionalNumber, optionalString } from "./mapperPrimitives";
+import { asArray, asBucket, asPlainObject, optionalNumber, optionalString } from "./mapperPrimitives";
 
-export function asUDSSection(input: any) {
+export function asUDSSection(input: unknown) {
+  const payload = asPlainObject(input) ?? {};
   return {
-    totalMessages: Number(input?.total_messages ?? 0),
-    serviceIDs: Array.isArray(input?.service_ids) ? input.service_ids.map(asBucket) : [],
-    negativeCodes: Array.isArray(input?.negative_codes) ? input.negative_codes.map(asBucket) : [],
-    dtcs: Array.isArray(input?.dtcs) ? input.dtcs.map(asBucket) : [],
-    vins: Array.isArray(input?.vins) ? input.vins.map(asBucket) : [],
-    messages: Array.isArray(input?.messages) ? input.messages.map(asUDSMessage) : [],
-    transactions: Array.isArray(input?.transactions) ? input.transactions.map(asUDSTransaction) : [],
+    totalMessages: Number(payload.total_messages ?? 0),
+    serviceIDs: asArray(payload.service_ids).map(asBucket),
+    negativeCodes: asArray(payload.negative_codes).map(asBucket),
+    dtcs: asArray(payload.dtcs).map(asBucket),
+    vins: asArray(payload.vins).map(asBucket),
+    messages: asArray(payload.messages).map(asUDSMessage),
+    transactions: asArray(payload.transactions).map(asUDSTransaction),
   };
 }
 
-function asUDSMessage(item: any) {
+function asUDSMessage(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
@@ -30,7 +32,8 @@ function asUDSMessage(item: any) {
   };
 }
 
-function asUDSTransaction(item: any) {
+function asUDSTransaction(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     requestPacketId: Number(item.request_packet_id ?? 0),
     responsePacketId: optionalNumber(item.response_packet_id),

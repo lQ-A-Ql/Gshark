@@ -1,16 +1,18 @@
-import { asBucket, optionalString } from "./mapperPrimitives";
+import { asArray, asBucket, asPlainObject, optionalString } from "./mapperPrimitives";
 
-export function asDoIPSection(input: any) {
+export function asDoIPSection(input: unknown) {
+  const payload = asPlainObject(input) ?? {};
   return {
-    totalMessages: Number(input?.total_messages ?? 0),
-    messageTypes: Array.isArray(input?.message_types) ? input.message_types.map(asBucket) : [],
-    vins: Array.isArray(input?.vins) ? input.vins.map(asBucket) : [],
-    endpoints: Array.isArray(input?.endpoints) ? input.endpoints.map(asBucket) : [],
-    messages: Array.isArray(input?.messages) ? input.messages.map(asDoIPMessage) : [],
+    totalMessages: Number(payload.total_messages ?? 0),
+    messageTypes: asArray(payload.message_types).map(asBucket),
+    vins: asArray(payload.vins).map(asBucket),
+    endpoints: asArray(payload.endpoints).map(asBucket),
+    messages: asArray(payload.messages).map(asDoIPMessage),
   };
 }
 
-function asDoIPMessage(item: any) {
+function asDoIPMessage(input: unknown) {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
