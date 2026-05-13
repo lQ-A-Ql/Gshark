@@ -71,14 +71,29 @@ export const sourceSizeBudgets = [
     reason: "HTTP login mapper should stay isolated from other protocol tool mappers",
   },
   {
+    path: "src/app/integrations/mappers/httpLoginRecordMapper.ts",
+    maxLines: 70,
+    reason: "HTTP login record mapper should keep endpoint and attempt record conversion isolated",
+  },
+  {
     path: "src/app/integrations/mappers/smtpMapper.ts",
     maxLines: 70,
     reason: "SMTP mapper should stay isolated from other protocol tool mappers",
   },
   {
+    path: "src/app/integrations/mappers/smtpRecordMapper.ts",
+    maxLines: 70,
+    reason: "SMTP record mapper should keep session, command, and message conversion isolated",
+  },
+  {
     path: "src/app/integrations/mappers/mysqlMapper.ts",
     maxLines: 70,
     reason: "MySQL mapper should stay isolated from other protocol tool mappers",
+  },
+  {
+    path: "src/app/integrations/mappers/mysqlRecordMapper.ts",
+    maxLines: 60,
+    reason: "MySQL record mapper should keep session, query, and server event conversion isolated",
   },
   {
     path: "src/app/integrations/mappers/shiroRememberMeMapper.ts",

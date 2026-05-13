@@ -132,4 +132,9 @@ describe("toolMapper", () => {
     expect(asSMB3SessionCandidates(null)).toEqual([]);
     expect(asNTLMSessionMaterials(null)).toEqual([]);
   });
+
+  it("coerces malformed session material payloads to safe defaults", () => {
+    expect(asSMB3SessionCandidates(["bad"])[0]).toMatchObject({ sessionId: "", complete: false });
+    expect(asNTLMSessionMaterials(["bad"])[0]).toMatchObject({ protocol: "", complete: false });
+  });
 });

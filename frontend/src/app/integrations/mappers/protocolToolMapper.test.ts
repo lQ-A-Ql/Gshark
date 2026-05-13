@@ -226,4 +226,17 @@ describe("protocolToolMapper", () => {
     expect(asShiroRememberMeAnalysis({}).candidates).toEqual([]);
     expect(asHTTPLoginAnalysis({}).report?.summary).toEqual([]);
   });
+
+  it("coerces malformed protocol payloads to safe defaults", () => {
+    expect(asHTTPLoginAnalysis({ endpoints: ["bad"], attempts: ["bad"] })).toMatchObject({
+      endpoints: [{ key: "", statusCodes: [] }],
+      attempts: [{ packetId: 0, requestKeys: [] }],
+    });
+    expect(asSMTPAnalysis({ sessions: ["bad"] }).sessions[0]).toMatchObject({ streamId: 0, commands: [] });
+    expect(asMySQLAnalysis({ sessions: ["bad"] }).sessions[0]).toMatchObject({ streamId: 0, queries: [] });
+    expect(asShiroRememberMeAnalysis({ candidates: ["bad"] }).candidates[0]).toMatchObject({
+      packetId: 0,
+      keyResults: [],
+    });
+  });
 });
