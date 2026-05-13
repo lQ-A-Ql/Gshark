@@ -1,8 +1,9 @@
 import type { WinRMDecryptResult } from "../../core/types";
+import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
 
 export function asWinRMDecryptResult(input: unknown, fallbackPort = 0): WinRMDecryptResult {
-  const payload = asPlainObject(input) ?? {};
+  const payload: WinRMDecryptResultWireDTO = asPlainObject(input) ?? {};
   return {
     resultId: String(payload.result_id ?? ""),
     captureName: String(payload.capture_name ?? ""),

@@ -126,6 +126,11 @@ export const sourceSizeBudgets = [
     reason: "WinRM mapper should stay isolated from misc module and session material mapping",
   },
   {
+    path: "src/app/integrations/wire/toolWireDtos.ts",
+    maxLines: 35,
+    reason: "tool wire DTOs should only describe raw backend payload fields before mapper normalization",
+  },
+  {
     path: "src/app/integrations/mappers/packetStreamMapper.ts",
     maxLines: 10,
     reason: "packet stream mapper should stay as a compatibility export layer",

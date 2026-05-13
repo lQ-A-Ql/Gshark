@@ -1,8 +1,9 @@
 import type { C2DecryptedRecord } from "../../core/types";
+import type { C2DecryptedRecordWireDTO } from "../wire/toolWireDtos";
 import { asPlainObject, asStringList } from "./mapperPrimitives";
 
 export function asC2DecryptedRecord(item: unknown): C2DecryptedRecord {
-  const payload = asPlainObject(item) ?? {};
+  const payload: C2DecryptedRecordWireDTO = asPlainObject(item) ?? {};
   const parsed = asPlainObject(payload.parsed);
   return {
     packetId: Number(payload.packet_id ?? 0) || undefined,
