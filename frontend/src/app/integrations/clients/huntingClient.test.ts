@@ -6,8 +6,10 @@ type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 describe("huntingClient", () => {
   it("encodes prefixes and maps threat hits from transport payloads", async () => {
-    const request = vi.fn(async (path: string) => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
       expect(path).toBe("/api/hunting?prefix=flag%7B&prefix=ctf%7B");
+      expect(init?.signal).toBe(signal);
       return [
         {
           id: 7,
@@ -22,7 +24,7 @@ describe("huntingClient", () => {
     }) as unknown as JsonRequest;
 
     const client = createHuntingClient(request);
-    const hits = await client.listThreatHits(["flag{", "ctf{"]);
+    const hits = await client.listThreatHits(["flag{", "ctf{"], signal);
 
     expect(hits).toEqual([
       {
@@ -86,6 +88,21 @@ describe("huntingClient", () => {
       yaraTimeoutMs: 15000,
     });
     expect(saved).toEqual({
+      prefixes: ["flag{"],
+      yaraEnabled: true,
+      yaraBin: "",
+      yaraRules: "",
+      yaraTimeoutMs: 25000,
+    });
+  });
+
+  it("defaults malformed runtime config payloads", async () => {
+    const request = vi.fn(async () => ({
+      prefixes: [" flag{ ", "", null],
+      yara_timeout_ms: "bad",
+    })) as unknown as JsonRequest;
+
+    await expect(createHuntingClient(request).getHuntingRuntimeConfig()).resolves.toEqual({
       prefixes: ["flag{"],
       yaraEnabled: true,
       yaraBin: "",
