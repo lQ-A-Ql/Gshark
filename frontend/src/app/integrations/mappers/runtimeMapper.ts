@@ -1,15 +1,21 @@
 import type { ToolRuntimeSnapshot } from "../../core/types";
+import type {
+  FFmpegStatusWireDTO,
+  SpeechStatusWireDTO,
+  ToolRuntimeConfigWireDTO,
+  ToolRuntimeSnapshotWireDTO,
+  YaraStatusWireDTO,
+} from "../wire/runtimeWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
 import { asTSharkStatus } from "./tsharkStatusMapper";
-
 export { asSpeechBatchTaskStatus } from "./speechBatchMapper";
 
 export function asToolRuntimeSnapshot(input: unknown): ToolRuntimeSnapshot {
-  const payload = asPlainObject(input) ?? {};
-  const config = asPlainObject(payload.config) ?? {};
-  const ffmpeg = asPlainObject(payload.ffmpeg) ?? {};
-  const speech = asPlainObject(payload.speech) ?? {};
-  const yara = asPlainObject(payload.yara) ?? {};
+  const payload: ToolRuntimeSnapshotWireDTO = asPlainObject(input) ?? {};
+  const config: ToolRuntimeConfigWireDTO = asPlainObject(payload.config) ?? {};
+  const ffmpeg: FFmpegStatusWireDTO = asPlainObject(payload.ffmpeg) ?? {};
+  const speech: SpeechStatusWireDTO = asPlainObject(payload.speech) ?? {};
+  const yara: YaraStatusWireDTO = asPlainObject(payload.yara) ?? {};
   return {
     config: {
       tsharkPath: String(config.tshark_path ?? ""),

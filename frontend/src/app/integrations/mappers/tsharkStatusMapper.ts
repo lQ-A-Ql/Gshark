@@ -1,8 +1,9 @@
 import type { TSharkStatus } from "../clients/toolRuntimeClient";
-import { asStringList } from "./mapperPrimitives";
+import type { TSharkStatusWireDTO } from "../wire/runtimeWireDtos";
+import { asPlainObject, asStringList } from "./mapperPrimitives";
 
 export function asTSharkStatus(input: unknown): TSharkStatus {
-  const payload = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  const payload: TSharkStatusWireDTO = asPlainObject(input) ?? {};
   return {
     available: Boolean(payload.available),
     path: String(payload.path ?? ""),
