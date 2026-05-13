@@ -1,19 +1,22 @@
 import type { C2DecryptedRecord } from "../../core/types";
+import { asPlainObject, asStringList } from "./mapperPrimitives";
 
-export function asC2DecryptedRecord(item: any): C2DecryptedRecord {
+export function asC2DecryptedRecord(item: unknown): C2DecryptedRecord {
+  const payload = asPlainObject(item) ?? {};
+  const parsed = asPlainObject(payload.parsed);
   return {
-    packetId: Number(item.packet_id ?? 0) || undefined,
-    streamId: Number(item.stream_id ?? 0) || undefined,
-    time: String(item.time ?? "") || undefined,
-    direction: String(item.direction ?? "") || undefined,
-    algorithm: String(item.algorithm ?? "") || undefined,
-    keyStatus: String(item.key_status ?? "") || undefined,
-    confidence: Number(item.confidence ?? 0),
-    plaintextPreview: String(item.plaintext_preview ?? "") || undefined,
-    parsed: item.parsed && typeof item.parsed === "object" && !Array.isArray(item.parsed) ? item.parsed : undefined,
-    rawLength: Number(item.raw_length ?? 0) || undefined,
-    decryptedLength: Number(item.decrypted_length ?? 0) || undefined,
-    tags: Array.isArray(item.tags) ? item.tags.map((value: unknown) => String(value ?? "")) : [],
-    error: String(item.error ?? "") || undefined,
+    packetId: Number(payload.packet_id ?? 0) || undefined,
+    streamId: Number(payload.stream_id ?? 0) || undefined,
+    time: String(payload.time ?? "") || undefined,
+    direction: String(payload.direction ?? "") || undefined,
+    algorithm: String(payload.algorithm ?? "") || undefined,
+    keyStatus: String(payload.key_status ?? "") || undefined,
+    confidence: Number(payload.confidence ?? 0),
+    plaintextPreview: String(payload.plaintext_preview ?? "") || undefined,
+    parsed,
+    rawLength: Number(payload.raw_length ?? 0) || undefined,
+    decryptedLength: Number(payload.decrypted_length ?? 0) || undefined,
+    tags: asStringList(payload.tags),
+    error: String(payload.error ?? "") || undefined,
   };
 }

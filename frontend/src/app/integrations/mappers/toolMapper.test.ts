@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { asC2DecryptedRecord } from "./c2DecryptMapper";
 import {
   asMiscModuleImportResult,
   asMiscModuleManifests,
@@ -10,12 +11,42 @@ import {
 } from "./toolMapper";
 
 describe("toolMapper", () => {
+  it("coerces malformed C2 decrypted records to safe defaults", () => {
+    expect(asC2DecryptedRecord("bad")).toMatchObject({
+      confidence: 0,
+      tags: [],
+    });
+    expect(
+      asC2DecryptedRecord({
+        packet_id: "7",
+        parsed: "bad",
+        tags: ["vshell", 1],
+        decrypted_length: "13",
+      }),
+    ).toMatchObject({
+      packetId: 7,
+      parsed: undefined,
+      tags: ["vshell", "1"],
+      decryptedLength: 13,
+    });
+  });
+
   it("maps WinRM decrypt result with fallback port", () => {
     expect(asWinRMDecryptResult({ result_id: "r1", preview_text: "ok", frame_count: 2 }, 5985)).toMatchObject({
       resultId: "r1",
       port: 5985,
       previewText: "ok",
       frameCount: 2,
+      exportFilename: "winrm-decrypt.txt",
+    });
+  });
+
+  it("coerces malformed WinRM decrypt payloads to safe defaults", () => {
+    expect(asWinRMDecryptResult("bad", 5986)).toMatchObject({
+      resultId: "",
+      port: 5986,
+      previewText: "",
+      frameCount: 0,
       exportFilename: "winrm-decrypt.txt",
     });
   });
