@@ -1,6 +1,8 @@
 import type { USBPacketRecord } from "../../core/types";
+import { asPlainObject } from "./mapperPrimitives";
 
-export function asUSBPacketRecord(item: any): USBPacketRecord {
+export function asUSBPacketRecord(input: unknown): USBPacketRecord {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),

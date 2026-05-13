@@ -1,7 +1,8 @@
 import type { USBHIDAnalysis, USBKeyboardEvent, USBMouseEvent } from "../../core/types";
-import { asBucket, asStringList } from "./mapperPrimitives";
+import { asArray, asBucket, asPlainObject, asStringList } from "./mapperPrimitives";
 
-export function asUSBKeyboardEvent(item: any): USBKeyboardEvent {
+export function asUSBKeyboardEvent(input: unknown): USBKeyboardEvent {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
@@ -18,7 +19,8 @@ export function asUSBKeyboardEvent(item: any): USBKeyboardEvent {
   };
 }
 
-export function asUSBMouseEvent(item: any): USBMouseEvent {
+export function asUSBMouseEvent(input: unknown): USBMouseEvent {
+  const item = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     time: String(item.time ?? ""),
@@ -37,11 +39,12 @@ export function asUSBMouseEvent(item: any): USBMouseEvent {
   };
 }
 
-export function asUSBHidAnalysis(payload: any): USBHIDAnalysis {
+export function asUSBHidAnalysis(input: unknown): USBHIDAnalysis {
+  const payload = asPlainObject(input) ?? {};
   return {
-    keyboardEvents: Array.isArray(payload?.keyboard_events) ? payload.keyboard_events.map(asUSBKeyboardEvent) : [],
-    mouseEvents: Array.isArray(payload?.mouse_events) ? payload.mouse_events.map(asUSBMouseEvent) : [],
-    devices: Array.isArray(payload?.devices) ? payload.devices.map(asBucket) : [],
-    notes: asStringList(payload?.notes),
+    keyboardEvents: asArray(payload.keyboard_events).map(asUSBKeyboardEvent),
+    mouseEvents: asArray(payload.mouse_events).map(asUSBMouseEvent),
+    devices: asArray(payload.devices).map(asBucket),
+    notes: asStringList(payload.notes),
   };
 }

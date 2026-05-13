@@ -155,10 +155,24 @@ describe("usbMapper", () => {
   });
 
   it("defaults malformed wire payloads and ignores non-array sections", () => {
-    const result = asUSBAnalysis({ records: "bad", devices: [null], notes: [1, "note"] });
+    const result = asUSBAnalysis({
+      records: "bad",
+      devices: [null],
+      keyboard_events: ["bad"],
+      mouse_events: ["bad"],
+      hid: "bad",
+      mass_storage: "bad",
+      other: "bad",
+      notes: [1, "note"],
+    });
 
     expect(result.records).toEqual([]);
     expect(result.devices).toEqual([{ label: "", count: 0 }]);
+    expect(result.keyboardEvents[0]).toMatchObject({ packetId: 0, keys: [] });
+    expect(result.mouseEvents[0]).toMatchObject({ packetId: 0, buttons: [] });
+    expect(result.hid.keyboardEvents).toEqual([]);
+    expect(result.massStorage.writeOperations).toEqual([]);
+    expect(result.other.records).toEqual([]);
     expect(result.notes).toEqual(["1", "note"]);
     expect(asUSBAnalysis(null).totalUSBPackets).toBe(0);
   });
