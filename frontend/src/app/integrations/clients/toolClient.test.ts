@@ -153,3 +153,51 @@ describe("toolClient protocol analysis methods", () => {
     });
   });
 });
+
+describe("toolClient SMB3 and NTLM methods", () => {
+  it("lists SMB3 session candidates and NTLM session materials", async () => {
+    const request = vi.fn(async (path: string) => {
+      switch (path) {
+        case "/api/tools/smb3-session-candidates":
+          return [{ session_id: "smb-1", username: "alice", nt_proof_str: "proof", complete: true }];
+        case "/api/tools/ntlm-sessions":
+          return [{ protocol: "HTTP", frame_number: "42", username: "bob", complete: true }];
+        default:
+          throw new Error(`unexpected path: ${path}`);
+      }
+    }) as unknown as JsonRequest;
+    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+
+    await expect(client.listSMB3SessionCandidates()).resolves.toMatchObject([
+      { sessionId: "smb-1", username: "alice", ntProofStr: "proof", complete: true },
+    ]);
+    await expect(client.listNTLMSessionMaterials()).resolves.toMatchObject([
+      { protocol: "HTTP", frameNumber: "42", username: "bob", complete: true },
+    ]);
+  });
+
+  it("posts SMB3 session key inputs and maps random session key results", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/tools/smb3-random-session-key");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toEqual({
+        username: "alice",
+        domain: "LAB",
+        ntlm_hash: "hash",
+        nt_proof_str: "proof",
+        encrypted_session_key: "esk",
+      });
+      return { random_session_key: "rsk", message: "ok" };
+    }) as unknown as JsonRequest;
+
+    await expect(
+      createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders).generateSMB3RandomSessionKey({
+        username: "alice",
+        domain: "LAB",
+        ntlmHash: "hash",
+        ntProofStr: "proof",
+        encryptedSessionKey: "esk",
+      }),
+    ).resolves.toEqual({ randomSessionKey: "rsk", message: "ok" });
+  });
+});

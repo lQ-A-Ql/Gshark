@@ -35,6 +35,11 @@ import type {
   ShiroRememberMeAnalysisWireDTO,
   SMTPAnalysisWireDTO,
 } from "../wire/protocolToolWireDtos";
+import type {
+  NTLMSessionMaterialWireDTO,
+  SMB3RandomSessionKeyResultWireDTO,
+  SMB3SessionCandidateWireDTO,
+} from "../wire/sessionMaterialWireDtos";
 import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -127,12 +132,12 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
     },
 
     async listSMB3SessionCandidates() {
-      const rows = await request<any[]>("/api/tools/smb3-session-candidates");
+      const rows = await request<SMB3SessionCandidateWireDTO[]>("/api/tools/smb3-session-candidates");
       return asSMB3SessionCandidates(rows);
     },
 
     async generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest) {
-      const payload = await request<any>("/api/tools/smb3-random-session-key", {
+      const payload = await request<SMB3RandomSessionKeyResultWireDTO>("/api/tools/smb3-random-session-key", {
         method: "POST",
         body: JSON.stringify({
           username: req.username,
@@ -146,7 +151,7 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
     },
 
     async listNTLMSessionMaterials() {
-      const payload = await request<any[]>("/api/tools/ntlm-sessions");
+      const payload = await request<NTLMSessionMaterialWireDTO[]>("/api/tools/ntlm-sessions");
       return asNTLMSessionMaterials(payload);
     },
 
