@@ -1,6 +1,12 @@
 import type { SpeechToTextStatus, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import { asToolRuntimeSnapshot } from "../mappers/runtimeMapper";
 import { asTSharkStatus } from "../mappers/tsharkStatusMapper";
+import type {
+  FFmpegStatusWireDTO,
+  SpeechStatusWireDTO,
+  ToolRuntimeSnapshotWireDTO,
+  TSharkStatusWireDTO,
+} from "../wire/runtimeWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -37,12 +43,12 @@ export interface ToolRuntimeClient {
 export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient {
   return {
     async checkTShark() {
-      const payload = await request<any>("/api/tools/tshark");
+      const payload = await request<TSharkStatusWireDTO>("/api/tools/tshark");
       return asTSharkStatus(payload);
     },
 
     async checkFFmpeg() {
-      const payload = await request<any>("/api/tools/ffmpeg");
+      const payload = await request<FFmpegStatusWireDTO>("/api/tools/ffmpeg");
       return {
         available: Boolean(payload.available),
         path: String(payload.path ?? ""),
@@ -51,7 +57,7 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
     },
 
     async checkSpeechToText() {
-      const payload = await request<any>("/api/tools/speech-to-text");
+      const payload = await request<SpeechStatusWireDTO>("/api/tools/speech-to-text");
       return {
         available: Boolean(payload.available),
         engine: String(payload.engine ?? ""),
@@ -67,12 +73,12 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
     },
 
     async getToolRuntimeSnapshot() {
-      const payload = await request<any>("/api/tools/runtime-config");
+      const payload = await request<ToolRuntimeSnapshotWireDTO>("/api/tools/runtime-config");
       return asToolRuntimeSnapshot(payload);
     },
 
     async updateToolRuntimeConfig(config: ToolRuntimeConfig) {
-      const payload = await request<any>("/api/tools/runtime-config", {
+      const payload = await request<ToolRuntimeSnapshotWireDTO>("/api/tools/runtime-config", {
         method: "POST",
         body: JSON.stringify({
           tshark_path: config.tsharkPath,
@@ -89,7 +95,7 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
     },
 
     async setTSharkPath(path: string) {
-      const payload = await request<any>("/api/tools/tshark", {
+      const payload = await request<TSharkStatusWireDTO>("/api/tools/tshark", {
         method: "POST",
         body: JSON.stringify({ path }),
       });
