@@ -1,5 +1,5 @@
 import type { C2DecryptedRecord } from "../../core/types";
-import type { C2DecryptedRecordWireDTO } from "../wire/toolWireDtos";
+import type { C2DecryptedRecordWireDTO } from "../wire/c2DecryptWireDtos";
 import { asPlainObject, asStringList } from "./mapperPrimitives";
 
 export function asC2DecryptedRecord(item: unknown): C2DecryptedRecord {

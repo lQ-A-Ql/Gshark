@@ -1,6 +1,7 @@
 import type { C2DecryptRequest, C2DecryptResult } from "../../core/types";
 import { asC2DecryptedRecord } from "../mappers/c2DecryptMapper";
 import { normalizeC2DecryptResultForDisplay } from "../mappers/c2DecryptDisplayMapper";
+import type { C2DecryptResultWireDTO } from "../wire/c2DecryptWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -11,7 +12,7 @@ export interface C2DecryptClient {
 export function createC2DecryptClient(request: JsonRequest): C2DecryptClient {
   return {
     async decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal) {
-      const payload = await request<any>("/api/c2-analysis/decrypt", {
+      const payload = await request<C2DecryptResultWireDTO>("/api/c2-analysis/decrypt", {
         method: "POST",
         signal,
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 import type { ExtractedObject } from "../../core/types";
 import { downloadBlob } from "../../utils/browserFile";
 import { asObjectList } from "../mappers/objectMapper";
+import type { ExtractedObjectWireDTO } from "../wire/evidenceWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 type BlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
@@ -13,7 +14,7 @@ export interface ObjectClient {
 export function createObjectClient(request: JsonRequest, requestBlob: BlobRequest): ObjectClient {
   return {
     async listObjects(signal?: AbortSignal) {
-      const rows = await request<any[]>("/api/objects", { signal });
+      const rows = await request<ExtractedObjectWireDTO[]>("/api/objects", { signal });
       return asObjectList(rows);
     },
 
