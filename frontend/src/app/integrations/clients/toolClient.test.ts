@@ -201,3 +201,51 @@ describe("toolClient SMB3 and NTLM methods", () => {
     ).resolves.toEqual({ randomSessionKey: "rsk", message: "ok" });
   });
 });
+
+describe("toolClient MISC module methods", () => {
+  it("lists, imports, deletes, and invokes MISC modules", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      switch (path) {
+        case "/api/tools/misc/modules":
+          return [
+            {
+              id: "decoder",
+              title: "Decoder",
+              api_prefix: "/api/tools/misc/decoder",
+              tags: ["misc"],
+              form_schema: { fields: [{ name: "payload", label: "Payload" }] },
+            },
+          ];
+        case "/api/tools/misc/import":
+          expect(init?.method).toBe("POST");
+          expect(init?.body).toBeInstanceOf(FormData);
+          expect((init?.body as FormData).get("file")).toBeInstanceOf(File);
+          return { module: { id: "custom" }, installed_path: "plugins/custom", message: "installed" };
+        case "/api/tools/misc/packages/module%2F1":
+          expect(init?.method).toBe("DELETE");
+          return {};
+        case "/api/tools/misc/packages/module%2F1/invoke":
+          expect(init?.method).toBe("POST");
+          expect(JSON.parse(String(init?.body))).toEqual({ values: { payload: "abc" } });
+          return { message: "done", text: "decoded" };
+        default:
+          throw new Error(`unexpected path: ${path}`);
+      }
+    }) as unknown as JsonRequest;
+    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+
+    await expect(client.listMiscModules()).resolves.toMatchObject([
+      { id: "decoder", title: "Decoder", apiPrefix: "/api/tools/misc/decoder", tags: ["misc"] },
+    ]);
+    await expect(client.importMiscModulePackage(new File(["zip"], "module.zip"))).resolves.toMatchObject({
+      module: { id: "custom" },
+      installedPath: "plugins/custom",
+      message: "installed",
+    });
+    await expect(client.deleteMiscModule("module/1")).resolves.toBeUndefined();
+    await expect(client.runMiscModule("module/1", { payload: "abc" })).resolves.toMatchObject({
+      message: "done",
+      text: "decoded",
+    });
+  });
+});

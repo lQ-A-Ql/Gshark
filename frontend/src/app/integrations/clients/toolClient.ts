@@ -36,6 +36,11 @@ import type {
   SMTPAnalysisWireDTO,
 } from "../wire/protocolToolWireDtos";
 import type {
+  MiscModuleImportResultWireDTO,
+  MiscModuleManifestWireDTO,
+  MiscModuleRunResultWireDTO,
+} from "../wire/miscModuleWireDtos";
+import type {
   NTLMSessionMaterialWireDTO,
   SMB3RandomSessionKeyResultWireDTO,
   SMB3SessionCandidateWireDTO,
@@ -103,14 +108,14 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
     },
 
     async listMiscModules() {
-      const rows = await request<any[]>("/api/tools/misc/modules");
+      const rows = await request<MiscModuleManifestWireDTO[]>("/api/tools/misc/modules");
       return asMiscModuleManifests(rows);
     },
 
     async importMiscModulePackage(file: File) {
       const form = new FormData();
       form.append("file", file);
-      const payload = await request<any>("/api/tools/misc/import", {
+      const payload = await request<MiscModuleImportResultWireDTO>("/api/tools/misc/import", {
         method: "POST",
         body: form,
       });
@@ -118,16 +123,19 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
     },
 
     async deleteMiscModule(id: string) {
-      await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}`, {
+      await request<unknown>(`/api/tools/misc/packages/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
     },
 
     async runMiscModule(id: string, values: Record<string, string>) {
-      const payload = await request<any>(`/api/tools/misc/packages/${encodeURIComponent(id)}/invoke`, {
-        method: "POST",
-        body: JSON.stringify({ values }),
-      });
+      const payload = await request<MiscModuleRunResultWireDTO>(
+        `/api/tools/misc/packages/${encodeURIComponent(id)}/invoke`,
+        {
+          method: "POST",
+          body: JSON.stringify({ values }),
+        },
+      );
       return asMiscModuleRunResult(payload);
     },
 

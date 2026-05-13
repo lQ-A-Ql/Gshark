@@ -141,6 +141,11 @@ export const sourceSizeBudgets = [
     reason: "session material wire DTOs should only describe raw SMB3 and NTLM payload fields",
   },
   {
+    path: "src/app/integrations/wire/miscModuleWireDtos.ts",
+    maxLines: 70,
+    reason: "misc module wire DTOs should only describe raw manifest, import, and run payload fields",
+  },
+  {
     path: "src/app/integrations/wire/c2DecryptWireDtos.ts",
     maxLines: 35,
     reason: "C2 decrypt wire DTOs should only describe raw decrypt payload fields before mapper normalization",
