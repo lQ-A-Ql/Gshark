@@ -2,6 +2,12 @@ import type { DBCProfile, DecryptionConfig, PluginItem } from "../../core/types"
 import { asDBCProfiles, asPluginItem, asPluginItems } from "../mappers/pluginMapper";
 import { asPluginSource, toPluginSourceRequest, type PluginSource } from "../mappers/pluginSourceMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "../mappers/tlsMapper";
+import type {
+  DBCProfileWireDTO,
+  DecryptionConfigWireDTO,
+  PluginItemWireDTO,
+  PluginSourceWireDTO,
+} from "../wire/pluginWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -23,12 +29,12 @@ export interface PluginClient {
 export function createPluginClient(request: JsonRequest): PluginClient {
   return {
     async listVehicleDBCProfiles() {
-      const rows = await request<any[]>("/api/analysis/vehicle/dbc");
+      const rows = await request<DBCProfileWireDTO[]>("/api/analysis/vehicle/dbc");
       return asDBCProfiles(rows);
     },
 
     async addVehicleDBC(path: string) {
-      const rows = await request<any[]>("/api/analysis/vehicle/dbc", {
+      const rows = await request<DBCProfileWireDTO[]>("/api/analysis/vehicle/dbc", {
         method: "POST",
         body: JSON.stringify({ path }),
       });
@@ -36,24 +42,24 @@ export function createPluginClient(request: JsonRequest): PluginClient {
     },
 
     async removeVehicleDBC(path: string) {
-      const rows = await request<any[]>(`/api/analysis/vehicle/dbc?path=${encodeURIComponent(path)}`, {
+      const rows = await request<DBCProfileWireDTO[]>(`/api/analysis/vehicle/dbc?path=${encodeURIComponent(path)}`, {
         method: "DELETE",
       });
       return asDBCProfiles(rows);
     },
 
     async listPlugins() {
-      const rows = await request<any[]>("/api/plugins");
+      const rows = await request<PluginItemWireDTO[]>("/api/plugins");
       return asPluginItems(rows);
     },
 
     async getPluginSource(id: string) {
-      const payload = await request<any>(`/api/plugins/source?id=${encodeURIComponent(id)}`);
+      const payload = await request<PluginSourceWireDTO>(`/api/plugins/source?id=${encodeURIComponent(id)}`);
       return asPluginSource(payload, id);
     },
 
     async savePluginSource(source: PluginSource) {
-      const payload = await request<any>(`/api/plugins/source`, {
+      const payload = await request<PluginSourceWireDTO>(`/api/plugins/source`, {
         method: "POST",
         body: JSON.stringify(toPluginSourceRequest(source)),
       });
@@ -61,7 +67,7 @@ export function createPluginClient(request: JsonRequest): PluginClient {
     },
 
     async addPlugin(plugin: PluginItem) {
-      const item = await request<any>(`/api/plugins/add`, {
+      const item = await request<PluginItemWireDTO>(`/api/plugins/add`, {
         method: "POST",
         body: JSON.stringify({
           id: String(plugin.id),
@@ -82,12 +88,14 @@ export function createPluginClient(request: JsonRequest): PluginClient {
     },
 
     async togglePlugin(id: string) {
-      const item = await request<any>(`/api/plugins/toggle?id=${encodeURIComponent(id)}`, { method: "POST" });
+      const item = await request<PluginItemWireDTO>(`/api/plugins/toggle?id=${encodeURIComponent(id)}`, {
+        method: "POST",
+      });
       return asPluginItem(item);
     },
 
     async setPluginsEnabled(ids: string[], enabled: boolean) {
-      const rows = await request<any[]>(`/api/plugins/bulk`, {
+      const rows = await request<PluginItemWireDTO[]>(`/api/plugins/bulk`, {
         method: "POST",
         body: JSON.stringify({ ids, enabled }),
       });
@@ -96,7 +104,7 @@ export function createPluginClient(request: JsonRequest): PluginClient {
 
     async getTLSConfig() {
       try {
-        const cfg = await request<any>("/api/tls");
+        const cfg = await request<DecryptionConfigWireDTO>("/api/tls");
         return asDecryptionConfig(cfg);
       } catch {
         return null;
