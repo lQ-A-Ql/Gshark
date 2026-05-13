@@ -137,6 +137,11 @@ export const sourceSizeBudgets = [
       "evidence wire DTOs should only describe raw evidence and object payload fields before mapper normalization",
   },
   {
+    path: "src/app/integrations/wire/reportWireDtos.ts",
+    maxLines: 25,
+    reason: "report wire DTOs should only describe raw investigation report payload fields",
+  },
+  {
     path: "src/app/integrations/mappers/packetStreamMapper.ts",
     maxLines: 10,
     reason: "packet stream mapper should stay as a compatibility export layer",

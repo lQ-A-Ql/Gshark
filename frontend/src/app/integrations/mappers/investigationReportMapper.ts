@@ -1,7 +1,8 @@
 import type { InvestigationReport, InvestigationReportItem } from "../../core/types";
+import type { InvestigationReportItemWireDTO, InvestigationReportWireDTO } from "../wire/reportWireDtos";
 import { asPlainObject, asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 function asInvestigationReportItem(input: unknown): InvestigationReportItem {
-  const raw = asPlainObject(input) ?? {};
+  const raw: InvestigationReportItemWireDTO = asPlainObject(input) ?? {};
   return {
     title: String(raw.title ?? ""),
     summary: optionalString(raw.summary),
@@ -18,7 +19,7 @@ function asInvestigationReportItem(input: unknown): InvestigationReportItem {
 const asItems = (input: unknown) =>
   Array.isArray(input) ? input.map(asInvestigationReportItem).filter((item) => item.title) : [];
 export function asInvestigationReport(input: unknown): InvestigationReport {
-  const report = asPlainObject(input) ?? {};
+  const report: InvestigationReportWireDTO = asPlainObject(input) ?? {};
   return {
     summary: asItems(report.summary),
     evidence: asItems(report.evidence),
