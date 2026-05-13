@@ -30,4 +30,17 @@ describe("objectMapper", () => {
     expect(asObjectList([{ id: 1 }, { id: 2, source: "FTP" }])).toHaveLength(2);
     expect(asObjectList(null)).toEqual([]);
   });
+
+  it("defaults malformed wire records without throwing", () => {
+    expect(asObject(null)).toEqual({
+      id: 0,
+      packetId: 0,
+      name: "object.bin",
+      sizeBytes: 0,
+      mime: "application/octet-stream",
+      magic: "",
+      source: "HTTP",
+    });
+    expect(asObjectList(["bad"])[0]?.name).toBe("object.bin");
+  });
 });

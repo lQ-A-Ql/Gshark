@@ -1,14 +1,19 @@
 import type { VehicleAnalysis } from "../../core/types";
 import { asInvestigationReport } from "./investigationReportMapper";
-import { asBucket, asConversation, asStringList } from "./mapperPrimitives";
+import { asArray, asBucket, asConversation, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asCANSection } from "./vehicleCanMapper";
 import { asDoIPSection, asJ1939Section, asUDSSection } from "./vehicleDiagnosticMapper";
 
-export function asVehicleAnalysis(payload: any): VehicleAnalysis {
+interface VehicleAnalysisWire extends Record<string, unknown> {
+  total_vehicle_packets?: unknown;
+}
+
+export function asVehicleAnalysis(input: unknown): VehicleAnalysis {
+  const payload = asPlainObject(input) as VehicleAnalysisWire | undefined;
   return {
     totalVehiclePackets: Number(payload?.total_vehicle_packets ?? 0),
-    protocols: Array.isArray(payload?.protocols) ? payload.protocols.map(asBucket) : [],
-    conversations: Array.isArray(payload?.conversations) ? payload.conversations.map(asConversation) : [],
+    protocols: asArray(payload?.protocols).map(asBucket),
+    conversations: asArray(payload?.conversations).map(asConversation),
     can: asCANSection(payload?.can),
     j1939: asJ1939Section(payload?.j1939),
     doip: asDoIPSection(payload?.doip),

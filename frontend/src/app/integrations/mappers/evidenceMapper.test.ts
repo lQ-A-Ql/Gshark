@@ -49,4 +49,20 @@ describe("evidenceMapper", () => {
     expect(normalizeEvidenceModule("object-file")).toBe("object");
     expect(normalizeEvidenceModule("unmapped")).toBe("unknown");
   });
+
+  it("treats malformed wire payloads as empty or defaulted records", () => {
+    expect(parseEvidenceRecords(null)).toEqual([]);
+    expect(parseEvidenceRecords({ records: "bad" })).toEqual([]);
+
+    expect(parseEvidenceRecords({ records: [null] })[0]).toMatchObject({
+      id: "",
+      module: "unknown",
+      sourceType: "",
+      summary: "",
+      confidenceLabel: "unknown",
+      severity: "info",
+      tags: [],
+      caveats: [],
+    });
+  });
 });

@@ -1,18 +1,24 @@
 import type { ExtractedObject } from "../../core/types";
+import { asArray, asPlainObject } from "./mapperPrimitives";
 
-export function asObject(input: any): ExtractedObject {
-  const source = String(input.source ?? "HTTP");
+type ExtractedObjectWire = Partial<
+  Record<"id" | "packet_id" | "name" | "size_bytes" | "mime" | "magic" | "source", unknown>
+>;
+
+export function asObject(input: unknown): ExtractedObject {
+  const payload = asPlainObject(input) as ExtractedObjectWire | undefined;
+  const source = String(payload?.source ?? "HTTP");
   return {
-    id: Number(input.id ?? 0),
-    packetId: Number(input.packet_id ?? 0),
-    name: String(input.name ?? "object.bin"),
-    sizeBytes: Number(input.size_bytes ?? 0),
-    mime: String(input.mime ?? "application/octet-stream"),
-    magic: String(input.magic ?? ""),
+    id: Number(payload?.id ?? 0),
+    packetId: Number(payload?.packet_id ?? 0),
+    name: String(payload?.name ?? "object.bin"),
+    sizeBytes: Number(payload?.size_bytes ?? 0),
+    mime: String(payload?.mime ?? "application/octet-stream"),
+    magic: String(payload?.magic ?? ""),
     source: source === "FTP" ? "FTP" : "HTTP",
   };
 }
 
-export function asObjectList(input: any): ExtractedObject[] {
-  return Array.isArray(input) ? input.map(asObject) : [];
+export function asObjectList(input: unknown): ExtractedObject[] {
+  return asArray(input).map(asObject);
 }

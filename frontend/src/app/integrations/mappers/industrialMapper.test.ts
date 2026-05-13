@@ -120,4 +120,14 @@ describe("asIndustrialAnalysis", () => {
     expect(result.modbus.transactions).toEqual([]);
     expect(result.details).toEqual([]);
   });
+
+  it("defaults malformed wire payloads without throwing", () => {
+    const result = asIndustrialAnalysis("bad");
+
+    expect(result.totalIndustrialPackets).toBe(0);
+    expect(result.protocols).toEqual([]);
+    expect(result.suspiciousWrites).toEqual([]);
+    expect(result.notes).toEqual([]);
+    expect(result.report?.summary).toEqual([]);
+  });
 });

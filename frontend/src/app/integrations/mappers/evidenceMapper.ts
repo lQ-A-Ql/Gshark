@@ -1,32 +1,41 @@
 import { confidenceLabel } from "../../core/types";
 import type { EvidenceModule, UnifiedEvidenceRecord } from "../../core/types";
+import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
 
-export function parseEvidenceRecords(payload: any): UnifiedEvidenceRecord[] {
-  const records = Array.isArray(payload?.records) ? payload.records : [];
-  return records.map(
-    (item: any): UnifiedEvidenceRecord => ({
-      id: String(item.id ?? ""),
-      module: normalizeEvidenceModule(String(item.module ?? "unknown")),
-      sourceModule: String(item.source_module ?? "") || undefined,
-      packetId: Number(item.packet_id ?? 0) || undefined,
-      streamId: Number(item.stream_id ?? 0) || undefined,
-      family: String(item.family ?? "") || undefined,
-      actorId: String(item.actor_id ?? "") || undefined,
-      actorName: String(item.actor_name ?? "") || undefined,
-      sourceType: String(item.source_type ?? ""),
-      summary: String(item.summary ?? ""),
-      value: String(item.value ?? "") || undefined,
-      confidence: typeof item.confidence === "number" ? item.confidence : undefined,
-      confidenceLabel: confidenceLabel(item.confidence),
-      severity: String(item.severity ?? "info") as UnifiedEvidenceRecord["severity"],
-      source: String(item.source ?? "") || undefined,
-      destination: String(item.destination ?? "") || undefined,
-      host: String(item.host ?? "") || undefined,
-      uri: String(item.uri ?? "") || undefined,
-      tags: Array.isArray(item.tags) ? item.tags.map((tag: unknown) => String(tag)) : [],
-      caveats: Array.isArray(item.caveats) ? item.caveats.map((caveat: unknown) => String(caveat)) : [],
-    }),
-  );
+interface EvidenceListWire {
+  records?: unknown;
+}
+
+export function parseEvidenceRecords(input: unknown): UnifiedEvidenceRecord[] {
+  const payload = asPlainObject(input) as EvidenceListWire | undefined;
+  return asArray(payload?.records).map(asEvidenceRecord);
+}
+
+function asEvidenceRecord(input: unknown): UnifiedEvidenceRecord {
+  const item = asPlainObject(input);
+  const confidence = typeof item?.confidence === "number" ? item.confidence : undefined;
+  return {
+    id: String(item?.id ?? ""),
+    module: normalizeEvidenceModule(String(item?.module ?? "unknown")),
+    sourceModule: String(item?.source_module ?? "") || undefined,
+    packetId: Number(item?.packet_id ?? 0) || undefined,
+    streamId: Number(item?.stream_id ?? 0) || undefined,
+    family: String(item?.family ?? "") || undefined,
+    actorId: String(item?.actor_id ?? "") || undefined,
+    actorName: String(item?.actor_name ?? "") || undefined,
+    sourceType: String(item?.source_type ?? ""),
+    summary: String(item?.summary ?? ""),
+    value: String(item?.value ?? "") || undefined,
+    confidence,
+    confidenceLabel: confidenceLabel(confidence),
+    severity: String(item?.severity ?? "info") as UnifiedEvidenceRecord["severity"],
+    source: String(item?.source ?? "") || undefined,
+    destination: String(item?.destination ?? "") || undefined,
+    host: String(item?.host ?? "") || undefined,
+    uri: String(item?.uri ?? "") || undefined,
+    tags: asStringList(item?.tags),
+    caveats: asStringList(item?.caveats),
+  };
 }
 
 export function normalizeEvidenceModule(raw: string): EvidenceModule {

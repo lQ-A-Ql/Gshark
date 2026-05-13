@@ -1,32 +1,38 @@
 import type { AnalysisConversation, TrafficBucket } from "../../core/types";
 
-export function asBucket(input: any): TrafficBucket {
+export function asBucket(input: unknown): TrafficBucket {
+  const payload = asPlainObject(input);
   return {
-    label: String(input.label ?? ""),
-    count: Number(input.count ?? 0),
+    label: String(payload?.label ?? ""),
+    count: Number(payload?.count ?? 0),
   };
 }
 
-export function asConversation(input: any): AnalysisConversation {
+export function asConversation(input: unknown): AnalysisConversation {
+  const payload = asPlainObject(input);
   return {
-    label: String(input.label ?? ""),
-    protocol: String(input.protocol ?? "") || undefined,
-    count: Number(input.count ?? 0),
+    label: String(payload?.label ?? ""),
+    protocol: String(payload?.protocol ?? "") || undefined,
+    count: Number(payload?.count ?? 0),
   };
 }
+
+export const asArray = (input: unknown): unknown[] => (Array.isArray(input) ? input : []);
 
 export function asStringList(input: unknown): string[] {
-  return Array.isArray(input) ? input.map((value) => String(value ?? "")) : [];
+  return asArray(input).map((value) => String(value ?? ""));
 }
 
 export function asPositiveNumbers(input: unknown): number[] {
-  if (!Array.isArray(input)) return [];
-  return input.map((value) => Number(value ?? 0)).filter(Boolean);
+  return asArray(input)
+    .map((value) => Number(value ?? 0))
+    .filter(Boolean);
 }
 
 export function asPositiveFiniteNumbers(input: unknown): number[] {
-  if (!Array.isArray(input)) return [];
-  return input.map((value) => Number(value ?? 0)).filter((value) => Number.isFinite(value) && value > 0);
+  return asArray(input)
+    .map((value) => Number(value ?? 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
 }
 
 export function asPlainObject(input: unknown): Record<string, unknown> | undefined {
@@ -36,12 +42,6 @@ export function asPlainObject(input: unknown): Record<string, unknown> | undefin
   return input as Record<string, unknown>;
 }
 
-export function optionalString(input: unknown): string | undefined {
-  const value = String(input ?? "");
-  return value || undefined;
-}
+export const optionalString = (input: unknown): string | undefined => String(input ?? "") || undefined;
 
-export function optionalNumber(input: unknown): number | undefined {
-  const value = Number(input ?? 0);
-  return value || undefined;
-}
+export const optionalNumber = (input: unknown): number | undefined => Number(input ?? 0) || undefined;

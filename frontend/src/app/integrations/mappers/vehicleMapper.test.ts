@@ -202,4 +202,13 @@ describe("vehicleMapper", () => {
     expect(result.uds.transactions).toEqual([]);
     expect(result.recommendations).toEqual([]);
   });
+
+  it("defaults malformed wire payloads without trusting nested shapes", () => {
+    const result = asVehicleAnalysis({ protocols: "bad", conversations: [null], recommendations: 7 });
+
+    expect(result.protocols).toEqual([]);
+    expect(result.conversations).toEqual([{ label: "", count: 0 }]);
+    expect(result.recommendations).toEqual([]);
+    expect(asVehicleAnalysis(null).totalVehiclePackets).toBe(0);
+  });
 });

@@ -153,4 +153,13 @@ describe("usbMapper", () => {
     expect(result.other.records).toEqual([]);
     expect(result.report?.summary).toEqual([]);
   });
+
+  it("defaults malformed wire payloads and ignores non-array sections", () => {
+    const result = asUSBAnalysis({ records: "bad", devices: [null], notes: [1, "note"] });
+
+    expect(result.records).toEqual([]);
+    expect(result.devices).toEqual([{ label: "", count: 0 }]);
+    expect(result.notes).toEqual(["1", "note"]);
+    expect(asUSBAnalysis(null).totalUSBPackets).toBe(0);
+  });
 });
