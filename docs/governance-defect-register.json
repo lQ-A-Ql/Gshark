@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-13T03:20:24+08:00",
+  "updatedAt": "2026-05-13T10:20:36+08:00",
   "entries": [
     {
       "id": "P0-1",
@@ -457,10 +457,42 @@
     {
       "id": "P1-6",
       "priority": "P1",
-      "title": "full mapper DTO/codegen migration",
-      "description": "Extend contract mapper round-trip coverage beyond pluginSourceMapper and tlsMapper to the remaining asymmetric mappers.",
+      "title": "frontend mapper raw any migration",
+      "description": "Frontend production mappers must accept unknown/explicit DTO inputs instead of raw any so malformed backend payloads degrade through parser helpers.",
       "keyFiles": [
         "frontend/src/app/integrations/mappers"
+      ],
+      "status": "resolved",
+      "resolvedIn": 10,
+      "evidence": {
+        "closedByCommit": "dc522143bc5276770b4918aff4c7aa8ebac444bb",
+        "closedAt": "2026-05-13T10:20:36+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/integrations/mappers/mapperPrimitives.ts",
+          "frontend/src/app/integrations/mappers/c2DecryptMapper.ts",
+          "frontend/src/app/integrations/mappers/miscModuleMapper.ts",
+          "frontend/src/app/integrations/mappers/miscModuleSchemaMapper.ts",
+          "frontend/src/app/integrations/mappers/toolMapper.test.ts"
+        ],
+        "validationCommands": [
+          "rg -n \"\\bany\\b\" frontend/src/app/integrations/mappers",
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/integrations/mappers/toolMapper.test.ts",
+          "frontend/src/app/integrations/mappers/contractMapper.property.test.ts"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-6",
+      "priority": "P2",
+      "title": "mapper schema/codegen feasibility",
+      "description": "Evaluate whether Go response structs should generate JSON Schema/OpenAPI and TypeScript DTOs now that handwritten mapper entrypoints no longer use raw any.",
+      "keyFiles": [
+        "frontend/src/app/integrations/mappers",
+        "backend/internal/model"
       ],
       "status": "open"
     }
