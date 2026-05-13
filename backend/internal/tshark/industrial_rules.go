@@ -8,6 +8,65 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+// Named constants consolidating previously hardcoded Modbus protocol thresholds
+// and severity levels used throughout this file. The goal is to keep all magic
+// numbers/strings in one place with documentation on their valid range and
+// origin so future maintenance does not require re-derivation from the
+// protocol specification.
+const (
+	// Modbus quantity limits per protocol spec (MB-TCP-v1.1b3).
+	// Used to flag requests that exceed the "commonly supported" upper bound,
+	// which is a strong indicator of fuzzing or malformed commands.
+	//
+	// Valid range: each limit is a positive integer upper bound (inclusive)
+	// derived directly from the Modbus Application Protocol specification.
+	modbusReadCoilsQuantityLimit          = 2000 // FC1 (Read Coils), FC2 (Read Discrete Inputs)
+	modbusReadRegistersQuantityLimit      = 125  // FC3 (Read Holding Registers), FC4 (Read Input Registers)
+	modbusWriteMultipleCoilsQuantityLimit = 1968 // FC15 (Write Multiple Coils)
+	modbusWriteMultipleRegistersLimit     = 123  // FC16 (Write Multiple Registers), FC23 (Read/Write Multiple Registers)
+
+	// Modbus exception codes that indicate a protocol-level error at the
+	// slave side. Codes 1-4 are the most common and are escalated to "high"
+	// severity because they are directly tied to malformed or rejected
+	// control commands per MB-TCP-v1.1b3.
+	//
+	// Valid range: 1-4 inclusive. Higher exception codes (5-11) exist but
+	// map to transient/acknowledgement conditions that we treat as "warning".
+	modbusExceptionIllegalFunction    = 1 // illegal function
+	modbusExceptionIllegalDataAddress = 2 // illegal data address
+	modbusExceptionIllegalDataValue   = 3 // illegal data value
+	modbusExceptionSlaveDeviceFailure = 4 // slave device failure
+
+	// Burst write detection thresholds. A stream of repeated writes to the
+	// same target is a common pattern for brute-force register scans or
+	// replay attacks. The "minimum" gate avoids alerting on single writes,
+	// and the "escalation" gate promotes long bursts to "high" severity.
+	//
+	// Valid range: both are positive integers with
+	// modbusWriteBurstMinimumCount <= modbusWriteBurstEscalationCount.
+	modbusWriteBurstMinimumCount    = 3 // minimum writes to emit a rule hit
+	modbusWriteBurstEscalationCount = 8 // at or above this, severity becomes "high"
+
+	// Function-code mutation threshold. After one mutation we emit at
+	// "warning"; at two or more consecutive mutations we escalate to
+	// "high" since a legitimate client rarely rotates Modbus function
+	// codes against the same target in a short window.
+	//
+	// Valid range: a positive integer >= 2.
+	modbusFunctionMutationEscalationCount = 2
+
+	// Rule severity level strings. Centralizing these avoids typos and
+	// lets industrialRuleLevelWeight stay the single source of truth for
+	// the ordering critical > high > warning > info.
+	//
+	// Valid values: the four listed strings. Any other value maps to
+	// weight 0 in industrialRuleLevelWeight.
+	industrialRuleLevelCritical = "critical"
+	industrialRuleLevelHigh     = "high"
+	industrialRuleLevelWarning  = "warning"
+	industrialRuleLevelInfo     = "info"
+)
+
 var knownModbusFunctionCodes = map[int]bool{
 	1:  true,
 	2:  true,
@@ -75,9 +134,9 @@ func buildModbusFunctionMutationRuleHits(transactions []model.ModbusTransaction)
 		window := windows[key]
 		if window.lastFunctionCode > 0 && window.lastFunctionCode != tx.FunctionCode {
 			window.mutationCount++
-			level := "warning"
-			if window.mutationCount >= 2 {
-				level = "high"
+			level := industrialRuleLevelWarning
+			if window.mutationCount >= modbusFunctionMutationEscalationCount {
+				level = industrialRuleLevelHigh
 			}
 			hits = append(hits, model.IndustrialRuleHit{
 				Rule:         "功能码突变",
@@ -143,7 +202,7 @@ func buildModbusRoleRuleHits(transactions []model.ModbusTransaction) []model.Ind
 	if topMaster != "" || topSlave != "" {
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:   "主从角色推断",
-			Level:  "info",
+			Level:  industrialRuleLevelInfo,
 			Source: topMaster,
 			Target: topSlave,
 			Evidence: joinRuleEvidence(
@@ -165,7 +224,7 @@ func buildModbusRoleRuleHits(transactions []model.ModbusTransaction) []model.Ind
 		sort.Strings(participants)
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:     "多主站竞争",
-			Level:    "warning",
+			Level:    industrialRuleLevelWarning,
 			Target:   target,
 			Evidence: "命中主站: " + strings.Join(participants, ", "),
 			Summary:  fmt.Sprintf("同一目标 %s 被多个源主机发起 Modbus 请求，可能存在主站冲突、接管或伪造控制。", target),
@@ -186,7 +245,7 @@ func buildModbusFunctionCodeRuleHits(transactions []model.ModbusTransaction) []m
 		}
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:         "未知功能码",
-			Level:        "high",
+			Level:        industrialRuleLevelHigh,
 			PacketID:     tx.PacketID,
 			Time:         tx.Time,
 			Source:       tx.Source,
@@ -207,9 +266,13 @@ func buildModbusExceptionRuleHits(transactions []model.ModbusTransaction) []mode
 		if tx.Kind != "exception" {
 			continue
 		}
-		level := "warning"
-		if tx.ExceptionCode == 1 || tx.ExceptionCode == 2 || tx.ExceptionCode == 3 || tx.ExceptionCode == 4 {
-			level = "high"
+		level := industrialRuleLevelWarning
+		switch tx.ExceptionCode {
+		case modbusExceptionIllegalFunction,
+			modbusExceptionIllegalDataAddress,
+			modbusExceptionIllegalDataValue,
+			modbusExceptionSlaveDeviceFailure:
+			level = industrialRuleLevelHigh
 		}
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:         "异常响应",
@@ -238,7 +301,7 @@ func buildModbusQuantityRuleHits(transactions []model.ModbusTransaction) []model
 		if quantity <= 0 {
 			hits = append(hits, model.IndustrialRuleHit{
 				Rule:         "非法数量字段",
-				Level:        "warning",
+				Level:        industrialRuleLevelWarning,
 				PacketID:     tx.PacketID,
 				Time:         tx.Time,
 				Source:       tx.Source,
@@ -257,7 +320,7 @@ func buildModbusQuantityRuleHits(transactions []model.ModbusTransaction) []model
 		}
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:         "数量越界",
-			Level:        "high",
+			Level:        industrialRuleLevelHigh,
 			PacketID:     tx.PacketID,
 			Time:         tx.Time,
 			Source:       tx.Source,
@@ -287,7 +350,7 @@ func buildModbusBitLengthRuleHits(transactions []model.ModbusTransaction) []mode
 		}
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:         "长度不一致",
-			Level:        "warning",
+			Level:        industrialRuleLevelWarning,
 			PacketID:     tx.PacketID,
 			Time:         tx.Time,
 			Source:       tx.Source,
@@ -305,12 +368,12 @@ func buildModbusBitLengthRuleHits(transactions []model.ModbusTransaction) []mode
 func buildModbusWriteBurstRuleHits(writes []model.ModbusSuspiciousWrite) []model.IndustrialRuleHit {
 	hits := make([]model.IndustrialRuleHit, 0, len(writes))
 	for _, write := range writes {
-		if write.WriteCount < 3 {
+		if write.WriteCount < modbusWriteBurstMinimumCount {
 			continue
 		}
-		level := "warning"
-		if write.WriteCount >= 8 {
-			level = "high"
+		level := industrialRuleLevelWarning
+		if write.WriteCount >= modbusWriteBurstEscalationCount {
+			level = industrialRuleLevelHigh
 		}
 		hits = append(hits, model.IndustrialRuleHit{
 			Rule:         "高频写入",
@@ -330,14 +393,14 @@ func buildModbusWriteBurstRuleHits(writes []model.ModbusSuspiciousWrite) []model
 
 func expectedModbusQuantityLimit(functionCode int) (int, bool) {
 	switch functionCode {
-	case 1, 2:
-		return 2000, true
-	case 3, 4:
-		return 125, true
-	case 15:
-		return 1968, true
-	case 16, 23:
-		return 123, true
+	case 1, 2: // FC1 (Read Coils) and FC2 (Read Discrete Inputs) per MB-TCP-v1.1b3
+		return modbusReadCoilsQuantityLimit, true
+	case 3, 4: // FC3 (Read Holding Registers) and FC4 (Read Input Registers)
+		return modbusReadRegistersQuantityLimit, true
+	case 15: // FC15 (Write Multiple Coils)
+		return modbusWriteMultipleCoilsQuantityLimit, true
+	case 16, 23: // FC16 (Write Multiple Registers) and FC23 (Read/Write Multiple Registers)
+		return modbusWriteMultipleRegistersLimit, true
 	default:
 		return 0, false
 	}
@@ -345,13 +408,13 @@ func expectedModbusQuantityLimit(functionCode int) (int, bool) {
 
 func industrialRuleLevelWeight(level string) int {
 	switch strings.ToLower(strings.TrimSpace(level)) {
-	case "critical":
+	case industrialRuleLevelCritical:
 		return 4
-	case "high":
+	case industrialRuleLevelHigh:
 		return 3
-	case "warning":
+	case industrialRuleLevelWarning:
 		return 2
-	case "info":
+	case industrialRuleLevelInfo:
 		return 1
 	default:
 		return 0

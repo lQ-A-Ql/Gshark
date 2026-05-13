@@ -41,64 +41,98 @@ describe("useCaptureStartWorkflow", () => {
       const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
       const [, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
 
+      const activeCapturePathRef = useRef("");
+      const captureSeqRef = useRef(0);
+      const captureTaskScopeRef = useRef(createCaptureTaskScope());
+      const filterSeqRef = useRef(0);
+      const hasMorePacketsRef = useRef(false);
+      const pageStartRef = useRef(0);
+      const parseErrorRef = useRef("");
+      const parseFinishedRef = useRef(false);
+      const preloadingRef = useRef(false);
+      const preloadProcessedRef = useRef(0);
+      const preloadTotalRef = useRef(0);
+
+      const httpCacheRef = useRef(new Map<number, HttpStream>());
+      const tcpCacheRef = useRef(new Map<number, BinaryStream>());
+      const udpCacheRef = useRef(new Map<number, BinaryStream>());
+      const httpPrefetchInFlightRef = useRef(new Set<number>());
+      const tcpPrefetchInFlightRef = useRef(new Set<number>());
+      const udpPrefetchInFlightRef = useRef(new Set<number>());
+      const streamSwitchDurationsRef = useRef({ ALL: [], HTTP: [], TCP: [], UDP: [] });
+      const streamSwitchHitsRef = useRef({ ALL: 0, HTTP: 0, TCP: 0, UDP: 0 });
+      const streamSwitchSequencesRef = useRef(createStreamSwitchSequences());
+
       const startCapture = useCaptureStartWorkflow({
-        backendConnected: true,
-        displayFilter: "",
-        activeCapturePathRef: useRef(""),
-        captureSeqRef: useRef(0),
-        captureTaskScopeRef: useRef(createCaptureTaskScope()),
-        filterSeqRef: useRef(0),
-        hasMorePacketsRef: useRef(false),
-        httpCacheRef: useRef(new Map<number, HttpStream>()),
-        httpPrefetchInFlightRef: useRef(new Set<number>()),
-        pageStartRef: useRef(0),
-        parseErrorRef: useRef(""),
-        parseFinishedRef: useRef(false),
-        preloadingRef: useRef(false),
-        preloadProcessedRef: useRef(0),
-        preloadTotalRef: useRef(0),
-        streamSwitchDurationsRef: useRef({ ALL: [], HTTP: [], TCP: [], UDP: [] }),
-        streamSwitchHitsRef: useRef({ ALL: 0, HTTP: 0, TCP: 0, UDP: 0 }),
-        streamSwitchSequencesRef: useRef(createStreamSwitchSequences()),
-        tcpCacheRef: useRef(new Map<number, BinaryStream>()),
-        tcpPrefetchInFlightRef: useRef(new Set<number>()),
-        udpCacheRef: useRef(new Map<number, BinaryStream>()),
-        udpPrefetchInFlightRef: useRef(new Set<number>()),
-        commitPacketPage: (safeCursor, page) => {
-          setPackets(page.items);
-          setTotalPackets(page.total);
-          expect(safeCursor).toBe(0);
+        context: {
+          backendConnected: true,
+          displayFilter: "",
         },
-        getCaptureStatus,
-        listPacketsPage,
-        openPcapFile: vi.fn(async () => opened),
-        prepareForCaptureReplacement,
-        refreshAnalysisResult,
-        refreshStreamIndex,
-        rememberRecentCapture,
-        resetAnalysisState,
-        setBackendStatus,
-        setCaptureRevision: vi.fn(),
-        setCaptureTransaction,
-        setFileMeta,
-        setHasMorePackets: vi.fn(),
-        setHasPrevPackets: vi.fn(),
-        setIsFilterLoading: vi.fn(),
-        setIsPreloadingCapture: vi.fn(),
-        setPacketPageError: vi.fn(),
-        setPackets,
-        setPageStart: vi.fn(),
-        setPreloadProcessed: vi.fn(),
-        setPreloadTotal: vi.fn(),
-        setSelectedPacketDetail: vi.fn(),
-        setSelectedPacketId: vi.fn(),
-        setSelectedPacketLayers: vi.fn(),
-        setSelectedPacketRawHex: vi.fn(),
-        setStreamSwitchMetrics,
-        setTotalPackets,
-        startStreamingPackets,
-        waitForCaptureSignal: vi.fn(async () => undefined),
-        wakeCaptureWaiters,
+        refs: {
+          activeCapturePathRef,
+          captureSeqRef,
+          captureTaskScopeRef,
+          filterSeqRef,
+          hasMorePacketsRef,
+          pageStartRef,
+          parseErrorRef,
+          parseFinishedRef,
+          preloadingRef,
+          preloadProcessedRef,
+          preloadTotalRef,
+        },
+        streamRefs: {
+          httpCacheRef,
+          tcpCacheRef,
+          udpCacheRef,
+          httpPrefetchInFlightRef,
+          tcpPrefetchInFlightRef,
+          udpPrefetchInFlightRef,
+          streamSwitchDurationsRef,
+          streamSwitchHitsRef,
+          streamSwitchSequencesRef,
+        },
+        setters: {
+          setBackendStatus,
+          setCaptureRevision: vi.fn(),
+          setCaptureTransaction,
+          setFileMeta,
+          setHasMorePackets: vi.fn(),
+          setHasPrevPackets: vi.fn(),
+          setIsFilterLoading: vi.fn(),
+          setIsPreloadingCapture: vi.fn(),
+          setPacketPageError: vi.fn(),
+          setPackets,
+          setPageStart: vi.fn(),
+          setPreloadProcessed: vi.fn(),
+          setPreloadTotal: vi.fn(),
+          setSelectedPacketDetail: vi.fn(),
+          setSelectedPacketId: vi.fn(),
+          setSelectedPacketLayers: vi.fn(),
+          setSelectedPacketRawHex: vi.fn(),
+          setStreamSwitchMetrics,
+          setTotalPackets,
+        },
+        clients: {
+          getCaptureStatus,
+          listPacketsPage,
+          openPcapFile: vi.fn(async () => opened),
+          startStreamingPackets,
+        },
+        hooks: {
+          commitPacketPage: (safeCursor, page) => {
+            setPackets(page.items);
+            setTotalPackets(page.total);
+            expect(safeCursor).toBe(0);
+          },
+          prepareForCaptureReplacement,
+          refreshAnalysisResult,
+          refreshStreamIndex,
+          rememberRecentCapture,
+          resetAnalysisState,
+          waitForCaptureSignal: vi.fn(async () => undefined),
+          wakeCaptureWaiters,
+        },
       });
 
       return { backendStatus, captureTransaction, fileMeta, packets, startCapture, totalPackets };

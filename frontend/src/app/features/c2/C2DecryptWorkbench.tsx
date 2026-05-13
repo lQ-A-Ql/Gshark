@@ -1,3 +1,12 @@
+/**
+ * Stability: experimental
+ *
+ * The C2 decryption workbench covers VShell (triple-KDF) and Cobalt Strike
+ * keyed offline paths. Decryption heuristics have been validated against
+ * public reference samples but may produce false positives or fail on novel
+ * loaders. Expect input fields and backend contract to evolve; treat decrypt
+ * output as advisory evidence rather than authoritative.
+ */
 import { KeyRound, Unlock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { EmptyState } from "../../components/DesignSystem";

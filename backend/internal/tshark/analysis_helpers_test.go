@@ -13,7 +13,11 @@ func TestPlanFieldScanByCapabilitiesSkipsMissingOptionalFields(t *testing.T) {
 	})
 	ClearCapabilityCache()
 
+	// Include display-layer fields so _ws.col.Info is present and resolvable,
+	// matching the test's original semantics of measuring optional-field skip
+	// behavior (modbus.func_code is the field that should be skipped).
 	fields := append([]string{}, requiredCapabilityFields...)
+	fields = append(fields, displayLayerCapabilityFields...)
 	fields = append(fields, "ip.src")
 	binary := writeFakeTShark(t, "TShark 4.2.0", fields)
 	SetBinaryPath(binary)
@@ -39,14 +43,18 @@ func TestPlanFieldScanByCapabilitiesRejectsMissingRequiredFields(t *testing.T) {
 	})
 	ClearCapabilityCache()
 
+	// Fake tshark publishes only frame.number, so requesting frame.protocols
+	// (a genuinely required protocol-layer field) must trigger the missing-
+	// required-field error. _ws.col.Info is no longer required after the
+	// P0-3 display-layer downgrade, so it cannot be used to drive this path.
 	binary := writeFakeTShark(t, "TShark 3.2.0", []string{"frame.number"})
 	SetBinaryPath(binary)
 
-	_, err := planFieldScanByCapabilities([]string{"frame.number", "_ws.col.Info"})
+	_, err := planFieldScanByCapabilities([]string{"frame.number", "frame.protocols"})
 	if err == nil {
 		t.Fatal("expected missing required field error")
 	}
-	if got := err.Error(); got == "" || !stringContainsAll(got, "_ws.col.Info", "TShark 3.2.0") {
+	if got := err.Error(); got == "" || !stringContainsAll(got, "frame.protocols", "TShark 3.2.0") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -147,8 +155,8 @@ func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 		ClearFieldScanCache("")
 	})
 
-	key := buildFieldScanCacheKey("demo.pcap", normalizeFieldScanOptions(fieldScanOptions{}))
-	storeFieldScanCacheEntry(key, []string{"frame.number", "ip.src", "_ws.col.Info"}, [][]string{
+	key := cacheKey(buildFieldScanCacheParams("demo.pcap", normalizeFieldScanOptions(fieldScanOptions{})))
+	storeFieldScanCacheEntry(key, "demo.pcap", []string{"frame.number", "ip.src", "_ws.col.Info"}, [][]string{
 		{"7", "192.0.2.10", "GET /index"},
 	})
 

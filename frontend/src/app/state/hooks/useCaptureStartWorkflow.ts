@@ -17,43 +17,38 @@ import type { CaptureStatus, PacketsPageResult } from "../../integrations/client
 type Ref<T> = MutableRefObject<T>;
 type Setter<T> = (value: T | ((prev: T) => T)) => void;
 
-interface UseCaptureStartWorkflowOptions {
+export interface CaptureStartBackendContext {
   readonly backendConnected: boolean;
   readonly displayFilter: string;
+}
+
+export interface CaptureStartRefs {
   readonly activeCapturePathRef: Ref<string>;
   readonly captureSeqRef: Ref<number>;
   readonly captureTaskScopeRef: Ref<CaptureTaskScope>;
   readonly filterSeqRef: Ref<number>;
   readonly hasMorePacketsRef: Ref<boolean>;
-  readonly httpCacheRef: Ref<Map<number, HttpStream>>;
-  readonly httpPrefetchInFlightRef: Ref<Set<number>>;
   readonly pageStartRef: Ref<number>;
   readonly parseErrorRef: Ref<string>;
   readonly parseFinishedRef: Ref<boolean>;
   readonly preloadingRef: Ref<boolean>;
   readonly preloadProcessedRef: Ref<number>;
   readonly preloadTotalRef: Ref<number>;
+}
+
+export interface CaptureStartStreamRefs {
+  readonly httpCacheRef: Ref<Map<number, HttpStream>>;
+  readonly tcpCacheRef: Ref<Map<number, BinaryStream>>;
+  readonly udpCacheRef: Ref<Map<number, BinaryStream>>;
+  readonly httpPrefetchInFlightRef: Ref<Set<number>>;
+  readonly tcpPrefetchInFlightRef: Ref<Set<number>>;
+  readonly udpPrefetchInFlightRef: Ref<Set<number>>;
   readonly streamSwitchDurationsRef: Ref<StreamSwitchDurations>;
   readonly streamSwitchHitsRef: Ref<StreamSwitchHits>;
   readonly streamSwitchSequencesRef: Ref<StreamSwitchSequences>;
-  readonly tcpCacheRef: Ref<Map<number, BinaryStream>>;
-  readonly tcpPrefetchInFlightRef: Ref<Set<number>>;
-  readonly udpCacheRef: Ref<Map<number, BinaryStream>>;
-  readonly udpPrefetchInFlightRef: Ref<Set<number>>;
-  readonly commitPacketPage: (safeCursor: number, page: Pick<PacketsPageResult, "items" | "total" | "hasMore">) => void;
-  readonly getCaptureStatus: (signal?: AbortSignal) => Promise<CaptureStatus>;
-  readonly listPacketsPage: (
-    cursor: number,
-    limit: number,
-    filter?: string,
-    signal?: AbortSignal,
-  ) => Promise<PacketsPageResult>;
-  readonly openPcapFile: () => Promise<OpenedCapture>;
-  readonly prepareForCaptureReplacement: () => Promise<void>;
-  readonly refreshAnalysisResult: (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>;
-  readonly refreshStreamIndex: () => Promise<void>;
-  readonly rememberRecentCapture: Parameters<typeof prepareAndStartOpenedCapture>[0]["rememberRecentCapture"];
-  readonly resetAnalysisState: () => void;
+}
+
+export interface CaptureStartSetters {
   readonly setBackendStatus: (status: string) => void;
   readonly setCaptureRevision: Setter<number>;
   readonly setCaptureTransaction: Setter<CaptureTransactionStatus>;
@@ -73,51 +68,81 @@ interface UseCaptureStartWorkflowOptions {
   readonly setSelectedPacketRawHex: Setter<string>;
   readonly setStreamSwitchMetrics: Setter<StreamSwitchMetrics>;
   readonly setTotalPackets: Setter<number>;
+}
+
+export interface CaptureStartBackendClients {
+  readonly getCaptureStatus: (signal?: AbortSignal) => Promise<CaptureStatus>;
+  readonly listPacketsPage: (
+    cursor: number,
+    limit: number,
+    filter?: string,
+    signal?: AbortSignal,
+  ) => Promise<PacketsPageResult>;
+  readonly openPcapFile: () => Promise<OpenedCapture>;
   readonly startStreamingPackets: (filePath: string, filter: string, signal?: AbortSignal) => Promise<unknown>;
+}
+
+export interface CaptureStartHooks {
+  readonly commitPacketPage: (safeCursor: number, page: Pick<PacketsPageResult, "items" | "total" | "hasMore">) => void;
+  readonly prepareForCaptureReplacement: () => Promise<void>;
+  readonly refreshAnalysisResult: (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>;
+  readonly refreshStreamIndex: () => Promise<void>;
+  readonly rememberRecentCapture: Parameters<typeof prepareAndStartOpenedCapture>[0]["rememberRecentCapture"];
+  readonly resetAnalysisState: () => void;
   readonly waitForCaptureSignal: (delayMs: number) => Promise<void>;
   readonly wakeCaptureWaiters: () => void;
 }
 
+export interface UseCaptureStartWorkflowOptions {
+  readonly context: CaptureStartBackendContext;
+  readonly refs: CaptureStartRefs;
+  readonly streamRefs: CaptureStartStreamRefs;
+  readonly setters: CaptureStartSetters;
+  readonly clients: CaptureStartBackendClients;
+  readonly hooks: CaptureStartHooks;
+}
+
 export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions) {
+  const { context, refs, streamRefs, setters, clients, hooks } = options;
   return useCallback(
     async (filePath?: string, filterOverride?: string) => {
-      if (!options.backendConnected) {
-        options.setBackendStatus(getCaptureOpenDisconnectedStatus());
+      if (!context.backendConnected) {
+        setters.setBackendStatus(getCaptureOpenDisconnectedStatus());
         return false;
       }
 
-      const captureSeq = ++options.captureSeqRef.current;
-      options.filterSeqRef.current += 1;
-      const effectiveFilter = filterOverride ?? options.displayFilter;
-      const hadActiveCapture = Boolean(options.activeCapturePathRef.current);
+      const captureSeq = ++refs.captureSeqRef.current;
+      refs.filterSeqRef.current += 1;
+      const effectiveFilter = filterOverride ?? context.displayFilter;
+      const hadActiveCapture = Boolean(refs.activeCapturePathRef.current);
       let pendingCapture = buildOpenedCaptureFromPath(filePath ?? "");
 
       try {
-        const opened = await resolveOpenedCapture({ filePath, openPcapFile: options.openPcapFile });
+        const opened = await resolveOpenedCapture({ filePath, openPcapFile: clients.openPcapFile });
         pendingCapture = opened;
 
         const started = await prepareAndStartOpenedCapture({
           opened,
           openedAt: new Date().toISOString(),
           hadActiveCapture,
-          preloadProcessedRef: options.preloadProcessedRef,
-          preloadTotalRef: options.preloadTotalRef,
-          parseFinishedRef: options.parseFinishedRef,
-          parseErrorRef: options.parseErrorRef,
-          preloadingRef: options.preloadingRef,
-          setIsFilterLoading: options.setIsFilterLoading,
-          setPacketPageError: options.setPacketPageError,
-          setPreloadProcessed: options.setPreloadProcessed,
-          setPreloadTotal: options.setPreloadTotal,
-          setIsPreloadingCapture: options.setIsPreloadingCapture,
-          setCaptureTransaction: options.setCaptureTransaction,
-          setBackendStatus: options.setBackendStatus,
-          rememberRecentCapture: options.rememberRecentCapture,
+          preloadProcessedRef: refs.preloadProcessedRef,
+          preloadTotalRef: refs.preloadTotalRef,
+          parseFinishedRef: refs.parseFinishedRef,
+          parseErrorRef: refs.parseErrorRef,
+          preloadingRef: refs.preloadingRef,
+          setIsFilterLoading: setters.setIsFilterLoading,
+          setPacketPageError: setters.setPacketPageError,
+          setPreloadProcessed: setters.setPreloadProcessed,
+          setPreloadTotal: setters.setPreloadTotal,
+          setIsPreloadingCapture: setters.setIsPreloadingCapture,
+          setCaptureTransaction: setters.setCaptureTransaction,
+          setBackendStatus: setters.setBackendStatus,
+          rememberRecentCapture: hooks.rememberRecentCapture,
           captureSeq,
-          captureSeqRef: options.captureSeqRef,
-          captureTaskScopeRef: options.captureTaskScopeRef,
-          prepareForCaptureReplacement: options.prepareForCaptureReplacement,
-          startStreamingPackets: options.startStreamingPackets,
+          captureSeqRef: refs.captureSeqRef,
+          captureTaskScopeRef: refs.captureTaskScopeRef,
+          prepareForCaptureReplacement: hooks.prepareForCaptureReplacement,
+          startStreamingPackets: clients.startStreamingPackets,
         });
         if (!started) return false;
 
@@ -125,17 +150,17 @@ export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions)
           opened,
           filter: effectiveFilter,
           captureSeq,
-          captureSeqRef: options.captureSeqRef,
-          captureTaskScopeRef: options.captureTaskScopeRef,
-          parseFinishedRef: options.parseFinishedRef,
-          parseErrorRef: options.parseErrorRef,
-          preloadProcessedRef: options.preloadProcessedRef,
-          preloadTotalRef: options.preloadTotalRef,
-          listPacketsPage: options.listPacketsPage,
-          getCaptureStatus: options.getCaptureStatus,
-          waitForCaptureSignal: options.waitForCaptureSignal,
-          setTotalPackets: options.setTotalPackets,
-          setPreloadProcessed: options.setPreloadProcessed,
+          captureSeqRef: refs.captureSeqRef,
+          captureTaskScopeRef: refs.captureTaskScopeRef,
+          parseFinishedRef: refs.parseFinishedRef,
+          parseErrorRef: refs.parseErrorRef,
+          preloadProcessedRef: refs.preloadProcessedRef,
+          preloadTotalRef: refs.preloadTotalRef,
+          listPacketsPage: clients.listPacketsPage,
+          getCaptureStatus: clients.getCaptureStatus,
+          waitForCaptureSignal: hooks.waitForCaptureSignal,
+          setTotalPackets: setters.setTotalPackets,
+          setPreloadProcessed: setters.setPreloadProcessed,
         });
         if (!validatedFirstPage) return false;
 
@@ -143,64 +168,64 @@ export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions)
           opened,
           validatedFirstPage,
           captureSeq,
-          captureSeqRef: options.captureSeqRef,
-          pageStartRef: options.pageStartRef,
-          hasMorePacketsRef: options.hasMorePacketsRef,
-          activeCapturePathRef: options.activeCapturePathRef,
-          httpCache: options.httpCacheRef.current,
-          tcpCache: options.tcpCacheRef.current,
-          udpCache: options.udpCacheRef.current,
-          httpPrefetchInFlight: options.httpPrefetchInFlightRef.current,
-          tcpPrefetchInFlight: options.tcpPrefetchInFlightRef.current,
-          udpPrefetchInFlight: options.udpPrefetchInFlightRef.current,
-          switchSequences: options.streamSwitchSequencesRef.current,
-          switchDurationsRef: options.streamSwitchDurationsRef,
-          switchHitsRef: options.streamSwitchHitsRef,
-          setPackets: options.setPackets,
-          setTotalPackets: options.setTotalPackets,
-          setPageStart: options.setPageStart,
-          setHasPrevPackets: options.setHasPrevPackets,
-          setHasMorePackets: options.setHasMorePackets,
-          setSelectedPacketId: options.setSelectedPacketId,
-          setSelectedPacketDetail: options.setSelectedPacketDetail,
-          setSelectedPacketRawHex: options.setSelectedPacketRawHex,
-          setSelectedPacketLayers: options.setSelectedPacketLayers,
-          setStreamSwitchMetrics: options.setStreamSwitchMetrics,
-          resetAnalysisState: options.resetAnalysisState,
-          setFileMeta: options.setFileMeta,
-          setCaptureRevision: options.setCaptureRevision,
-          commitPacketPage: options.commitPacketPage,
-          refreshStreamIndex: options.refreshStreamIndex,
-          setCaptureTransaction: options.setCaptureTransaction,
-          setBackendStatus: options.setBackendStatus,
-          refreshAnalysisResult: options.refreshAnalysisResult,
+          captureSeqRef: refs.captureSeqRef,
+          pageStartRef: refs.pageStartRef,
+          hasMorePacketsRef: refs.hasMorePacketsRef,
+          activeCapturePathRef: refs.activeCapturePathRef,
+          httpCache: streamRefs.httpCacheRef.current,
+          tcpCache: streamRefs.tcpCacheRef.current,
+          udpCache: streamRefs.udpCacheRef.current,
+          httpPrefetchInFlight: streamRefs.httpPrefetchInFlightRef.current,
+          tcpPrefetchInFlight: streamRefs.tcpPrefetchInFlightRef.current,
+          udpPrefetchInFlight: streamRefs.udpPrefetchInFlightRef.current,
+          switchSequences: streamRefs.streamSwitchSequencesRef.current,
+          switchDurationsRef: streamRefs.streamSwitchDurationsRef,
+          switchHitsRef: streamRefs.streamSwitchHitsRef,
+          setPackets: setters.setPackets,
+          setTotalPackets: setters.setTotalPackets,
+          setPageStart: setters.setPageStart,
+          setHasPrevPackets: setters.setHasPrevPackets,
+          setHasMorePackets: setters.setHasMorePackets,
+          setSelectedPacketId: setters.setSelectedPacketId,
+          setSelectedPacketDetail: setters.setSelectedPacketDetail,
+          setSelectedPacketRawHex: setters.setSelectedPacketRawHex,
+          setSelectedPacketLayers: setters.setSelectedPacketLayers,
+          setStreamSwitchMetrics: setters.setStreamSwitchMetrics,
+          resetAnalysisState: hooks.resetAnalysisState,
+          setFileMeta: setters.setFileMeta,
+          setCaptureRevision: setters.setCaptureRevision,
+          commitPacketPage: hooks.commitPacketPage,
+          refreshStreamIndex: hooks.refreshStreamIndex,
+          setCaptureTransaction: setters.setCaptureTransaction,
+          setBackendStatus: setters.setBackendStatus,
+          refreshAnalysisResult: hooks.refreshAnalysisResult,
         });
       } catch (error) {
         if (isAbortLikeError(error)) return false;
-        if (captureSeq === options.captureSeqRef.current) {
+        if (captureSeq === refs.captureSeqRef.current) {
           const failedTransaction = buildFailedCaptureTransactionStatus({
             error,
-            parseError: options.parseErrorRef.current,
+            parseError: refs.parseErrorRef.current,
             hadActiveCapture,
             fallbackName: filePath?.trim() || "",
             fallbackPath: filePath?.trim() || "",
             pendingCaptureName: pendingCapture?.fileName,
             pendingCapturePath: pendingCapture?.filePath,
           });
-          options.setCaptureTransaction(failedTransaction);
-          options.setBackendStatus(failedTransaction.message);
+          setters.setCaptureTransaction(failedTransaction);
+          setters.setBackendStatus(failedTransaction.message);
         }
         return false;
       } finally {
-        if (captureSeq === options.captureSeqRef.current) {
+        if (captureSeq === refs.captureSeqRef.current) {
           stopCapturePreloading({
-            preloadingRef: options.preloadingRef,
-            setIsPreloadingCapture: options.setIsPreloadingCapture,
+            preloadingRef: refs.preloadingRef,
+            setIsPreloadingCapture: setters.setIsPreloadingCapture,
           });
-          options.wakeCaptureWaiters();
+          hooks.wakeCaptureWaiters();
         }
       }
     },
-    [options],
+    [context, refs, streamRefs, setters, clients, hooks],
   );
 }

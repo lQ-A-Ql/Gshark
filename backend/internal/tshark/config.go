@@ -94,7 +94,7 @@ func CurrentStatus() Status {
 			CustomPath:      custom,
 			UsingCustomPath: true,
 			Capabilities: Capabilities{
-				FieldProfile:            "unavailable",
+				FieldProfile:            FieldProfileUnavailable,
 				CapabilityMessage:       err.Error(),
 				CapabilityCheckDegraded: true,
 			},
@@ -108,7 +108,7 @@ func CurrentStatus() Status {
 			Path:      "",
 			Message:   "找不到 tshark QAQ ，需要自行配置正确的路径OVO",
 			Capabilities: Capabilities{
-				FieldProfile:            "unavailable",
+				FieldProfile:            FieldProfileUnavailable,
 				CapabilityMessage:       "tshark binary is unavailable",
 				CapabilityCheckDegraded: true,
 			},

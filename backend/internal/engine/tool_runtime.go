@@ -14,7 +14,22 @@ const (
 	voskModelEnvVar = "GSHARK_VOSK_MODEL"
 )
 
+// ToolRuntimeConfig returns a coherent snapshot of the tool runtime
+// configuration. Because the underlying state lives in three different
+// backings (OS env vars, the tshark package global, and s.yaraConf under
+// s.huntMu), the read is guarded by s.toolRuntimeMu so concurrent callers
+// of SetToolRuntimeConfig cannot observe half-applied state.
 func (s *Service) ToolRuntimeConfig() model.ToolRuntimeConfig {
+	s.toolRuntimeMu.RLock()
+	defer s.toolRuntimeMu.RUnlock()
+	return s.toolRuntimeConfigLocked()
+}
+
+// toolRuntimeConfigLocked returns the current tool runtime configuration.
+// Callers MUST hold s.toolRuntimeMu (read or write). The function briefly
+// takes s.huntMu internally to copy the yaraConf slice; s.huntMu is a
+// different mutex so there is no risk of re-entering s.toolRuntimeMu.
+func (s *Service) toolRuntimeConfigLocked() model.ToolRuntimeConfig {
 	s.huntMu.RLock()
 	yc := s.yaraConf
 	s.huntMu.RUnlock()
@@ -36,7 +51,14 @@ func (s *Service) ToolRuntimeConfig() model.ToolRuntimeConfig {
 	}
 }
 
+// SetToolRuntimeConfig atomically applies cfg to the three config backings
+// and returns the resulting coherent snapshot. Holding s.toolRuntimeMu for
+// the entire critical section — including the concluding read — guarantees
+// no other reader or writer can interleave.
 func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig {
+	s.toolRuntimeMu.Lock()
+	defer s.toolRuntimeMu.Unlock()
+
 	tshark.SetBinaryPath(strings.TrimSpace(cfg.TSharkPath))
 	setEnvOrUnset(ffmpegEnvVar, cfg.FFmpegPath)
 	setEnvOrUnset(pythonEnvVar, cfg.PythonPath)
@@ -57,9 +79,13 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
 
-	return s.ToolRuntimeConfig()
+	return s.toolRuntimeConfigLocked()
 }
 
+// ToolRuntimeSnapshot composes the configuration with the status reports
+// of each tool. The underlying status getters (TShark/FFmpeg/Speech/Yara)
+// manage their own locking on independent mutexes, so the snapshot is
+// coherent for the configuration slice without re-locking them here.
 func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
 	return model.ToolRuntimeSnapshot{
 		Config: s.ToolRuntimeConfig(),
@@ -74,7 +100,12 @@ func (s *Service) TSharkStatus() any {
 	return tshark.CurrentStatus()
 }
 
+// SetTSharkPath updates the tshark binary path. It takes s.toolRuntimeMu
+// so a concurrent SetToolRuntimeConfig cannot observe or clobber a
+// partially-applied tshark path.
 func (s *Service) SetTSharkPath(path string) any {
+	s.toolRuntimeMu.Lock()
+	defer s.toolRuntimeMu.Unlock()
 	tshark.SetBinaryPath(strings.TrimSpace(path))
 	return tshark.CurrentStatus()
 }

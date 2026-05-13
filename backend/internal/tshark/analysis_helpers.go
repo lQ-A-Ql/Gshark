@@ -3,81 +3,64 @@ package tshark
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
-	"sort"
-	"strconv"
 	"strings"
-	"sync"
-
-	"github.com/gshark/sentinel/backend/internal/model"
 )
 
-type conversationCount struct {
-	Label    string
-	Protocol string
-	Count    int
-}
+// Field-scan subprocess execution.
+//
+// This file owns the narrow responsibility of turning a (filePath, fields,
+// opts) request into the rows tshark emits, gated by the field-scan cache.
+// It intentionally stays short; adjacent concerns live in focused siblings:
+//
+//   - field_scan_plan.go        — capability planning + PlannedFieldScan
+//                                 wrapper for callers that own their argv.
+//   - field_scan_normalize.go   — input trimming/dedupe/padding helpers.
+//   - field_scan_degradation.go — human-readable missing-optional-field notes.
+//   - field_scan_warm.go        — WarmFieldScanCache / WarmSpecializedFieldCache.
+//   - field_scan_cache.go       — LRU-bounded cache storage and replay.
+//   - cache_key.go              — deterministic SHA-256 cache key.
+//   - analysis_utils.go         — protocol-agnostic utilities (hex, flex int,
+//                                 conversation bucket sort).
 
+// fieldScanOptions selects the tshark CLI knobs that influence scan output:
+// a display filter, the -E occurrence mode, and the -E aggregator. Blank
+// fields receive tshark-standard defaults via normalizeFieldScanOptions.
 type fieldScanOptions struct {
 	DisplayFilter string
 	Occurrence    string
 	Aggregator    string
 }
 
-type fieldScanCacheKey struct {
-	FilePath      string
-	DisplayFilter string
-	Occurrence    string
-	Aggregator    string
-}
-
+// fieldScanCacheEntry is the payload stored under a cache key: the concrete
+// ordered field list, a reverse index for projection lookups, and the raw
+// rows. fieldIndex lets findFieldScanCacheEntry answer superset-projection
+// queries in O(requested fields) time.
 type fieldScanCacheEntry struct {
 	fields     []string
 	fieldIndex map[string]int
 	rows       [][]string
 }
 
-type fieldScanWarmPlan struct {
-	fields []string
-	opts   fieldScanOptions
-}
-
-type fieldScanCapabilityPlan struct {
-	requestedFields []string
-	tsharkFields    []string
-	projection      []int
-	missingOptional []string
-}
-
-type PlannedFieldScan struct {
-	Args             []string
-	RequestedFields  []string
-	TSharkFields     []string
-	MissingOptional  []string
-	CapabilityActive bool
-	plan             fieldScanCapabilityPlan
-}
-
-var fieldScanCache = struct {
-	mu      sync.RWMutex
-	entries map[fieldScanCacheKey][]*fieldScanCacheEntry
-}{
-	entries: map[fieldScanCacheKey][]*fieldScanCacheEntry{},
-}
-
 func scanFieldRows(filePath string, fields []string, onRow func([]string)) error {
 	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{}, onRow)
 }
 
+// ScanFieldRowsWithDisplayFilter is the exported wrapper that applies a
+// display filter to an otherwise-default field scan.
 func ScanFieldRowsWithDisplayFilter(filePath string, fields []string, displayFilter string, onRow func([]string)) error {
 	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{DisplayFilter: displayFilter}, onRow)
 }
 
+// ScanFieldRows is the exported no-options field-scan entry point.
 func ScanFieldRows(filePath string, fields []string, onRow func([]string)) error {
 	return scanFieldRows(filePath, fields, onRow)
 }
 
+// scanFieldRowsWithOptions is the single cache-aware code path that every
+// field-scan flow funnels through. It normalizes inputs, consults the
+// capability plan and cache, and either replays cached rows or spawns tshark
+// once and stores the result for future callers.
 func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOptions, onRow func([]string)) error {
 	normalizedFields := normalizeFieldScanFields(fields)
 	if len(normalizedFields) == 0 {
@@ -88,9 +71,10 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		return err
 	}
 	normalizedOpts := normalizeFieldScanOptions(opts)
-	cacheKey := buildFieldScanCacheKey(filePath, normalizedOpts)
+	cacheParams := buildFieldScanCacheParams(filePath, normalizedOpts)
+	key := cacheKey(cacheParams)
 
-	if entry, indices, ok := findFieldScanCacheEntry(cacheKey, plan.requestedFields); ok {
+	if entry, indices, ok := findFieldScanCacheEntry(key, plan.requestedFields); ok {
 		replayCachedFieldRows(entry, indices, onRow)
 		return nil
 	}
@@ -100,16 +84,16 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 
 	args := []string{
 		"-n",
-		"-r", cacheKey.FilePath,
+		"-r", cacheParams.FilePath,
 	}
-	if cacheKey.DisplayFilter != "" {
-		args = append(args, "-Y", cacheKey.DisplayFilter)
+	if cacheParams.DisplayFilter != "" {
+		args = append(args, "-Y", cacheParams.DisplayFilter)
 	}
 	args = append(args,
 		"-T", "fields",
 		"-E", "separator=\t",
-		"-E", "occurrence="+cacheKey.Occurrence,
-		"-E", "aggregator="+cacheKey.Aggregator,
+		"-E", "occurrence="+cacheParams.Occurrence,
+		"-E", "aggregator="+cacheParams.Aggregator,
 		"-E", "quote=n",
 	)
 	for _, field := range plan.tsharkFields {
@@ -161,80 +145,15 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		return fmt.Errorf("wait tshark: %w", err)
 	}
 
-	storeFieldScanCacheEntry(cacheKey, plan.requestedFields, rows)
+	storeFieldScanCacheEntry(key, cacheParams.FilePath, plan.requestedFields, rows)
 	return nil
 }
 
-func planFieldScanByCapabilities(fields []string) (fieldScanCapabilityPlan, error) {
-	plan := fieldScanCapabilityPlan{
-		requestedFields: append([]string(nil), fields...),
-		tsharkFields:    append([]string(nil), fields...),
-		projection:      make([]int, len(fields)),
-	}
-	for idx := range plan.projection {
-		plan.projection[idx] = idx
-	}
-
-	binary, err := ResolveBinary()
-	if err != nil {
-		return plan, nil
-	}
-	fieldSet, capabilities, ok := CurrentFieldSet(context.Background(), binary)
-	if !ok {
-		return plan, nil
-	}
-
-	tsharkFields := make([]string, 0, len(fields))
-	projection := make([]int, len(fields))
-	missingRequired := []string{}
-	missingOptional := []string{}
-	for idx, field := range fields {
-		if resolvedField, exists := resolveCapabilityField(fieldSet, field); exists {
-			projection[idx] = len(tsharkFields)
-			tsharkFields = append(tsharkFields, resolvedField)
-			continue
-		}
-		projection[idx] = -1
-		if isRequiredCapabilityField(field) {
-			missingRequired = append(missingRequired, field)
-			continue
-		}
-		missingOptional = append(missingOptional, field)
-	}
-	if len(missingRequired) > 0 {
-		sort.Strings(missingRequired)
-		version := strings.TrimSpace(capabilities.Version)
-		if version == "" {
-			version = "unknown"
-		}
-		return plan, fmt.Errorf("tshark field capability check failed: missing required fields %s (version: %s)", strings.Join(missingRequired, ", "), version)
-	}
-
-	plan.tsharkFields = tsharkFields
-	plan.projection = projection
-	plan.missingOptional = missingOptional
-	return plan, nil
-}
-
-func projectCapabilityFieldScanRow(row []string, plan fieldScanCapabilityPlan) []string {
-	out := make([]string, len(plan.requestedFields))
-	for idx, projected := range plan.projection {
-		if projected >= 0 && projected < len(row) {
-			out[idx] = row[projected]
-		}
-	}
-	return out
-}
-
-func isRequiredCapabilityField(field string) bool {
-	for _, required := range requiredCapabilityFields {
-		if field == required {
-			return true
-		}
-	}
-	return false
-}
-
+// runDirectFieldScan drives a custom tshark argv (no caching, no planning)
+// and invokes onRow for every parsed line. width tells the scanner how many
+// fields to expect per row. Callers that already built their own -e list
+// (e.g. runner.go's packet-list pipeline) use this instead of the cache-
+// aware entry point.
 func runDirectFieldScan(args []string, width int, onRow func([]string)) error {
 	if width <= 0 {
 		return nil
@@ -282,386 +201,4 @@ func runDirectFieldScan(args []string, width int, onRow func([]string)) error {
 		return fmt.Errorf("wait tshark: %w", err)
 	}
 	return nil
-}
-
-func appendPlannedFieldArgs(args []string, fields []string) ([]string, fieldScanCapabilityPlan, error) {
-	normalizedFields := normalizeFieldScanFields(fields)
-	plan, err := planFieldScanByCapabilities(normalizedFields)
-	if err != nil {
-		return nil, plan, err
-	}
-	for _, field := range plan.tsharkFields {
-		args = append(args, "-e", field)
-	}
-	return args, plan, nil
-}
-
-func BuildPlannedFieldArgs(baseArgs []string, fields []string) (PlannedFieldScan, error) {
-	args, plan, err := appendPlannedFieldArgs(append([]string(nil), baseArgs...), fields)
-	if err != nil {
-		return PlannedFieldScan{}, err
-	}
-	return PlannedFieldScan{
-		Args:             args,
-		RequestedFields:  append([]string(nil), plan.requestedFields...),
-		TSharkFields:     append([]string(nil), plan.tsharkFields...),
-		MissingOptional:  append([]string(nil), plan.missingOptional...),
-		CapabilityActive: !sameFieldScanFields(plan.requestedFields, plan.tsharkFields) || len(plan.missingOptional) > 0,
-		plan:             plan,
-	}, nil
-}
-
-func (scan PlannedFieldScan) ProjectRow(parts []string) []string {
-	if len(scan.plan.requestedFields) == 0 {
-		return append([]string(nil), parts...)
-	}
-	return projectCapabilityFieldScanRow(normalizeFieldScanRow(parts, len(scan.plan.tsharkFields)), scan.plan)
-}
-
-func appendTSharkFieldDegradationNote(notes []string, scope string, missingOptional []string) []string {
-	note := buildTSharkFieldDegradationNote(scope, missingOptional)
-	if note == "" {
-		return notes
-	}
-	return append(notes, note)
-}
-
-func buildTSharkFieldDegradationNote(scope string, missingOptional []string) string {
-	fields := normalizeFieldScanFields(missingOptional)
-	if len(fields) == 0 {
-		return ""
-	}
-	sort.Strings(fields)
-	displayFields := fields
-	const maxDisplayedFields = 8
-	if len(displayFields) > maxDisplayedFields {
-		displayFields = displayFields[:maxDisplayedFields]
-	}
-	more := ""
-	if hidden := len(fields) - len(displayFields); hidden > 0 {
-		more = fmt.Sprintf(" 等，另有 %d 个字段", hidden)
-	}
-	scope = strings.TrimSpace(scope)
-	if scope == "" {
-		scope = "TShark 字段扫描"
-	}
-	return fmt.Sprintf("%s：当前 tshark 缺少 %d 个可选字段（%s%s），相关列已按空值降级；如该页结果异常偏少，建议升级 Wireshark/tshark 或切换 tshark 路径。",
-		scope,
-		len(fields),
-		strings.Join(displayFields, ", "),
-		more,
-	)
-}
-
-func runDirectFieldScanWithPlan(args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
-	if len(plan.tsharkFields) == 0 {
-		return nil
-	}
-	return runDirectFieldScan(args, len(plan.tsharkFields), func(parts []string) {
-		row := projectCapabilityFieldScanRow(parts, plan)
-		if onRow != nil {
-			onRow(row)
-		}
-	})
-}
-
-func WarmFieldScanCache(filePath string, fields []string, opts fieldScanOptions) error {
-	return scanFieldRowsWithOptions(filePath, fields, opts, nil)
-}
-
-func WarmSpecializedFieldCache(filePath string) error {
-	for _, plan := range specializedFieldWarmPlans() {
-		if err := WarmFieldScanCache(filePath, plan.fields, plan.opts); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ClearFieldScanCache(filePath string) {
-	normalizedPath := strings.TrimSpace(filePath)
-	fieldScanCache.mu.Lock()
-	defer fieldScanCache.mu.Unlock()
-
-	if normalizedPath == "" {
-		fieldScanCache.entries = map[fieldScanCacheKey][]*fieldScanCacheEntry{}
-		return
-	}
-
-	for key := range fieldScanCache.entries {
-		if key.FilePath == normalizedPath {
-			delete(fieldScanCache.entries, key)
-		}
-	}
-}
-
-func specializedFieldWarmPlans() []fieldScanWarmPlan {
-	return []fieldScanWarmPlan{
-		{
-			fields: unionFieldScanFields(
-				modbusAnalysisFields,
-				s7CommDetailFields,
-				dnp3DetailFields,
-				cipDetailFields,
-				profinetDetailFields,
-				bacnetDetailFields,
-				iec104DetailFields,
-				opcuaDetailFields,
-				vehicleAnalysisFields,
-				canPayloadAnalysisFields,
-				dbcDecodedMessageFields,
-			),
-			opts: fieldScanOptions{},
-		},
-		{
-			fields: mediaControlFields,
-			opts: fieldScanOptions{
-				DisplayFilter: "rtsp || sdp",
-				Occurrence:    "a",
-				Aggregator:    "|",
-			},
-		},
-		{
-			fields: mediaRTPFields,
-			opts: fieldScanOptions{
-				DisplayFilter: "rtp",
-			},
-		},
-	}
-}
-
-func normalizeFieldScanOptions(opts fieldScanOptions) fieldScanOptions {
-	return fieldScanOptions{
-		DisplayFilter: strings.TrimSpace(opts.DisplayFilter),
-		Occurrence:    FirstNonEmpty(strings.TrimSpace(opts.Occurrence), "f"),
-		Aggregator:    FirstNonEmpty(strings.TrimSpace(opts.Aggregator), ","),
-	}
-}
-
-func buildFieldScanCacheKey(filePath string, opts fieldScanOptions) fieldScanCacheKey {
-	return fieldScanCacheKey{
-		FilePath:      strings.TrimSpace(filePath),
-		DisplayFilter: opts.DisplayFilter,
-		Occurrence:    opts.Occurrence,
-		Aggregator:    opts.Aggregator,
-	}
-}
-
-func normalizeFieldScanFields(fields []string) []string {
-	seen := map[string]struct{}{}
-	out := make([]string, 0, len(fields))
-	for _, field := range fields {
-		value := strings.TrimSpace(field)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	return out
-}
-
-func normalizeFieldScanRow(parts []string, width int) []string {
-	if len(parts) == width {
-		return parts
-	}
-	if len(parts) > width {
-		return parts[:width]
-	}
-	out := make([]string, width)
-	copy(out, parts)
-	return out
-}
-
-func findFieldScanCacheEntry(key fieldScanCacheKey, fields []string) (*fieldScanCacheEntry, []int, bool) {
-	fieldScanCache.mu.RLock()
-	defer fieldScanCache.mu.RUnlock()
-
-	entries := fieldScanCache.entries[key]
-	if len(entries) == 0 {
-		return nil, nil, false
-	}
-
-	var (
-		bestEntry   *fieldScanCacheEntry
-		bestIndices []int
-		bestWidth   int
-	)
-	for _, entry := range entries {
-		indices, ok := buildFieldProjection(entry.fieldIndex, fields)
-		if !ok {
-			continue
-		}
-		if bestEntry == nil || len(entry.fields) < bestWidth {
-			bestEntry = entry
-			bestIndices = indices
-			bestWidth = len(entry.fields)
-		}
-	}
-	if bestEntry == nil {
-		return nil, nil, false
-	}
-	return bestEntry, bestIndices, true
-}
-
-func buildFieldProjection(fieldIndex map[string]int, fields []string) ([]int, bool) {
-	indices := make([]int, 0, len(fields))
-	for _, field := range fields {
-		idx, ok := fieldIndex[field]
-		if !ok {
-			return nil, false
-		}
-		indices = append(indices, idx)
-	}
-	return indices, true
-}
-
-func replayCachedFieldRows(entry *fieldScanCacheEntry, indices []int, onRow func([]string)) {
-	if onRow == nil {
-		return
-	}
-	for _, row := range entry.rows {
-		projected := make([]string, len(indices))
-		for i, idx := range indices {
-			if idx >= 0 && idx < len(row) {
-				projected[i] = row[idx]
-			}
-		}
-		onRow(projected)
-	}
-}
-
-func storeFieldScanCacheEntry(key fieldScanCacheKey, fields []string, rows [][]string) {
-	entry := &fieldScanCacheEntry{
-		fields:     append([]string(nil), fields...),
-		fieldIndex: make(map[string]int, len(fields)),
-		rows:       rows,
-	}
-	for idx, field := range fields {
-		entry.fieldIndex[field] = idx
-	}
-
-	fieldScanCache.mu.Lock()
-	defer fieldScanCache.mu.Unlock()
-
-	existing := fieldScanCache.entries[key]
-	for _, item := range existing {
-		if sameFieldScanFields(item.fields, fields) {
-			item.rows = rows
-			item.fieldIndex = entry.fieldIndex
-			return
-		}
-	}
-	fieldScanCache.entries[key] = append(existing, entry)
-}
-
-func sameFieldScanFields(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i := range left {
-		if left[i] != right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func unionFieldScanFields(groups ...[]string) []string {
-	seen := map[string]struct{}{}
-	out := make([]string, 0, 256)
-	for _, group := range groups {
-		for _, field := range group {
-			field = strings.TrimSpace(field)
-			if field == "" {
-				continue
-			}
-			if _, ok := seen[field]; ok {
-				continue
-			}
-			seen[field] = struct{}{}
-			out = append(out, field)
-		}
-	}
-	return out
-}
-
-func sortConversationBuckets(input map[string]conversationCount) []model.AnalysisConversation {
-	items := make([]model.AnalysisConversation, 0, len(input))
-	for _, item := range input {
-		items = append(items, model.AnalysisConversation{
-			Label:    item.Label,
-			Protocol: item.Protocol,
-			Count:    item.Count,
-		})
-	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].Count == items[j].Count {
-			return items[i].Label < items[j].Label
-		}
-		return items[i].Count > items[j].Count
-	})
-	return items
-}
-
-func previewHexBytes(raw string, limit int) string {
-	parts := splitHexBytes(raw)
-	if len(parts) == 0 {
-		return ""
-	}
-	if limit <= 0 || len(parts) <= limit {
-		return strings.Join(parts, ":")
-	}
-	return strings.Join(parts[:limit], ":") + ":..."
-}
-
-func parseFlexibleInt(raw string) int {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return 0
-	}
-	if strings.HasPrefix(trimmed, "0x") || strings.HasPrefix(trimmed, "0X") {
-		if value, err := strconv.ParseInt(trimmed[2:], 16, 64); err == nil {
-			return int(value)
-		}
-	}
-	if value, err := strconv.Atoi(trimmed); err == nil {
-		return value
-	}
-	return 0
-}
-
-func splitHexBytes(raw string) []string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return nil
-	}
-	parts := strings.FieldsFunc(trimmed, func(r rune) bool {
-		return r == ':' || r == ' ' || r == '\t' || r == '\r' || r == '\n'
-	})
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		out = append(out, part)
-	}
-	return out
-}
-
-func normalizeHexBytes(raw string) string {
-	parts := splitHexBytes(raw)
-	return strings.Join(parts, ":")
-}
-
-func formatHex(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if strings.HasPrefix(trimmed, "0x") {
-		return "0X" + trimmed[2:]
-	}
-	return trimmed
 }

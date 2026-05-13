@@ -69,6 +69,58 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("evidence types are only referenced by engine and transport", func(t *testing.T) {
+		// Evidence value types (EvidenceRecord, EvidenceResponse, EvidenceFilter,
+		// APTEvidenceRecord) are declared in the shared model package but
+		// semantically belong to the evidence pipeline. Only the engine owner
+		// (which produces them) and the transport consumer (which ships them
+		// over HTTP) may reference them directly. Any other internal package
+		// must interact via exported helper functions on engine.Service.
+		//
+		// Validates Requirements 6.2 (P2-1: report/evidence package boundary
+		// enforcement).
+		internalDir := filepath.Join(root, "internal")
+		allowedOwners := map[string]struct{}{
+			filepath.Join(internalDir, "engine"):    {},
+			filepath.Join(internalDir, "transport"): {},
+			// model itself declares the types.
+			filepath.Join(internalDir, "model"): {},
+			// this boundary test file legitimately names them in string form.
+			filepath.Join(internalDir, "architecture"): {},
+		}
+		evidenceTypeNames := []string{
+			"model.EvidenceRecord",
+			"model.EvidenceResponse",
+			"model.EvidenceFilter",
+			"model.APTEvidenceRecord",
+		}
+
+		err := filepath.WalkDir(internalDir, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				if _, ok := allowedOwners[path]; ok {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(entry.Name(), ".go") {
+				return nil
+			}
+			body := readFile(t, path)
+			for _, typeName := range evidenceTypeNames {
+				if strings.Contains(body, typeName) {
+					t.Fatalf("%s references evidence type %s; evidence types must stay within engine/transport/model (P2-1 boundary)", rel(root, path), typeName)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk internal for evidence boundary: %v", err)
+		}
+	})
 }
 
 func backendRoot(t *testing.T) string {

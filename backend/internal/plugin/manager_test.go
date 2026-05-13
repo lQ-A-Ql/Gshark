@@ -351,7 +351,7 @@ func TestRunEnabledPacketPluginsEnforcesThreatEmitCapability(t *testing.T) {
   "author": "tester",
   "enabled": true,
   "entry": "limited.js",
-  "capabilities": ["packet.read"]
+  "capabilities": ["packet.read", "exec.local"]
 }
 `), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
@@ -401,7 +401,7 @@ func TestRunEnabledPacketPluginsRequiresPacketReadCapability(t *testing.T) {
   "author": "tester",
   "enabled": true,
   "entry": "broken.js",
-  "capabilities": ["threat.emit"]
+  "capabilities": ["threat.emit", "exec.local"]
 }
 `), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
@@ -421,5 +421,53 @@ func TestRunEnabledPacketPluginsRequiresPacketReadCapability(t *testing.T) {
 	}
 	if warnings := strings.Join(runner.Warnings(), "\n"); !strings.Contains(warnings, "packet.read") {
 		t.Fatalf("expected missing packet.read warning, got %q", warnings)
+	}
+}
+
+// TestRunEnabledPacketPluginsRequiresExecLocalCapability verifies that a
+// plugin whose declared capabilities omit exec.local is denied local code
+// execution and receives a descriptive error — the explicit boundary required
+// by P0-4. Validates Requirements 4.5.
+func TestRunEnabledPacketPluginsRequiresExecLocalCapability(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "nocodeexec.json")
+	logicPath := filepath.Join(dir, "nocodeexec.js")
+
+	if err := os.WriteFile(configPath, []byte(`{
+  "id": "nocodeexec",
+  "name": "No Code Exec",
+  "version": "1.0.0",
+  "tag": "custom",
+  "author": "tester",
+  "enabled": true,
+  "entry": "nocodeexec.js",
+  "capabilities": ["packet.read", "threat.emit"]
+}
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	if err := os.WriteFile(logicPath, []byte(`export function onPacket(packet, ctx) {
+  ctx.emitHit({ packetId: packet.id, category: "CTF", rule: "blocked", level: "high", preview: "x", match: "x" });
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile(logic) error = %v", err)
+	}
+
+	manager := NewManager()
+	if err := manager.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+
+	runner := manager.NewPacketPluginRunner(context.Background())
+	if runner == nil {
+		t.Fatal("expected runner to be created")
+	}
+	// No packets should be processed because the session failed to create.
+	hits := runner.Close(1)
+	if len(hits) != 0 {
+		t.Fatalf("expected no hits from plugin without exec.local capability, got %+v", hits)
+	}
+	warnings := strings.Join(runner.Warnings(), "\n")
+	if !strings.Contains(warnings, PermLocalExec) {
+		t.Fatalf("expected exec.local warning, got %q", warnings)
 	}
 }

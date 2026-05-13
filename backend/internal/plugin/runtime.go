@@ -168,6 +168,9 @@ type jsPacketSession struct {
 }
 
 func newJSPacketSession(meta model.Plugin, logicPath string) (*jsPacketSession, error) {
+	if !pluginHasCapability(meta, PermLocalExec) {
+		return nil, fmt.Errorf("plugin %s is missing required capability %s", meta.ID, PermLocalExec)
+	}
 	if !pluginHasCapability(meta, "packet.read") {
 		return nil, fmt.Errorf("plugin %s is missing required capability packet.read", meta.ID)
 	}
@@ -328,6 +331,9 @@ type pythonPacketSession struct {
 }
 
 func newPythonPacketSession(ctx context.Context, meta model.Plugin, logicPath string) (*pythonPacketSession, error) {
+	if !pluginHasCapability(meta, PermLocalExec) {
+		return nil, fmt.Errorf("plugin %s is missing required capability %s", meta.ID, PermLocalExec)
+	}
 	if !pluginHasCapability(meta, "packet.read") {
 		return nil, fmt.Errorf("plugin %s is missing required capability packet.read", meta.ID)
 	}

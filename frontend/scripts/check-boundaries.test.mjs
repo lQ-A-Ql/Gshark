@@ -131,6 +131,18 @@ describe("check-boundaries script", () => {
     ]);
   });
 
+  it("allows feature imports from integrations/backendClients (the sanctioned bridge)", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/features/demo/useDemo.ts",
+      'import { backendClients } from "../../integrations/backendClients";',
+    );
+    writeFixtureFile(frontendRoot, "src/app/integrations/backendClients.ts", "export const backendClients = {};");
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
+  });
+
   it("rejects shared analysis component imports from feature layers", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(

@@ -13,16 +13,19 @@ func TestCurrentCapabilitiesBuildsFullProfileFromFieldRegistry(t *testing.T) {
 	ClearCapabilityCache()
 	t.Cleanup(ClearCapabilityCache)
 
-	binary := writeFakeTShark(t, "TShark 4.2.0", append(requiredCapabilityFields, optionalCapabilityFields...))
+	allFields := append([]string{}, requiredCapabilityFields...)
+	allFields = append(allFields, displayLayerCapabilityFields...)
+	allFields = append(allFields, optionalCapabilityFields...)
+	binary := writeFakeTShark(t, "TShark 4.2.0", allFields)
 	capabilities := CurrentCapabilities(context.Background(), binary)
 
 	if capabilities.Version != "TShark 4.2.0" {
 		t.Fatalf("expected version from fake tshark, got %+v", capabilities)
 	}
-	if capabilities.FieldProfile != "full" || capabilities.CapabilityCheckDegraded {
+	if capabilities.FieldProfile != FieldProfileFull || capabilities.CapabilityCheckDegraded {
 		t.Fatalf("expected full profile, got %+v", capabilities)
 	}
-	if capabilities.FieldCount != len(append(requiredCapabilityFields, optionalCapabilityFields...)) {
+	if capabilities.FieldCount != len(allFields) {
 		t.Fatalf("expected field count, got %+v", capabilities)
 	}
 }
@@ -31,17 +34,67 @@ func TestCurrentCapabilitiesReportsMissingRequiredAndOptionalFields(t *testing.T
 	ClearCapabilityCache()
 	t.Cleanup(ClearCapabilityCache)
 
+	// Only two of the three required protocol-layer fields present: missing
+	// "frame.protocols" must surface as a required-field miss and drive the
+	// profile to "incompatible".
 	binary := writeFakeTShark(t, "TShark 3.6.0", []string{"frame.number", "frame.time_epoch"})
 	capabilities := CurrentCapabilities(context.Background(), binary)
 
-	if capabilities.FieldProfile != "incompatible" || !capabilities.CapabilityCheckDegraded {
+	if capabilities.FieldProfile != FieldProfileIncompatible || !capabilities.CapabilityCheckDegraded {
 		t.Fatalf("expected incompatible degraded profile, got %+v", capabilities)
 	}
-	if !stringSliceHas(capabilities.MissingRequiredFields, "_ws.col.Info") {
-		t.Fatalf("expected missing required fields, got %+v", capabilities.MissingRequiredFields)
+	if !stringSliceHas(capabilities.MissingRequiredFields, "frame.protocols") {
+		t.Fatalf("expected frame.protocols in missing required fields, got %+v", capabilities.MissingRequiredFields)
+	}
+	// _ws.col.Info is now a display-layer field and must surface in
+	// MissingOptionalFields (merged API surface), not MissingRequiredFields.
+	if stringSliceHas(capabilities.MissingRequiredFields, "_ws.col.Info") {
+		t.Fatalf("expected _ws.col.Info NOT in missing required fields after display-layer split, got %+v", capabilities.MissingRequiredFields)
+	}
+	if !stringSliceHas(capabilities.MissingOptionalFields, "_ws.col.Info") {
+		t.Fatalf("expected _ws.col.Info in merged missing optional fields, got %+v", capabilities.MissingOptionalFields)
 	}
 	if !stringSliceHas(capabilities.MissingOptionalFields, "modbus.func_code") {
 		t.Fatalf("expected missing optional fields, got %+v", capabilities.MissingOptionalFields)
+	}
+}
+
+// Validates task 6.3/6.4 (P0-3): _ws.col.* fields produce a severity strictly
+// lower than protocol-layer anomaly fields, so missing summary columns don't
+// cause the same CapabilityCheckDegraded blast as missing frame.protocols.
+func TestCapabilitiesDisplayLayerSeverityLowerThanProtocolLayer(t *testing.T) {
+	// Build a field set that includes every required and optional protocol
+	// field but omits the display-layer fields.
+	displayMissingSet := map[string]struct{}{}
+	for _, f := range requiredCapabilityFields {
+		displayMissingSet[f] = struct{}{}
+	}
+	for _, f := range optionalCapabilityFields {
+		displayMissingSet[f] = struct{}{}
+	}
+	capsDisplay := buildCapabilities("TShark 4.6.5", displayMissingSet)
+	if fieldProfileSeverity(capsDisplay.FieldProfile) >= fieldProfileSeverity(FieldProfileIncompatible) {
+		t.Fatalf("display-layer missing should be less severe than Incompatible, got %q (severity %d)",
+			capsDisplay.FieldProfile, fieldProfileSeverity(capsDisplay.FieldProfile))
+	}
+	if capsDisplay.CapabilityCheckDegraded {
+		t.Fatalf("display-layer-only missing must not set CapabilityCheckDegraded, got %+v", capsDisplay)
+	}
+
+	// Build a field set that includes every display-layer and optional field
+	// but omits all required protocol-layer fields.
+	protoMissingSet := map[string]struct{}{}
+	for _, f := range displayLayerCapabilityFields {
+		protoMissingSet[f] = struct{}{}
+	}
+	for _, f := range optionalCapabilityFields {
+		protoMissingSet[f] = struct{}{}
+	}
+	capsProto := buildCapabilities("TShark 4.6.5", protoMissingSet)
+	if fieldProfileSeverity(capsProto.FieldProfile) <= fieldProfileSeverity(capsDisplay.FieldProfile) {
+		t.Fatalf("protocol-layer missing (severity %d, %q) should be strictly more severe than display-layer missing (severity %d, %q)",
+			fieldProfileSeverity(capsProto.FieldProfile), capsProto.FieldProfile,
+			fieldProfileSeverity(capsDisplay.FieldProfile), capsDisplay.FieldProfile)
 	}
 }
 
@@ -54,7 +107,7 @@ func TestCurrentCapabilitiesAcceptsColumnFieldAliases(t *testing.T) {
 	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
 	capabilities := CurrentCapabilities(context.Background(), binary)
 
-	if capabilities.FieldProfile != "full" || capabilities.CapabilityCheckDegraded {
+	if capabilities.FieldProfile != FieldProfileFull || capabilities.CapabilityCheckDegraded {
 		t.Fatalf("expected aliases to satisfy required fields, got %+v", capabilities)
 	}
 }

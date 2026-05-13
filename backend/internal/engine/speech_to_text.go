@@ -1,3 +1,12 @@
+// Stability: beta
+//
+// Batch speech-to-text transcription relies on an external Vosk runtime that
+// must be installed and configured separately by the operator. Runtime
+// availability, supported acoustic models, and language coverage are not yet
+// fully documented; transcription quality varies with audio codec, bitrate,
+// and background noise. Treat returned transcripts as advisory input to
+// downstream evidence review rather than authoritative transcripts.
+
 package engine
 
 import (

@@ -5,7 +5,9 @@ go 1.25.0
 require (
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/google/gopacket v1.1.19
+	golang.org/x/text v0.22.0
 	modernc.org/sqlite v1.48.2
+	pgregory.net/rapid v1.3.0
 )
 
 require (
@@ -19,7 +21,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

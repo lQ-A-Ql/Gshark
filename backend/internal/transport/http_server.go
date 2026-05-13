@@ -43,7 +43,14 @@ const (
 )
 
 type Server struct {
-	svc *engine.Service
+	capture      CaptureService
+	detection    DetectionService
+	analysis     AnalysisService
+	media        MediaService
+	toolRuntime  ToolRuntimeService
+	toolAnalysis ToolAnalysisService
+	plugins      PluginService
+
 	hub *Hub
 
 	mu          sync.Mutex
@@ -64,12 +71,20 @@ func NewServer(svc *engine.Service, hub *Hub) *Server {
 	pkgMgr := miscpkg.NewManager()
 	_ = pkgMgr.LoadFromDir(filepath.Join("plugins", "misc"))
 	s := &Server{
-		svc:           svc,
 		hub:           hub,
 		clients:       map[chan event]struct{}{},
 		miscModules:   defaultMiscModules(),
 		miscPkgMgr:    pkgMgr,
 		uploadedFiles: map[string]struct{}{},
+	}
+	if svc != nil {
+		s.capture = svc
+		s.detection = svc
+		s.analysis = svc
+		s.media = svc
+		s.toolRuntime = svc
+		s.toolAnalysis = svc
+		s.plugins = svc
 	}
 	hub.OnPacket(func(packet model.Packet) {
 		s.broadcast(event{Type: "packet", Data: packet})
@@ -190,7 +205,7 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.TSharkStatus())
+		writeJSON(w, http.StatusOK, s.toolRuntime.TSharkStatus())
 	case http.MethodPost:
 		var payload struct {
 			Path string `json:"path"`
@@ -199,7 +214,7 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		writeJSON(w, http.StatusOK, s.svc.SetTSharkPath(payload.Path))
+		writeJSON(w, http.StatusOK, s.toolRuntime.SetTSharkPath(payload.Path))
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
@@ -208,26 +223,26 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.ToolRuntimeSnapshot())
+		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshot())
 	case http.MethodPost:
 		var cfg model.ToolRuntimeConfig
 		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		s.svc.SetToolRuntimeConfig(cfg)
-		writeJSON(w, http.StatusOK, s.svc.ToolRuntimeSnapshot())
+		s.toolRuntime.SetToolRuntimeConfig(cfg)
+		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshot())
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
 func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.FFmpegStatus())
+	writeJSON(w, http.StatusOK, s.toolRuntime.FFmpegStatus())
 }
 
 func (s *Server) handleSpeechToTextStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.SpeechToTextStatus())
+	writeJSON(w, http.StatusOK, s.media.SpeechToTextStatus())
 }
 
 func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +255,7 @@ func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.svc.RunWinRMDecrypt(req)
+	result, err := s.toolAnalysis.RunWinRMDecrypt(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -258,7 +273,7 @@ func (s *Server) handleWinRMDecryptExport(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "missing result_id")
 		return
 	}
-	filePath, filename, err := s.svc.WinRMExportFile(resultID)
+	filePath, filename, err := s.toolAnalysis.WinRMExportFile(resultID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -284,7 +299,7 @@ func (s *Server) handleSMB3RandomSessionKey(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.svc.GenerateSMB3RandomSessionKey(req)
+	result, err := s.toolAnalysis.GenerateSMB3RandomSessionKey(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -297,7 +312,7 @@ func (s *Server) handleSMB3SessionCandidates(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.svc.ListSMB3SessionCandidates()
+	rows, err := s.toolAnalysis.ListSMB3SessionCandidates()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -335,13 +350,13 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		info.Size(),
 		options.DisplayFilter,
 		options.FastList,
-		s.svc.TSharkStatusPath(),
-		s.svc.TSharkUsingCustomPath(),
+		s.toolRuntime.TSharkStatusPath(),
+		s.toolRuntime.TSharkUsingCustomPath(),
 	)
 	s.promoteUploadedFile(options.FilePath)
-	loadRunID, loadCtx := s.svc.BeginCaptureLoad(context.WithoutCancel(r.Context()))
+	loadRunID, loadCtx := s.capture.BeginCaptureLoad(context.WithoutCancel(r.Context()))
 	go func() {
-		if err := s.svc.LoadPCAPWithRun(loadCtx, options, loadRunID); err != nil {
+		if err := s.capture.LoadPCAPWithRun(loadCtx, options, loadRunID); err != nil {
 			log.Printf("http: capture start failed file=%q err=%v", options.FilePath, err)
 			if errors.Is(err, context.Canceled) {
 				return
@@ -359,7 +374,7 @@ func (s *Server) handleCaptureStop(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	s.svc.StopStreaming()
+	s.capture.StopStreaming()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 
@@ -368,7 +383,7 @@ func (s *Server) handleCapturePrepareReplacement(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	s.svc.PrepareCaptureReplacement()
+	s.capture.PrepareCaptureReplacement()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "prepared"})
 }
 
@@ -377,7 +392,7 @@ func (s *Server) handleCaptureClose(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if err := s.svc.ClearCapture(); err != nil {
+	if err := s.capture.ClearCapture(); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -389,7 +404,7 @@ func (s *Server) handleCaptureStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, s.svc.CaptureStatus())
+	writeJSON(w, http.StatusOK, s.capture.CaptureStatus())
 }
 
 func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
@@ -445,7 +460,7 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePackets(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.Packets())
+	writeJSON(w, http.StatusOK, s.capture.Packets())
 }
 
 type packetsPageResponse struct {
@@ -461,7 +476,7 @@ func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
-	items, next, total, filtering, err := s.svc.PacketsPageWithState(cursor, limit, filter)
+	items, next, total, filtering, err := s.capture.PacketsPageWithState(cursor, limit, filter)
 	if err != nil {
 		if engine.IsDisplayFilterError(err) {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -489,7 +504,7 @@ func (s *Server) handlePacketLocate(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
-	cursor, total, found, err := s.svc.PacketPageCursorWithError(packetID, limit, filter)
+	cursor, total, found, err := s.capture.PacketPageCursorWithError(packetID, limit, filter)
 	if err != nil {
 		if engine.IsDisplayFilterError(err) {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -513,7 +528,7 @@ func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	packet, err := s.svc.Packet(packetID)
+	packet, err := s.capture.Packet(packetID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -523,13 +538,13 @@ func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHunting(w http.ResponseWriter, r *http.Request) {
 	prefixes := r.URL.Query()["prefix"]
-	writeJSON(w, http.StatusOK, s.svc.ThreatHuntWithContext(r.Context(), prefixes))
+	writeJSON(w, http.StatusOK, s.detection.ThreatHuntWithContext(r.Context(), prefixes))
 }
 
 func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.GetHuntingRuntimeConfig())
+		writeJSON(w, http.StatusOK, s.detection.GetHuntingRuntimeConfig())
 		return
 	case http.MethodPost:
 		var cfg model.HuntingRuntimeConfig
@@ -537,7 +552,7 @@ func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		writeJSON(w, http.StatusOK, s.svc.SetHuntingRuntimeConfig(cfg))
+		writeJSON(w, http.StatusOK, s.detection.SetHuntingRuntimeConfig(cfg))
 		return
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -546,7 +561,7 @@ func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.ObjectsWithContext(r.Context()))
+	writeJSON(w, http.StatusOK, s.detection.ObjectsWithContext(r.Context()))
 }
 
 func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
@@ -556,7 +571,7 @@ func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawHex, err := s.svc.PacketRawHex(packetID)
+	rawHex, err := s.capture.PacketRawHex(packetID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -575,7 +590,7 @@ func (s *Server) handlePacketLayers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	layers, err := s.svc.PacketLayers(packetID)
+	layers, err := s.capture.PacketLayers(packetID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -594,7 +609,7 @@ func (s *Server) handleStreamIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ids := s.svc.StreamIDs(protocol)
+	ids := s.capture.StreamIDs(protocol)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"protocol": protocol,
 		"total":    len(ids),
@@ -603,7 +618,7 @@ func (s *Server) handleStreamIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, _ *http.Request) {
-	stats, err := s.svc.GlobalTrafficStats()
+	stats, err := s.analysis.GlobalTrafficStats()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -612,7 +627,7 @@ func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, _ *http.Request
 }
 
 func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.svc.IndustrialAnalysis()
+	analysis, err := s.analysis.IndustrialAnalysis()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -621,7 +636,7 @@ func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, _ *http.Request
 }
 
 func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.svc.VehicleAnalysis()
+	analysis, err := s.analysis.VehicleAnalysis()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -638,9 +653,9 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 		err      error
 	)
 	if forceRefresh {
-		analysis, err = s.svc.RefreshMediaAnalysis()
+		analysis, err = s.media.RefreshMediaAnalysis()
 	} else {
-		analysis, err = s.svc.MediaAnalysis()
+		analysis, err = s.media.MediaAnalysis()
 	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -650,7 +665,7 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUSBAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.svc.USBAnalysis()
+	analysis, err := s.analysis.USBAnalysis()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -659,7 +674,7 @@ func (s *Server) handleUSBAnalysis(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
-	analysis, err := s.svc.C2SampleAnalysis(r.Context())
+	analysis, err := s.analysis.C2SampleAnalysis(r.Context())
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
@@ -681,7 +696,7 @@ func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.svc.C2Decrypt(r.Context(), payload)
+	result, err := s.analysis.C2Decrypt(r.Context(), payload)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
@@ -694,7 +709,7 @@ func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPTAnalysis(w http.ResponseWriter, r *http.Request) {
-	analysis, err := s.svc.APTAnalysis(r.Context())
+	analysis, err := s.analysis.APTAnalysis(r.Context())
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
@@ -716,7 +731,7 @@ func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	result, err := s.svc.GatherEvidence(r.Context(), filter)
+	result, err := s.analysis.GatherEvidence(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
@@ -735,7 +750,7 @@ func (s *Server) handleMediaArtifactDownload(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	path, name, err := s.svc.MediaArtifact(token)
+	path, name, err := s.media.MediaArtifact(token)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -777,7 +792,7 @@ func (s *Server) handleMediaArtifactPlayback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	path, name, err := s.svc.MediaPlaybackWithContext(r.Context(), token)
+	path, name, err := s.media.MediaPlaybackWithContext(r.Context(), token)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -821,7 +836,7 @@ func (s *Server) handleMediaArtifactTranscription(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.svc.TranscribeMediaArtifact(payload.Token, payload.Force)
+	result, err := s.media.TranscribeMediaArtifact(payload.Token, payload.Force)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -832,7 +847,7 @@ func (s *Server) handleMediaArtifactTranscription(w http.ResponseWriter, r *http
 func (s *Server) handleMediaBatchTranscription(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.MediaBatchTranscriptionStatus())
+		writeJSON(w, http.StatusOK, s.media.MediaBatchTranscriptionStatus())
 	case http.MethodPost:
 		var payload struct {
 			Force bool `json:"force"`
@@ -840,7 +855,7 @@ func (s *Server) handleMediaBatchTranscription(w http.ResponseWriter, r *http.Re
 		if r.Body != nil {
 			_ = json.NewDecoder(r.Body).Decode(&payload)
 		}
-		status, err := s.svc.StartMediaBatchTranscription(payload.Force)
+		status, err := s.media.StartMediaBatchTranscription(payload.Force)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -856,7 +871,7 @@ func (s *Server) handleMediaBatchTranscriptionCancel(w http.ResponseWriter, r *h
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, s.svc.CancelMediaBatchTranscription())
+	writeJSON(w, http.StatusOK, s.media.CancelMediaBatchTranscription())
 }
 
 func (s *Server) handleMediaBatchTranscriptionExport(w http.ResponseWriter, r *http.Request) {
@@ -865,7 +880,7 @@ func (s *Server) handleMediaBatchTranscriptionExport(w http.ResponseWriter, r *h
 		return
 	}
 	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
-	export := s.svc.ExportMediaBatchTranscription()
+	export := s.media.ExportMediaBatchTranscription()
 	if len(export.Items) == 0 {
 		writeError(w, http.StatusBadRequest, "no batch transcription results available")
 		return
@@ -899,7 +914,7 @@ func (s *Server) handleMediaBatchTranscriptionExport(w http.ResponseWriter, r *h
 func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.VehicleDBCProfiles())
+		writeJSON(w, http.StatusOK, s.analysis.VehicleDBCProfiles())
 	case http.MethodPost:
 		var payload struct {
 			Path string `json:"path"`
@@ -908,7 +923,7 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		profiles, err := s.svc.AddVehicleDBC(payload.Path)
+		profiles, err := s.analysis.AddVehicleDBC(payload.Path)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -920,7 +935,7 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "missing dbc path")
 			return
 		}
-		writeJSON(w, http.StatusOK, s.svc.RemoveVehicleDBC(path))
+		writeJSON(w, http.StatusOK, s.analysis.RemoveVehicleDBC(path))
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
@@ -955,7 +970,7 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	allObjects := s.svc.ObjectsWithContext(r.Context())
+	allObjects := s.detection.ObjectsWithContext(r.Context())
 	var toDownload []model.ObjectFile
 
 	if len(reqIds) == 0 {
@@ -1010,7 +1025,7 @@ func (s *Server) handleAddPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plugin, err := s.svc.AddPlugin(payload)
+	plugin, err := s.plugins.AddPlugin(payload)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1043,7 +1058,7 @@ func (s *Server) handleDeletePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.svc.DeletePlugin(id); err != nil {
+	if err := s.plugins.DeletePlugin(id); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1060,7 +1075,7 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		source, err := s.svc.PluginSource(id)
+		source, err := s.plugins.PluginSource(id)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -1073,7 +1088,7 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		source, err := s.svc.UpdatePluginSource(payload)
+		source, err := s.plugins.UpdatePluginSource(payload)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -1086,7 +1101,7 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHTTPStream(w http.ResponseWriter, r *http.Request) {
 	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
-	writeJSON(w, http.StatusOK, s.svc.HTTPStream(r.Context(), streamID))
+	writeJSON(w, http.StatusOK, s.capture.HTTPStream(r.Context(), streamID))
 }
 
 func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
@@ -1095,7 +1110,7 @@ func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
 	if protocol == "" {
 		protocol = "TCP"
 	}
-	writeJSON(w, http.StatusOK, s.svc.RawStream(r.Context(), protocol, streamID))
+	writeJSON(w, http.StatusOK, s.capture.RawStream(r.Context(), protocol, streamID))
 }
 
 type streamPageResponse struct {
@@ -1119,7 +1134,7 @@ func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
 	cursor, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("cursor")))
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 
-	stream, next, total := s.svc.RawStreamPage(r.Context(), protocol, streamID, cursor, limit)
+	stream, next, total := s.capture.RawStreamPage(r.Context(), protocol, streamID, cursor, limit)
 	writeJSON(w, http.StatusOK, streamPageResponse{
 		StreamID:   stream.StreamID,
 		Protocol:   stream.Protocol,
@@ -1186,7 +1201,7 @@ func (s *Server) handleStreamPayloadSources(w http.ResponseWriter, r *http.Reque
 		}
 		limit = parsed
 	}
-	rows, err := s.svc.ListStreamPayloadSources(limit)
+	rows, err := s.capture.ListStreamPayloadSources(limit)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1210,7 +1225,7 @@ func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stream, err := s.svc.UpdateStreamPayloads(r.Context(), payload.Protocol, payload.StreamID, payload.Patches)
+	stream, err := s.capture.UpdateStreamPayloads(r.Context(), payload.Protocol, payload.StreamID, payload.Patches)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1221,14 +1236,14 @@ func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.svc.TLSConfig())
+		writeJSON(w, http.StatusOK, s.toolRuntime.TLSConfig())
 	case http.MethodPost:
 		var cfg model.TLSConfig
 		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		s.svc.SetTLSConfig(cfg)
+		s.toolRuntime.SetTLSConfig(cfg)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1240,7 +1255,7 @@ func (s *Server) handleNTLMSessionMaterials(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.svc.ListNTLMSessionMaterials()
+	rows, err := s.toolAnalysis.ListNTLMSessionMaterials()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1253,7 +1268,7 @@ func (s *Server) handleHTTPLoginAnalysis(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.svc.HTTPLoginAnalysis(r.Context())
+	rows, err := s.toolAnalysis.HTTPLoginAnalysis(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1266,7 +1281,7 @@ func (s *Server) handleSMTPAnalysis(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.svc.SMTPAnalysis(r.Context())
+	rows, err := s.toolAnalysis.SMTPAnalysis(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1279,7 +1294,7 @@ func (s *Server) handleMySQLAnalysis(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.svc.MySQLAnalysis(r.Context())
+	rows, err := s.toolAnalysis.MySQLAnalysis(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1299,7 +1314,7 @@ func (s *Server) handleShiroRememberMeAnalysis(w http.ResponseWriter, r *http.Re
 			return
 		}
 	}
-	rows, err := s.svc.ShiroRememberMeAnalysis(r.Context(), req)
+	rows, err := s.toolAnalysis.ShiroRememberMeAnalysis(r.Context(), req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1321,7 +1336,7 @@ func (s *Server) handleAuditLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlugins(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.ListPlugins())
+	writeJSON(w, http.StatusOK, s.plugins.ListPlugins())
 }
 
 func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
@@ -1334,7 +1349,7 @@ func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "missing plugin id")
 		return
 	}
-	plugin, err := s.svc.TogglePlugin(id)
+	plugin, err := s.plugins.TogglePlugin(id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -1359,7 +1374,7 @@ func (s *Server) handleBulkPlugins(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plugins, err := s.svc.SetPluginsEnabled(req.IDs, req.Enabled)
+	plugins, err := s.plugins.SetPluginsEnabled(req.IDs, req.Enabled)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

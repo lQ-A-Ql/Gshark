@@ -72,10 +72,10 @@ func (s *Server) handlePackagedMiscModuleRoute(w http.ResponseWriter, r *http.Re
 	}
 
 	runtime := miscpkg.InvokeContext{}
-	if s.svc != nil {
-		runtime.CapturePath = s.svc.CurrentCapturePath()
-		runtime.PythonPath = s.svc.ToolRuntimeSnapshot().Config.PythonPath
-		runtime.TSharkPath = s.svc.TSharkStatusPath()
+	if s.capture != nil {
+		runtime.CapturePath = s.capture.CurrentCapturePath()
+		runtime.PythonPath = s.toolRuntime.ToolRuntimeSnapshot().Config.PythonPath
+		runtime.TSharkPath = s.toolRuntime.TSharkStatusPath()
 	}
 	result, err := s.miscPkgMgr.Invoke(r.Context(), parts[0], req, runtime)
 	if err != nil {

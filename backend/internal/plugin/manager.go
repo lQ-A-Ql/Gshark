@@ -35,15 +35,24 @@ type Manager struct {
 
 var pluginIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
+// PermLocalExec is the capability that must be declared before the plugin
+// runtime will execute the plugin's local code (JS via goja, Python via
+// exec.Command). Omitting this capability from a plugin config causes the
+// session constructors in runtime.go to refuse to create a session for that
+// plugin and to surface a descriptive error.
+// Validates Requirements 4.5 (P0-4 defect: plugin local code execution boundary).
+const PermLocalExec = "exec.local"
+
 var allowedPluginCapabilities = map[string]struct{}{
 	"packet.read":   {},
 	"threat.emit":   {},
 	"logging":       {},
 	"finish.hook":   {},
 	"metadata.read": {},
+	PermLocalExec:   {},
 }
 
-var defaultPluginCapabilities = []string{"finish.hook", "logging", "packet.read", "threat.emit"}
+var defaultPluginCapabilities = []string{"exec.local", "finish.hook", "logging", "packet.read", "threat.emit"}
 
 func NewManager() *Manager {
 	return &Manager{

@@ -1,3 +1,12 @@
+// Stability: beta
+//
+// Media playback depends on an external ffmpeg binary that must be installed
+// and discoverable on the host. Supported codecs, container formats, and
+// transcoding behavior are driven by the linked ffmpeg build and are not yet
+// fully documented. Expect playback compatibility edge cases on unusual
+// codecs; operators should verify ffmpeg version and codec support before
+// relying on playback output for evidence review.
+
 package engine
 
 import (

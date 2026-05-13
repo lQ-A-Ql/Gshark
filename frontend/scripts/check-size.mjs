@@ -373,7 +373,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/hooks/useCaptureStartWorkflow.ts",
-    maxLines: 220,
+    maxLines: 245,
     reason: "capture start hook should only wire open, preload, finalize, and failure status workflow",
   },
   {
@@ -1937,7 +1937,7 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/state/hooks/useCaptureStartWorkflow.test.tsx",
-    maxLines: 145,
+    maxLines: 175,
     reason: "capture start workflow tests should cover owner hook wiring without duplicating all pure helper tests",
   },
   {

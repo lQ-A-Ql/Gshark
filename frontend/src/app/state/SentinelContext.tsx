@@ -3,7 +3,6 @@ import {
   useContext,
   useMemo,
   useRef,
-  useState,
   type Dispatch,
   type PropsWithChildren,
   type SetStateAction,
@@ -13,8 +12,9 @@ import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
-import { createInitialCaptureFileMeta } from "./captureOpenState";
-import { createIdleCaptureTransactionStatus } from "./captureTransactionStatus";
+import { useCapturePreloadState } from "./hooks/useCapturePreloadState";
+import { useCaptureSessionState } from "./hooks/useCaptureSessionState";
+import { useDisplayFilterState } from "./hooks/useDisplayFilterState";
 import type { SentinelContextValue } from "./sentinelTypes";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
@@ -35,11 +35,19 @@ import { usePacketPageState } from "./hooks/usePacketPageState";
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
 export function SentinelProvider({ children }: PropsWithChildren) {
-  const [isPreloadingCapture, setIsPreloadingCapture] = useState(false);
-  const [preloadProcessed, setPreloadProcessed] = useState(0);
-  const [preloadTotal, setPreloadTotal] = useState(0);
-  const [captureTransaction, setCaptureTransaction] = useState(createIdleCaptureTransactionStatus(false));
-  const [displayFilter, setDisplayFilter] = useState("");
+  const {
+    isPreloadingCapture,
+    preloadProcessed,
+    preloadTotal,
+    preloadProcessedRef,
+    preloadTotalRef,
+    setIsPreloadingCapture,
+    setPreloadProcessed,
+    setPreloadTotal,
+  } = useCapturePreloadState();
+  const { captureTransaction, setCaptureTransaction, fileMeta, setFileMeta, captureRevision, setCaptureRevision } =
+    useCaptureSessionState();
+  const { displayFilter, setDisplayFilter } = useDisplayFilterState();
   const threatAnalysisSeqRef = useRef(0);
   const {
     threatHits,
@@ -53,8 +61,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     refreshAnalysisResult: refreshAnalysisResultImpl,
     resetAnalysisState,
   } = useAnalysisProgress(threatAnalysisSeqRef);
-  const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
-  const [captureRevision, setCaptureRevision] = useState(0);
   const { recentCaptures, rememberRecentCapture } = useRecentCapturesState();
 
   const captureTaskScopeRef = useRef(createCaptureTaskScope());
@@ -64,8 +70,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const captureSeqRef = useRef(0);
   const filterSeqRef = useRef(0);
   const { captureWaitersRef, wakeCaptureWaiters, waitForCaptureSignal } = useCaptureSignalWaiters();
-  const preloadProcessedRef = useRef(0);
-  const preloadTotalRef = useRef(0);
   const activeCapturePathRef = useRef("");
   const scheduleLoadMoreRef = useRef<() => void>(() => undefined);
   const setSelectedPacketIdRef = useRef<Dispatch<SetStateAction<number | null>>>(() => undefined);
@@ -290,59 +294,71 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   useCaptureTaskScopeCleanup(captureTaskScopeRef);
 
   const startCapture = useCaptureStartWorkflow({
-    backendConnected,
-    displayFilter,
-    activeCapturePathRef,
-    captureSeqRef,
-    captureTaskScopeRef,
-    filterSeqRef,
-    hasMorePacketsRef,
-    httpCacheRef: httpStreamCacheRef,
-    httpPrefetchInFlightRef,
-    pageStartRef,
-    parseErrorRef,
-    parseFinishedRef,
-    preloadingRef,
-    preloadProcessedRef,
-    preloadTotalRef,
-    streamSwitchDurationsRef,
-    streamSwitchHitsRef,
-    streamSwitchSequencesRef,
-    tcpCacheRef: tcpStreamCacheRef,
-    tcpPrefetchInFlightRef,
-    udpCacheRef: udpStreamCacheRef,
-    udpPrefetchInFlightRef,
-    commitPacketPage,
-    getCaptureStatus: backendClients.capture.getCaptureStatus,
-    listPacketsPage: backendClients.packet.listPacketsPage,
-    openPcapFile: backendClients.capture.openPcapFile,
-    prepareForCaptureReplacement,
-    refreshAnalysisResult,
-    refreshStreamIndex,
-    rememberRecentCapture,
-    resetAnalysisState,
-    setBackendStatus,
-    setCaptureRevision,
-    setCaptureTransaction,
-    setFileMeta,
-    setHasMorePackets,
-    setHasPrevPackets,
-    setIsFilterLoading,
-    setIsPreloadingCapture,
-    setPacketPageError,
-    setPackets,
-    setPageStart,
-    setPreloadProcessed,
-    setPreloadTotal,
-    setSelectedPacketDetail,
-    setSelectedPacketId,
-    setSelectedPacketLayers,
-    setSelectedPacketRawHex,
-    setStreamSwitchMetrics,
-    setTotalPackets,
-    startStreamingPackets: backendClients.capture.startStreamingPackets,
-    waitForCaptureSignal,
-    wakeCaptureWaiters,
+    context: {
+      backendConnected,
+      displayFilter,
+    },
+    refs: {
+      activeCapturePathRef,
+      captureSeqRef,
+      captureTaskScopeRef,
+      filterSeqRef,
+      hasMorePacketsRef,
+      pageStartRef,
+      parseErrorRef,
+      parseFinishedRef,
+      preloadingRef,
+      preloadProcessedRef,
+      preloadTotalRef,
+    },
+    streamRefs: {
+      httpCacheRef: httpStreamCacheRef,
+      tcpCacheRef: tcpStreamCacheRef,
+      udpCacheRef: udpStreamCacheRef,
+      httpPrefetchInFlightRef,
+      tcpPrefetchInFlightRef,
+      udpPrefetchInFlightRef,
+      streamSwitchDurationsRef,
+      streamSwitchHitsRef,
+      streamSwitchSequencesRef,
+    },
+    setters: {
+      setBackendStatus,
+      setCaptureRevision,
+      setCaptureTransaction,
+      setFileMeta,
+      setHasMorePackets,
+      setHasPrevPackets,
+      setIsFilterLoading,
+      setIsPreloadingCapture,
+      setPacketPageError,
+      setPackets,
+      setPageStart,
+      setPreloadProcessed,
+      setPreloadTotal,
+      setSelectedPacketDetail,
+      setSelectedPacketId,
+      setSelectedPacketLayers,
+      setSelectedPacketRawHex,
+      setStreamSwitchMetrics,
+      setTotalPackets,
+    },
+    clients: {
+      getCaptureStatus: backendClients.capture.getCaptureStatus,
+      listPacketsPage: backendClients.packet.listPacketsPage,
+      openPcapFile: backendClients.capture.openPcapFile,
+      startStreamingPackets: backendClients.capture.startStreamingPackets,
+    },
+    hooks: {
+      commitPacketPage,
+      prepareForCaptureReplacement,
+      refreshAnalysisResult,
+      refreshStreamIndex,
+      rememberRecentCapture,
+      resetAnalysisState,
+      waitForCaptureSignal,
+      wakeCaptureWaiters,
+    },
   });
 
   const { applyFilter, clearFilter } = useDisplayFilterWorkflow({

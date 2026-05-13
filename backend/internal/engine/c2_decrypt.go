@@ -1,3 +1,13 @@
+// Stability: experimental
+//
+// The C2 decryption workbench covers VShell (triple-KDF: md5(salt),
+// md5(salt+vkey), md5(saltPad32+vkey)) and Cobalt Strike keyed offline paths.
+// Implementations have been validated against public reference samples but
+// may produce false positives or fail silently on novel or heavily modified
+// loaders. Expect API and heuristic changes in future iterations; callers
+// should treat partial decrypt results as advisory evidence, not ground
+// truth, and always cross-reference with stream-level indicators.
+
 package engine
 
 import (

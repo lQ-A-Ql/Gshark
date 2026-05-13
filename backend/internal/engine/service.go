@@ -67,6 +67,12 @@ type Service struct {
 	yaraLastError  string
 	yaraMu         sync.Mutex
 
+	// toolRuntimeMu serializes reads and writes of the tool runtime
+	// configuration surface (tshark path, ffmpeg/python/vosk env vars and
+	// the yaraConf slice below). It wraps the composite ToolRuntimeConfig
+	// read so callers always observe a consistent snapshot.
+	toolRuntimeMu sync.RWMutex
+
 	huntMu          sync.RWMutex
 	huntingPrefixes []string
 	yaraConf        model.YaraConfig

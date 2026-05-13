@@ -1,3 +1,34 @@
+// Frontend module-boundary enforcement.
+//
+// This script fails CI when the import graph violates any of the following
+// layering invariants (validated via frontend/scripts/check-boundaries.test.mjs):
+//
+// 1. No production code may import ./integrations/wailsBridge — it's a
+//    test-only escape hatch. Use integrations/backendClients instead.
+// 2. Only the integrations/ layer itself may reach inside bridgeTypes,
+//    bridgeFactory, httpBridge, desktopBridge, or bridgeDomains. App code
+//    (pages, features, state) MUST consume the curated domain projections
+//    from integrations/backendClients.
+// 3. State code (src/app/state/**) may not import UI components (pages/
+//    or components/). State stays UI-free.
+// 4. Pages may not import mappers directly or reach through the legacy
+//    evidenceSchema shim; pages consume feature- or core-level view models.
+// 5. Features may not import from other features (cross-feature coupling
+//    must route through core/, shared components/analysis, or integrations/).
+//    This is the rule flagged in the 2026-05-12 engineering report.
+// 6. Mappers (integrations/mappers/**) stay UI-free and decision-free:
+//    no React imports, no pages/components imports, no feature "rules"
+//    imports.
+// 7. Clients (integrations/clients/**) stay transport-only: no pages,
+//    components, or features imports.
+// 8. UI primitives (components/ui/**) stay domain-free.
+// 9. Shared analysis components (components/analysis/**) stay
+//    domain-neutral — no features/ imports.
+//
+// The allowlist `allowedFeatureCrossImports` lets us grandfather specific
+// cross-feature edges during a refactor. It currently contains zero
+// entries; adding to it requires explicit justification in the PR.
+
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

@@ -5,11 +5,12 @@
 ## 推荐阅读顺序
 
 1. [项目根 README](../README.md)：了解产品定位、核心功能、启动方式和当前边界。
-2. [2026-05-11 归档索引](./audit-development-report-archive-2026-05-11/README.md)：查看 2026-05-11 工程治理日报拆分、主线回正、统一报告 schema 与回归门禁。
-3. [2026-05-05 归档索引](./audit-development-report-archive-2026-05-05/README.md)：查看主线收口、Evidence 范围澄清、Vehicle / USB 证据接入和验证结果。
-4. [2026-05-02 归档索引](./audit-development-report-archive-2026-05-02/README.md)：查看上一轮 C2 / APT / MISC 证据链产品化、前端模块化和验证结果。
-5. [当前开发态势与下一步规划](./audit-development-report-archive-2026-04-30/current-development-status-and-roadmap-2026-04-30.md)：查看上一轮跨方向状态、风险和建议优先级。
-6. [2026-04-30 归档索引](./audit-development-report-archive-2026-04-30/README.md)：查看前端一致性、MISC 风格基线、方向摘要和路线图。
+2. [2026-05-13 归档索引](./audit-development-report-archive-2026-05-13/README.md)：查看 iterative-dev-governance spec 首轮治理日报，含 9 个架构缺陷闭环与 14 个设计属性 PBT 覆盖。
+3. [2026-05-11 归档索引](./audit-development-report-archive-2026-05-11/README.md)：查看 2026-05-11 工程治理日报拆分、主线回正、统一报告 schema 与回归门禁。
+4. [2026-05-05 归档索引](./audit-development-report-archive-2026-05-05/README.md)：查看主线收口、Evidence 范围澄清、Vehicle / USB 证据接入和验证结果。
+5. [2026-05-02 归档索引](./audit-development-report-archive-2026-05-02/README.md)：查看上一轮 C2 / APT / MISC 证据链产品化、前端模块化和验证结果。
+6. [当前开发态势与下一步规划](./audit-development-report-archive-2026-04-30/current-development-status-and-roadmap-2026-04-30.md)：查看上一轮跨方向状态、风险和建议优先级。
+7. [2026-04-30 归档索引](./audit-development-report-archive-2026-04-30/README.md)：查看前端一致性、MISC 风格基线、方向摘要和路线图。
 
 ## 当前方向摘要
 
@@ -39,6 +40,7 @@
 
 ## 归档说明
 
+- `audit-development-report-archive-2026-05-13/`：iterative-dev-governance spec 首轮治理日报，含 9 个架构缺陷闭环、14 个设计属性 PBT 覆盖。
 - `audit-development-report-archive-2026-05-11/`：2026-05-11 工程治理日报拆分、主线回正、统一报告 schema、桥接与公共样本回归。
 - `audit-development-report-archive-2026-05-05/`：主线收口、Evidence 范围澄清、Vehicle / USB 主线证据接入、验证记录与文档评审。
 - `audit-development-report-archive-2026-05-02/`：最新 C2 / APT / MISC 证据链产品化、WebShell 解码表达、前端模块化和验证报告。

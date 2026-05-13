@@ -1,3 +1,11 @@
+/**
+ * Stability: beta
+ *
+ * Batch media transcription depends on an external Vosk speech-to-text
+ * runtime that must be installed and configured by the operator. Supported
+ * languages, acoustic models, and accuracy characteristics are not yet fully
+ * documented. Treat transcripts as advisory input to evidence review.
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus, SpeechToTextStatus } from "../../core/types";
