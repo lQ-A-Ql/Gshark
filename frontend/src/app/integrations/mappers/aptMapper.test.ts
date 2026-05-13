@@ -82,9 +82,11 @@ describe("aptMapper", () => {
   });
 
   it("returns empty defaults for malformed payload sections", () => {
-    const result = asAPTAnalysis({ profiles: "bad", evidence: null });
-    expect(result.profiles).toEqual([]);
-    expect(result.evidence).toEqual([]);
+    const result = asAPTAnalysis({ profiles: [null], evidence: [null], actors: "bad" });
+    expect(result.actors).toEqual([]);
+    expect(result.profiles[0]).toMatchObject({ id: "", name: "", evidenceCount: 0 });
+    expect(result.evidence[0]).toMatchObject({ packetId: 0, tags: [] });
     expect(result.notes).toEqual([]);
+    expect(asAPTAnalysis(null).totalEvidence).toBe(0);
   });
 });

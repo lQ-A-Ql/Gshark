@@ -167,7 +167,8 @@ describe("c2SampleMapper", () => {
   it("uses safe defaults for missing or malformed payload sections", () => {
     const result = asC2SampleAnalysis({
       cs: {
-        candidates: [{ packet_id: 1, family: "unknown", summary: "fallback" }],
+        host_uri_aggregates: [null],
+        candidates: [{ packet_id: 1, family: "unknown", summary: "fallback" }, null],
         notes: "not-array",
       },
     });
@@ -178,8 +179,11 @@ describe("c2SampleMapper", () => {
       family: "cs",
       summary: "fallback",
     });
+    expect(result.cs.candidates[1]).toMatchObject({ packetId: 0, family: "cs" });
+    expect(result.cs.hostUriAggregates?.[0]).toMatchObject({ host: "", uri: "", methods: [] });
     expect(result.cs.notes).toEqual([]);
     expect(result.vshell.candidates).toEqual([]);
     expect(result.cs.report?.summary).toEqual([]);
+    expect(asC2SampleAnalysis(null).totalMatchedPackets).toBe(0);
   });
 });
