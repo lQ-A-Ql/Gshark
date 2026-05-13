@@ -14,6 +14,7 @@ import { asIndustrialAnalysis } from "../mappers/industrialMapper";
 import { asGlobalTrafficStats } from "../mappers/trafficMapper";
 import { asUSBAnalysis } from "../mappers/usbMapper";
 import { asVehicleAnalysis } from "../mappers/vehicleMapper";
+import type { EvidenceListWireDTO } from "../wire/evidenceWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -31,37 +32,37 @@ export interface AnalysisClient {
 export function createAnalysisClient(request: JsonRequest): AnalysisClient {
   return {
     async getGlobalTrafficStats(signal?: AbortSignal) {
-      const payload = await request<any>("/api/stats/traffic/global", { signal });
+      const payload = await request<unknown>("/api/stats/traffic/global", { signal });
       return asGlobalTrafficStats(payload);
     },
 
     async getIndustrialAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/analysis/industrial", { signal });
+      const payload = await request<unknown>("/api/analysis/industrial", { signal });
       return asIndustrialAnalysis(payload);
     },
 
     async getVehicleAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/analysis/vehicle", { signal });
+      const payload = await request<unknown>("/api/analysis/vehicle", { signal });
       return asVehicleAnalysis(payload);
     },
 
     async getUSBAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/analysis/usb", { signal });
+      const payload = await request<unknown>("/api/analysis/usb", { signal });
       return asUSBAnalysis(payload);
     },
 
     async getC2SampleAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/c2-analysis", { signal });
+      const payload = await request<unknown>("/api/c2-analysis", { signal });
       return asC2SampleAnalysis(payload);
     },
 
     async getAPTAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/apt-analysis", { signal });
+      const payload = await request<unknown>("/api/apt-analysis", { signal });
       return asAPTAnalysis(payload);
     },
 
     async getEvidence(signal?: AbortSignal) {
-      const payload = await request<any>("/api/evidence", { signal });
+      const payload = await request<EvidenceListWireDTO>("/api/evidence", { signal });
       return parseEvidenceRecords(payload);
     },
 
@@ -72,7 +73,7 @@ export function createAnalysisClient(request: JsonRequest): AnalysisClient {
       }
       const qs = params.toString();
       const path = qs ? `/api/evidence?${qs}` : "/api/evidence";
-      const payload = await request<any>(path, { signal });
+      const payload = await request<EvidenceListWireDTO>(path, { signal });
       return parseEvidenceRecords(payload);
     },
   };

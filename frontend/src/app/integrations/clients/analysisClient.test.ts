@@ -5,6 +5,55 @@ import { createAnalysisClient } from "./analysisClient";
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 describe("analysisClient", () => {
+  it("passes signals through traffic and evidence requests", async () => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(init?.signal).toBe(signal);
+      if (path === "/api/stats/traffic/global") {
+        return {
+          total_packets: 12,
+          protocol_kinds: 2,
+          timeline: [{ label: "10:00", count: 3 }],
+          protocol_dist: [],
+          top_talkers: [],
+          top_hostnames: [],
+          top_domains: [],
+          top_src_ips: [],
+          top_dst_ips: [],
+          top_computer_names: [],
+          top_dest_ports: [],
+          top_src_ports: [],
+        };
+      }
+      if (path === "/api/evidence") {
+        return {
+          records: [
+            {
+              id: "c2-1",
+              module: "c2",
+              source_type: "cs",
+              summary: "CS candidate",
+              severity: "medium",
+              confidence: 71,
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
+    }) as unknown as JsonRequest;
+
+    const client = createAnalysisClient(request);
+
+    await expect(client.getGlobalTrafficStats(signal)).resolves.toMatchObject({
+      totalPackets: 12,
+      protocolKinds: 2,
+      timeline: [{ label: "10:00", count: 3 }],
+    });
+    await expect(client.getEvidence(signal)).resolves.toMatchObject([
+      { id: "c2-1", module: "c2", summary: "CS candidate", severity: "medium" },
+    ]);
+  });
+
   it("maps USB and C2 report payloads from transport responses", async () => {
     const request = vi.fn(async (path: string) => {
       if (path === "/api/analysis/usb") {
@@ -127,6 +176,20 @@ describe("analysisClient", () => {
       sourceType: "uds",
       summary: "UDS 负响应",
       severity: "high",
+    });
+  });
+
+  it("maps malformed APT analysis payloads to empty collections", async () => {
+    const request = vi.fn(async (path: string) => {
+      expect(path).toBe("/api/apt-analysis");
+      return { total_evidence: 3, profiles: "bad", evidence: null, notes: ["partial"] };
+    }) as unknown as JsonRequest;
+
+    await expect(createAnalysisClient(request).getAPTAnalysis()).resolves.toMatchObject({
+      totalEvidence: 3,
+      profiles: [],
+      evidence: [],
+      notes: ["partial"],
     });
   });
 });
