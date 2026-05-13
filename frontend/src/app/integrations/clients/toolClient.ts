@@ -29,6 +29,12 @@ import {
   asSMB3SessionCandidates,
   asWinRMDecryptResult,
 } from "../mappers/toolMapper";
+import type {
+  HTTPLoginAnalysisWireDTO,
+  MySQLAnalysisWireDTO,
+  ShiroRememberMeAnalysisWireDTO,
+  SMTPAnalysisWireDTO,
+} from "../wire/protocolToolWireDtos";
 import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -145,22 +151,22 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
     },
 
     async getHTTPLoginAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/tools/http-login-analysis", { signal });
+      const payload = await request<HTTPLoginAnalysisWireDTO>("/api/tools/http-login-analysis", { signal });
       return asHTTPLoginAnalysis(payload);
     },
 
     async getSMTPAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/tools/smtp-analysis", { signal });
+      const payload = await request<SMTPAnalysisWireDTO>("/api/tools/smtp-analysis", { signal });
       return asSMTPAnalysis(payload);
     },
 
     async getMySQLAnalysis(signal?: AbortSignal) {
-      const payload = await request<any>("/api/tools/mysql-analysis", { signal });
+      const payload = await request<MySQLAnalysisWireDTO>("/api/tools/mysql-analysis", { signal });
       return asMySQLAnalysis(payload);
     },
 
     async getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal) {
-      const payload = await request<any>("/api/tools/shiro-rememberme", {
+      const payload = await request<ShiroRememberMeAnalysisWireDTO>("/api/tools/shiro-rememberme", {
         method: "POST",
         signal,
         body: JSON.stringify({

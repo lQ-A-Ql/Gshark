@@ -95,3 +95,61 @@ describe("toolClient WinRM methods", () => {
     await expect(client.getWinRMDecryptResultText("missing")).rejects.toThrow("no result");
   });
 });
+
+describe("toolClient protocol analysis methods", () => {
+  it("fetches protocol GET analyses with abort signals and maps payloads", async () => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(init?.signal).toBe(signal);
+      switch (path) {
+        case "/api/tools/http-login-analysis":
+          return { total_attempts: 2, candidate_endpoints: 1, notes: ["http"] };
+        case "/api/tools/smtp-analysis":
+          return { session_count: 1, auth_count: 1, notes: ["smtp"] };
+        case "/api/tools/mysql-analysis":
+          return { session_count: 1, query_count: 3, notes: ["mysql"] };
+        default:
+          throw new Error(`unexpected path: ${path}`);
+      }
+    }) as unknown as JsonRequest;
+    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+
+    await expect(client.getHTTPLoginAnalysis(signal)).resolves.toMatchObject({
+      totalAttempts: 2,
+      candidateEndpoints: 1,
+      notes: ["http"],
+    });
+    await expect(client.getSMTPAnalysis(signal)).resolves.toMatchObject({
+      sessionCount: 1,
+      authCount: 1,
+      notes: ["smtp"],
+    });
+    await expect(client.getMySQLAnalysis(signal)).resolves.toMatchObject({
+      sessionCount: 1,
+      queryCount: 3,
+      notes: ["mysql"],
+    });
+  });
+
+  it("posts Shiro rememberMe candidate keys and maps payloads", async () => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/tools/shiro-rememberme");
+      expect(init?.method).toBe("POST");
+      expect(init?.signal).toBe(signal);
+      expect(JSON.parse(String(init?.body))).toEqual({ candidate_keys: ["k1", "k2"] });
+      return { candidate_count: 2, hit_count: 1, notes: ["shiro"] };
+    }) as unknown as JsonRequest;
+
+    await expect(
+      createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders).getShiroRememberMeAnalysis(
+        ["k1", "k2"],
+        signal,
+      ),
+    ).resolves.toMatchObject({
+      candidateCount: 2,
+      hitCount: 1,
+      notes: ["shiro"],
+    });
+  });
+});
