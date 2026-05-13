@@ -34,6 +34,9 @@ jobs:
       - name: Backend focused contracts
         run: go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
 
+      - name: Backend governance register check
+        run: go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
+
       - name: Go test
         run: go test ./...
 

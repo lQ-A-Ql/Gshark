@@ -27,11 +27,6 @@ Invoke-Step "Backend fmt check" {
   }
 }
 
-Invoke-Step "Backend tests" {
-  Set-Location (Join-Path $root "backend")
-  go test ./...
-}
-
 Invoke-Step "Backend boundary check" {
   Set-Location (Join-Path $root "backend")
   go test ./internal/architecture -run TestBackendArchitectureBoundaries -count=1 -v
@@ -40,6 +35,16 @@ Invoke-Step "Backend boundary check" {
 Invoke-Step "Backend focused contracts" {
   Set-Location (Join-Path $root "backend")
   go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
+}
+
+Invoke-Step "Backend governance register check" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
+}
+
+Invoke-Step "Backend tests" {
+  Set-Location (Join-Path $root "backend")
+  go test ./...
 }
 
 Invoke-Step "Frontend package manager check" {

@@ -1,0 +1,468 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-13T03:20:24+08:00",
+  "entries": [
+    {
+      "id": "P0-1",
+      "priority": "P0",
+      "title": "tshark capability graceful degradation",
+      "description": "Missing optional tshark fields must degrade to partial results with visible diagnostics instead of silently failing.",
+      "keyFiles": [
+        "backend/internal/tshark/capabilities.go",
+        "backend/internal/tshark/analysis_helpers.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/capabilities.go",
+          "backend/internal/tshark/capabilities_property_test.go",
+          "backend/internal/tshark/field_scan_degradation.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/capabilities_property_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P0-2",
+      "priority": "P0",
+      "title": "field scan cache key determinism",
+      "description": "Field scan cache entries require deterministic collision-resistant keys covering scan parameters.",
+      "keyFiles": [
+        "backend/internal/tshark/cache_key.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/cache_key.go",
+          "backend/internal/tshark/cache_key_property_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/cache_key_property_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P0-3",
+      "priority": "P0",
+      "title": "_ws.col display field severity downgrade",
+      "description": "Display-layer _ws.col fields must not be classified with protocol-layer field severity.",
+      "keyFiles": [
+        "backend/internal/tshark/capabilities.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/capabilities.go",
+          "backend/internal/tshark/capabilities_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/capabilities_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P0-4",
+      "priority": "P0",
+      "title": "plugin local execution permission boundary",
+      "description": "Plugins must declare explicit exec.local permission before any local code execution path runs.",
+      "keyFiles": [
+        "backend/internal/plugin/manager.go",
+        "backend/internal/plugin/runtime.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/plugin/manager.go",
+          "backend/internal/plugin/manager_test.go",
+          "backend/internal/plugin/runtime.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/plugin/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/plugin/manager_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-1",
+      "priority": "P1",
+      "title": "backend transport service interface split",
+      "description": "Transport must depend on focused service interfaces instead of a monolithic engine service surface.",
+      "keyFiles": [
+        "backend/internal/transport/services.go",
+        "backend/internal/transport/http_server.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/transport/services.go",
+          "backend/internal/transport/http_server.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/transport/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/architecture/boundary_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-2",
+      "priority": "P1",
+      "title": "SentinelContext state ownership extraction",
+      "description": "Independent state slices must have owner hooks and focused tests before public context splitting.",
+      "keyFiles": [
+        "frontend/src/app/state/SentinelContext.tsx",
+        "frontend/src/app/state/hooks/useCaptureSessionState.ts"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/state/SentinelContext.tsx",
+          "frontend/src/app/state/hooks/useCapturePreloadState.ts",
+          "frontend/src/app/state/hooks/useCapturePreloadState.test.tsx",
+          "frontend/src/app/state/hooks/useCaptureSessionState.ts",
+          "frontend/src/app/state/hooks/useCaptureSessionState.test.tsx",
+          "frontend/src/app/state/hooks/useDisplayFilterState.ts",
+          "frontend/src/app/state/hooks/useDisplayFilterState.test.tsx"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/state/hooks/useCapturePreloadState.test.tsx",
+          "frontend/src/app/state/hooks/useCaptureSessionState.test.tsx",
+          "frontend/src/app/state/hooks/useDisplayFilterState.test.tsx"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-3",
+      "priority": "P1",
+      "title": "useCaptureStartWorkflow option grouping",
+      "description": "The capture start workflow must accept grouped typed options instead of a large flat parameter object.",
+      "keyFiles": [
+        "frontend/src/app/state/hooks/useCaptureStartWorkflow.ts"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/state/hooks/useCaptureStartWorkflow.ts",
+          "frontend/src/app/state/hooks/useCaptureStartWorkflow.test.tsx"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/state/hooks/useCaptureStartWorkflow.test.tsx"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-4",
+      "priority": "P1",
+      "title": "tool runtime config persistence consistency",
+      "description": "Tool runtime config reads and writes must use a single locked authoritative path.",
+      "keyFiles": [
+        "backend/internal/engine/tool_runtime.go",
+        "backend/internal/engine/service.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/engine/service.go",
+          "backend/internal/engine/tool_runtime.go",
+          "frontend/src/app/state/toolRuntimeStorage.test.ts"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/engine -run TestToolRuntime -count=1",
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/state/toolRuntimeStorage.test.ts"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-5",
+      "priority": "P1",
+      "title": "contract mapper round-trip coverage",
+      "description": "Frontend/backend contract mappers need generated or derived DTO coverage; current closure adds the first PBT slice and leaves full migration open.",
+      "keyFiles": [
+        "frontend/src/app/integrations/mappers/contractMapper.property.test.ts"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/integrations/mappers/contractMapper.property.test.ts"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/integrations/mappers/contractMapper.property.test.ts"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-1",
+      "priority": "P2",
+      "title": "evidence type package boundary",
+      "description": "Evidence value types must only be referenced by model, engine, transport, and architecture tests.",
+      "keyFiles": [
+        "backend/internal/architecture/boundary_test.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/architecture/boundary_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/architecture -run TestBackendArchitectureBoundaries -count=1 -v",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/architecture/boundary_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-2",
+      "priority": "P2",
+      "title": "industrial rules named constants",
+      "description": "Industrial tshark rules should use named constants instead of magic values.",
+      "keyFiles": [
+        "backend/internal/tshark/industrial_rules.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/industrial_rules.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/analysis_helpers_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-3",
+      "priority": "P2",
+      "title": "frontend boundary depth",
+      "description": "Frontend boundary checks must cover feature imports, state/UI boundaries, mapper purity, client transport-only rules, and UI primitive domain boundaries.",
+      "keyFiles": [
+        "frontend/scripts/check-boundaries.mjs"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "frontend/scripts/check-boundaries.mjs",
+          "frontend/scripts/check-boundaries.test.mjs"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run boundary:check",
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "frontend/scripts/check-boundaries.test.mjs"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-4",
+      "priority": "P2",
+      "title": "field scan cache LRU capacity",
+      "description": "Field scan cache must have bounded capacity and deterministic eviction behavior.",
+      "keyFiles": [
+        "backend/internal/tshark/field_scan_cache.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/field_scan_cache.go",
+          "backend/internal/tshark/cache_capacity_property_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/cache_capacity_property_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P2-5",
+      "priority": "P2",
+      "title": "analysis helpers responsibility split",
+      "description": "tshark analysis helpers should be split into focused planning, normalization, degradation, warmup, and utility files.",
+      "keyFiles": [
+        "backend/internal/tshark/analysis_helpers.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/tshark/analysis_helpers.go",
+          "backend/internal/tshark/field_scan_plan.go",
+          "backend/internal/tshark/field_scan_normalize.go",
+          "backend/internal/tshark/field_scan_degradation.go",
+          "backend/internal/tshark/field_scan_warm.go",
+          "backend/internal/tshark/analysis_utils.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/tshark/... -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/tshark/analysis_helpers_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P3-1",
+      "priority": "P3",
+      "title": "feature maturity markers",
+      "description": "Wide or experimental feature surfaces need explicit stability markers.",
+      "keyFiles": [
+        "backend/internal/engine/speech_to_text.go",
+        "backend/internal/engine/c2_decrypt.go",
+        "backend/internal/engine/media_playback.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/engine/speech_to_text.go",
+          "backend/internal/engine/c2_decrypt.go",
+          "backend/internal/engine/media_playback.go",
+          "frontend/src/app/features/c2/C2DecryptWorkbench.tsx",
+          "frontend/src/app/features/media/useMediaTranscriptionWorkflow.ts"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./...",
+          "cd frontend && pnpm run ci"
+        ],
+        "evidenceTests": [
+          "backend/internal/engine/public_threat_sample_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P3-2",
+      "priority": "P3",
+      "title": "real PCAP regression matrix",
+      "description": "Major analysis domains require real/public PCAP regression coverage while local true samples remain opt-in.",
+      "keyFiles": [
+        "backend/internal/engine/public_protocol_sample_test.go",
+        "backend/internal/engine/public_threat_sample_test.go"
+      ],
+      "status": "resolved",
+      "resolvedIn": 1,
+      "evidence": {
+        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
+        "closedAt": "2026-05-13T03:20:24+08:00",
+        "modifiedFiles": [
+          "backend/internal/engine/public_protocol_sample_test.go",
+          "backend/internal/engine/public_threat_sample_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/engine -run \"TestBundledPublic|TestThreatSample\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/engine/public_protocol_sample_test.go",
+          "backend/internal/engine/public_threat_sample_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
+      }
+    },
+    {
+      "id": "P1-6",
+      "priority": "P1",
+      "title": "full mapper DTO/codegen migration",
+      "description": "Extend contract mapper round-trip coverage beyond pluginSourceMapper and tlsMapper to the remaining asymmetric mappers.",
+      "keyFiles": [
+        "frontend/src/app/integrations/mappers"
+      ],
+      "status": "open"
+    }
+  ]
+}

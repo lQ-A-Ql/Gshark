@@ -494,7 +494,6 @@ func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, plannedSca
 			return err
 		}
 	}
-	return nil
 }
 
 func appendCSHTTPFieldCandidatesFromLine(line string, plannedScan tshark.PlannedFieldScan, seen map[string]struct{}, out *[]c2DecryptCandidate) {

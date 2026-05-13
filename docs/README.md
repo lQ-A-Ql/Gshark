@@ -14,6 +14,7 @@
 
 ## 当前方向摘要
 
+- [治理缺陷登记表](./governance-defect-register.json)：机器可读的 Architecture_Defect 状态源，记录缺陷优先级、关闭提交、验证命令、证据测试和报告路径。
 - [2026-05-11 主线审计与路线图](./audit-development-report-archive-2026-05-11/mainline-audit-and-roadmap-2026-05-11.md)：记录从前端拆分主导切回主线能力闭环主导，落地统一调查报告 schema、桥接回归与公共样本门禁。
 - [主线收口与 Evidence 范围澄清报告](./audit-development-report-archive-2026-05-05/mainline-evidence-scope-and-validation-report-2026-05-05.md)：明确 MISC 不接入 Evidence，新增 Vehicle / USB 主线证据，修复前端模块归类，补齐验证与文档索引。
 - [C2 / APT / MISC 证据链产品化报告](./audit-development-report-archive-2026-05-02/c2-apt-misc-productization-report-2026-05-02.md)：C2 VShell、APT actor registry、MISC Payload / WebShell、误导文案清理、前端骨架审计与模块化拆分（types 目录拆分、feature hooks 提取、UI 组件收敛）、测试验证和下一步优先级。
