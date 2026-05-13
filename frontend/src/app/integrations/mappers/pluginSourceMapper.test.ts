@@ -26,4 +26,8 @@ describe("pluginSourceMapper", () => {
       logic_content: "code",
     });
   });
+
+  it("uses fallback defaults for malformed plugin source payloads", () => {
+    expect(asPluginSource("bad", "fallback")).toMatchObject({ id: "fallback", configPath: "", entry: "" });
+  });
 });

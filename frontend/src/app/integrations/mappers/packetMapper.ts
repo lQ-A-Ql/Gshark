@@ -1,23 +1,25 @@
 import type { Packet } from "../../core/types";
+import { asPlainObject } from "./mapperPrimitives";
 
-export function asPacket(input: any): Packet {
-  const color = input.color_features ?? {};
+export function asPacket(input: unknown): Packet {
+  const payload = asPlainObject(input) ?? {};
+  const color = asPlainObject(payload.color_features) ?? {};
   return {
-    id: Number(input.id ?? 0),
-    time: normalizePacketTime(input.timestamp),
-    src: String(input.source_ip ?? ""),
-    srcPort: Number(input.source_port ?? 0),
-    dst: String(input.dest_ip ?? ""),
-    dstPort: Number(input.dest_port ?? 0),
-    proto: String(input.protocol ?? "OTHER") as Packet["proto"],
-    displayProtocol: String(input.display_protocol ?? "").trim() || undefined,
-    length: Number(input.length ?? 0),
-    info: String(input.info ?? ""),
-    payload: String(input.payload ?? ""),
-    rawHex: String(input.raw_hex ?? "") || undefined,
-    streamId: Number(input.stream_id ?? 0),
-    ipHeaderLen: Number(input.ip_header_len ?? 0) || undefined,
-    l4HeaderLen: Number(input.l4_header_len ?? 0) || undefined,
+    id: Number(payload.id ?? 0),
+    time: normalizePacketTime(payload.timestamp),
+    src: String(payload.source_ip ?? ""),
+    srcPort: Number(payload.source_port ?? 0),
+    dst: String(payload.dest_ip ?? ""),
+    dstPort: Number(payload.dest_port ?? 0),
+    proto: String(payload.protocol ?? "OTHER") as Packet["proto"],
+    displayProtocol: String(payload.display_protocol ?? "").trim() || undefined,
+    length: Number(payload.length ?? 0),
+    info: String(payload.info ?? ""),
+    payload: String(payload.payload ?? ""),
+    rawHex: String(payload.raw_hex ?? "") || undefined,
+    streamId: Number(payload.stream_id ?? 0),
+    ipHeaderLen: Number(payload.ip_header_len ?? 0) || undefined,
+    l4HeaderLen: Number(payload.l4_header_len ?? 0) || undefined,
     colorFeatures: {
       tcpAnalysisFlags: Boolean(color.tcp_analysis_flags),
       tcpWindowUpdate: Boolean(color.tcp_window_update),

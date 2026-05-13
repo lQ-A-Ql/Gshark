@@ -111,4 +111,11 @@ describe("packetStreamMapper", () => {
       level: "critical",
     });
   });
+
+  it("coerces malformed packet and stream payloads to safe defaults", () => {
+    expect(asPacket("bad")).toMatchObject({ id: 0, src: "", proto: "OTHER" });
+    expect(asHttpStream({ chunks: ["bad"] }).chunks).toEqual([{ packetId: 0, direction: "client", body: "" }]);
+    expect(asBinaryStream("bad", "TCP")).toMatchObject({ id: 1, protocol: "TCP", chunks: [] });
+    expect(asThreatHit("bad")).toMatchObject({ id: 0, level: "low" });
+  });
 });

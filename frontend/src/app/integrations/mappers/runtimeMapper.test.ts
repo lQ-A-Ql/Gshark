@@ -51,4 +51,12 @@ describe("runtimeMapper", () => {
       yara: { enabled: true, timeoutMs: 456 },
     });
   });
+
+  it("uses safe defaults for malformed runtime snapshots", () => {
+    const result = asToolRuntimeSnapshot("bad");
+    expect(result.config.tsharkPath).toBe("");
+    expect(result.tshark.available).toBe(false);
+    expect(result.ffmpeg.path).toBe("");
+    expect(result.yara.timeoutMs).toBe(25000);
+  });
 });

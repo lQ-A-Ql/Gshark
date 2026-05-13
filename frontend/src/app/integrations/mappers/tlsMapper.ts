@@ -1,6 +1,8 @@
 import type { DecryptionConfig } from "../../core/types";
+import { asPlainObject } from "./mapperPrimitives";
 
-export function asDecryptionConfig(payload: any): DecryptionConfig {
+export function asDecryptionConfig(input: unknown): DecryptionConfig {
+  const payload = asPlainObject(input) ?? {};
   return {
     sslKeyLogPath: String(payload.ssl_key_log_file ?? ""),
     privateKeyPath: String(payload.rsa_private_key ?? ""),

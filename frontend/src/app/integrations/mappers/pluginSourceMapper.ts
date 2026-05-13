@@ -7,7 +7,10 @@ export interface PluginSource {
   entry: string;
 }
 
-export function asPluginSource(payload: any, fallbackId = ""): PluginSource {
+import { asPlainObject } from "./mapperPrimitives";
+
+export function asPluginSource(input: unknown, fallbackId = ""): PluginSource {
+  const payload = asPlainObject(input) ?? {};
   return {
     id: String(payload.id ?? fallbackId),
     configPath: String(payload.config_path ?? ""),

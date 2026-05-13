@@ -1,65 +1,70 @@
 import type { BinaryStream, HttpStream } from "../../core/types";
+import { asArray, asPlainObject } from "./mapperPrimitives";
 
-export function asHttpStream(input: any): HttpStream {
-  const chunks = asStreamChunks(input.chunks);
+export function asHttpStream(input: unknown): HttpStream {
+  const payload = asPlainObject(input) ?? {};
+  const chunks = asStreamChunks(payload.chunks);
   const fallbackChunks = chunks.length
     ? chunks
     : [
-        ...(String(input.request ?? "")
-          ? [{ packetId: 0, direction: "client" as const, body: String(input.request ?? "") }]
+        ...(String(payload.request ?? "")
+          ? [{ packetId: 0, direction: "client" as const, body: String(payload.request ?? "") }]
           : []),
-        ...(String(input.response ?? "")
-          ? [{ packetId: 0, direction: "server" as const, body: String(input.response ?? "") }]
+        ...(String(payload.response ?? "")
+          ? [{ packetId: 0, direction: "server" as const, body: String(payload.response ?? "") }]
           : []),
       ];
 
   return {
-    id: Number(input.stream_id ?? 1),
-    client: String(input.from ?? ""),
-    server: String(input.to ?? ""),
-    request: String(input.request ?? ""),
-    response: String(input.response ?? ""),
+    id: Number(payload.stream_id ?? 1),
+    client: String(payload.from ?? ""),
+    server: String(payload.to ?? ""),
+    request: String(payload.request ?? ""),
+    response: String(payload.response ?? ""),
     chunks: fallbackChunks,
-    loadMeta: asStreamLoadMeta(input.load_meta),
+    loadMeta: asStreamLoadMeta(payload.load_meta),
   };
 }
 
-export function asBinaryStream(input: any, protocol: "TCP" | "UDP"): BinaryStream {
-  const chunks = asStreamChunks(input.chunks);
+export function asBinaryStream(input: unknown, protocol: "TCP" | "UDP"): BinaryStream {
+  const payload = asPlainObject(input) ?? {};
+  const chunks = asStreamChunks(payload.chunks);
   return {
-    id: Number(input.stream_id ?? 1),
+    id: Number(payload.stream_id ?? 1),
     protocol,
-    from: String(input.from ?? ""),
-    to: String(input.to ?? ""),
+    from: String(payload.from ?? ""),
+    to: String(payload.to ?? ""),
     chunks,
-    nextCursor: Number(input.next_cursor ?? chunks.length),
-    totalChunks: Number(input.total ?? chunks.length),
-    hasMore: Boolean(input.has_more),
-    loadMeta: asStreamLoadMeta(input.load_meta),
+    nextCursor: Number(payload.next_cursor ?? chunks.length),
+    totalChunks: Number(payload.total ?? chunks.length),
+    hasMore: Boolean(payload.has_more),
+    loadMeta: asStreamLoadMeta(payload.load_meta),
   };
 }
 
-function asStreamChunks(input: any): HttpStream["chunks"] {
-  return Array.isArray(input)
-    ? input.map((chunk: any) => ({
-        packetId: Number(chunk.packet_id ?? 0),
-        direction: chunk.direction === "server" ? "server" : "client",
-        body: String(chunk.body ?? ""),
-      }))
-    : [];
+function asStreamChunks(input: unknown): HttpStream["chunks"] {
+  return asArray(input).map((value) => {
+    const chunk = asPlainObject(value) ?? {};
+    return {
+      packetId: Number(chunk.packet_id ?? 0),
+      direction: chunk.direction === "server" ? "server" : "client",
+      body: String(chunk.body ?? ""),
+    };
+  });
 }
 
-function asStreamLoadMeta(input: any): HttpStream["loadMeta"] {
-  if (!input || typeof input !== "object") {
+function asStreamLoadMeta(input: unknown): HttpStream["loadMeta"] {
+  const payload = asPlainObject(input);
+  if (!payload) {
     return undefined;
   }
   return {
-    source: String(input.source ?? "").trim() || undefined,
-    loading: Boolean(input.loading),
-    cacheHit: Boolean(input.cache_hit),
-    indexHit: Boolean(input.index_hit),
-    fileFallback: Boolean(input.file_fallback),
-    tsharkMs: Number(input.tshark_ms ?? 0) || 0,
-    overrideCount: Number(input.override_count ?? 0) || undefined,
+    source: String(payload.source ?? "").trim() || undefined,
+    loading: Boolean(payload.loading),
+    cacheHit: Boolean(payload.cache_hit),
+    indexHit: Boolean(payload.index_hit),
+    fileFallback: Boolean(payload.file_fallback),
+    tsharkMs: Number(payload.tshark_ms ?? 0) || 0,
+    overrideCount: Number(payload.override_count ?? 0) || undefined,
   };
 }

@@ -1,22 +1,20 @@
 import type { TSharkStatus } from "../clients/toolRuntimeClient";
+import { asStringList } from "./mapperPrimitives";
 
-export function asTSharkStatus(input: any): TSharkStatus {
+export function asTSharkStatus(input: unknown): TSharkStatus {
+  const payload = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
   return {
-    available: Boolean(input?.available),
-    path: String(input?.path ?? ""),
-    message: String(input?.message ?? ""),
-    customPath: String(input?.custom_path ?? ""),
-    usingCustomPath: Boolean(input?.using_custom_path),
-    version: String(input?.version ?? "") || undefined,
-    fieldProfile: String(input?.field_profile ?? "") || undefined,
-    fieldCount: Number(input?.field_count ?? 0) || undefined,
-    missingRequiredFields: stringList(input?.missing_required_fields),
-    missingOptionalFields: stringList(input?.missing_optional_fields),
-    capabilityMessage: String(input?.capability_message ?? "") || undefined,
-    capabilityCheckDegraded: Boolean(input?.capability_check_degraded),
+    available: Boolean(payload.available),
+    path: String(payload.path ?? ""),
+    message: String(payload.message ?? ""),
+    customPath: String(payload.custom_path ?? ""),
+    usingCustomPath: Boolean(payload.using_custom_path),
+    version: String(payload.version ?? "") || undefined,
+    fieldProfile: String(payload.field_profile ?? "") || undefined,
+    fieldCount: Number(payload.field_count ?? 0) || undefined,
+    missingRequiredFields: asStringList(payload.missing_required_fields),
+    missingOptionalFields: asStringList(payload.missing_optional_fields),
+    capabilityMessage: String(payload.capability_message ?? "") || undefined,
+    capabilityCheckDegraded: Boolean(payload.capability_check_degraded),
   };
-}
-
-function stringList(input: unknown): string[] {
-  return Array.isArray(input) ? input.map((item) => String(item ?? "")) : [];
 }

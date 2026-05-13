@@ -16,4 +16,8 @@ describe("tlsMapper", () => {
       target_ip_port: "c",
     });
   });
+
+  it("uses empty defaults for malformed config payloads", () => {
+    expect(asDecryptionConfig("bad")).toEqual({ sslKeyLogPath: "", privateKeyPath: "", privateKeyIpPort: "" });
+  });
 });

@@ -28,4 +28,8 @@ describe("trafficMapper", () => {
     expect(result.timeline).toEqual([]);
     expect(result.topTalkers).toEqual([]);
   });
+
+  it("uses empty defaults for malformed payloads", () => {
+    expect(asGlobalTrafficStats("bad")).toMatchObject({ totalPackets: 0, protocolDist: [] });
+  });
 });

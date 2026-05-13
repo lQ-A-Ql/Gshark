@@ -30,4 +30,9 @@ describe("pluginMapper", () => {
     });
     expect(asPluginItems([{ id: "a" }, { id: "b" }])).toHaveLength(2);
   });
+
+  it("coerces malformed plugin payloads to safe defaults", () => {
+    expect(asDBCProfiles(["bad"])[0]).toEqual({ path: "", name: "", messageCount: 0, signalCount: 0 });
+    expect(asPluginItem("bad")).toMatchObject({ id: "", name: "", enabled: false, capabilities: [] });
+  });
 });
