@@ -224,6 +224,16 @@ func TestUpdateSourcePersistsCapabilities(t *testing.T) {
 	}
 }
 
+func TestDefaultCapabilitiesDeclareLocalExec(t *testing.T) {
+	if _, ok := allowedPluginCapabilities[PermLocalExec]; !ok {
+		t.Fatalf("%s must remain an allowed plugin capability", PermLocalExec)
+	}
+	capabilities := normalizePluginCapabilities(nil)
+	if !pluginHasCapability(model.Plugin{ID: "defaulted", Capabilities: capabilities}, PermLocalExec) {
+		t.Fatalf("default plugin capabilities must include %s, got %+v", PermLocalExec, capabilities)
+	}
+}
+
 func TestAddRejectsEscapingEntry(t *testing.T) {
 	dir := t.TempDir()
 	manager := NewManager()

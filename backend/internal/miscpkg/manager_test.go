@@ -213,6 +213,38 @@ func TestImportZipBytesRejectsTooManyFiles(t *testing.T) {
 	}
 }
 
+func TestImportZipBytesRejectsInvalidModuleID(t *testing.T) {
+	manager := NewManager()
+	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("bad-id")
+	files["bad-id/manifest.json"] = `{"id":"../bad","title":"Bad ID","summary":"bad","backend":"backend.js"}`
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "invalid misc module id") {
+		t.Fatalf("expected invalid id error, got %v", err)
+	}
+}
+
+func TestImportZipBytesRejectsZipSlipPath(t *testing.T) {
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	manager := NewManager()
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("zip-slip")
+	files["zip-slip/../escaped.txt"] = "escape"
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "escapes managed misc module dir") {
+		t.Fatalf("expected zip-slip path error, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "zip-slip")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected failed import to remove partial module dir, stat err = %v", statErr)
+	}
+}
+
 func TestImportZipBytesRejectsOversizedFile(t *testing.T) {
 	manager := NewManager()
 	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
@@ -373,6 +405,36 @@ if __name__ == "__main__":
 	}
 	if result.Text != "12|example.test" {
 		t.Fatalf("unexpected text result: %+v", result)
+	}
+}
+
+func TestPythonHostBridgeRejectsUnknownMethod(t *testing.T) {
+	called := false
+	response := handlePythonHostCall(context.Background(), map[string]any{
+		"id":     "req-1",
+		"method": "delete_everything",
+		"params": map[string]any{},
+	}, InvokeContext{
+		CapturePath: "demo.pcapng",
+		ScanFieldsWithContext: func(ctx context.Context, filePath string, fields []string, displayFilter string) ([]map[string]string, error) {
+			called = true
+			return nil, nil
+		},
+	})
+
+	if called {
+		t.Fatalf("unknown host bridge method should not call scan fields")
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(response), &decoded); err != nil {
+		t.Fatalf("response is not JSON: %v", err)
+	}
+	if decoded["type"] != "host_response" || decoded["id"] != "req-1" {
+		t.Fatalf("unexpected response envelope: %+v", decoded)
+	}
+	message := fmt.Sprint(decoded["error"])
+	if !strings.Contains(message, "unsupported host bridge method: delete_everything") {
+		t.Fatalf("expected unsupported method error, got %+v", decoded)
 	}
 }
 

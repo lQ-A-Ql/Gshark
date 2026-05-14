@@ -106,8 +106,8 @@ func (s *Service) gatherAPTEvidence(ctx context.Context) ([]model.EvidenceRecord
 	return records, nil
 }
 
-func (s *Service) gatherIndustrialEvidence() ([]model.EvidenceRecord, error) {
-	analysis, err := s.IndustrialAnalysis()
+func (s *Service) gatherIndustrialEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	analysis, err := s.IndustrialAnalysisWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

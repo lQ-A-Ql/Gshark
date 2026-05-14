@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -73,6 +74,20 @@ func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 	}
 	if !modules["vehicle"] || !modules["usb"] {
 		t.Fatalf("expected vehicle and usb evidence, got %+v", result.Records)
+	}
+}
+
+func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
+	svc := NewService(nil, nil)
+	t.Cleanup(func() {
+		_ = svc.packetStore.Close()
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := svc.GatherEvidence(ctx, model.EvidenceFilter{Modules: []string{"industrial"}})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 }
 

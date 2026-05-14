@@ -68,8 +68,8 @@ func (s *Service) gatherObjectEvidence(ctx context.Context) ([]model.EvidenceRec
 	return records, nil
 }
 
-func (s *Service) gatherVehicleEvidence() ([]model.EvidenceRecord, error) {
-	analysis, err := s.VehicleAnalysis()
+func (s *Service) gatherVehicleEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	analysis, err := s.VehicleAnalysisWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +124,8 @@ func (s *Service) gatherVehicleEvidence() ([]model.EvidenceRecord, error) {
 	return records, nil
 }
 
-func (s *Service) gatherUSBEvidence() ([]model.EvidenceRecord, error) {
-	analysis, err := s.USBAnalysis()
+func (s *Service) gatherUSBEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	analysis, err := s.USBAnalysisWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

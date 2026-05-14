@@ -512,10 +512,11 @@ type MiscModuleRunRequest struct {
 }
 
 type MiscModuleRunResult struct {
-	Message string                 `json:"message,omitempty"`
-	Text    string                 `json:"text,omitempty"`
-	Output  any                    `json:"output,omitempty"`
-	Table   *MiscModuleTableResult `json:"table,omitempty"`
+	Message string `json:"message,omitempty"`
+	Text    string `json:"text,omitempty"`
+	// Output stays dynamic because MISC modules can return scalar, object, or list payloads.
+	Output any                    `json:"output,omitempty"`
+	Table  *MiscModuleTableResult `json:"table,omitempty"`
 }
 
 type MiscModulePackageManifest struct {
@@ -628,16 +629,17 @@ type ReassembledStream struct {
 }
 
 type StreamPayloadCandidate struct {
-	ID                 string         `json:"id"`
-	Label              string         `json:"label"`
-	Kind               string         `json:"kind"`
-	ParamName          string         `json:"param_name,omitempty"`
-	Value              string         `json:"value"`
-	Preview            string         `json:"preview,omitempty"`
-	Confidence         int            `json:"confidence,omitempty"`
-	DecoderHints       []string       `json:"decoder_hints,omitempty"`
-	Fingerprints       []string       `json:"fingerprints,omitempty"`
-	FamilyHint         string         `json:"family_hint,omitempty"`
+	ID           string   `json:"id"`
+	Label        string   `json:"label"`
+	Kind         string   `json:"kind"`
+	ParamName    string   `json:"param_name,omitempty"`
+	Value        string   `json:"value"`
+	Preview      string   `json:"preview,omitempty"`
+	Confidence   int      `json:"confidence,omitempty"`
+	DecoderHints []string `json:"decoder_hints,omitempty"`
+	Fingerprints []string `json:"fingerprints,omitempty"`
+	FamilyHint   string   `json:"family_hint,omitempty"`
+	// DecoderOptionsHint remains dynamic because different payload families expose different option sets.
 	DecoderOptionsHint map[string]any `json:"decoder_options_hint,omitempty"`
 	SourceRole         string         `json:"source_role,omitempty"`
 }
@@ -653,20 +655,21 @@ type StreamPayloadInspection struct {
 }
 
 type StreamPayloadSource struct {
-	ID                  string         `json:"id"`
-	Method              string         `json:"method,omitempty"`
-	Host                string         `json:"host,omitempty"`
-	URI                 string         `json:"uri,omitempty"`
-	PacketID            int64          `json:"packet_id"`
-	StreamID            int64          `json:"stream_id,omitempty"`
-	SourceType          string         `json:"source_type,omitempty"`
-	ParamName           string         `json:"param_name,omitempty"`
-	Payload             string         `json:"payload"`
-	Preview             string         `json:"preview,omitempty"`
-	Confidence          int            `json:"confidence,omitempty"`
-	Signals             []string       `json:"signals,omitempty"`
-	DecoderHints        []string       `json:"decoder_hints,omitempty"`
-	FamilyHint          string         `json:"family_hint,omitempty"`
+	ID           string   `json:"id"`
+	Method       string   `json:"method,omitempty"`
+	Host         string   `json:"host,omitempty"`
+	URI          string   `json:"uri,omitempty"`
+	PacketID     int64    `json:"packet_id"`
+	StreamID     int64    `json:"stream_id,omitempty"`
+	SourceType   string   `json:"source_type,omitempty"`
+	ParamName    string   `json:"param_name,omitempty"`
+	Payload      string   `json:"payload"`
+	Preview      string   `json:"preview,omitempty"`
+	Confidence   int      `json:"confidence,omitempty"`
+	Signals      []string `json:"signals,omitempty"`
+	DecoderHints []string `json:"decoder_hints,omitempty"`
+	FamilyHint   string   `json:"family_hint,omitempty"`
+	// DecoderOptionsHint stays dynamic for the same reason as StreamPayloadCandidate.DecoderOptionsHint.
 	DecoderOptionsHint  map[string]any `json:"decoder_options_hint,omitempty"`
 	SourceRole          string         `json:"source_role,omitempty"`
 	ContentType         string         `json:"content_type,omitempty"`
@@ -864,19 +867,20 @@ type C2DecryptRequest struct {
 }
 
 type C2DecryptedRecord struct {
-	PacketID         int64          `json:"packet_id,omitempty"`
-	StreamID         int64          `json:"stream_id,omitempty"`
-	Time             string         `json:"time,omitempty"`
-	Direction        string         `json:"direction,omitempty"`
-	Algorithm        string         `json:"algorithm,omitempty"`
-	KeyStatus        string         `json:"key_status,omitempty"`
-	Confidence       int            `json:"confidence"`
-	PlaintextPreview string         `json:"plaintext_preview,omitempty"`
-	Parsed           map[string]any `json:"parsed,omitempty"`
-	RawLength        int            `json:"raw_length,omitempty"`
-	DecryptedLength  int            `json:"decrypted_length,omitempty"`
-	Tags             []string       `json:"tags,omitempty"`
-	Error            string         `json:"error,omitempty"`
+	PacketID         int64  `json:"packet_id,omitempty"`
+	StreamID         int64  `json:"stream_id,omitempty"`
+	Time             string `json:"time,omitempty"`
+	Direction        string `json:"direction,omitempty"`
+	Algorithm        string `json:"algorithm,omitempty"`
+	KeyStatus        string `json:"key_status,omitempty"`
+	Confidence       int    `json:"confidence"`
+	PlaintextPreview string `json:"plaintext_preview,omitempty"`
+	// Parsed is family-specific decrypted metadata; stable fields stay beside it.
+	Parsed          map[string]any `json:"parsed,omitempty"`
+	RawLength       int            `json:"raw_length,omitempty"`
+	DecryptedLength int            `json:"decrypted_length,omitempty"`
+	Tags            []string       `json:"tags,omitempty"`
+	Error           string         `json:"error,omitempty"`
 }
 
 type C2DecryptResult struct {

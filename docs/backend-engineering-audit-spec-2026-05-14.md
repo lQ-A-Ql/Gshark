@@ -707,3 +707,799 @@ Validation:
 Remaining context work:
 
 - A deeper TShark field-scan context migration would still be needed to interrupt an already-running subprocess earlier in `backend/internal/tshark/analysis_helpers.go`.
+
+## 23. Script Execution Trust Model
+
+Status: `BE-SCRIPT-7.1` completed on 2026-05-15 01:20:55 +08:00.
+
+This documentation-only slice clarifies that Plugin and MISC script execution are local trusted extension points, not strong sandboxes.
+
+Updated docs:
+
+- `docs/misc-module-interface.md`
+- `docs/plugin-interface.md`
+
+Trust model now stated explicitly:
+
+- MISC zip modules run local `backend.js` or `backend.py` logic under the current user context after import.
+- Plugin execution requires `exec.local`, but that capability is an explicit local execution consent marker, not an isolation guarantee.
+- Zip/import validation, host bridge scoping, unified forms, and `exec.local` permission checks are engineering guardrails, not malicious-code containment.
+- Unknown-source modules/plugins should not be imported or enabled.
+- Untrusted code execution requires external isolation such as an OS sandbox, VM, or separate process policy outside the current Plugin/MISC model.
+
+Validation:
+
+- `git diff --check` — PASS.
+
+Remaining script governance work:
+
+- `BE-SCRIPT-7.2`: design a candidate MISC permission model such as `exec.local`, `capture.read`, and `field.scan`.
+- `BE-SCRIPT-7.3`: add host bridge method registry tests.
+- `BE-SCRIPT-7.4`: strengthen MISC import safety tests.
+- `BE-SCRIPT-7.5`: keep plugin permission parity tests aligned with `exec.local`.
+
+## 24. MISC Permission Model Design
+
+Status: `BE-SCRIPT-7.2` completed on 2026-05-15 01:28:11 +08:00.
+
+This documentation-only slice defines a backward-compatible MISC `permissions` field model without changing runtime behavior.
+
+Updated doc:
+
+- `docs/misc-module-interface.md`
+
+Candidate permissions:
+
+- `exec.local`: allows running the local module backend script.
+- `capture.read`: allows reading current capture path/context or capture-derived data.
+- `field.scan`: allows host-backed field scans, including JavaScript `ctx.scanFields()` and Python `scan_fields()`.
+- `host.bridge`: allows Python host bridge helper exposure.
+
+Compatibility decisions:
+
+- Missing `permissions` keeps current v3 behavior so installed modules are not broken.
+- `host_bridge: true` is treated as requiring `host.bridge` in future gates.
+- `requires_capture: true` is treated as requiring `capture.read` in future gates.
+- Field scan usage should declare `field.scan`.
+- Future enforcement should start with warnings before hard failures.
+- `permissions` is capability exposure governance, not sandboxing.
+
+Validation:
+
+- `git diff --check -- docs/misc-module-interface.md docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+
+Remaining script governance work:
+
+- `BE-SCRIPT-7.3`: add host bridge method registry tests.
+- `BE-SCRIPT-7.4`: strengthen MISC import safety tests.
+- `BE-SCRIPT-7.5`: keep plugin permission parity tests aligned with `exec.local`.
+
+## 25. Host Bridge Unknown-Method Regression Test
+
+Status: `BE-SCRIPT-7.3` first slice completed on 2026-05-15 01:31:55 +08:00.
+
+This slice adds a direct regression test for the Python MISC host bridge method registry behavior.
+
+Changed file:
+
+- `backend/internal/miscpkg/manager_test.go`
+
+Coverage added:
+
+- `TestPythonHostBridgeRejectsUnknownMethod` calls `handlePythonHostCall` directly with an unsupported method name.
+- The test verifies the response envelope remains a `host_response` with the original request id.
+- The test verifies the error names the unsupported method.
+- The test verifies unknown methods do not call the field-scan callback.
+
+Validation:
+
+- `cd backend && gofmt -w internal/miscpkg/manager_test.go` — PASS.
+- `cd backend && gofmt -l internal/miscpkg/manager_test.go` — PASS.
+- `cd backend && go test ./internal/miscpkg -run "TestPythonHostBridgeRejectsUnknownMethod|TestInvokePythonHostBridgeUsesContextAwareScanFields" -count=1 -v` — PASS.
+
+Remaining script governance work:
+
+- `BE-SCRIPT-7.3`: a later hardening slice can promote the implicit method switch into a named registry if more bridge methods are added.
+- `BE-SCRIPT-7.4`: strengthen MISC import safety tests.
+- `BE-SCRIPT-7.5`: keep plugin permission parity tests aligned with `exec.local`.
+
+## 26. MISC Import Safety Test Gaps
+
+Status: `BE-SCRIPT-7.4` completed on 2026-05-15 01:36:31 +08:00.
+
+This slice audits and strengthens MISC zip import safety tests.
+
+Existing coverage before this slice:
+
+- Too many files.
+- Oversized single file.
+- Oversized total uncompressed content.
+
+New coverage:
+
+- `TestImportZipBytesRejectsInvalidModuleID`: rejects traversal-style module IDs such as `../bad` before extraction.
+- `TestImportZipBytesRejectsZipSlipPath`: rejects zip entries that escape the managed module directory during extraction and removes partial module directories after failed import.
+
+Changed file:
+
+- `backend/internal/miscpkg/manager_test.go`
+
+Validation:
+
+- `cd backend && gofmt -w internal/miscpkg/manager_test.go` — PASS.
+- `cd backend && go test ./internal/miscpkg -run "TestImportZipBytesRejects" -count=1 -v` — PASS.
+- `cd backend && go test ./internal/miscpkg -count=1` — PASS.
+
+Remaining script governance work:
+
+- `BE-SCRIPT-7.5`: keep plugin permission parity tests aligned with `exec.local`.
+- Optional future hardening: named host bridge registry if more bridge methods are added.
+
+## 27. Plugin `exec.local` Permission Parity
+
+Status: `BE-SCRIPT-7.5` completed on 2026-05-15 01:39:36 +08:00.
+
+This slice verifies plugin permission behavior remains aligned with the documented local execution trust boundary.
+
+Changed file:
+
+- `backend/internal/plugin/manager_test.go`
+
+Coverage added:
+
+- `TestDefaultCapabilitiesDeclareLocalExec` verifies `exec.local` remains in the allowed plugin capability set.
+- The same test verifies default plugin capabilities include `exec.local`, matching the current compatibility behavior for plugins without explicit capability lists.
+
+Existing coverage preserved:
+
+- `TestRunEnabledPacketPluginsRequiresExecLocalCapability` verifies plugins that explicitly omit `exec.local` do not execute local code and surface a warning.
+
+Validation:
+
+- `cd backend && gofmt -w internal/plugin/manager_test.go` — PASS.
+- `cd backend && gofmt -l internal/plugin/manager_test.go` — PASS.
+- `cd backend && go test ./internal/plugin -run "TestDefaultCapabilitiesDeclareLocalExec|TestRunEnabledPacketPluginsRequiresExecLocalCapability" -count=1 -v` — PASS.
+- `cd backend && go test ./internal/plugin -count=1` — PASS.
+
+Script governance status:
+
+- `BE-SCRIPT-7.1` complete: trust model documented.
+- `BE-SCRIPT-7.2` complete: MISC permission model designed.
+- `BE-SCRIPT-7.3` first slice complete: host bridge unknown-method regression covered.
+- `BE-SCRIPT-7.4` complete: MISC import safety tests strengthened.
+- `BE-SCRIPT-7.5` complete: plugin `exec.local` parity tests aligned.
+
+Recommended next backend epic:
+
+- Move to `BE-MODEL-5.1` for model type classification, or `BE-CONTRACT-1.8` for backend-only schema/codegen decision notes.
+
+## 28. Model Type Classification
+
+Status: `BE-MODEL-5.1` completed on 2026-05-15 01:52:45 +08:00.
+
+This documentation-only slice classifies `backend/internal/model/types.go` before any package/file split. No Go model types were moved or renamed.
+
+Classification rule:
+
+- `domain`: value types used internally by engine/tshark/plugin logic and also often serialized.
+- `wire response`: HTTP-facing response/request DTOs whose JSON shape is part of the frontend contract.
+- `runtime config`: persisted or runtime tool configuration/status values.
+- `plugin/misc contract`: extension API and host bridge data shapes.
+- `dynamic boundary`: intentionally dynamic JSON payload positions that should remain explicit rather than hidden.
+
+Current groups in `types.go`:
+
+| Lines | Representative Types | Classification | Notes |
+|---:|---|---|---|
+| 3-64 | `Packet`, `PacketColorFeatures` | domain + wire response | Packet rows are engine domain values and exported API payloads; JSON tags are contract-sensitive. |
+| 66-157 | `TLSConfig`, `HuntingRuntimeConfig`, `YaraConfig`, `ToolRuntimeConfig`, `*ToolStatus`, `ToolRuntimeSnapshot`, `CaptureStatus` | runtime config + wire response | Tool/runtime surfaces should keep stable JSON tags; `YaraConfig` has no JSON tags and is internal config. |
+| 159-543 | WinRM, SMB3, NTLM, HTTP login, SMTP, MySQL, Shiro, MISC package result types | wire response + plugin/misc contract | Tool workbench DTOs are protocol-specific wire contracts; MISC package types are extension API contracts. |
+| 545-587 | `ObjectFile`, `Plugin`, `PluginSource`, `AuditEntry` | wire response + plugin contract | `ObjectFile.Path` is intentionally `json:"-"`; plugin capability fields are governance-sensitive. |
+| 589-679 | `ParseOptions`, stream chunks, stream payload candidates/sources/inspection | domain + wire response + dynamic boundary | `DecoderOptionsHint map[string]any` is an intentional dynamic decoder-options boundary. |
+| 681-1045 | Traffic, C2, APT, investigation report/evidence-related types | wire response + domain | Primary contract area for future producer snapshots; evidence types are already architecture-gated to engine/transport/model. |
+| 1047-1272 | Industrial and vehicle analysis types | wire response + domain | Large protocol analysis surfaces; good candidates for JSON tag consistency tests before any split. |
+| 1274-1541 | Media, speech, USB, and remaining protocol result types | wire response + domain | Media/speech task status and USB nested analysis are contract-sensitive dense UI payloads. |
+
+Dynamic boundary inventory:
+
+- `StreamPayloadCandidate.DecoderOptionsHint map[string]any`
+- `StreamPayloadSource.DecoderOptionsHint map[string]any`
+- `MiscModuleRunResult.Output any`
+- `MiscModuleTableResult` row maps and parsed plugin/MISC output handled in `internal/miscpkg`
+- Packet layer output is exposed as `map[string]any` via transport/service interfaces rather than a model struct
+
+Recommended split order if `BE-MODEL-5.2` proceeds later while keeping package name `model`:
+
+1. `packet.go`: packet row and color feature values.
+2. `runtime.go`: tool runtime, TLS, YARA, capture status.
+3. `tool_protocols.go`: WinRM/SMB3/NTLM/HTTP-login/SMTP/MySQL/Shiro DTOs.
+4. `extensions.go`: plugin and MISC extension contracts.
+5. `stream.go`: streams and payload inspection/source DTOs.
+6. `analysis_c2_apt.go`: traffic, C2, APT, evidence/report-adjacent records.
+7. `analysis_industrial_vehicle.go`: industrial and vehicle analysis DTOs.
+8. `media_usb.go`: media, speech, USB analysis DTOs.
+
+Guardrails before any split:
+
+- Keep package name `model` to avoid import churn.
+- Do not rename exported types or JSON tags.
+- Add focused JSON tag consistency tests for selected contract structs before moving large groups.
+- Keep dynamic `any` positions documented rather than trying to eliminate them globally.
+
+Validation:
+
+- `git diff --check -- docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+
+## 47. Twenty-Round Backend Engineering Approval
+
+Status: cycle 2 approval completed on 2026-05-15 03:05:54 +08:00.
+
+Cycle scope:
+
+- R11 `BE-TRANSPORT-2.1b`: mutating route method policy tests.
+- R12 `BE-CONTEXT-3.6`: request cancellation regression test.
+- R13 `BE-MODEL-5.3`: dynamic model boundary comments.
+- R14 `BE-TSHARK-6.1`: field-plan usage audit.
+- R15 transport route baseline expansion for plugin write routes.
+- R16 engine service ownership follow-up constructor gate.
+- R17 backend producer contract pilot expansion for `/api/tools/runtime-config`.
+- R18 `BE-CONTEXT-3.6` context exception audit update.
+- R19 docs/report self-review and cycle approval prep.
+- R20 cycle approval and next-cycle task optimization.
+
+Validation:
+
+- `cd backend && gofmt -l .` — PASS.
+- `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md docs/plugin-interface.md docs/audit-development-report-archive-2026-05-14/backend-engineering-report-2026-05-14.md` — PASS.
+
+Cycle approval result:
+
+- Approved.
+- The cycle improved route-level safety nets, request cancellation confidence, model contract readability, TShark audit clarity, engine owner invariants, and producer contract maturity without broad refactors.
+- Average effective score: Gold.
+- No round remained below the 90 approval threshold after self-review.
+
+Optimized next task order:
+
+1. `BE-TRANSPORT-2.2`: move capture handlers after the route baseline is stronger.
+2. `BE-ENGINE-4.2` or `BE-ENGINE-4.3`: extract one owner group if a tested seam is now obvious.
+3. `BE-CONTRACT-1.6` / `BE-CONTRACT-1.7`: continue contract hardening only where stable dynamic boundaries are already documented.
+4. `BE-TSHARK-6.2`: expand capability matrix tests if a new scan path or field registry change lands.
+5. `BE-CONTEXT-3.6` follow-up: cover one media/tool path cancellation regression if a lightweight fake becomes available.
+
+Deferred tasks:
+
+- Full schema/codegen remains deferred.
+- Deep TShark field-scan subprocess cancellation remains deferred.
+- Broad `engine.Service` extraction remains deferred until more focused owner tests exist.
+
+## 39. Mutating Route Method Policy Baseline
+
+Status: `BE-TRANSPORT-2.1b` completed on 2026-05-15 02:31:18 +08:00.
+
+This slice extends the route behavior baseline from read-route registration into representative mutating route method policy.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage added:
+
+- `TestHandlerRegistersMutatingRouteMethodPolicy` exercises routes through `Server.Handler()` rather than direct handler methods.
+- Covered routes: `/api/capture/stop`, `/api/capture/prepare-replacement`, and `/api/capture/close`.
+- Each route now has a route-level assertion that a bad `GET` method returns `405 Method Not Allowed`.
+- Each route now has a route-level assertion that the intended `POST` method returns the stable status JSON payload.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegisters(MutatingRouteMethodPolicy|CoreReadRoutes)$" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- Risk remains low because this is test-only and avoids endpoints that require real captures, multipart uploads, or external tools.
+- Follow-up route baselines can add auth/audit-sensitive paths before moving handler groups into separate files.
+
+## 40. Request Cancellation Regression Test
+
+Status: `BE-CONTEXT-3.6` first slice completed on 2026-05-15 02:35:44 +08:00.
+
+This slice adds a narrow transport regression test proving a request-scoped context reaches a context-aware long-running analysis method.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage added:
+
+- `TestHandleC2AnalysisUsesCanceledRequestContext` creates an already-canceled request context.
+- A fake `AnalysisService` records `ctx.Err()` in `C2SampleAnalysis(ctx)` and returns it.
+- The handler returns `408 Request Timeout` for `context.Canceled`, matching existing cancellation error handling.
+- The test fails if the handler stops passing `r.Context()` to `C2SampleAnalysis`.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandleC2Analysis(ReturnsInitializedPayload|UsesCanceledRequestContext)$" -count=1` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- The test avoids slow external tools while still guarding the request-context propagation behavior that matters for cancellation.
+- Further cancellation tests should cover one media/tool path once a fake service can be injected without broad scaffolding.
+
+## 41. Dynamic Model Boundary Comments
+
+Status: `BE-MODEL-5.3` first slice completed on 2026-05-15 02:39:26 +08:00.
+
+This slice adds narrow comments at the currently identified dynamic JSON boundaries in `backend/internal/model/types.go`.
+
+Changed file:
+
+- `backend/internal/model/types.go`
+
+Comments added:
+
+- `MiscModuleRunResult.Output` explains that MISC modules may return scalar, object, or list payloads.
+- `StreamPayloadCandidate.DecoderOptionsHint` explains that different payload families expose different option sets.
+- `StreamPayloadSource.DecoderOptionsHint` mirrors that explanation for source-level payload discovery.
+- `C2DecryptedRecord.Parsed` explains that the parsed payload is family-specific decrypted metadata beside stable fields.
+
+Validation:
+
+- `cd backend && go test ./internal/model -count=1` — PASS.
+
+Self-review:
+
+- Score: 93/100, Gold.
+- The comments are deliberately small and sit only on dynamic boundaries already tolerated by contract tests.
+- A broader boundary inventory can wait until the next model split or contract expansion.
+
+## 42. TShark Field-Plan Usage Audit
+
+Status: `BE-TSHARK-6.1` audited on 2026-05-15 02:43:12 +08:00.
+
+This slice audits current `field-scan` usage rather than changing the TShark subsystem.
+
+Findings:
+
+- `backend/internal/tshark/analysis_helpers.go` is the single shared execution path for cache-aware field scans.
+- `backend/internal/tshark/field_scan_plan.go` already centralizes capability-aware planning, alias resolution, optional-field degradation, and projection back to caller layout.
+- Existing call sites already route through the planner or its exported wrapper, including `engine/tool_ntlm.go`, `engine/tool_smb3.go`, `engine/tool_winrm.go`, `miscpkg/manager.go`, `engine/c2_decrypt.go`, `tshark/runner.go`, `tshark/filter_ids.go`, `tshark/stream_follow.go`, `tshark/usb_analysis.go`, and the various helper tests.
+- The current test suite already covers optional-field skipping, required-field rejection, alias resolution, argument ordering, degradation notes, and cache reuse.
+
+Remaining watchpoints:
+
+- If a new field-scan path is added outside the planner, it should either call `BuildPlannedFieldArgs` or justify a direct scan with a test.
+- Deep subprocess cancellation is still bounded by the current `Command` execution model and is better handled with a future focused helper change than with this audit slice.
+
+Validation:
+
+- `rg -n "ScanFieldRowsWithDisplayFilter|BuildPlannedFieldArgs|planFieldScanByCapabilities" backend/internal` — PASS as an audit pass.
+
+Self-review:
+
+- Score: 92/100, Gold.
+- This is an audit-only slice because the existing design is already centralized and the current tests cover the important planner invariants.
+- The next TShark change should be event-driven, not speculative.
+
+## 43. Plugin Write Route Registration Baseline
+
+Status: transport route baseline expansion completed on 2026-05-15 02:48:57 +08:00.
+
+This slice extends route-level testing into plugin write routes that are audit/security sensitive.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage added:
+
+- `TestHandlerRegistersPluginWriteRoutes` exercises plugin routes through `Server.Handler()` with a fake `PluginService`.
+- Covered routes: `/api/plugins/add`, `/api/plugins/delete`, `/api/plugins/source`, and `/api/plugins/bulk`.
+- The test verifies route registration, method wiring, basic JSON response shape, and that the expected plugin service method is invoked for add/delete/bulk.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegistersPluginWriteRoutes|TestHandlerRegistersMutatingRouteMethodPolicy" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- The route matrix is still intentionally partial, but it now covers read routes, simple mutating capture routes, and plugin write routes.
+- Future transport splitting has a stronger route-level safety net without broad handler movement yet.
+
+## 44. Engine Service Owner State Constructor Gate
+
+Status: engine ownership follow-up completed on 2026-05-15 02:52:08 +08:00.
+
+This slice adds a small constructor invariant test before any `Service` owner extraction.
+
+Changed file:
+
+- `backend/internal/engine/service_ownership_test.go`
+
+Coverage added:
+
+- `TestNewServiceInitializesOwnerState` verifies `NewService` initializes the default emitter, packet store, capture task registry, display-filter cache, stream owner maps, media owner maps, default hunting prefixes, and default YARA config.
+- The test protects future service-owner extraction from accidentally leaving map-backed owner state nil.
+
+Validation:
+
+- `cd backend && go test ./internal/engine -run TestNewServiceInitializesOwnerState -count=1` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- This avoids broad `Service` extraction while adding a useful invariant around the owner groups documented earlier.
+- Future extraction can use this as a minimum constructor-safety baseline.
+
+## 45. Runtime Config Producer Contract Pilot
+
+Status: third backend producer contract pilot completed on 2026-05-15 02:57:24 +08:00.
+
+This slice adds the previously recommended `/api/tools/runtime-config` producer contract pilot.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage added:
+
+- `TestToolRuntimeConfigContract` exercises `handleToolRuntimeConfig` with a fake `ToolRuntimeService`.
+- The test verifies top-level keys: `config`, `tshark`, `ffmpeg`, `speech`, and `yara`.
+- The test verifies stable nested keys for tool runtime config and status objects while respecting `omitempty` fields.
+- `contractToolRuntimeService` provides stable fixture data without requiring local tools to be installed.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestToolRuntimeConfigContract|TestHandlerRegistersPluginWriteRoutes|TestHandlerRegistersMutatingRouteMethodPolicy" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- This completes the third small producer pilot without introducing full schema/codegen or frontend changes.
+- The pilot strengthens `P2-6` evidence while preserving the current handwritten DTO strategy.
+
+## 46. Context Exception Audit Update
+
+Status: context policy update completed on 2026-05-15 03:00:16 +08:00.
+
+This slice revisits the `context.Background()` classification after adding request-cancellation coverage.
+
+Current enforcement evidence:
+
+- `backend/internal/architecture/boundary_test.go` still blocks known HTTP handlers from using no-context long-running wrappers.
+- `TestHandleC2AnalysisUsesCanceledRequestContext` now proves a canceled request context reaches a context-aware analysis service and returns `408 Request Timeout`.
+- The grep audit found production `context.Background()` uses still fit the documented categories: tests, legacy wrappers delegating to `WithContext`, nil-context fallback, short tool/runtime probes, background tasks, server shutdown, and field capability planning.
+
+Clarified exception:
+
+- `tshark/field_scan_plan.go` uses `context.Background()` for capability planning because it is not request-owned today. This remains an accepted short probe/planning category, not a request handler exception.
+
+Deferred limitation:
+
+- Request contexts reach many long-running handlers, but field-scan subprocess cancellation is still constrained by current `tshark.Command`/`CommandContext` call sites. Changing that requires a focused helper migration and should not be mixed into route or contract work.
+
+Validation:
+
+- `rg -n "context\.Canceled|WithContext\(r\.Context\(\)\)|context\.Background\(\)" backend/internal` — PASS as context policy audit evidence.
+
+Self-review:
+
+- Score: 91/100, Gold.
+- This is intentionally documentation/audit-only because the current production usage still matches the policy and the new cancellation test adds machine evidence.
+- Future hardening should add AST-based allowlists only if string-based checks become noisy.
+
+## 36. Core Route Registration Baseline
+
+Status: `BE-TRANSPORT-2.1` first slice completed on 2026-05-15 02:21:54 +08:00.
+
+This slice adds a route registration smoke baseline before any `http_server.go` handler split.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage added:
+
+- `TestHandlerRegistersCoreReadRoutes` exercises `Server.Handler()` rather than direct handler methods.
+- Covered routes: `/health`, `/api/runtime/identity`, `/api/capture/status`, `/api/packets/page`, `/api/streams/index`, `/api/evidence`, `/api/tools/misc/modules`.
+- The test verifies core read routes remain registered and return `200 OK` on an unauthenticated local test server.
+
+Validation:
+
+- `cd backend && gofmt -w internal/transport/http_server_test.go` — PASS.
+- `cd backend && go test ./internal/transport -run "TestHandlerRegistersCoreReadRoutes" -count=1 -v` — PASS.
+- `cd backend && go test ./internal/transport -count=1` — PASS.
+
+Next route baseline hardening:
+
+- Add method policy checks for mutating routes before splitting capture/tool/media handlers.
+- Add auth/audit route baseline only where behavior is already stable and tested.
+
+## 37. Ten-Round Backend Engineering Approval
+
+Status: cycle 1 approval completed on 2026-05-15 02:23:40 +08:00.
+
+Cycle scope:
+
+- R1 `BE-MODEL-5.1`: model type classification.
+- R2 `BE-CONTRACT-1.8`: backend schema/codegen decision for `P2-6`.
+- R3 stream index producer contract pilot.
+- R4 evidence producer contract pilot.
+- R5 `BE-CONTEXT-3.3`: evidence collector cancellation.
+- R6 `BE-CONTEXT-3.5`: `context.Background()` exception classification.
+- R7 `BE-MODEL-5.5`: core JSON tag consistency gate.
+- R8 `BE-ENGINE-4.1`: engine service state ownership map.
+- R9 `BE-TRANSPORT-2.1`: core route registration baseline.
+- R10 cycle approval and task optimization.
+
+Validation:
+
+- `cd backend && gofmt -l .` — PASS.
+- `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md docs/plugin-interface.md` — PASS.
+
+Cycle approval result:
+
+- Approved. The cycle improved producer contracts, context cancellation, model governance, script governance, and route baseline without high-risk broad refactors.
+- Average effective score: Gold.
+- No round remained below the 90 approval threshold after self-review.
+
+Optimized next task order:
+
+1. `BE-TRANSPORT-2.1b`: add method policy tests for a small set of mutating routes.
+2. `BE-CONTEXT-3.6`: add one cancellation regression test for a request-scoped long-running handler path.
+3. `BE-MODEL-5.3`: add dynamic payload comments near model dynamic boundaries.
+4. `BE-TSHARK-6.1`: audit field-plan usage for recently migrated scan paths.
+5. `BE-TRANSPORT-2.2`: only after route/method baselines, move capture handlers into a separate file.
+
+Deferred tasks:
+
+- Full OpenAPI/JSON Schema/codegen remains deferred.
+- Deep TShark field-scan context migration remains deferred until after smaller route/context gates.
+- Broad `engine.Service` extraction remains deferred until owner-specific tests are expanded.
+
+## 30. Stream Index Producer Contract Pilot
+
+Status: backend producer contract pilot completed on 2026-05-15 02:00:03 +08:00.
+
+This slice implements the first `P2-6` backend producer contract pilot for `/api/streams/index`.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage strengthened:
+
+- `TestStreamIndexContract` now requires the exact response key set: `protocol`, `total`, `ids`.
+- Empty-capture behavior now asserts `ids` is encoded as an empty JSON array, not `null`.
+- `TestStreamIndexContractWithIDs` covers non-empty IDs, protocol normalization for `udp` -> `UDP`, and `total == len(ids)`.
+- `contractCaptureService` now allows per-test stream ID fixtures and returns a copy to avoid accidental mutation coupling.
+
+Validation:
+
+- `cd backend && gofmt -w internal/transport/http_contract_test.go` — PASS.
+- `cd backend && go test ./internal/transport -run "TestStreamIndexContract" -count=1 -v` — PASS.
+- `cd backend && go test ./internal/transport -count=1` — PASS.
+
+Next producer contract pilot:
+
+- Strengthen `/api/evidence` by adding a non-empty/module-filtered response contract fixture.
+
+## 31. Evidence Producer Contract Pilot
+
+Status: second backend producer contract pilot completed on 2026-05-15 02:06:49 +08:00.
+
+This slice strengthens `/api/evidence` producer-side contract coverage for non-empty and module-filtered responses.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage added:
+
+- `TestEvidenceContractModuleFilter` verifies query parsing trims module names and skips empty entries.
+- The test verifies a non-empty response includes `records`, `total`, and `notes`.
+- The test verifies evidence record core fields: `id`, `module`, `source_type`, `summary`, and `severity`.
+- The test verifies `notes` remains a JSON array when present.
+- `contractEvidenceAnalysisService` captures the passed `model.EvidenceFilter` and returns a stable one-record fixture.
+
+Validation:
+
+- `cd backend && gofmt -w internal/transport/http_contract_test.go` — PASS.
+- `cd backend && go test ./internal/transport -run "TestEvidenceContract" -count=1 -v` — PASS.
+- `cd backend && go test ./internal/transport -count=1` — PASS.
+
+`P2-6` backend pilot status:
+
+- Pilot 1 `/api/streams/index`: completed.
+- Pilot 2 `/api/evidence`: completed for empty and non-empty/module-filter paths.
+- Full schema/codegen remains deferred until JSON tag consistency and dynamic boundary tests improve.
+
+## 32. Evidence Collector Cancellation
+
+Status: `BE-CONTEXT-3.3` completed on 2026-05-15 02:12:30 +08:00.
+
+This slice strengthens `GatherEvidence` cancellation behavior without changing HTTP response shapes.
+
+Changed files:
+
+- `backend/internal/engine/evidence.go`
+- `backend/internal/engine/evidence_collectors_detection.go`
+- `backend/internal/engine/evidence_collectors_assets.go`
+- `backend/internal/engine/evidence_test.go`
+
+Behavior changes:
+
+- `GatherEvidence` now normalizes a nil context to `context.Background()`.
+- Each selected evidence module checks `ctx.Err()` before starting collection.
+- Industrial evidence now calls `IndustrialAnalysisWithContext(ctx)`.
+- Vehicle evidence now calls `VehicleAnalysisWithContext(ctx)`.
+- USB evidence now calls `USBAnalysisWithContext(ctx)`.
+- `TestGatherEvidenceReturnsCanceledContext` verifies canceled contexts return `context.Canceled` before expensive collectors run.
+
+Validation:
+
+- `cd backend && gofmt -w internal/engine/evidence.go internal/engine/evidence_collectors_detection.go internal/engine/evidence_collectors_assets.go internal/engine/evidence_test.go` — PASS.
+- `cd backend && go test ./internal/engine -run "TestGatherEvidence" -count=1` — PASS.
+- `cd backend && go test ./internal/engine ./internal/transport -count=1` — PASS.
+
+Remaining context work:
+
+- Deep TShark field-scan cancellation still requires context-aware variants under `backend/internal/tshark/analysis_helpers.go`.
+- Desktop/legacy `context.Background()` wrappers should still be classified under `BE-CONTEXT-3.5`.
+
+## 33. `context.Background()` Exception Classification
+
+Status: `BE-CONTEXT-3.5` completed on 2026-05-15 02:14:24 +08:00.
+
+This documentation slice classifies allowed `context.Background()` use so future context gates can distinguish legitimate wrappers from HTTP handler regressions.
+
+Allowed categories:
+
+| Category | Example Files | Policy |
+|---|---|---|
+| Tests | `*_test.go` | Allowed; tests may use background contexts unless specifically testing cancellation. |
+| Legacy synchronous wrappers | `engine/service.go`, `tool_ntlm.go`, `tool_smb3.go`, `tool_winrm.go`, `speech_to_text.go` | Allowed only when the method immediately delegates to a `WithContext` variant. HTTP handlers must call the `WithContext` variant. |
+| Nil-context fallback | `engine/*`, `tshark/capabilities.go`, `media_playback.go`, `c2_decrypt.go` | Allowed inside context-aware functions to normalize `nil` into a usable context. |
+| Tool/runtime probes | `tshark/config.go`, speech runtime checks | Allowed for short local capability probes that are not tied to a request lifecycle. Prefer timeout contexts when subprocesses are involved. |
+| Background tasks | `speech_to_text.go`, `service.go` capture task registry | Allowed for user-initiated background tasks that own their own cancel function. Must be registered/cancellable where long-running. |
+| Server shutdown | `transport/http_server.go` | Allowed as an operational root; future improvement can add a bounded timeout context. |
+
+Disallowed category:
+
+- HTTP handlers must not use no-context long-running service wrappers when a request context is available.
+
+Current machine enforcement:
+
+- `backend/internal/architecture/boundary_test.go` prevents known migrated HTTP handlers from calling no-context wrappers.
+
+Future hardening:
+
+- Promote this classification into a small architecture allowlist if `context.Background()` starts spreading outside the categories above.
+- Add timeout context to server shutdown if graceful shutdown hangs become observable.
+
+Validation:
+
+- `git diff --check -- docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+
+## 34. Core JSON Tag Consistency Gate
+
+Status: `BE-MODEL-5.5` first slice completed on 2026-05-15 02:17:22 +08:00.
+
+This slice adds a small model-level JSON tag consistency test for the most contract-sensitive structs touched by current producer pilots.
+
+Changed file:
+
+- `backend/internal/model/json_tags_test.go`
+
+Coverage added:
+
+- `Packet`: packet table/detail contract tags such as `id`, `source_ip`, `dest_ip`, `stream_id`.
+- `EvidenceRecord`: core evidence record tags such as `id`, `module`, `source_type`, `summary`, `severity`.
+- `EvidenceResponse`: `records`, `total`, and `notes,omitempty`.
+- `ToolRuntimeSnapshot`: `config`, `tshark`, `ffmpeg`, `speech`, and `yara`.
+
+Validation:
+
+- `cd backend && gofmt -w internal/model/json_tags_test.go` — PASS.
+- `cd backend && go test ./internal/model -count=1 -v` — PASS.
+- `cd backend && go test ./internal/model ./internal/transport ./internal/architecture -count=1` — PASS.
+
+Next JSON tag hardening:
+
+- Add protocol-analysis tag tests only when touching their tests or before splitting `model/types.go`.
+
+## 35. Engine Service State Ownership Map
+
+Status: `BE-ENGINE-4.1` completed on 2026-05-15 02:18:48 +08:00.
+
+This documentation-only slice maps ownership groups inside `backend/internal/engine/service.go` before any state extraction.
+
+Current `Service` state groups:
+
+| Fields | Owner Group | Notes |
+|---|---|---|
+| `emitter`, `pluginManger` | integration dependencies | Constructor-owned dependencies; spelling of `pluginManger` is existing API/internal state and should not be renamed casually. |
+| `mu`, `loadMu`, `activeLoadMu`, `activeLoadID`, `activeLoadCancel`, `runID`, `cancel` | capture lifecycle and cancellation | Governs load serialization, active run identity, cancellation and capture replacement behavior. |
+| `captureTaskMu`, `captureTaskSeq`, `captureTasks` | capture-scoped background task registry | Owns cancellable tasks tied to capture lifecycle such as speech/media background work. |
+| `packetStore`, `pcap`, `tlsConf` | capture data and parse configuration | Core loaded capture state and TLS parse options. |
+| `displayFilterCache`, `displayFilterCacheOrder` | packet filter cache owner | LRU-like packet filter index cache; separate from tshark field scan cache. |
+| `globalTrafficStats`, `industrialAnalysis`, `vehicleAnalysis`, `mediaAnalysis`, `usbAnalysis`, `c2Analysis`, `aptAnalysis` | analysis result cache owner | Cached high-level analysis outputs; invalidated on capture replacement. |
+| `vehicleDBCDefs` | vehicle DBC owner | Vehicle-specific decode configuration; candidate for a focused owner if vehicle code grows. |
+| `streamCache`, `streamCacheOrder`, `rawStreamIndex`, `streamOverrides` | stream cache and override owner | Reassembled stream caching, pagination/indexing, and user patch state. |
+| `exportDir`, `mediaExportDir`, `objectsLoaded`, `objects`, `mediaArtifacts`, `mediaPlayback`, `mediaSpeech`, `speechBatch`, `speechCancel`, `objMu` | object/media/speech owner | Mixed asset extraction and speech transcription state; likely future extraction target. |
+| `yaraLoaded`, `yaraHits`, `yaraLastError`, `yaraMu` | YARA result owner | Detection cache and last error. |
+| `toolRuntimeMu`, `huntMu`, `huntingPrefixes`, `yaraConf` | runtime configuration owner | Tool paths, hunting prefixes, and YARA runtime config; already partially protected by focused locks. |
+
+Extraction guardrails:
+
+- Do not extract fields only to reduce line count; extract only when a tested behavior boundary exists.
+- Prefer helper-owner structs that stay inside package `engine` before introducing new packages.
+- Preserve `Service` public method signatures unless a transport interface already hides the change.
+- Move tests first or alongside owner extraction.
+
+Recommended extraction order:
+
+1. Stream cache owner (`streamCache`, `rawStreamIndex`, `streamOverrides`) because cache behavior is cohesive and already has stream tests.
+2. Object/media/speech owner because state is broad but user-facing workflows already have tests.
+3. Capture task registry owner because cancellation semantics are now important and isolated.
+4. Analysis result cache owner only after contract/cancellation gates remain stable.
+
+Validation:
+
+- `git diff --check -- docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+
+Next recommended task:
+
+- `BE-CONTRACT-1.8`: record backend-only schema/codegen decision for `P2-6`, using this classification to choose a small producer-side contract pilot.
+
+## 29. Backend Schema/Codegen Decision for `P2-6`
+
+Status: `BE-CONTRACT-1.8` backend-side decision completed on 2026-05-15 01:55:04 +08:00.
+
+Decision:
+
+- Do not introduce full OpenAPI, JSON Schema generation, or generated TypeScript DTOs yet.
+- Continue handwritten Go structs and frontend WireDTOs for now, but add producer-side backend contract pilots for small stable surfaces.
+- Revisit full schema/codegen only after at least two backend producer pilots prove stable field naming, optionality, and dynamic-boundary policy.
+
+Rationale:
+
+- `backend/internal/model/types.go` still mixes domain, wire response, runtime config, plugin/MISC contracts, and dynamic boundaries.
+- Several response surfaces intentionally contain dynamic JSON (`map[string]any` / `any`) because packet layers, decoder options, and extension outputs are protocol/script dependent.
+- Full codegen now would encode unstable ownership boundaries and increase migration cost.
+- Backend producer contract tests already exist and are lower-risk than adding a generation toolchain during ongoing refactors.
+
+Pilot recommendation:
+
+1. First pilot: `/api/streams/index`.
+   - Small shape: `protocol`, `total`, `ids`.
+   - Already covered by `TestStreamIndexContract`.
+   - Low dynamic payload risk.
+   - Good candidate for stricter JSON snapshot/schema-like assertions.
+2. Second pilot: `/api/evidence` empty and module-filtered responses.
+   - High product value.
+   - Already has empty-capture contract coverage.
+   - Needs non-empty/module-filter fixture before schema generation should be considered.
+3. Third pilot candidate: `/api/tools/runtime-config`.
+   - Stable runtime/tool status surface.
+   - Useful for config compatibility checks.
+
+Promotion threshold for full schema/codegen:
+
+- At least two pilot surfaces have backend producer contract tests with stable JSON fields.
+- Dynamic boundary inventory is documented and tests explicitly allow those dynamic positions.
+- Model type groups have been split or at least guarded by JSON tag consistency tests.
+- Generated artifacts have a clear owner and CI check that does not require frontend source changes in backend-only flows.
+- The governance register can cite concrete backend tests and validation commands before closing `P2-6`.
+
+Next backend-only contract task:
+
+- Add a stricter producer contract test for `/api/streams/index`, checking field set, value types, empty-list encoding, and protocol normalization.
+
+Validation:
+
+- `git diff --check -- docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.

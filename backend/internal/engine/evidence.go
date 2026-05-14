@@ -8,6 +8,9 @@ import (
 )
 
 func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilter) (model.EvidenceResponse, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	records := make([]model.EvidenceRecord, 0)
 	var notes []string
 
@@ -25,6 +28,9 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("hunting") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
 		if hits, err := s.gatherThreatEvidence(ctx); err == nil {
 			records = append(records, hits...)
 		} else {
@@ -33,6 +39,9 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("c2") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
 		if c2, err := s.gatherC2Evidence(ctx); err == nil {
 			records = append(records, c2...)
 		} else {
@@ -41,6 +50,9 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("apt") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
 		if apt, err := s.gatherAPTEvidence(ctx); err == nil {
 			records = append(records, apt...)
 		} else {
@@ -49,7 +61,10 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("industrial") {
-		if ind, err := s.gatherIndustrialEvidence(); err == nil {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
+		if ind, err := s.gatherIndustrialEvidence(ctx); err == nil {
 			records = append(records, ind...)
 		} else {
 			notes = append(notes, fmt.Sprintf("工控证据收集失败: %v", err))
@@ -57,6 +72,9 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("object") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
 		if obj, err := s.gatherObjectEvidence(ctx); err == nil {
 			records = append(records, obj...)
 		} else {
@@ -65,7 +83,10 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("vehicle") {
-		if vehicle, err := s.gatherVehicleEvidence(); err == nil {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
+		if vehicle, err := s.gatherVehicleEvidence(ctx); err == nil {
 			records = append(records, vehicle...)
 		} else {
 			notes = append(notes, fmt.Sprintf("车机证据收集失败: %v", err))
@@ -73,7 +94,10 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 	}
 
 	if hasModule("usb") {
-		if usb, err := s.gatherUSBEvidence(); err == nil {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
+		if usb, err := s.gatherUSBEvidence(ctx); err == nil {
 			records = append(records, usb...)
 		} else {
 			notes = append(notes, fmt.Sprintf("USB 证据收集失败: %v", err))

@@ -28,6 +28,24 @@
 
 - `zip 模块包 = 元数据 + 接口声明 + 表单声明 + 脚本后端`
 
+### 1.1 执行信任边界
+
+`MISC` zip 自定义模块是本地可信扩展点，不是强沙箱。导入模块等价于允许该模块在本机以当前用户权限运行 `backend.js` 或 `backend.py`，因此只应导入自己编写、来源可信或已经审查过的模块。
+
+当前宿主提供的是工程约束和能力收口，而不是恶意代码隔离：
+
+- zip 包会经过路径、模块 ID、入口文件和大小等导入校验，防止误导入、路径穿越和明显损坏的包。
+- 模块不能注册任意 HTTP 路由，也不能携带自定义前端源码或样式；所有表单和结果由宿主统一渲染。
+- `host_bridge` 只暴露宿主明确实现的 helper 方法；未开启时，Python 模块只能通过标准输入/输出与宿主交换一份 JSON。
+- JavaScript/Python 运行时仍属于本地代码执行面，不能承诺抵御恶意脚本读取文件、发起本机进程行为或消耗资源。
+
+安全使用规则：
+
+- 不要导入未知来源 zip 模块。
+- 不要把 `host_bridge` 当作权限模型；它只是宿主能力桥接开关。
+- 需要强隔离、远程不可信代码执行或细粒度权限审计时，应在系统级沙箱、虚拟机或独立进程策略中解决，而不是依赖 MISC 模块机制本身。
+- 需要深度访问 Go 服务、长期维护或更强治理的能力，应升级为内置模块，并通过后端代码审查和测试覆盖。
+
 ## 2. 当前两类模块
 
 ### 2.1 内置模块
@@ -188,7 +206,8 @@ ioc-demo.zip
 {
   "method": "POST",
   "entry": "backend.js",
-  "host_bridge": false
+  "host_bridge": false,
+  "permissions": ["exec.local"]
 }
 ```
 
@@ -197,6 +216,29 @@ ioc-demo.zip
 - `method`: 当前固定建议 `POST`
 - `entry`: 后端脚本入口，相对模块目录
 - `host_bridge`: 主要给 Python 模块使用，开启后可使用宿主桥接 helper
+- `permissions`: 候选权限声明字段；当前文档化为治理模型，运行时尚未强制校验
+
+### 6.1 候选权限模型
+
+`permissions` 用于把 MISC 模块的本地执行、抓包读取和宿主桥接能力显式化。它是后续治理模型的兼容字段：旧模块没有该字段时仍按现有行为运行；新模块建议主动声明所需权限，便于后续 UI 提示、导入审查和运行时 gate 逐步落地。
+
+候选权限如下：
+
+| Permission | Meaning | Current Compatibility |
+|---|---|---|
+| `exec.local` | 允许运行模块脚本后端，即本地 `backend.js` 或 `backend.py`。 | 当前所有 zip 自定义模块隐含具备；未来可要求显式声明。 |
+| `capture.read` | 允许读取当前抓包路径、抓包上下文摘要或使用抓包派生数据。 | 当前 `requires_capture` 和 `capture_path` 已表达部分语义；未来应与该权限合并校验。 |
+| `field.scan` | 允许通过宿主能力扫描抓包字段，例如 JavaScript `ctx.scanFields()` 或 Python host bridge `scan_fields()`。 | 当前已开放给 JS ctx 和 Python `host_bridge`；未来可作为细粒度 gate。 |
+| `host.bridge` | 允许 Python 模块启用宿主桥接 helper。 | 当前由 `host_bridge: true` 控制；未来可要求同时声明该权限。 |
+
+兼容策略：
+
+- `permissions` 缺失时，宿主按 v3 现有行为处理，不拒绝旧模块。
+- `host_bridge: true` 等价于声明需要 `host.bridge`，但不自动表示未来所有 host 方法都可用。
+- `requires_capture: true` 等价于声明需要 `capture.read`。
+- 使用 `ctx.scanFields()` 或 `scan_fields()` 的模块应声明 `field.scan`。
+- 未来如果运行时强制权限，应先增加导入/执行 warning，再切换到 hard fail，避免直接破坏已安装模块。
+- `permissions` 不是沙箱；它只控制宿主是否暴露能力，不能隔离脚本自己的本地代码执行风险。
 
 当前宿主统一执行地址始终为：
 
@@ -649,7 +691,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 {
   "method": "POST",
   "entry": "backend.js",
-  "host_bridge": false
+  "host_bridge": false,
+  "permissions": ["exec.local"]
 }
 ```
 

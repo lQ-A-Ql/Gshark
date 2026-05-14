@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
@@ -68,6 +69,61 @@ func TestEvidenceContractEmptyCapture(t *testing.T) {
 	requireJSONKeys(t, payload, "records", "total")
 	requireJSONArray(t, payload, "records")
 	requireJSONNumber(t, payload, "total")
+}
+
+func TestEvidenceContractModuleFilter(t *testing.T) {
+	analysis := &contractEvidenceAnalysisService{}
+	server := &Server{analysis: analysis}
+	rec := httptest.NewRecorder()
+
+	server.handleEvidence(rec, httptest.NewRequest(http.MethodGet, "/api/evidence?modules=c2,%20usb,,", nil))
+
+	requireStatus(t, rec, http.StatusOK)
+	if got := strings.Join(analysis.modules, ","); got != "c2,usb" {
+		t.Fatalf("modules = %q, want c2,usb", got)
+	}
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "records", "total", "notes")
+	if got := payload["total"]; got != float64(1) {
+		t.Fatalf("total = %#v, want 1", got)
+	}
+	records := requireJSONArray(t, payload, "records")
+	if len(records) != 1 {
+		t.Fatalf("records = %#v, want one record", records)
+	}
+	record, ok := records[0].(map[string]any)
+	if !ok {
+		t.Fatalf("record = %#v, want object", records[0])
+	}
+	requireJSONKeys(t, record, "id", "module", "source_type", "summary", "severity")
+	if record["id"] != "ev-1" || record["module"] != "c2" || record["severity"] != "high" {
+		t.Fatalf("unexpected evidence record: %#v", record)
+	}
+	notes := requireJSONArray(t, payload, "notes")
+	if len(notes) != 1 || notes[0] != "contract" {
+		t.Fatalf("notes = %#v, want [contract]", notes)
+	}
+}
+
+func TestToolRuntimeConfigContract(t *testing.T) {
+	server := &Server{toolRuntime: contractToolRuntimeService{}}
+	rec := httptest.NewRecorder()
+
+	server.handleToolRuntimeConfig(rec, httptest.NewRequest(http.MethodGet, "/api/tools/runtime-config", nil))
+
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "config", "tshark", "ffmpeg", "speech", "yara")
+	config := requireJSONNestedObject(t, payload, "config")
+	requireJSONKeys(t, config, "tshark_path", "ffmpeg_path", "python_path", "vosk_model_path", "yara_enabled", "yara_bin", "yara_rules", "yara_timeout_ms")
+	tshark := requireJSONNestedObject(t, payload, "tshark")
+	requireJSONKeys(t, tshark, "available", "path", "message")
+	ffmpeg := requireJSONNestedObject(t, payload, "ffmpeg")
+	requireJSONKeys(t, ffmpeg, "available", "path", "message")
+	speech := requireJSONNestedObject(t, payload, "speech")
+	requireJSONKeys(t, speech, "available", "engine", "language", "python_available", "ffmpeg_available", "vosk_available", "model_available", "message")
+	yara := requireJSONNestedObject(t, payload, "yara")
+	requireJSONKeys(t, yara, "available", "enabled", "message", "using_custom_bin", "using_custom_rules", "timeout_ms")
 }
 
 func TestPacketInlineContractRejectsInvalidID(t *testing.T) {
@@ -389,6 +445,73 @@ func (contractAnalysisService) GatherEvidence(context.Context, model.EvidenceFil
 	return model.EvidenceResponse{Records: []model.EvidenceRecord{}, Total: 0}, nil
 }
 
+type contractEvidenceAnalysisService struct {
+	contractAnalysisService
+	modules []string
+}
+
+func (s *contractEvidenceAnalysisService) GatherEvidence(_ context.Context, filter model.EvidenceFilter) (model.EvidenceResponse, error) {
+	s.modules = append([]string(nil), filter.Modules...)
+	return model.EvidenceResponse{
+		Records: []model.EvidenceRecord{
+			{
+				ID:         "ev-1",
+				Module:     "c2",
+				SourceType: "stream",
+				Summary:    "contract evidence",
+				Severity:   "high",
+			},
+		},
+		Total: 1,
+		Notes: []string{"contract"},
+	}, nil
+}
+
+type contractToolRuntimeService struct{}
+
+func (contractToolRuntimeService) TSharkStatus() model.TSharkToolStatus {
+	return model.TSharkToolStatus{Available: true, Path: "tshark", Message: "ok"}
+}
+
+func (contractToolRuntimeService) SetTSharkPath(string) model.TSharkToolStatus {
+	return contractToolRuntimeService{}.TSharkStatus()
+}
+
+func (contractToolRuntimeService) TSharkStatusPath() string { return "tshark" }
+
+func (contractToolRuntimeService) TSharkUsingCustomPath() bool { return false }
+
+func (contractToolRuntimeService) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
+	return model.ToolRuntimeSnapshot{
+		Config: model.ToolRuntimeConfig{
+			TSharkPath:    "tshark",
+			FFmpegPath:    "ffmpeg",
+			PythonPath:    "python",
+			VoskModelPath: "model",
+			YaraEnabled:   true,
+			YaraBin:       "yara",
+			YaraRules:     "rules.yar",
+			YaraTimeoutMS: 25000,
+		},
+		TShark: model.TSharkToolStatus{Available: true, Path: "tshark", Message: "ok"},
+		FFmpeg: model.FFmpegToolStatus{Available: true, Path: "ffmpeg", Message: "ok"},
+		Speech: model.SpeechToTextStatus{Available: true, Engine: "vosk", Language: "auto", PythonAvailable: true, FFmpegAvailable: true, VoskAvailable: true, ModelAvailable: true, Message: "ok"},
+		Yara:   model.YaraToolStatus{Available: true, Enabled: true, Message: "ok", TimeoutMS: 25000},
+	}
+}
+
+func (contractToolRuntimeService) SetToolRuntimeConfig(model.ToolRuntimeConfig) model.ToolRuntimeConfig {
+	return contractToolRuntimeService{}.ToolRuntimeSnapshot().Config
+}
+
+func (contractToolRuntimeService) FFmpegStatus() model.FFmpegToolStatus {
+	return model.FFmpegToolStatus{Available: true, Path: "ffmpeg", Message: "ok"}
+}
+
+func (contractToolRuntimeService) TLSConfig() model.TLSConfig { return model.TLSConfig{} }
+
+func (contractToolRuntimeService) SetTLSConfig(model.TLSConfig) {}
+
 func contractReport() model.InvestigationReport {
 	return model.InvestigationReport{
 		Summary: []model.InvestigationReportItem{{Title: "Contract", Summary: "shape guard", Severity: "info"}},
@@ -420,6 +543,14 @@ func requireJSONKeys(t *testing.T, payload map[string]any, keys ...string) {
 	}
 }
 
+func requireExactJSONKeys(t *testing.T, payload map[string]any, keys ...string) {
+	t.Helper()
+	requireJSONKeys(t, payload, keys...)
+	if len(payload) != len(keys) {
+		t.Fatalf("payload keys = %#v, want exactly %#v", payload, keys)
+	}
+}
+
 func requireJSONString(t *testing.T, payload map[string]any, key string) {
 	t.Helper()
 	if _, ok := payload[key].(string); !ok {
@@ -441,11 +572,13 @@ func requireJSONNumber(t *testing.T, payload map[string]any, key string) {
 	}
 }
 
-func requireJSONArray(t *testing.T, payload map[string]any, key string) {
+func requireJSONArray(t *testing.T, payload map[string]any, key string) []any {
 	t.Helper()
-	if _, ok := payload[key].([]any); !ok {
+	value, ok := payload[key].([]any)
+	if !ok {
 		t.Fatalf("JSON key %q = %#v, want array", key, payload[key])
 	}
+	return value
 }
 
 func requireJSONObject(t *testing.T, payload map[string]any, key string) {
@@ -453,4 +586,13 @@ func requireJSONObject(t *testing.T, payload map[string]any, key string) {
 	if _, ok := payload[key].(map[string]any); !ok {
 		t.Fatalf("JSON key %q = %#v, want object", key, payload[key])
 	}
+}
+
+func requireJSONNestedObject(t *testing.T, payload map[string]any, key string) map[string]any {
+	t.Helper()
+	value, ok := payload[key].(map[string]any)
+	if !ok {
+		t.Fatalf("JSON key %q = %#v, want object", key, payload[key])
+	}
+	return value
 }

@@ -3,6 +3,7 @@ package transport
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -136,6 +137,206 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	}
 }
 
+func TestHandlerRegistersCoreReadRoutes(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	handler := server.Handler()
+	tests := []struct {
+		path string
+		want int
+	}{
+		{path: "/health", want: http.StatusOK},
+		{path: "/api/runtime/identity", want: http.StatusOK},
+		{path: "/api/capture/status", want: http.StatusOK},
+		{path: "/api/packets/page?cursor=0&limit=1", want: http.StatusOK},
+		{path: "/api/streams/index?protocol=tcp", want: http.StatusOK},
+		{path: "/api/evidence", want: http.StatusOK},
+		{path: "/api/tools/misc/modules", want: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			if rec.Code != tt.want {
+				t.Fatalf("%s status = %d, want %d body=%s", tt.path, rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandlerRegistersMutatingRouteMethodPolicy(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	handler := server.Handler()
+	tests := []struct {
+		name        string
+		path        string
+		badMethod   string
+		goodMethod  string
+		goodStatus  int
+		goodPayload string
+	}{
+		{
+			name:        "capture stop",
+			path:        "/api/capture/stop",
+			badMethod:   http.MethodGet,
+			goodMethod:  http.MethodPost,
+			goodStatus:  http.StatusOK,
+			goodPayload: `{"status":"stopped"}`,
+		},
+		{
+			name:        "capture prepare replacement",
+			path:        "/api/capture/prepare-replacement",
+			badMethod:   http.MethodGet,
+			goodMethod:  http.MethodPost,
+			goodStatus:  http.StatusOK,
+			goodPayload: `{"status":"prepared"}`,
+		},
+		{
+			name:        "capture close",
+			path:        "/api/capture/close",
+			badMethod:   http.MethodGet,
+			goodMethod:  http.MethodPost,
+			goodStatus:  http.StatusOK,
+			goodPayload: `{"status":"closed"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" rejects bad method", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.badMethod, tt.path, nil))
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.badMethod, tt.path, rec.Code, http.StatusMethodNotAllowed, rec.Body.String())
+			}
+		})
+
+		t.Run(tt.name+" accepts good method", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.goodMethod, tt.path, nil))
+			if rec.Code != tt.goodStatus {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.goodMethod, tt.path, rec.Code, tt.goodStatus, rec.Body.String())
+			}
+			if body := strings.TrimSpace(rec.Body.String()); body != tt.goodPayload {
+				t.Fatalf("%s %s body = %s, want %s", tt.goodMethod, tt.path, body, tt.goodPayload)
+			}
+		})
+	}
+}
+
+func TestHandlerRegistersPluginWriteRoutes(t *testing.T) {
+	plugins := &fakePluginService{}
+	server := &Server{plugins: plugins}
+	handler := server.Handler()
+
+	t.Run("plugin add", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/plugins/add", strings.NewReader(`{"id":"plug-1","name":"Demo","version":"1.0.0","tag":"demo","author":"qa","enabled":true}`))
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected add plugin route to succeed, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		var payload model.Plugin
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode add plugin payload: %v", err)
+		}
+		if payload.ID != "plug-1" || payload.Enabled != true {
+			t.Fatalf("unexpected add plugin payload: %+v", payload)
+		}
+		if !plugins.addCalled {
+			t.Fatal("expected AddPlugin to be called")
+		}
+	})
+
+	t.Run("plugin delete", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodDelete, "/api/plugins/delete?id=plug-1", nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected delete plugin route to succeed, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode delete plugin payload: %v", err)
+		}
+		if got := payload["id"]; got != "plug-1" {
+			t.Fatalf("unexpected delete payload id: %#v", got)
+		}
+		if got := payload["deleted"]; got != true {
+			t.Fatalf("unexpected delete payload deleted flag: %#v", got)
+		}
+		if !plugins.deleteCalled {
+			t.Fatal("expected DeletePlugin to be called")
+		}
+	})
+
+	t.Run("plugin source", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/plugins/source?id=plug-1", nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected plugin source route to succeed, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		var payload model.PluginSource
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode plugin source payload: %v", err)
+		}
+		if payload.ID != "plug-1" {
+			t.Fatalf("unexpected plugin source payload: %+v", payload)
+		}
+	})
+
+	t.Run("plugin bulk", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/plugins/bulk", strings.NewReader(`{"ids":["plug-1"],"enabled":false}`))
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected plugin bulk route to succeed, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		if !plugins.bulkCalled {
+			t.Fatal("expected SetPluginsEnabled to be called")
+		}
+	})
+}
+
+type fakePluginService struct {
+	addCalled    bool
+	deleteCalled bool
+	bulkCalled   bool
+}
+
+func (s *fakePluginService) ListPlugins() []model.Plugin { return []model.Plugin{} }
+
+func (s *fakePluginService) AddPlugin(p model.Plugin) (model.Plugin, error) {
+	s.addCalled = true
+	return p, nil
+}
+
+func (s *fakePluginService) DeletePlugin(id string) error {
+	s.deleteCalled = true
+	return nil
+}
+
+func (s *fakePluginService) PluginSource(id string) (model.PluginSource, error) {
+	return model.PluginSource{ID: id}, nil
+}
+
+func (s *fakePluginService) UpdatePluginSource(source model.PluginSource) (model.PluginSource, error) {
+	return source, nil
+}
+
+func (s *fakePluginService) TogglePlugin(id string) (model.Plugin, error) {
+	return model.Plugin{ID: id}, nil
+}
+
+func (s *fakePluginService) SetPluginsEnabled(ids []string, enabled bool) ([]model.Plugin, error) {
+	s.bulkCalled = true
+	plugins := make([]model.Plugin, 0, len(ids))
+	for _, id := range ids {
+		plugins = append(plugins, model.Plugin{ID: id, Enabled: enabled})
+	}
+	return plugins, nil
+}
+
 func TestWithAuditRecordsSensitiveRequests(t *testing.T) {
 	server := &Server{}
 	handler := server.withAudit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +413,34 @@ func TestHandleC2AnalysisReturnsInitializedPayload(t *testing.T) {
 	if payload.CS.Candidates == nil || payload.VShell.Candidates == nil {
 		t.Fatalf("expected initialized family payload, got %+v", payload)
 	}
+}
+
+func TestHandleC2AnalysisUsesCanceledRequestContext(t *testing.T) {
+	analysis := &canceledC2AnalysisService{}
+	server := &Server{analysis: analysis}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/c2-analysis", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	server.handleC2Analysis(rec, req)
+
+	if rec.Code != http.StatusRequestTimeout {
+		t.Fatalf("expected canceled c2 analysis request to return %d, got %d body=%s", http.StatusRequestTimeout, rec.Code, rec.Body.String())
+	}
+	if analysis.ctxErr != context.Canceled {
+		t.Fatalf("analysis ctx error = %v, want %v", analysis.ctxErr, context.Canceled)
+	}
+}
+
+type canceledC2AnalysisService struct {
+	contractAnalysisService
+	ctxErr error
+}
+
+func (s *canceledC2AnalysisService) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error) {
+	s.ctxErr = ctx.Err()
+	return model.C2SampleAnalysis{}, s.ctxErr
 }
 
 func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
