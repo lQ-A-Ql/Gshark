@@ -143,6 +143,32 @@ describe("check-boundaries script", () => {
     expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
   });
 
+  it("rejects new page imports from aggregate backendClients", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/pages/NewPage.tsx",
+      'import { backendClients } from "../integrations/backendClients";',
+    );
+    writeFixtureFile(frontendRoot, "src/app/integrations/backendClients.ts", "export const backendClients = {};");
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([
+      "src/app/pages/NewPage.tsx imports aggregate backendClients via ../integrations/backendClients; move backend calls into a feature hook or a domain client wrapper",
+    ]);
+  });
+
+  it("keeps existing page backendClients edges baselined until migrated", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    writeFixtureFile(
+      frontendRoot,
+      "src/app/pages/VehicleAnalysis.tsx",
+      'import { backendClients } from "../integrations/backendClients";',
+    );
+    writeFixtureFile(frontendRoot, "src/app/integrations/backendClients.ts", "export const backendClients = {};");
+
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
+  });
+
   it("rejects shared analysis component imports from feature layers", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(

@@ -13,16 +13,18 @@
 //    or components/). State stays UI-free.
 // 4. Pages may not import mappers directly or reach through the legacy
 //    evidenceSchema shim; pages consume feature- or core-level view models.
-// 5. Features may not import from other features (cross-feature coupling
+// 5. Pages may not add new direct dependencies on aggregate backendClients.
+//    Existing page edges are baselined while they migrate into feature hooks.
+// 6. Features may not import from other features (cross-feature coupling
 //    must route through core/, shared components/analysis, or integrations/).
 //    This is the rule flagged in the 2026-05-12 engineering report.
-// 6. Mappers (integrations/mappers/**) stay UI-free and decision-free:
+// 7. Mappers (integrations/mappers/**) stay UI-free and decision-free:
 //    no React imports, no pages/components imports, no feature "rules"
 //    imports.
-// 7. Clients (integrations/clients/**) stay transport-only: no pages,
+// 8. Clients (integrations/clients/**) stay transport-only: no pages,
 //    components, or features imports.
-// 8. UI primitives (components/ui/**) stay domain-free.
-// 9. Shared analysis components (components/analysis/**) stay
+// 9. UI primitives (components/ui/**) stay domain-free.
+// 10. Shared analysis components (components/analysis/**) stay
 //    domain-neutral — no features/ imports.
 //
 // The allowlist `allowedFeatureCrossImports` lets us grandfather specific
@@ -37,6 +39,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
 const allowedFeatureCrossImports = new Set([]);
+const allowedPageBackendClientImports = new Set([
+  "src/app/pages/MiscTools.tsx",
+  "src/app/pages/ObjectExport.tsx",
+  "src/app/pages/RawStreamPage.tsx",
+  "src/app/pages/ThreatHunting.tsx",
+  "src/app/pages/UpdateCenter.tsx",
+  "src/app/pages/VehicleAnalysis.tsx",
+]);
 
 export function findBoundaryViolations({ frontendRoot = root } = {}) {
   const appRoot = resolve(frontendRoot, "src/app");
@@ -127,6 +137,16 @@ function normalizeIfSource(frontendRoot, appRoot, pathWithoutExt) {
 
 function recordViolation(violations, source, specifier, target) {
   if (!source.startsWith("src/app/integrations/")) {
+    if (
+      source.startsWith("src/app/pages/") &&
+      target === "src/app/integrations/backendClients.ts" &&
+      !allowedPageBackendClientImports.has(source)
+    ) {
+      violations.push(
+        `${source} imports aggregate backendClients via ${specifier}; move backend calls into a feature hook or a domain client wrapper`,
+      );
+      return;
+    }
     if (target === "src/app/integrations/backendClients.ts") {
       return;
     }
@@ -153,7 +173,6 @@ function recordViolation(violations, source, specifier, target) {
   if (source.startsWith("src/app/pages/") && target === "src/app/features/evidence/evidenceSchema.ts") {
     violations.push(`${source} imports evidence schema shim ${specifier}; pages must use core evidence contracts`);
   }
-
   recordFeatureBoundaryViolation(violations, source, specifier, target);
 
   if (source.startsWith("src/app/integrations/mappers/")) {
