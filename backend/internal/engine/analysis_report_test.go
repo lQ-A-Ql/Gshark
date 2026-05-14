@@ -216,6 +216,30 @@ func TestBuildVehicleInvestigationReportCapturesRuleMetadata(t *testing.T) {
 	assertReportEvidenceHasRuleMetadata(t, report.Evidence[0], "vehicle.uds.security_access")
 }
 
+func TestReportRuleRegistryCoversMainlineEvidenceRules(t *testing.T) {
+	for _, ruleID := range []string{
+		"usb.mass_storage.write.failed",
+		"c2.cs.high_confidence",
+		"c2.vshell.decrypt.hit",
+		"c2.family.candidate",
+		"industrial.rule.hit",
+		"industrial.modbus.write",
+		"vehicle.uds.security_access",
+	} {
+		meta, ok := reportRuleRegistry[ruleID]
+		if !ok {
+			t.Fatalf("expected report rule metadata for %q", ruleID)
+		}
+		if meta.RuleID != ruleID || meta.Reason == "" || meta.DefaultConfidence <= 0 || len(meta.Caveats) == 0 {
+			t.Fatalf("expected complete report rule metadata for %q, got %+v", ruleID, meta)
+		}
+		item := withReportRuleID(reportItem("title", "summary", "medium", 1, 0), ruleID, 0)
+		if item.RuleID != ruleID || item.Reason == "" || item.Confidence != meta.DefaultConfidence || len(item.Caveats) == 0 {
+			t.Fatalf("expected rule metadata to populate report item for %q, got %+v", ruleID, item)
+		}
+	}
+}
+
 func assertReportEvidenceHasRuleMetadata(t *testing.T, item model.InvestigationReportItem, wantRuleID string) {
 	t.Helper()
 	if item.RuleID != wantRuleID {

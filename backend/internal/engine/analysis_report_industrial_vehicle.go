@@ -16,24 +16,24 @@ func buildIndustrialInvestigationReport(analysis model.IndustrialAnalysis) model
 	)
 
 	for _, hit := range analysis.RuleHits {
-		report.Evidence = append(report.Evidence, withReportRule(reportItem(
+		report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 			firstNonEmptyText(hit.Rule, "工控规则命中"),
 			firstNonEmptyText(hit.Summary, hit.Evidence),
 			mapIndustrialSeverity(hit.Level),
 			hit.PacketID,
 			0,
 			"industrial", strings.ToLower(strings.TrimSpace(hit.Rule)),
-		), "industrial.rule.hit", "工控规则命中来自协议字段、操作类型或异常响应组合，需结合原始协议帧复核。", confidenceFromSeverity(mapIndustrialSeverity(hit.Level)), "教学或基线流量可能存在协议操作，不应仅凭单条规则命中判定入侵。"))
+		), "industrial.rule.hit", confidenceFromSeverity(mapIndustrialSeverity(hit.Level))))
 	}
 	for _, write := range analysis.SuspiciousWrites {
-		report.Evidence = append(report.Evidence, withReportRule(reportItem(
+		report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 			fmt.Sprintf("%s 写操作集中出现", firstNonEmptyText(write.FunctionName, "Modbus 写操作")),
 			fmt.Sprintf("目标 %s / 次数 %d / 来源 %s", write.Target, write.WriteCount, joinOrFallback(write.Sources, "无")),
 			"medium",
 			write.SamplePacketID,
 			0,
 			"industrial", "write",
-		), "industrial.modbus.write", "Modbus 写类功能码集中出现，优先复核目标寄存器、来源主机和时间窗口。", 58, "普通控制任务也可能包含写操作，需结合业务时段和资产角色判断。"))
+		), "industrial.modbus.write", 58))
 	}
 
 	for _, command := range limitIndustrialCommands(analysis.ControlCommands, 4) {
@@ -79,14 +79,14 @@ func buildVehicleInvestigationReport(analysis model.VehicleAnalysis) model.Inves
 		if packetID == 0 {
 			packetID = tx.RequestPacketID
 		}
-		report.Evidence = append(report.Evidence, withReportRule(reportItem(
+		report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 			buildUDSEvidenceSummary(tx),
 			fmt.Sprintf("%s -> %s / 状态 %s / 请求 %s / 响应 %s", orDash(tx.SourceAddress), orDash(tx.TargetAddress), tx.Status, orDash(tx.RequestSummary), orDash(tx.ResponseSummary)),
 			severityFromConfidence(confidence),
 			packetID,
 			0,
 			"vehicle", "uds",
-		), "vehicle.uds.security_access", "UDS 诊断事务触发安全访问、负响应或高风险服务，需结合请求/响应 packet 复核。", confidence, "车机诊断流量在维修或测试场景中可能正常出现，不能脱离场景直接定性。"))
+		), "vehicle.uds.security_access", confidence))
 	}
 	if len(report.Evidence) == 0 && analysis.CAN.ErrorFrames > 0 {
 		report.Evidence = append(report.Evidence, reportItem(
