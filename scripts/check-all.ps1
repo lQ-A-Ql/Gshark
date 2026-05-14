@@ -82,6 +82,11 @@ Invoke-Step "Frontend boundary check" {
   pnpm run boundary:check
 }
 
+Invoke-Step "Frontend client any check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run client:any:check
+}
+
 Invoke-Step "Frontend mapper any check" {
   Set-Location (Join-Path $root "frontend")
   pnpm run mapper:any:check
