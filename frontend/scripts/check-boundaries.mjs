@@ -39,7 +39,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const importPattern = /import\s+(?:type\s+)?(?:[^'"()]+?\s+from\s+)?["']([^"']+)["']/g;
 const allowedFeatureCrossImports = new Set([]);
-const allowedPageBackendClientImports = new Set(["src/app/pages/MiscTools.tsx", "src/app/pages/ObjectExport.tsx"]);
+const allowedPageBackendClientImports = new Set(["src/app/pages/MiscTools.tsx"]);
 
 export function findBoundaryViolations({ frontendRoot = root } = {}) {
   const appRoot = resolve(frontendRoot, "src/app");

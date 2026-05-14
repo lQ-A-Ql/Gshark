@@ -161,7 +161,7 @@ describe("check-boundaries script", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
-      "src/app/pages/ObjectExport.tsx",
+      "src/app/pages/MiscTools.tsx",
       'import { backendClients } from "../integrations/backendClients";',
     );
     writeFixtureFile(frontendRoot, "src/app/integrations/backendClients.ts", "export const backendClients = {};");

@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
-import { backendClients } from "../integrations/backendClients";
 import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
 import { useSentinel } from "../state/SentinelContext";
 import {
@@ -18,7 +17,7 @@ const OBJECT_EXPORT_TAGS = ["HTTP", "FTP", "文件对象", "Magic 分类", "批�
 
 export default function ObjectExport() {
   const { extractedObjects, backendConnected } = useSentinel();
-  const { objects: sourceObjects } = useObjectExport({ backendConnected, extractedObjects });
+  const { objects: sourceObjects, downloadZip } = useObjectExport({ backendConnected, extractedObjects });
   const [selected, setSelected] = useState<number[]>([]);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<ObjectKind | "all">("all");
@@ -32,15 +31,6 @@ export default function ObjectExport() {
 
   const toggleSelect = (id: number) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-
-  const downloadZip = async (ids: number[]) => {
-    if (ids.length === 0) return;
-    try {
-      await backendClients.object.downloadObjectsZip(ids);
-    } catch (err) {
-      console.error("下载失败:", err);
-    }
   };
 
   return (
