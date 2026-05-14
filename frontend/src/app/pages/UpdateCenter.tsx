@@ -1,7 +1,4 @@
-import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import type { AppUpdateStatus } from "../core/types";
-import { backendClients } from "../integrations/backendClients";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import {
@@ -10,62 +7,11 @@ import {
   UpdateStatusPanel,
   UpdateStepsPanel,
 } from "../features/update/UpdateCenterPanels";
+import { useUpdateCenter } from "../features/update/useUpdateCenter";
 
 export default function UpdateCenter() {
-  const [status, setStatus] = useState<AppUpdateStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [installing, setInstalling] = useState(false);
-  const [error, setError] = useState("");
-  const [installProgress, setInstallProgress] = useState(0);
-
-  const refreshStatus = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const next = await backendClients.runtime.checkAppUpdate();
-      setStatus(next);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "检查更新失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const installUpdate = async () => {
-    setInstalling(true);
-    setError("");
-    setInstallProgress(12);
-    try {
-      await backendClients.runtime.installAppUpdate();
-      setInstallProgress(100);
-    } catch (nextError) {
-      setInstalling(false);
-      setInstallProgress(0);
-      setError(nextError instanceof Error ? nextError.message : "启动更新失败");
-      await refreshStatus();
-    }
-  };
-
-  useEffect(() => {
-    void refreshStatus();
-  }, []);
-
-  useEffect(() => {
-    if (!installing) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      setInstallProgress((prev) => {
-        if (prev >= 92) {
-          return prev;
-        }
-        return Math.min(92, prev + 6);
-      });
-    }, 420);
-    return () => window.clearInterval(timer);
-  }, [installing]);
-
-  const notes = status?.releaseNotes?.trim() || "该版本没有附带 Release 说明。";
+  const { status, loading, installing, error, installProgress, notes, refreshStatus, installUpdate } =
+    useUpdateCenter();
 
   return (
     <PageShell>

@@ -44,7 +44,6 @@ const allowedPageBackendClientImports = new Set([
   "src/app/pages/ObjectExport.tsx",
   "src/app/pages/RawStreamPage.tsx",
   "src/app/pages/ThreatHunting.tsx",
-  "src/app/pages/UpdateCenter.tsx",
   "src/app/pages/VehicleAnalysis.tsx",
 ]);
 
