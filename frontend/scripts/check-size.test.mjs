@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { countLines, findSizeBudgetFailures, findUnbudgetedMapperFiles } from "./check-size.mjs";
+import {
+  countLines,
+  findSizeBudgetFailures,
+  findUnbudgetedMapperFiles,
+  findUnbudgetedWireFiles,
+} from "./check-size.mjs";
 
 function writeFixtureFile(frontendRoot, relativePath, content) {
   const absolutePath = resolve(frontendRoot, relativePath);
@@ -68,5 +73,25 @@ describe("check-size script", () => {
         ],
       }),
     ).toEqual(["src/app/integrations/mappers/unbudgetedMapper.ts"]);
+  });
+
+  it("reports wire DTO files that do not have a configured line budget", () => {
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-size-check-"));
+    writeFixtureFile(frontendRoot, "src/app/integrations/wire/budgetedWireDtos.ts", "export {};");
+    writeFixtureFile(frontendRoot, "src/app/integrations/wire/unbudgetedWireDtos.ts", "export {};");
+    writeFixtureFile(frontendRoot, "src/app/integrations/wire/unbudgetedWireDtos.test.ts", "export {};");
+
+    expect(
+      findUnbudgetedWireFiles({
+        frontendRoot,
+        budgets: [
+          {
+            path: "src/app/integrations/wire/budgetedWireDtos.ts",
+            maxLines: 5,
+            reason: "fixture wire DTO has a budget",
+          },
+        ],
+      }),
+    ).toEqual(["src/app/integrations/wire/unbudgetedWireDtos.ts"]);
   });
 });

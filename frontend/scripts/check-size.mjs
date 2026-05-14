@@ -2459,11 +2459,27 @@ export function findSizeBudgetFailures({ frontendRoot = root, budgets = sizeBudg
 }
 
 export function findUnbudgetedMapperFiles({ frontendRoot = root, budgets = sizeBudgets } = {}) {
-  const mapperDir = resolve(frontendRoot, "src/app/integrations/mappers");
+  return findUnbudgetedIntegrationFiles({
+    frontendRoot,
+    budgets,
+    directory: "src/app/integrations/mappers",
+  });
+}
+
+export function findUnbudgetedWireFiles({ frontendRoot = root, budgets = sizeBudgets } = {}) {
+  return findUnbudgetedIntegrationFiles({
+    frontendRoot,
+    budgets,
+    directory: "src/app/integrations/wire",
+  });
+}
+
+function findUnbudgetedIntegrationFiles({ frontendRoot, budgets, directory }) {
+  const sourceDir = resolve(frontendRoot, directory);
   const budgetedPaths = new Set(budgets.map((budget) => budget.path.replaceAll("\\", "/")));
-  return readdirSync(mapperDir)
+  return readdirSync(sourceDir)
     .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-    .map((name) => `src/app/integrations/mappers/${name}`)
+    .map((name) => `${directory}/${name}`)
     .filter((path) => !budgetedPaths.has(path))
     .sort();
 }
@@ -2471,8 +2487,9 @@ export function findUnbudgetedMapperFiles({ frontendRoot = root, budgets = sizeB
 function runCli() {
   const failures = findSizeBudgetFailures();
   const unbudgetedMapperFiles = findUnbudgetedMapperFiles();
+  const unbudgetedWireFiles = findUnbudgetedWireFiles();
 
-  if (failures.length > 0 || unbudgetedMapperFiles.length > 0) {
+  if (failures.length > 0 || unbudgetedMapperFiles.length > 0 || unbudgetedWireFiles.length > 0) {
     if (failures.length > 0) {
       console.error("Frontend size budget exceeded:");
     }
@@ -2483,6 +2500,12 @@ function runCli() {
       console.error("Frontend mapper files missing size budgets:");
       for (const mapperPath of unbudgetedMapperFiles) {
         console.error(`- ${mapperPath}`);
+      }
+    }
+    if (unbudgetedWireFiles.length > 0) {
+      console.error("Frontend wire DTO files missing size budgets:");
+      for (const wirePath of unbudgetedWireFiles) {
+        console.error(`- ${wirePath}`);
       }
     }
     process.exit(1);
