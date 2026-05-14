@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
@@ -16,7 +16,7 @@ import {
   parseThreatPrefixes,
   routeForPreparedStream,
 } from "../features/hunting/threatHuntingRules";
-import { backendClients } from "../integrations/backendClients";
+import { useThreatHuntingWorkbench } from "../features/hunting/useThreatHuntingWorkbench";
 import { useSentinel } from "../state/SentinelContext";
 
 export default function ThreatHunting() {
@@ -29,105 +29,36 @@ export default function ThreatHunting() {
     isThreatAnalysisLoading,
     threatAnalysisProgress,
   } = useSentinel();
-  const [hits, setHits] = useState(threatHits);
-  const [selectedHit, setSelectedHit] = useState<number | null>(threatHits[0]?.id ?? null);
-  const [prefixText, setPrefixText] = useState("flag{,ctf{");
-  const [yaraEnabled, setYaraEnabled] = useState(true);
-  const [yaraBin, setYaraBin] = useState("");
-  const [yaraRules, setYaraRules] = useState("");
-  const [yaraTimeoutMs, setYaraTimeoutMs] = useState(25000);
-  const [configBusy, setConfigBusy] = useState(false);
-  const [huntBusy, setHuntBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState("");
-  const [statusText, setStatusText] = useState("");
-
-  const runHunt = async (prefixes: string[]) => {
-    if (!backendConnected) return;
-    setHuntBusy(true);
-    try {
-      const nextHits = await backendClients.hunting.listThreatHits(prefixes);
-      setHits(nextHits);
-      setSelectedHit(nextHits[0]?.id ?? null);
-      setStatusText(`狩猎完成: ${nextHits.length} 条命中`);
-    } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "狩猎执行失败");
-    } finally {
-      setHuntBusy(false);
-    }
-  };
-
-  const loadConfig = async () => {
-    if (!backendConnected) return;
-    setConfigBusy(true);
-    try {
-      const cfg = await backendClients.hunting.getHuntingRuntimeConfig();
-      setPrefixText((cfg.prefixes.length > 0 ? cfg.prefixes : ["flag{", "ctf{"]).join(","));
-      setYaraEnabled(cfg.yaraEnabled);
-      setYaraBin(cfg.yaraBin);
-      setYaraRules(cfg.yaraRules);
-      setYaraTimeoutMs(cfg.yaraTimeoutMs > 0 ? cfg.yaraTimeoutMs : 25000);
-      setStatusText("已加载狩猎运行参数");
-    } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "加载狩猎参数失败");
-    } finally {
-      setConfigBusy(false);
-    }
-  };
-
-  const applyConfigAndRun = async () => {
-    if (!backendConnected) return;
-    const prefixes = parseThreatPrefixes(prefixText);
-    if (prefixes.length === 0) {
-      setStatusText("至少需要一个 Prefix（例如 flag{）");
-      return;
-    }
-
-    setConfigBusy(true);
-    try {
-      const saved = await backendClients.hunting.updateHuntingRuntimeConfig({
-        prefixes,
-        yaraEnabled,
-        yaraBin: yaraBin.trim(),
-        yaraRules: yaraRules.trim(),
-        yaraTimeoutMs: Number.isFinite(yaraTimeoutMs) && yaraTimeoutMs > 0 ? Math.floor(yaraTimeoutMs) : 25000,
-      });
-      setPrefixText(saved.prefixes.join(","));
-      setYaraEnabled(saved.yaraEnabled);
-      setYaraBin(saved.yaraBin);
-      setYaraRules(saved.yaraRules);
-      setYaraTimeoutMs(saved.yaraTimeoutMs > 0 ? saved.yaraTimeoutMs : 25000);
-      setStatusText("参数已保存，开始重跑狩猎...");
-      await runHunt(saved.prefixes);
-    } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "保存参数失败");
-    } finally {
-      setConfigBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    setHits(threatHits);
-    setSelectedHit((prev) => prev ?? threatHits[0]?.id ?? null);
-  }, [threatHits]);
-
-  useEffect(() => {
-    void loadConfig();
-  }, [backendConnected]);
-
-  const stats = useMemo(() => {
-    const ctf = hits.filter((hit) => hit.category === "CTF").length;
-    const owasp = hits.filter((hit) => hit.category === "OWASP").length;
-    const anomaly = hits.filter((hit) => hit.category === "Anomaly").length;
-    return { ctf, owasp, anomaly };
-  }, [hits]);
+  const {
+    hits,
+    selectedHit,
+    selected,
+    stats,
+    prefixText,
+    yaraEnabled,
+    yaraBin,
+    yaraRules,
+    yaraTimeoutMs,
+    configBusy,
+    huntBusy,
+    statusText,
+    setSelectedHit,
+    setPrefixText,
+    setYaraEnabled,
+    setYaraBin,
+    setYaraRules,
+    setYaraTimeoutMs,
+    runHunt,
+    loadConfig,
+    applyConfigAndRun,
+  } = useThreatHuntingWorkbench({ backendConnected, threatHits });
   const report = useMemo(() => buildThreatHuntingInvestigationReport(hits), [hits]);
 
   const progress = useMemo(
     () => buildThreatHuntingProgressView({ huntBusy, isThreatAnalysisLoading, progress: threatAnalysisProgress }),
     [huntBusy, isThreatAnalysisLoading, threatAnalysisProgress],
   );
-
-  const selected = hits.find((hit) => hit.id === selectedHit) ?? null;
 
   const jumpToPacket = async (packetId: number) => {
     setActionBusy(`packet:${packetId}`);
