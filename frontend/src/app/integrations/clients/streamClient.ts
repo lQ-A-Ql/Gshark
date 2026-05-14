@@ -7,6 +7,7 @@ import type {
 } from "../../core/types";
 import { asPlainObject } from "../mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream } from "../mappers/packetStreamMapper";
+import type { BinaryStreamWireDTO, HttpStreamWireDTO, StreamPayloadUpdateWireDTO } from "../wire/streamPayloadWireDtos";
 import type { PacketLayersWireDTO, PacketRawHexWireDTO, StreamIndexWireDTO } from "../wire/streamWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -43,14 +44,17 @@ export interface StreamClient {
 export function createStreamClient(request: JsonRequest): StreamClient {
   return {
     async getHttpStream(streamId: number, signal?: AbortSignal) {
-      const stream = await request<any>(`/api/streams/http?streamId=${encodeURIComponent(String(streamId))}`, {
-        signal,
-      });
+      const stream = await request<HttpStreamWireDTO>(
+        `/api/streams/http?streamId=${encodeURIComponent(String(streamId))}`,
+        {
+          signal,
+        },
+      );
       return asHttpStream(stream);
     },
 
     async getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal) {
-      const stream = await request<any>(
+      const stream = await request<BinaryStreamWireDTO>(
         `/api/streams/raw?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}`,
         { signal },
       );
@@ -64,7 +68,7 @@ export function createStreamClient(request: JsonRequest): StreamClient {
       limit: number,
       signal?: AbortSignal,
     ) {
-      const stream = await request<any>(
+      const stream = await request<BinaryStreamWireDTO>(
         `/api/streams/raw/page?protocol=${protocol}&streamId=${encodeURIComponent(String(streamId))}&cursor=${encodeURIComponent(String(cursor))}&limit=${encodeURIComponent(String(limit))}`,
         { signal },
       );
@@ -182,7 +186,7 @@ export function createStreamClient(request: JsonRequest): StreamClient {
       patches: Array<{ index: number; body: string }>,
       signal?: AbortSignal,
     ) {
-      const payload = await request<any>("/api/streams/payloads", {
+      const payload = await request<StreamPayloadUpdateWireDTO>("/api/streams/payloads", {
         method: "POST",
         signal,
         body: JSON.stringify({

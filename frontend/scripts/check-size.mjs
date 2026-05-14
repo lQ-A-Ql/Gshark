@@ -151,6 +151,11 @@ export const sourceSizeBudgets = [
     reason: "stream wire DTOs should only describe raw stream index and packet resource payload fields",
   },
   {
+    path: "src/app/integrations/wire/streamPayloadWireDtos.ts",
+    maxLines: 50,
+    reason: "stream payload wire DTOs should only describe HTTP/raw stream transport payload fields",
+  },
+  {
     path: "src/app/integrations/wire/c2DecryptWireDtos.ts",
     maxLines: 35,
     reason: "C2 decrypt wire DTOs should only describe raw decrypt payload fields before mapper normalization",
