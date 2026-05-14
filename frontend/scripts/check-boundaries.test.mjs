@@ -157,7 +157,7 @@ describe("check-boundaries script", () => {
     ]);
   });
 
-  it("keeps existing page backendClients edges baselined until migrated", () => {
+  it("does not baseline page backendClients edges after migration", () => {
     const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
@@ -166,7 +166,9 @@ describe("check-boundaries script", () => {
     );
     writeFixtureFile(frontendRoot, "src/app/integrations/backendClients.ts", "export const backendClients = {};");
 
-    expect(findBoundaryViolations({ frontendRoot })).toEqual([]);
+    expect(findBoundaryViolations({ frontendRoot })).toEqual([
+      "src/app/pages/MiscTools.tsx imports aggregate backendClients via ../integrations/backendClients; move backend calls into a feature hook or a domain client wrapper",
+    ]);
   });
 
   it("rejects shared analysis component imports from feature layers", () => {
