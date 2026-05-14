@@ -21,7 +21,14 @@ const form: ToolRuntimeConfig = {
 };
 
 const snapshot = {
-  tshark: { available: true, message: "ok", path: form.tsharkPath },
+  tshark: {
+    available: true,
+    message: "ok",
+    path: form.tsharkPath,
+    version: "TShark 4.6.5",
+    fieldProfile: "compat",
+    missingOptionalFields: ["usb.capdata"],
+  },
   ffmpeg: { available: true, message: "ok", path: form.ffmpegPath },
   yara: {
     available: true,
@@ -57,6 +64,8 @@ describe("RuntimeSettingsSections", () => {
     );
 
     expect(screen.getByText("抓包与解析")).toBeInTheDocument();
+    expect(screen.getByText("字段档案: compat")).toBeInTheDocument();
+    expect(screen.getByText("降级可选字段：usb.capdata")).toBeInTheDocument();
     expect(screen.getByText("媒体播放与转码")).toBeInTheDocument();
     expect(screen.getByText("YARA 狩猎")).toBeInTheDocument();
     expect(screen.getByText(/当前使用的规则文件/)).toBeInTheDocument();

@@ -1890,8 +1890,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureSettingsSection.tsx",
-    maxLines: 35,
+    maxLines: 40,
     reason: "capture runtime settings section should keep TShark path and status fields only",
+  },
+  {
+    path: "src/app/components/TSharkCapabilityDetails.tsx",
+    maxLines: 50,
+    reason: "TShark capability diagnostics should stay as a small presentational component",
   },
   {
     path: "src/app/components/YaraSettingsSection.tsx",
@@ -2375,8 +2380,13 @@ export const testSizeBudgets = [
   },
   {
     path: "src/app/components/RuntimeSettingsSections.test.tsx",
-    maxLines: 85,
+    maxLines: 95,
     reason: "runtime settings section tests should stay focused on field rendering and setter wiring",
+  },
+  {
+    path: "src/app/components/TSharkCapabilityDetails.test.tsx",
+    maxLines: 55,
+    reason: "TShark capability diagnostics tests should cover visible and empty states only",
   },
   {
     path: "src/app/components/useCaptureMissionOverviewBundle.test.tsx",

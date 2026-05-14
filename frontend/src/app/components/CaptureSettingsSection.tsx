@@ -2,6 +2,7 @@ import { SearchCode } from "lucide-react";
 
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
+import { TSharkCapabilityDetails } from "./TSharkCapabilityDetails";
 
 export function CaptureSettingsSection({ backendConnected, form, snapshot, setForm }: RuntimeSettingsSectionProps) {
   return (
@@ -25,6 +26,7 @@ export function CaptureSettingsSection({ backendConnected, form, snapshot, setFo
         message={snapshot?.tshark.message ?? (backendConnected ? "等待检测" : "后端未连接")}
         path={snapshot?.tshark.path}
       />
+      <TSharkCapabilityDetails status={snapshot?.tshark} />
     </section>
   );
 }
