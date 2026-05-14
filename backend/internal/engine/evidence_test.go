@@ -249,37 +249,81 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 			}},
 		},
 	}
+	svc.industrialAnalysis = &model.IndustrialAnalysis{
+		RuleHits: []model.IndustrialRuleHit{{
+			Rule:         "Modbus 可疑写突发",
+			Level:        "high",
+			PacketID:     41,
+			FunctionName: "Write Multiple Registers",
+			Target:       "Holding Register 40001",
+			Evidence:     "write burst",
+			Summary:      "High-frequency writes",
+		}},
+		SuspiciousWrites: []model.ModbusSuspiciousWrite{{
+			FunctionName:   "Write Multiple Registers",
+			FunctionCode:   16,
+			Target:         "holding-register",
+			WriteCount:     3,
+			Sources:        []string{"10.0.0.5"},
+			SampleValues:   []string{"0x0001"},
+			SamplePacketID: 42,
+		}},
+	}
+	svc.vehicleAnalysis = &model.VehicleAnalysis{
+		UDS: model.UDSAnalysis{
+			Transactions: []model.UDSTransaction{{
+				RequestPacketID:  51,
+				ResponsePacketID: 52,
+				ServiceID:        "0x27",
+				ServiceName:      "SecurityAccess",
+				Status:           "negative-response",
+				NegativeCode:     "0x33",
+				SourceAddress:    "0x7e0",
+				TargetAddress:    "0x7e8",
+				RequestSummary:   "security seed request",
+				ResponseSummary:  "security denied",
+			}},
+		},
+	}
 
-	evidence, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"usb", "c2"}})
+	evidence, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"usb", "c2", "industrial", "vehicle"}})
 	if err != nil {
 		t.Fatalf("GatherEvidence() error = %v", err)
 	}
 	usbReport := buildUSBInvestigationReport(*svc.usbAnalysis)
 	c2Report := buildC2FamilyInvestigationReport("cs", svc.c2Analysis.CS)
+	industrialReport := buildIndustrialInvestigationReport(*svc.industrialAnalysis)
+	vehicleReport := buildVehicleInvestigationReport(*svc.vehicleAnalysis)
 
 	usbEvidence := firstEvidenceByModule(evidence.Records, "usb")
 	if usbEvidence == nil || len(usbReport.Evidence) == 0 {
 		t.Fatalf("expected USB evidence and report items, got evidence=%+v report=%+v", evidence.Records, usbReport)
 	}
-	if usbEvidence.PacketID != usbReport.Evidence[0].PacketID || usbEvidence.Severity != usbReport.Evidence[0].Severity {
-		t.Fatalf("USB evidence/report mismatch: evidence=%+v report=%+v", *usbEvidence, usbReport.Evidence[0])
-	}
-	if usbReport.Evidence[0].RuleID == "" || usbReport.Evidence[0].Reason == "" || usbReport.Evidence[0].Confidence == 0 || len(usbReport.Evidence[0].Caveats) == 0 {
-		t.Fatalf("expected USB report explainability metadata, got %+v", usbReport.Evidence[0])
-	}
+	assertEvidenceReportLinkage(t, "USB", *usbEvidence, usbReport.Evidence[0], false)
 
 	c2Evidence := firstEvidenceByModule(evidence.Records, "c2")
 	if c2Evidence == nil || len(c2Report.Evidence) == 0 {
 		t.Fatalf("expected C2 evidence and report items, got evidence=%+v report=%+v", evidence.Records, c2Report)
 	}
-	if c2Evidence.PacketID != c2Report.Evidence[0].PacketID ||
-		c2Evidence.StreamID != c2Report.Evidence[0].StreamID ||
-		c2Evidence.Severity != c2Report.Evidence[0].Severity {
-		t.Fatalf("C2 evidence/report mismatch: evidence=%+v report=%+v", *c2Evidence, c2Report.Evidence[0])
+	assertEvidenceReportLinkage(t, "C2", *c2Evidence, c2Report.Evidence[0], true)
+
+	industrialRuleEvidence := firstEvidenceByModuleAndSourceType(evidence.Records, "industrial", "Write Multiple Registers")
+	if industrialRuleEvidence == nil || len(industrialReport.Evidence) < 2 {
+		t.Fatalf("expected industrial rule evidence and report items, got evidence=%+v report=%+v", evidence.Records, industrialReport)
 	}
-	if c2Report.Evidence[0].RuleID == "" || c2Report.Evidence[0].Reason == "" || c2Report.Evidence[0].Confidence != c2Evidence.Confidence || len(c2Report.Evidence[0].Caveats) == 0 {
-		t.Fatalf("expected C2 report explainability metadata aligned with evidence, got evidence=%+v report=%+v", *c2Evidence, c2Report.Evidence[0])
+	assertEvidenceReportLinkage(t, "industrial rule", *industrialRuleEvidence, industrialReport.Evidence[0], false)
+
+	industrialWriteEvidence := firstEvidenceByModuleAndSourceType(evidence.Records, "industrial", "suspicious-write")
+	if industrialWriteEvidence == nil {
+		t.Fatalf("expected industrial write evidence, got %+v", evidence.Records)
 	}
+	assertEvidenceReportLinkage(t, "industrial write", *industrialWriteEvidence, industrialReport.Evidence[1], false)
+
+	vehicleEvidence := firstEvidenceByModule(evidence.Records, "vehicle")
+	if vehicleEvidence == nil || len(vehicleReport.Evidence) == 0 {
+		t.Fatalf("expected vehicle evidence and report items, got evidence=%+v report=%+v", evidence.Records, vehicleReport)
+	}
+	assertEvidenceReportLinkage(t, "vehicle", *vehicleEvidence, vehicleReport.Evidence[0], false)
 }
 
 func firstEvidenceByModule(records []model.EvidenceRecord, module string) *model.EvidenceRecord {
@@ -290,6 +334,31 @@ func firstEvidenceByModule(records []model.EvidenceRecord, module string) *model
 		}
 	}
 	return nil
+}
+
+func firstEvidenceByModuleAndSourceType(records []model.EvidenceRecord, module, sourceType string) *model.EvidenceRecord {
+	for _, record := range records {
+		if record.Module == module && record.SourceType == sourceType {
+			copy := record
+			return &copy
+		}
+	}
+	return nil
+}
+
+func assertEvidenceReportLinkage(t *testing.T, label string, evidence model.EvidenceRecord, report model.InvestigationReportItem, requireConfidenceMatch bool) {
+	t.Helper()
+	if evidence.PacketID != report.PacketID ||
+		evidence.StreamID != report.StreamID ||
+		evidence.Severity != report.Severity {
+		t.Fatalf("%s evidence/report mismatch: evidence=%+v report=%+v", label, evidence, report)
+	}
+	if report.RuleID == "" || report.Reason == "" || report.Confidence == 0 || len(report.Caveats) == 0 {
+		t.Fatalf("expected %s report explainability metadata, got %+v", label, report)
+	}
+	if requireConfidenceMatch && report.Confidence != evidence.Confidence {
+		t.Fatalf("expected %s report confidence to match evidence confidence, got evidence=%+v report=%+v", label, evidence, report)
+	}
 }
 
 func containsEvidenceString(items []string, want string) bool {

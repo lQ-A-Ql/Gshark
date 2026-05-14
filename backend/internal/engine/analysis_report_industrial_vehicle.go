@@ -29,11 +29,11 @@ func buildIndustrialInvestigationReport(analysis model.IndustrialAnalysis) model
 		report.Evidence = append(report.Evidence, withReportRule(reportItem(
 			fmt.Sprintf("%s 写操作集中出现", firstNonEmptyText(write.FunctionName, "Modbus 写操作")),
 			fmt.Sprintf("目标 %s / 次数 %d / 来源 %s", write.Target, write.WriteCount, joinOrFallback(write.Sources, "无")),
-			"high",
+			"medium",
 			write.SamplePacketID,
 			0,
 			"industrial", "write",
-		), "industrial.modbus.write", "Modbus 写类功能码集中出现，优先复核目标寄存器、来源主机和时间窗口。", 78, "普通控制任务也可能包含写操作，需结合业务时段和资产角色判断。"))
+		), "industrial.modbus.write", "Modbus 写类功能码集中出现，优先复核目标寄存器、来源主机和时间窗口。", 58, "普通控制任务也可能包含写操作，需结合业务时段和资产角色判断。"))
 	}
 
 	for _, command := range limitIndustrialCommands(analysis.ControlCommands, 4) {

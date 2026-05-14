@@ -81,9 +81,9 @@ func (s *Service) gatherVehicleEvidence() ([]model.EvidenceRecord, error) {
 			continue
 		}
 
-		packetID := tx.RequestPacketID
+		packetID := tx.ResponsePacketID
 		if packetID == 0 {
-			packetID = tx.ResponsePacketID
+			packetID = tx.RequestPacketID
 		}
 
 		summary := buildUDSEvidenceSummary(tx)
