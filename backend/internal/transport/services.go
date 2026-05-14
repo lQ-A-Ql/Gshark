@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 
-	"github.com/gshark/sentinel/backend/internal/engine"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
@@ -83,7 +82,7 @@ type ToolRuntimeService interface {
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot
 	SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig
-	FFmpegStatus() engine.FFmpegStatus
+	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig
 	SetTLSConfig(cfg model.TLSConfig)
 }

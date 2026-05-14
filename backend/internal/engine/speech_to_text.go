@@ -54,7 +54,7 @@ const speechEnhancementFilter = "highpass=f=120,lowpass=f=3800,acompressor=thres
 
 func (s *Service) SpeechToTextStatus() model.SpeechToTextStatus {
 	status := speechToTextStatusFn()
-	status.FFmpegAvailable = s.FFmpegStatus().Available
+	status.FFmpegAvailable = s.ffmpegStatus().Available
 	if !status.FFmpegAvailable && strings.TrimSpace(status.Message) == "" {
 		status.Message = "未检测到 ffmpeg，请先安装 ffmpeg 或在设置中配置其路径。"
 	}

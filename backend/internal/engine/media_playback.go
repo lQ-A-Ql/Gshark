@@ -17,6 +17,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 type playbackProfile struct {
@@ -35,7 +37,11 @@ type FFmpegStatus struct {
 	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
 }
 
-func (s *Service) FFmpegStatus() FFmpegStatus {
+func (s *Service) FFmpegStatus() model.FFmpegToolStatus {
+	return toModelFFmpegStatus(s.ffmpegStatus())
+}
+
+func (s *Service) ffmpegStatus() FFmpegStatus {
 	customPath := strings.TrimSpace(os.Getenv(ffmpegEnvVar))
 	path, err := resolveFFmpegBinary(customPath)
 	if err != nil {
@@ -65,7 +71,7 @@ func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (s
 	if err := ctx.Err(); err != nil {
 		return "", "", err
 	}
-	status := s.FFmpegStatus()
+	status := s.ffmpegStatus()
 	if !status.Available {
 		return "", "", errors.New(status.Message)
 	}

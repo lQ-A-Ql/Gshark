@@ -90,7 +90,7 @@ func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
 	return model.ToolRuntimeSnapshot{
 		Config: s.ToolRuntimeConfig(),
 		TShark: toModelTSharkStatus(tshark.CurrentStatus()),
-		FFmpeg: toModelFFmpegStatus(s.FFmpegStatus()),
+		FFmpeg: s.FFmpegStatus(),
 		Speech: s.SpeechToTextStatus(),
 		Yara:   s.YaraStatus(),
 	}
