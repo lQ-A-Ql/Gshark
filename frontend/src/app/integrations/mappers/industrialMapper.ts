@@ -1,24 +1,12 @@
 import type { IndustrialAnalysis } from "../../core/types";
+import type { IndustrialAnalysisWireDTO } from "../wire/industrialWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asBucket, asConversation, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asIndustrialControlCommands, asIndustrialDetails, asIndustrialRuleHits } from "./industrialDetailMapper";
 import { asModbusAnalysis, asModbusSuspiciousWrites } from "./modbusMapper";
 
-interface IndustrialAnalysisWire {
-  total_industrial_packets?: unknown;
-  protocols?: unknown;
-  conversations?: unknown;
-  modbus?: unknown;
-  suspicious_writes?: unknown;
-  control_commands?: unknown;
-  rule_hits?: unknown;
-  details?: unknown;
-  notes?: unknown;
-  report?: unknown;
-}
-
 export function asIndustrialAnalysis(input: unknown): IndustrialAnalysis {
-  const payload = asPlainObject(input) as IndustrialAnalysisWire | undefined;
+  const payload = asPlainObject(input) as IndustrialAnalysisWireDTO | undefined;
   return {
     totalIndustrialPackets: Number(payload?.total_industrial_packets ?? 0),
     protocols: asArray(payload?.protocols).map(asBucket),

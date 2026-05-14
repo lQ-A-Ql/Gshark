@@ -1,4 +1,5 @@
 import type { USBAnalysis } from "../../core/types";
+import type { USBAnalysisWireDTO } from "../wire/usbWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asBucket, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asUSBHidAnalysis, asUSBKeyboardEvent, asUSBMouseEvent } from "./usbHidMapper";
@@ -6,17 +7,8 @@ import { asUSBMassStorageAnalysis } from "./usbMassStorageMapper";
 import { asUSBOtherAnalysis } from "./usbOtherMapper";
 import { asUSBPacketRecord } from "./usbRecordMapper";
 
-interface USBAnalysisWire extends Record<string, unknown> {
-  total_usb_packets?: unknown;
-  keyboard_packets?: unknown;
-  mouse_packets?: unknown;
-  other_usb_packets?: unknown;
-  hid_packets?: unknown;
-  mass_storage_packets?: unknown;
-}
-
 export function asUSBAnalysis(input: unknown): USBAnalysis {
-  const payload = asPlainObject(input) as USBAnalysisWire | undefined;
+  const payload = asPlainObject(input) as USBAnalysisWireDTO | undefined;
   return {
     totalUSBPackets: Number(payload?.total_usb_packets ?? 0),
     keyboardPackets: Number(payload?.keyboard_packets ?? 0),

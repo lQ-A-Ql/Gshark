@@ -1,15 +1,12 @@
 import type { VehicleAnalysis } from "../../core/types";
+import type { VehicleAnalysisWireDTO } from "../wire/vehicleWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asBucket, asConversation, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asCANSection } from "./vehicleCanMapper";
 import { asDoIPSection, asJ1939Section, asUDSSection } from "./vehicleDiagnosticMapper";
 
-interface VehicleAnalysisWire extends Record<string, unknown> {
-  total_vehicle_packets?: unknown;
-}
-
 export function asVehicleAnalysis(input: unknown): VehicleAnalysis {
-  const payload = asPlainObject(input) as VehicleAnalysisWire | undefined;
+  const payload = asPlainObject(input) as VehicleAnalysisWireDTO | undefined;
   return {
     totalVehiclePackets: Number(payload?.total_vehicle_packets ?? 0),
     protocols: asArray(payload?.protocols).map(asBucket),

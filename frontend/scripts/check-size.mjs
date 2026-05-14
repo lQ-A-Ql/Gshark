@@ -202,6 +202,21 @@ export const sourceSizeBudgets = [
     reason: "hunting wire DTOs should only describe raw hunting hits and runtime config fields",
   },
   {
+    path: "src/app/integrations/wire/industrialWireDtos.ts",
+    maxLines: 20,
+    reason: "industrial wire DTOs should only describe raw industrial analysis payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/usbWireDtos.ts",
+    maxLines: 30,
+    reason: "USB wire DTOs should only describe raw USB analysis payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/vehicleWireDtos.ts",
+    maxLines: 20,
+    reason: "vehicle wire DTOs should only describe raw vehicle analysis payload fields",
+  },
+  {
     path: "src/app/integrations/wire/pluginWireDtos.ts",
     maxLines: 40,
     reason: "plugin wire DTOs should only describe raw plugin, DBC, source, and TLS payload fields",
