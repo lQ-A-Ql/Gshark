@@ -92,6 +92,11 @@ Invoke-Step "Frontend mapper any check" {
   pnpm run mapper:any:check
 }
 
+Invoke-Step "Frontend wire any check" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run wire:any:check
+}
+
 Invoke-Step "Frontend build" {
   Set-Location (Join-Path $root "frontend")
   pnpm run build

@@ -9,7 +9,7 @@
     "build": "vite build",
     "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1",
     "boundary:check": "node scripts/check-boundaries.mjs",
-    "ci": "pnpm run package-manager:check && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run size:check && pnpm run boundary:check && pnpm run client:any:check && pnpm run mapper:any:check && pnpm run test:run && pnpm run build",
+    "ci": "pnpm run package-manager:check && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run size:check && pnpm run boundary:check && pnpm run client:any:check && pnpm run mapper:any:check && pnpm run wire:any:check && pnpm run test:run && pnpm run build",
     "client:any:check": "node scripts/check-client-any.mjs",
     "format:check": "node scripts/check-format.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"eslint.config.js\" --max-warnings=0",
@@ -19,7 +19,8 @@
     "size:check": "node scripts/check-size.mjs",
     "test": "vitest run",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters"
+    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
+    "wire:any:check": "node scripts/check-wire-any.mjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "1.1.6",
