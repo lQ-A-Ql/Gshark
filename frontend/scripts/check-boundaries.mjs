@@ -42,7 +42,6 @@ const allowedFeatureCrossImports = new Set([]);
 const allowedPageBackendClientImports = new Set([
   "src/app/pages/MiscTools.tsx",
   "src/app/pages/ObjectExport.tsx",
-  "src/app/pages/RawStreamPage.tsx",
   "src/app/pages/ThreatHunting.tsx",
   "src/app/pages/VehicleAnalysis.tsx",
 ]);

@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { backendClients } from "../integrations/backendClients";
+import { rawStreamClient } from "../features/raw-stream/rawStreamClient";
 import { useSentinel } from "../state/SentinelContext";
 import { downloadText } from "../utils/browserFile";
 import {
@@ -41,7 +41,7 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const streamList = protocol === "TCP" ? streamIds.tcp : streamIds.udp;
   const { enableScrollLoad, loadingText, selectedPanelClass, tone } = getRawStreamProtocolConfig(protocol);
   const { loadError, loadingMore, loadMore } = useRawStreamPageLoader({
-    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
+    fetchRawStreamPage: rawStreamClient.getRawStreamPage,
     pageSize: STREAM_PAGE_SIZE,
     protocol,
     setStreamView,
