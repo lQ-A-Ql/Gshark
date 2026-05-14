@@ -7,6 +7,7 @@ import type {
 } from "../../core/types";
 import { asPlainObject } from "../mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream } from "../mappers/packetStreamMapper";
+import type { PacketLayersWireDTO, PacketRawHexWireDTO, StreamIndexWireDTO } from "../wire/streamWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -194,7 +195,9 @@ export function createStreamClient(request: JsonRequest): StreamClient {
     },
 
     async listStreamIds(protocol: "HTTP" | "TCP" | "UDP", signal?: AbortSignal) {
-      const payload = await request<any>(`/api/streams/index?protocol=${encodeURIComponent(protocol)}`, { signal });
+      const payload = await request<StreamIndexWireDTO>(`/api/streams/index?protocol=${encodeURIComponent(protocol)}`, {
+        signal,
+      });
       const ids = Array.isArray(payload.ids) ? payload.ids : [];
       return ids
         .map((id: unknown) => Number(id))
@@ -203,12 +206,19 @@ export function createStreamClient(request: JsonRequest): StreamClient {
     },
 
     async getPacketRawHex(packetId: number, signal?: AbortSignal) {
-      const payload = await request<any>(`/api/packet/raw?id=${encodeURIComponent(String(packetId))}`, { signal });
+      const payload = await request<PacketRawHexWireDTO>(`/api/packet/raw?id=${encodeURIComponent(String(packetId))}`, {
+        signal,
+      });
       return String(payload.raw_hex ?? "");
     },
 
     async getPacketLayers(packetId: number, signal?: AbortSignal) {
-      const payload = await request<any>(`/api/packet/layers?id=${encodeURIComponent(String(packetId))}`, { signal });
+      const payload = await request<PacketLayersWireDTO>(
+        `/api/packet/layers?id=${encodeURIComponent(String(packetId))}`,
+        {
+          signal,
+        },
+      );
       const layers = payload.layers;
       if (layers && typeof layers === "object" && !Array.isArray(layers)) {
         return layers as Record<string, unknown>;
