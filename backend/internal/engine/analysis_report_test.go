@@ -125,6 +125,7 @@ func TestBuildUSBInvestigationReportCapturesWriteEvidence(t *testing.T) {
 	if len(report.Evidence) == 0 || report.Evidence[0].Severity != "high" {
 		t.Fatalf("expected USB write evidence with escalated severity, got %+v", report)
 	}
+	assertReportEvidenceHasRuleMetadata(t, report.Evidence[0], "usb.mass_storage.write.failed")
 	if len(report.Details) == 0 {
 		t.Fatalf("expected USB report details, got %+v", report)
 	}
@@ -163,5 +164,64 @@ func TestBuildC2FamilyInvestigationReportCapturesCandidateAndAggregateDetails(t 
 	}
 	if report.Evidence[0].PacketID != 9 || report.Evidence[0].StreamID != 4 {
 		t.Fatalf("expected packet-linked C2 report evidence, got %+v", report.Evidence[0])
+	}
+	assertReportEvidenceHasRuleMetadata(t, report.Evidence[0], "c2.cs.high_confidence")
+}
+
+func TestBuildIndustrialInvestigationReportCapturesRuleMetadata(t *testing.T) {
+	report := buildIndustrialInvestigationReport(model.IndustrialAnalysis{
+		RuleHits: []model.IndustrialRuleHit{{
+			Rule:     "modbus-write",
+			Level:    "high",
+			Summary:  "write function detected",
+			Evidence: "function=16",
+			PacketID: 41,
+		}},
+		SuspiciousWrites: []model.ModbusSuspiciousWrite{{
+			FunctionName:   "Write Multiple Registers",
+			Target:         "holding-register",
+			WriteCount:     3,
+			Sources:        []string{"10.0.0.5"},
+			SamplePacketID: 42,
+		}},
+	})
+
+	if len(report.Evidence) < 2 {
+		t.Fatalf("expected industrial rule and write evidence, got %+v", report)
+	}
+	assertReportEvidenceHasRuleMetadata(t, report.Evidence[0], "industrial.rule.hit")
+	assertReportEvidenceHasRuleMetadata(t, report.Evidence[1], "industrial.modbus.write")
+}
+
+func TestBuildVehicleInvestigationReportCapturesRuleMetadata(t *testing.T) {
+	report := buildVehicleInvestigationReport(model.VehicleAnalysis{
+		UDS: model.UDSAnalysis{
+			Transactions: []model.UDSTransaction{{
+				RequestPacketID:  51,
+				ResponsePacketID: 52,
+				ServiceID:        "0x27",
+				ServiceName:      "SecurityAccess",
+				Status:           "negative-response",
+				SourceAddress:    "0x7e0",
+				TargetAddress:    "0x7e8",
+				RequestSummary:   "security seed request",
+				ResponseSummary:  "negative response",
+			}},
+		},
+	})
+
+	if len(report.Evidence) == 0 {
+		t.Fatalf("expected vehicle UDS evidence, got %+v", report)
+	}
+	assertReportEvidenceHasRuleMetadata(t, report.Evidence[0], "vehicle.uds.security_access")
+}
+
+func assertReportEvidenceHasRuleMetadata(t *testing.T, item model.InvestigationReportItem, wantRuleID string) {
+	t.Helper()
+	if item.RuleID != wantRuleID {
+		t.Fatalf("expected rule_id=%q, got item=%+v", wantRuleID, item)
+	}
+	if item.Reason == "" || item.Confidence <= 0 || item.PacketID <= 0 {
+		t.Fatalf("expected reason/confidence/packet linkage in report evidence, got %+v", item)
 	}
 }
