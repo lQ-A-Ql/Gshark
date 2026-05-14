@@ -1,8 +1,14 @@
 import type { APTAnalysis, APTEvidenceRecord, APTActorProfile, APTScoreFactor } from "../../core/types";
+import type {
+  APTActorProfileWireDTO,
+  APTAnalysisWireDTO,
+  APTEvidenceRecordWireDTO,
+  APTScoreFactorWireDTO,
+} from "../wire/aptWireDtos";
 import { asArray, asBucket, asPlainObject, asStringList } from "./mapperPrimitives";
 
 function asAPTScoreFactor(input: unknown): APTScoreFactor {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as APTScoreFactorWireDTO | undefined;
   return {
     name: String(item?.name ?? ""),
     weight: Number(item?.weight ?? 0),
@@ -13,7 +19,7 @@ function asAPTScoreFactor(input: unknown): APTScoreFactor {
 }
 
 function asAPTRecord(input: unknown): APTEvidenceRecord {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as APTEvidenceRecordWireDTO | undefined;
   return {
     packetId: Number(item?.packet_id ?? 0),
     streamId: Number(item?.stream_id ?? 0) || undefined,
@@ -42,7 +48,7 @@ function asAPTRecord(input: unknown): APTEvidenceRecord {
 }
 
 function asAPTProfile(input: unknown): APTActorProfile {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as APTActorProfileWireDTO | undefined;
   return {
     id: String(item?.id ?? ""),
     name: String(item?.name ?? ""),
@@ -62,7 +68,7 @@ function asAPTProfile(input: unknown): APTActorProfile {
 }
 
 export function asAPTAnalysis(input: unknown): APTAnalysis {
-  const payload = asPlainObject(input);
+  const payload = asPlainObject(input) as APTAnalysisWireDTO | undefined;
   return {
     totalEvidence: Number(payload?.total_evidence ?? 0),
     actors: asArray(payload?.actors).map(asBucket),

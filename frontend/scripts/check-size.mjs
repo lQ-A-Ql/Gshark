@@ -202,6 +202,11 @@ export const sourceSizeBudgets = [
     reason: "hunting wire DTOs should only describe raw hunting hits and runtime config fields",
   },
   {
+    path: "src/app/integrations/wire/aptWireDtos.ts",
+    maxLines: 65,
+    reason: "APT wire DTOs should only describe raw actor profile and evidence payload fields",
+  },
+  {
     path: "src/app/integrations/wire/industrialWireDtos.ts",
     maxLines: 20,
     reason: "industrial wire DTOs should only describe raw industrial analysis payload fields",
