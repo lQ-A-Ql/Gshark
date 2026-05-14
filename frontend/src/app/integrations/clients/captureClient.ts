@@ -1,5 +1,12 @@
 import type { Packet } from "../../core/types";
+import { asArray, asPlainObject } from "../mappers/mapperPrimitives";
 import { asPacket } from "../mappers/packetStreamMapper";
+import type {
+  CaptureStatusWireDTO,
+  PacketLocateWireDTO,
+  PacketsPageWireDTO,
+  PacketWireDTO,
+} from "../wire/captureWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -109,12 +116,12 @@ export function createCaptureClient(
     },
 
     async getCaptureStatus(signal?: AbortSignal) {
-      const payload = await request<any>("/api/capture/status", { signal });
+      const payload = await request<CaptureStatusWireDTO>("/api/capture/status", { signal });
       return asCaptureStatus(payload);
     },
 
     async listPackets() {
-      const rows = await request<any[]>("/api/packets");
+      const rows = await request<PacketWireDTO[]>("/api/packets");
       return rows.map(asPacket);
     },
 
@@ -126,8 +133,8 @@ export function createCaptureClient(
       if (filter.trim()) {
         query.set("filter", filter);
       }
-      const payload = await request<any>(`/api/packets/page?${query.toString()}`, { signal });
-      const rows = Array.isArray(payload.items) ? payload.items : [];
+      const payload = await request<PacketsPageWireDTO>(`/api/packets/page?${query.toString()}`, { signal });
+      const rows = asArray(payload.items);
       return {
         items: rows.map(asPacket),
         nextCursor: Number(payload.next_cursor ?? rows.length),
@@ -145,7 +152,7 @@ export function createCaptureClient(
       if (filter.trim()) {
         query.set("filter", filter);
       }
-      const payload = await request<any>(`/api/packets/locate?${query.toString()}`, { signal });
+      const payload = await request<PacketLocateWireDTO>(`/api/packets/locate?${query.toString()}`, { signal });
       return {
         packetId: Number(payload.packet_id ?? packetId),
         cursor: Number(payload.cursor ?? 0),
@@ -155,13 +162,16 @@ export function createCaptureClient(
     },
 
     async getPacket(packetId: number, signal?: AbortSignal) {
-      const payload = await request<any>(`/api/packet?id=${encodeURIComponent(String(packetId))}`, { signal });
+      const payload = await request<PacketWireDTO>(`/api/packet?id=${encodeURIComponent(String(packetId))}`, {
+        signal,
+      });
       return asPacket(payload);
     },
   };
 }
 
-export function asCaptureStatus(payload: any): CaptureStatus {
+export function asCaptureStatus(input: unknown): CaptureStatus {
+  const payload = (asPlainObject(input) ?? {}) as CaptureStatusWireDTO;
   return {
     filePath: String(payload?.file_path ?? payload?.filePath ?? ""),
     hasCapture: Boolean(payload?.has_capture ?? payload?.hasCapture),

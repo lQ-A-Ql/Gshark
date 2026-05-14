@@ -131,6 +131,11 @@ export const sourceSizeBudgets = [
     reason: "tool wire DTOs should only describe raw backend payload fields before mapper normalization",
   },
   {
+    path: "src/app/integrations/wire/captureWireDtos.ts",
+    maxLines: 45,
+    reason: "capture wire DTOs should only describe capture status, packet, page, and locate payload fields",
+  },
+  {
     path: "src/app/integrations/wire/protocolToolWireDtos.ts",
     maxLines: 45,
     reason: "protocol tool wire DTOs should only describe raw HTTP, SMTP, MySQL, and Shiro payload fields",
