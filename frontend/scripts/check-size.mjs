@@ -176,6 +176,11 @@ export const sourceSizeBudgets = [
     reason: "C2 decrypt wire DTOs should only describe raw decrypt payload fields before mapper normalization",
   },
   {
+    path: "src/app/integrations/wire/c2SampleWireDtos.ts",
+    maxLines: 130,
+    reason: "C2 sample wire DTOs should only describe raw family, indicator, and aggregate payload fields",
+  },
+  {
     path: "src/app/integrations/wire/evidenceWireDtos.ts",
     maxLines: 45,
     reason:

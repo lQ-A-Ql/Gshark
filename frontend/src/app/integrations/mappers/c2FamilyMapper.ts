@@ -1,11 +1,12 @@
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
+import type { C2FamilyWireDTO, C2SampleAnalysisWireDTO } from "../wire/c2SampleWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asBucket, asConversation, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asC2DNSAggregate, asC2HTTPEndpointAggregate, asC2StreamAggregate } from "./c2AggregateMapper";
 import { asC2BeaconPattern, asC2Record } from "./c2IndicatorMapper";
 
 export function asC2SampleAnalysis(input: unknown): C2SampleAnalysis {
-  const payload = asPlainObject(input);
+  const payload = asPlainObject(input) as C2SampleAnalysisWireDTO | undefined;
   return {
     totalMatchedPackets: Number(payload?.total_matched_packets ?? 0),
     families: asArray(payload?.families).map(asBucket),
@@ -17,7 +18,7 @@ export function asC2SampleAnalysis(input: unknown): C2SampleAnalysis {
 }
 
 function asC2Family(input: unknown): C2FamilyAnalysis {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2FamilyWireDTO | undefined;
   return {
     candidateCount: Number(item?.candidate_count ?? 0),
     matchedRuleCount: Number(item?.matched_rule_count ?? 0),

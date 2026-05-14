@@ -1,4 +1,9 @@
 import type { C2DNSAggregate, C2HTTPEndpointAggregate, C2StreamAggregate } from "../../core/types";
+import type {
+  C2DNSAggregateWireDTO,
+  C2HTTPEndpointAggregateWireDTO,
+  C2StreamAggregateWireDTO,
+} from "../wire/c2SampleWireDtos";
 import {
   asArray,
   asBucket,
@@ -10,7 +15,7 @@ import {
 import { asC2ScoreFactor } from "./c2IndicatorMapper";
 
 export function asC2HTTPEndpointAggregate(input: unknown): C2HTTPEndpointAggregate {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2HTTPEndpointAggregateWireDTO | undefined;
   return {
     host: String(item?.host ?? ""),
     uri: String(item?.uri ?? ""),
@@ -35,7 +40,7 @@ export function asC2HTTPEndpointAggregate(input: unknown): C2HTTPEndpointAggrega
 }
 
 export function asC2DNSAggregate(input: unknown): C2DNSAggregate {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2DNSAggregateWireDTO | undefined;
   return {
     qname: String(item?.qname ?? ""),
     total: Number(item?.total ?? 0),
@@ -58,7 +63,7 @@ export function asC2DNSAggregate(input: unknown): C2DNSAggregate {
 }
 
 export function asC2StreamAggregate(input: unknown): C2StreamAggregate {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2StreamAggregateWireDTO | undefined;
   return {
     streamId: Number(item?.stream_id ?? 0),
     protocol: String(item?.protocol ?? "") || undefined,

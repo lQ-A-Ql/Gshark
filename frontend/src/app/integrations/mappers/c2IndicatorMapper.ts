@@ -1,8 +1,9 @@
 import type { C2BeaconPattern, C2IndicatorRecord, C2ScoreFactor } from "../../core/types";
+import type { C2BeaconPatternWireDTO, C2IndicatorRecordWireDTO, C2ScoreFactorWireDTO } from "../wire/c2SampleWireDtos";
 import { asPlainObject, asStringList } from "./mapperPrimitives";
 
 export function asC2Record(input: unknown): C2IndicatorRecord {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2IndicatorRecordWireDTO | undefined;
   return {
     packetId: Number(item?.packet_id ?? 0),
     streamId: Number(item?.stream_id ?? 0) || undefined,
@@ -31,7 +32,7 @@ export function asC2Record(input: unknown): C2IndicatorRecord {
 }
 
 export function asC2BeaconPattern(input: unknown): C2BeaconPattern {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2BeaconPatternWireDTO | undefined;
   return {
     name: String(item?.name ?? ""),
     value: String(item?.value ?? ""),
@@ -41,7 +42,7 @@ export function asC2BeaconPattern(input: unknown): C2BeaconPattern {
 }
 
 export function asC2ScoreFactor(input: unknown): C2ScoreFactor {
-  const item = asPlainObject(input);
+  const item = asPlainObject(input) as C2ScoreFactorWireDTO | undefined;
   return {
     name: String(item?.name ?? ""),
     weight: Number(item?.weight ?? 0),
