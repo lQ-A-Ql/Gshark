@@ -136,6 +136,167 @@ describe("streamClient packet resource methods", () => {
     });
   });
 
+  it("posts decode requests and maps decoder result payloads", async () => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/streams/decode");
+      expect(init?.method).toBe("POST");
+      expect(init?.signal).toBe(signal);
+      expect(JSON.parse(String(init?.body ?? "{}"))).toEqual({
+        decoder: "base64",
+        payload: "SGVsbG8=",
+        options: { charset: "utf-8" },
+      });
+      return {
+        decoder: "base64",
+        summary: "decoded",
+        text: "Hello",
+        bytes_hex: "48656c6c6f",
+        encoding: "utf-8",
+        confidence: 88,
+        warnings: ["short"],
+        signals: ["ascii"],
+        attempt_errors: ["fallback skipped"],
+      };
+    }) as unknown as JsonRequest;
+
+    await expect(
+      createStreamClient(request).decodeStreamPayload("base64", "SGVsbG8=", { charset: "utf-8" }, signal),
+    ).resolves.toEqual({
+      decoder: "base64",
+      summary: "decoded",
+      text: "Hello",
+      bytesHex: "48656c6c6f",
+      encoding: "utf-8",
+      confidence: 88,
+      warnings: ["short"],
+      signals: ["ascii"],
+      attemptErrors: ["fallback skipped"],
+    });
+  });
+
+  it("posts inspect requests and maps candidate payloads", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/streams/inspect");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body ?? "{}"))).toEqual({ payload: "cmd=whoami" });
+      return {
+        normalized_payload: "cmd=whoami",
+        candidates: [
+          {
+            id: "query:cmd",
+            label: "cmd",
+            kind: "parameter",
+            param_name: "cmd",
+            value: "whoami",
+            preview: "whoami",
+            confidence: 92,
+            decoder_hints: ["base64"],
+            fingerprints: ["command"],
+            family_hint: "antsword",
+            decoder_options_hint: { mode: "strict" },
+            source_role: "request",
+          },
+          "bad",
+        ],
+        suggested_candidate_id: "query:cmd",
+        suggested_decoder: "base64",
+        suggested_family: "antsword",
+        confidence: 92,
+        reasons: ["parameter command"],
+      };
+    }) as unknown as JsonRequest;
+
+    await expect(createStreamClient(request).inspectStreamPayload("cmd=whoami")).resolves.toMatchObject({
+      normalizedPayload: "cmd=whoami",
+      candidates: [
+        {
+          id: "query:cmd",
+          label: "cmd",
+          kind: "parameter",
+          paramName: "cmd",
+          value: "whoami",
+          preview: "whoami",
+          confidence: 92,
+          decoderHints: ["base64"],
+          fingerprints: ["command"],
+          familyHint: "antsword",
+          decoderOptionsHint: { mode: "strict" },
+          sourceRole: "request",
+        },
+        { id: "", label: "", kind: "", value: "", decoderHints: [], fingerprints: [] },
+      ],
+      suggestedCandidateId: "query:cmd",
+      suggestedDecoder: "base64",
+      suggestedFamily: "antsword",
+      confidence: 92,
+      reasons: ["parameter command"],
+    });
+  });
+
+  it("maps stream payload sources with source metadata", async () => {
+    const signal = new AbortController().signal;
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/streams/payload-sources?limit=25");
+      expect(init?.signal).toBe(signal);
+      return [
+        {
+          id: "source-1",
+          method: "POST",
+          host: "example.test",
+          uri: "/shell.php",
+          packet_id: 42,
+          stream_id: 7,
+          source_type: "http_param",
+          param_name: "cmd",
+          payload: "whoami",
+          preview: "whoami",
+          confidence: 90,
+          signals: ["command"],
+          decoder_hints: ["base64"],
+          family_hint: "antsword",
+          decoder_options_hint: { key: "value" },
+          source_role: "request",
+          content_type: "application/x-www-form-urlencoded",
+          occurrence_count: 3,
+          first_time: "2026-05-14T00:00:00Z",
+          last_time: "2026-05-14T00:00:03Z",
+          repeat_window_seconds: 3,
+          related_packets: [42, "43", 0],
+          rule_reasons: ["repeat burst"],
+        },
+      ];
+    }) as unknown as JsonRequest;
+
+    await expect(createStreamClient(request).listStreamPayloadSources(signal, 25)).resolves.toEqual([
+      {
+        id: "source-1",
+        method: "POST",
+        host: "example.test",
+        uri: "/shell.php",
+        packetId: 42,
+        streamId: 7,
+        sourceType: "http_param",
+        paramName: "cmd",
+        payload: "whoami",
+        preview: "whoami",
+        confidence: 90,
+        signals: ["command"],
+        decoderHints: ["base64"],
+        familyHint: "antsword",
+        decoderOptionsHint: { key: "value" },
+        sourceRole: "request",
+        contentType: "application/x-www-form-urlencoded",
+        occurrenceCount: 3,
+        firstTime: "2026-05-14T00:00:00Z",
+        lastTime: "2026-05-14T00:00:03Z",
+        repeatWindowSeconds: 3,
+        relatedPackets: [42, 43],
+        ruleReasons: ["repeat burst"],
+      },
+    ]);
+  });
+
   it("maps packet raw hex payloads and packet layers", async () => {
     const signal = new AbortController().signal;
     const requestMock = vi

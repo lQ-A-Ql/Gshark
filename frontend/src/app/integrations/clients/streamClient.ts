@@ -2,12 +2,19 @@ import type {
   BinaryStream,
   HttpStream,
   StreamDecodeResult,
+  StreamPayloadCandidate,
   StreamPayloadInspection,
   StreamPayloadSource,
 } from "../../core/types";
-import { asPlainObject } from "../mappers/mapperPrimitives";
+import { asArray, asPlainObject, asStringList } from "../mappers/mapperPrimitives";
 import { asBinaryStream, asHttpStream } from "../mappers/packetStreamMapper";
+import type {
+  StreamDecodeResultWireDTO,
+  StreamPayloadCandidateWireDTO,
+  StreamPayloadInspectionWireDTO,
+} from "../wire/streamDecodeWireDtos";
 import type { BinaryStreamWireDTO, HttpStreamWireDTO, StreamPayloadUpdateWireDTO } from "../wire/streamPayloadWireDtos";
+import type { StreamPayloadSourceWireDTO } from "../wire/streamPayloadSourceWireDtos";
 import type { PacketLayersWireDTO, PacketRawHexWireDTO, StreamIndexWireDTO } from "../wire/streamWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -81,7 +88,7 @@ export function createStreamClient(request: JsonRequest): StreamClient {
       options: Record<string, unknown> = {},
       signal?: AbortSignal,
     ) {
-      const result = await request<any>("/api/streams/decode", {
+      const result = await request<StreamDecodeResultWireDTO>("/api/streams/decode", {
         method: "POST",
         signal,
         body: JSON.stringify({
@@ -97,87 +104,36 @@ export function createStreamClient(request: JsonRequest): StreamClient {
         bytesHex: String(result.bytes_hex ?? ""),
         encoding: String(result.encoding ?? ""),
         confidence: Number(result.confidence ?? 0) || undefined,
-        warnings: Array.isArray(result.warnings) ? result.warnings.map((item: unknown) => String(item ?? "")) : [],
-        signals: Array.isArray(result.signals) ? result.signals.map((item: unknown) => String(item ?? "")) : [],
-        attemptErrors: Array.isArray(result.attempt_errors)
-          ? result.attempt_errors.map((item: unknown) => String(item ?? ""))
-          : [],
+        warnings: asStringList(result.warnings),
+        signals: asStringList(result.signals),
+        attemptErrors: asStringList(result.attempt_errors),
       };
     },
 
     async inspectStreamPayload(payload: string, signal?: AbortSignal) {
-      const result = await request<any>("/api/streams/inspect", {
+      const result = await request<StreamPayloadInspectionWireDTO>("/api/streams/inspect", {
         method: "POST",
         signal,
         body: JSON.stringify({ payload }),
       });
       return {
         normalizedPayload: String(result.normalized_payload ?? ""),
-        candidates: Array.isArray(result.candidates)
-          ? result.candidates.map((item: any) => ({
-              id: String(item.id ?? ""),
-              label: String(item.label ?? ""),
-              kind: String(item.kind ?? ""),
-              paramName: String(item.param_name ?? "") || undefined,
-              value: String(item.value ?? ""),
-              preview: String(item.preview ?? "") || undefined,
-              confidence: Number(item.confidence ?? 0) || undefined,
-              decoderHints: Array.isArray(item.decoder_hints)
-                ? item.decoder_hints.map((x: unknown) => String(x ?? ""))
-                : [],
-              fingerprints: Array.isArray(item.fingerprints)
-                ? item.fingerprints.map((x: unknown) => String(x ?? ""))
-                : [],
-              familyHint: String(item.family_hint ?? "") || undefined,
-              decoderOptionsHint: asPlainObject(item.decoder_options_hint),
-              sourceRole: String(item.source_role ?? "") || undefined,
-            }))
-          : [],
+        candidates: asArray(result.candidates).map((value) => asStreamPayloadCandidate(value)),
         suggestedCandidateId: String(result.suggested_candidate_id ?? "") || undefined,
         suggestedDecoder: String(result.suggested_decoder ?? "") || undefined,
         suggestedFamily: String(result.suggested_family ?? "") || undefined,
         confidence: Number(result.confidence ?? 0) || undefined,
-        reasons: Array.isArray(result.reasons) ? result.reasons.map((item: unknown) => String(item ?? "")) : [],
+        reasons: asStringList(result.reasons),
       } as StreamPayloadInspection;
     },
 
     async listStreamPayloadSources(signal?: AbortSignal, limit = 500) {
       const query = new URLSearchParams();
       query.set("limit", String(limit));
-      const payload = await request<any[]>(`/api/streams/payload-sources?${query.toString()}`, { signal });
-      return Array.isArray(payload)
-        ? payload.map((item: any) => ({
-            id: String(item.id ?? ""),
-            method: String(item.method ?? "") || undefined,
-            host: String(item.host ?? "") || undefined,
-            uri: String(item.uri ?? "") || undefined,
-            packetId: Number(item.packet_id ?? 0),
-            streamId: Number(item.stream_id ?? 0) || undefined,
-            sourceType: String(item.source_type ?? "") || undefined,
-            paramName: String(item.param_name ?? "") || undefined,
-            payload: String(item.payload ?? ""),
-            preview: String(item.preview ?? "") || undefined,
-            confidence: Number(item.confidence ?? 0) || undefined,
-            signals: Array.isArray(item.signals) ? item.signals.map((value: unknown) => String(value ?? "")) : [],
-            decoderHints: Array.isArray(item.decoder_hints)
-              ? item.decoder_hints.map((value: unknown) => String(value ?? ""))
-              : [],
-            familyHint: String(item.family_hint ?? "") || undefined,
-            decoderOptionsHint: asPlainObject(item.decoder_options_hint),
-            sourceRole: String(item.source_role ?? "") || undefined,
-            contentType: String(item.content_type ?? "") || undefined,
-            occurrenceCount: Number(item.occurrence_count ?? 0) || undefined,
-            firstTime: String(item.first_time ?? "") || undefined,
-            lastTime: String(item.last_time ?? "") || undefined,
-            repeatWindowSeconds: Number(item.repeat_window_seconds ?? 0) || undefined,
-            relatedPackets: Array.isArray(item.related_packets)
-              ? item.related_packets.map((value: unknown) => Number(value ?? 0)).filter(Boolean)
-              : [],
-            ruleReasons: Array.isArray(item.rule_reasons)
-              ? item.rule_reasons.map((value: unknown) => String(value ?? ""))
-              : [],
-          }))
-        : [];
+      const payload = await request<StreamPayloadSourceWireDTO[]>(`/api/streams/payload-sources?${query.toString()}`, {
+        signal,
+      });
+      return asArray(payload).map((item) => asStreamPayloadSource(item));
     },
 
     async updateStreamPayloads(
@@ -229,5 +185,54 @@ export function createStreamClient(request: JsonRequest): StreamClient {
       }
       return null;
     },
+  };
+}
+
+function asStreamPayloadCandidate(input: unknown): StreamPayloadCandidate {
+  const item = (asPlainObject(input) ?? {}) as StreamPayloadCandidateWireDTO;
+  return {
+    id: String(item.id ?? ""),
+    label: String(item.label ?? ""),
+    kind: String(item.kind ?? ""),
+    paramName: String(item.param_name ?? "") || undefined,
+    value: String(item.value ?? ""),
+    preview: String(item.preview ?? "") || undefined,
+    confidence: Number(item.confidence ?? 0) || undefined,
+    decoderHints: asStringList(item.decoder_hints),
+    fingerprints: asStringList(item.fingerprints),
+    familyHint: String(item.family_hint ?? "") || undefined,
+    decoderOptionsHint: asPlainObject(item.decoder_options_hint),
+    sourceRole: String(item.source_role ?? "") || undefined,
+  };
+}
+
+function asStreamPayloadSource(input: unknown): StreamPayloadSource {
+  const item = (asPlainObject(input) ?? {}) as StreamPayloadSourceWireDTO;
+  return {
+    id: String(item.id ?? ""),
+    method: String(item.method ?? "") || undefined,
+    host: String(item.host ?? "") || undefined,
+    uri: String(item.uri ?? "") || undefined,
+    packetId: Number(item.packet_id ?? 0),
+    streamId: Number(item.stream_id ?? 0) || undefined,
+    sourceType: String(item.source_type ?? "") || undefined,
+    paramName: String(item.param_name ?? "") || undefined,
+    payload: String(item.payload ?? ""),
+    preview: String(item.preview ?? "") || undefined,
+    confidence: Number(item.confidence ?? 0) || undefined,
+    signals: asStringList(item.signals),
+    decoderHints: asStringList(item.decoder_hints),
+    familyHint: String(item.family_hint ?? "") || undefined,
+    decoderOptionsHint: asPlainObject(item.decoder_options_hint),
+    sourceRole: String(item.source_role ?? "") || undefined,
+    contentType: String(item.content_type ?? "") || undefined,
+    occurrenceCount: Number(item.occurrence_count ?? 0) || undefined,
+    firstTime: String(item.first_time ?? "") || undefined,
+    lastTime: String(item.last_time ?? "") || undefined,
+    repeatWindowSeconds: Number(item.repeat_window_seconds ?? 0) || undefined,
+    relatedPackets: asArray(item.related_packets)
+      .map((value) => Number(value ?? 0))
+      .filter(Boolean),
+    ruleReasons: asStringList(item.rule_reasons),
   };
 }
