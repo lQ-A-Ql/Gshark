@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rc4"
@@ -82,6 +83,16 @@ func (s *Service) CurrentCapturePath() string {
 }
 
 func (s *Service) RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	return s.RunWinRMDecryptWithContext(context.Background(), req)
+}
+
+func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return model.WinRMDecryptResult{}, err
+	}
 	capturePath := s.CurrentCapturePath()
 	if capturePath == "" {
 		return model.WinRMDecryptResult{}, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
@@ -112,8 +123,11 @@ func (s *Service) RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDec
 		previewLines = defaultWinRMPreviewLines
 	}
 
-	rows, err := scanWinRMRows(capturePath, req.Port)
+	rows, err := scanWinRMRowsWithContext(ctx, capturePath, req.Port)
 	if err != nil {
+		return model.WinRMDecryptResult{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return model.WinRMDecryptResult{}, err
 	}
 	report, err := decryptWinRMMessages(rows, req.Port, ntHash, winrmDecryptOptions{
@@ -163,6 +177,13 @@ func (s *Service) WinRMExportFile(resultID string) (string, string, error) {
 }
 
 func scanWinRMRows(capturePath string, port int) ([]winrmMessageRow, error) {
+	return scanWinRMRowsWithContext(context.Background(), capturePath, port)
+}
+
+func scanWinRMRowsWithContext(ctx context.Context, capturePath string, port int) ([]winrmMessageRow, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	filter := fmt.Sprintf("http && tcp.port == %d", port)
 	fieldSets := [][]string{
 		{
@@ -201,6 +222,9 @@ func scanWinRMRows(capturePath string, port int) ([]winrmMessageRow, error) {
 	}
 	var lastErr error
 	for index, fields := range fieldSets {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		rows := make([]winrmMessageRow, 0, 64)
 		err := scanWinRMRowsWithDisplayFilter(capturePath, fields, filter, func(parts []string) {
 			if len(parts) < len(fields) {

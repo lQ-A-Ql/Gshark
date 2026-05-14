@@ -46,12 +46,16 @@ type DetectionService interface {
 // evidence analysis methods consumed by the transport layer.
 type AnalysisService interface {
 	GlobalTrafficStats() (model.GlobalTrafficStats, error)
+	GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error)
 	IndustrialAnalysis() (model.IndustrialAnalysis, error)
+	IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error)
 	VehicleAnalysis() (model.VehicleAnalysis, error)
+	VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error)
 	VehicleDBCProfiles() []model.DBCProfile
 	AddVehicleDBC(path string) ([]model.DBCProfile, error)
 	RemoveVehicleDBC(path string) []model.DBCProfile
 	USBAnalysis() (model.USBAnalysis, error)
+	USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis, error)
 	C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error)
 	C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error)
 	APTAnalysis(ctx context.Context) (model.APTAnalysis, error)
@@ -66,6 +70,7 @@ type MediaService interface {
 	MediaArtifact(token string) (string, string, error)
 	MediaPlaybackWithContext(ctx context.Context, token string) (string, string, error)
 	TranscribeMediaArtifact(token string, force bool) (model.MediaTranscription, error)
+	TranscribeMediaArtifactWithContext(ctx context.Context, token string, force bool) (model.MediaTranscription, error)
 	MediaBatchTranscriptionStatus() model.SpeechBatchTaskStatus
 	StartMediaBatchTranscription(force bool) (model.SpeechBatchTaskStatus, error)
 	CancelMediaBatchTranscription() model.SpeechBatchTaskStatus
@@ -91,13 +96,16 @@ type ToolRuntimeService interface {
 // SMTP / MySQL / Shiro / SMB3 / WinRM) consumed by the transport layer.
 type ToolAnalysisService interface {
 	ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error)
+	ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error)
 	HTTPLoginAnalysis(ctx context.Context) (model.HTTPLoginAnalysis, error)
 	SMTPAnalysis(ctx context.Context) (model.SMTPAnalysis, error)
 	MySQLAnalysis(ctx context.Context) (model.MySQLAnalysis, error)
 	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
 	ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, error)
+	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
 	GenerateSMB3RandomSessionKey(req model.SMB3RandomSessionKeyRequest) (model.SMB3RandomSessionKeyResult, error)
 	RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
+	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	WinRMExportFile(resultID string) (string, string, error)
 }
 

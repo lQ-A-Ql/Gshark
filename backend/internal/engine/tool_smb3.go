@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rc4"
@@ -43,11 +44,15 @@ func normalizeHexInput(raw string) string {
 }
 
 func (s *Service) ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, error) {
+	return s.ListSMB3SessionCandidatesWithContext(context.Background())
+}
+
+func (s *Service) ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error) {
 	capturePath := s.CurrentCapturePath()
 	if capturePath == "" {
 		return nil, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
 	}
-	rows, err := scanSMB3SessionCandidates(capturePath)
+	rows, err := scanSMB3SessionCandidates(ctx, capturePath)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +126,11 @@ func encodeUTF16LE(raw []byte) []byte {
 	return out
 }
 
-func scanSMB3SessionCandidates(capturePath string) ([]model.SMB3SessionCandidate, error) {
+func scanSMB3SessionCandidates(ctx context.Context, capturePath string) ([]model.SMB3SessionCandidate, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	fields := []string{
 		"frame.number",
 		"frame.time",

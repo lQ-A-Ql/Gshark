@@ -255,7 +255,7 @@ func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.toolAnalysis.RunWinRMDecrypt(req)
+	result, err := s.toolAnalysis.RunWinRMDecryptWithContext(r.Context(), req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -312,7 +312,7 @@ func (s *Server) handleSMB3SessionCandidates(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.toolAnalysis.ListSMB3SessionCandidates()
+	rows, err := s.toolAnalysis.ListSMB3SessionCandidatesWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -617,8 +617,8 @@ func (s *Server) handleStreamIndex(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, _ *http.Request) {
-	stats, err := s.analysis.GlobalTrafficStats()
+func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.analysis.GlobalTrafficStatsWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -626,8 +626,8 @@ func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, _ *http.Request
 	writeJSON(w, http.StatusOK, stats)
 }
 
-func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.analysis.IndustrialAnalysis()
+func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, r *http.Request) {
+	analysis, err := s.analysis.IndustrialAnalysisWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -635,8 +635,8 @@ func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, _ *http.Request
 	writeJSON(w, http.StatusOK, analysis)
 }
 
-func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.analysis.VehicleAnalysis()
+func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, r *http.Request) {
+	analysis, err := s.analysis.VehicleAnalysisWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -664,8 +664,8 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, analysis)
 }
 
-func (s *Server) handleUSBAnalysis(w http.ResponseWriter, _ *http.Request) {
-	analysis, err := s.analysis.USBAnalysis()
+func (s *Server) handleUSBAnalysis(w http.ResponseWriter, r *http.Request) {
+	analysis, err := s.analysis.USBAnalysisWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -836,7 +836,7 @@ func (s *Server) handleMediaArtifactTranscription(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	result, err := s.media.TranscribeMediaArtifact(payload.Token, payload.Force)
+	result, err := s.media.TranscribeMediaArtifactWithContext(r.Context(), payload.Token, payload.Force)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1255,7 +1255,7 @@ func (s *Server) handleNTLMSessionMaterials(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	rows, err := s.toolAnalysis.ListNTLMSessionMaterials()
+	rows, err := s.toolAnalysis.ListNTLMSessionMaterialsWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

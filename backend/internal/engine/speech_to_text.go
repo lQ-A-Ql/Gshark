@@ -66,6 +66,10 @@ func (s *Service) TranscribeMediaArtifact(token string, force bool) (model.Media
 	return s.transcribeMediaArtifactWithContext(context.Background(), token, force)
 }
 
+func (s *Service) TranscribeMediaArtifactWithContext(ctx context.Context, token string, force bool) (model.MediaTranscription, error) {
+	return s.transcribeMediaArtifactWithContext(ctx, token, force)
+}
+
 func (s *Service) transcribeMediaArtifactWithContext(ctx context.Context, token string, force bool) (model.MediaTranscription, error) {
 	if ctx == nil {
 		ctx = context.Background()

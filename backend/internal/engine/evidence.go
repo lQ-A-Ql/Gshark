@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilter) (model.EvidenceResponse, error) {
-	var records []model.EvidenceRecord
+	records := make([]model.EvidenceRecord, 0)
 	var notes []string
 
 	modules := filter.Modules

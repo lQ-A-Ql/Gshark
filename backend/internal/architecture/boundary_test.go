@@ -154,6 +154,25 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 			t.Fatalf("walk internal for evidence boundary: %v", err)
 		}
 	})
+
+	t.Run("transport handlers use context-aware long running service calls", func(t *testing.T) {
+		body := readFile(t, filepath.Join(root, "internal", "transport", "http_server.go"))
+		forbidden := []string{
+			"s.analysis.GlobalTrafficStats()",
+			"s.analysis.IndustrialAnalysis()",
+			"s.analysis.VehicleAnalysis()",
+			"s.analysis.USBAnalysis()",
+			"s.media.TranscribeMediaArtifact(payload.Token, payload.Force)",
+			"s.toolAnalysis.ListNTLMSessionMaterials()",
+			"s.toolAnalysis.ListSMB3SessionCandidates()",
+			"s.toolAnalysis.RunWinRMDecrypt(req)",
+		}
+		for _, call := range forbidden {
+			if strings.Contains(body, call) {
+				t.Fatalf("http_server.go calls %s; transport handlers must pass request context to long-running service methods", call)
+			}
+		}
+	})
 }
 
 func backendRoot(t *testing.T) string {

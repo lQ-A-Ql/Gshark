@@ -1693,6 +1693,16 @@ func (s *Service) StreamIDs(protocol string) []int64 {
 }
 
 func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
+	return s.GlobalTrafficStatsWithContext(context.Background())
+}
+
+func (s *Service) GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return model.GlobalTrafficStats{}, err
+	}
 	s.mu.RLock()
 	pcap := s.pcap
 	cached := s.globalTrafficStats
@@ -1703,6 +1713,9 @@ func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
 	}
 	if strings.TrimSpace(pcap) == "" {
 		return model.GlobalTrafficStats{}, errors.New("no capture loaded")
+	}
+	if err := ctx.Err(); err != nil {
+		return model.GlobalTrafficStats{}, err
 	}
 
 	stats, err := tshark.BuildGlobalTrafficStatsFromFile(pcap)
@@ -1720,6 +1733,16 @@ func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
 }
 
 func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
+	return s.IndustrialAnalysisWithContext(context.Background())
+}
+
+func (s *Service) IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return model.IndustrialAnalysis{}, err
+	}
 	s.mu.RLock()
 	pcap := s.pcap
 	cached := s.industrialAnalysis
@@ -1731,8 +1754,14 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 	if strings.TrimSpace(pcap) == "" {
 		return model.IndustrialAnalysis{}, errors.New("no capture loaded")
 	}
+	if err := ctx.Err(); err != nil {
+		return model.IndustrialAnalysis{}, err
+	}
 	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
 		log.Printf("engine: specialized field cache warm failed for industrial analysis: %v", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return model.IndustrialAnalysis{}, err
 	}
 
 	analysis, err := tshark.BuildIndustrialAnalysisFromFile(pcap)
@@ -1751,6 +1780,16 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 }
 
 func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
+	return s.VehicleAnalysisWithContext(context.Background())
+}
+
+func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return model.VehicleAnalysis{}, err
+	}
 	s.mu.RLock()
 	pcap := s.pcap
 	cached := s.vehicleAnalysis
@@ -1762,8 +1801,14 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 	if strings.TrimSpace(pcap) == "" {
 		return model.VehicleAnalysis{}, errors.New("no capture loaded")
 	}
+	if err := ctx.Err(); err != nil {
+		return model.VehicleAnalysis{}, err
+	}
 	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
 		log.Printf("engine: specialized field cache warm failed for vehicle analysis: %v", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return model.VehicleAnalysis{}, err
 	}
 
 	s.mu.RLock()
@@ -1955,6 +2000,16 @@ func formatPortList(ports []int) string {
 }
 
 func (s *Service) USBAnalysis() (model.USBAnalysis, error) {
+	return s.USBAnalysisWithContext(context.Background())
+}
+
+func (s *Service) USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return model.USBAnalysis{}, err
+	}
 	s.mu.RLock()
 	pcap := s.pcap
 	cached := s.usbAnalysis
@@ -1966,8 +2021,14 @@ func (s *Service) USBAnalysis() (model.USBAnalysis, error) {
 	if strings.TrimSpace(pcap) == "" {
 		return model.USBAnalysis{}, errors.New("no capture loaded")
 	}
+	if err := ctx.Err(); err != nil {
+		return model.USBAnalysis{}, err
+	}
 	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
 		log.Printf("engine: specialized field cache warm failed for usb analysis: %v", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return model.USBAnalysis{}, err
 	}
 
 	analysis, err := tshark.BuildUSBAnalysisFromFile(pcap)

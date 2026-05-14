@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -31,14 +32,18 @@ type ntlmSessionScanRow struct {
 }
 
 func (s *Service) ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error) {
+	return s.ListNTLMSessionMaterialsWithContext(context.Background())
+}
+
+func (s *Service) ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error) {
 	capturePath := s.CurrentCapturePath()
 	if capturePath == "" {
 		return nil, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
 	}
-	return scanNTLMSessionMaterials(capturePath)
+	return scanNTLMSessionMaterials(ctx, capturePath)
 }
 
-func scanNTLMSessionMaterials(capturePath string) ([]model.NTLMSessionMaterial, error) {
+func scanNTLMSessionMaterials(ctx context.Context, capturePath string) ([]model.NTLMSessionMaterial, error) {
 	fieldSets := [][]string{
 		{
 			"frame.number",
@@ -84,6 +89,9 @@ func scanNTLMSessionMaterials(capturePath string) ([]model.NTLMSessionMaterial, 
 	var lastErr error
 	var rows []ntlmSessionScanRow
 	for _, fields := range fieldSets {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		rows = rows[:0]
 		err := scanNTLMSessionRowsWithDisplayFilter(capturePath, fields, "ntlmssp", func(parts []string) {
 			if len(parts) < len(fields) {
