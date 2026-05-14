@@ -72,10 +72,20 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 			}
 			body := readFile(t, path)
 			if strings.Contains(body, "withReportRule(") {
-				t.Fatalf("%s writes report rule metadata directly; use withReportRuleID and analysis_report_rules.go", rel(root, path))
+				t.Fatalf("%s writes report rule metadata directly; use withReportRuleID and internal/report", rel(root, path))
 			}
 			if containsAny(body, []string{"RuleID:", "Reason:", "Caveats:"}) {
-				t.Fatalf("%s defines report rule metadata outside analysis_report_rules.go", rel(root, path))
+				t.Fatalf("%s defines report rule metadata outside internal/report", rel(root, path))
+			}
+		}
+	})
+
+	t.Run("report package stays dependency-light", func(t *testing.T) {
+		for _, path := range goFiles(t, filepath.Join(root, "internal", "report")) {
+			for _, imported := range importsFor(t, path) {
+				if containsAny(imported, []string{"/internal/engine", "/internal/transport", "/internal/tshark"}) {
+					t.Fatalf("%s imports forbidden report dependency %q", rel(root, path), imported)
+				}
 			}
 		}
 	})

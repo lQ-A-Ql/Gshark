@@ -17,32 +17,32 @@ func buildShiroInvestigationReport(analysis model.ShiroRememberMeAnalysis) model
 	for _, candidate := range analysis.Candidates {
 		switch {
 		case candidate.HitCount > 0:
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 命中候选密钥", renderShiroCandidateReportTitle(candidate)),
 				fmt.Sprintf("stream=%d / 命中 %d 个密钥 / 预览 %s", candidate.StreamID, candidate.HitCount, orDash(candidate.CookiePreview)),
 				"high",
 				candidate.PacketID,
 				candidate.StreamID,
 				"shiro", "rememberme",
-			))
+			), "shiro.rememberme.key_hit", 88))
 		case shiroCandidateDeleteMe(candidate):
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 出现 deleteMe 回收痕迹", renderShiroCandidateReportTitle(candidate)),
 				fmt.Sprintf("源头 %s / 说明 %s", orDash(candidate.SourceHeader), joinOrFallback(candidate.Notes, "无")),
 				"medium",
 				candidate.PacketID,
 				candidate.StreamID,
 				"shiro", "deleteme",
-			))
+			), "shiro.rememberme.deleteme", 58))
 		case candidate.DecodeOK:
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 已解码但未命中密钥", renderShiroCandidateReportTitle(candidate)),
 				fmt.Sprintf("长度 %d / CBC=%t / GCM=%t", candidate.EncryptedLength, candidate.PossibleCBC, candidate.PossibleGCM),
 				"low",
 				candidate.PacketID,
 				candidate.StreamID,
 				"shiro", "cookie",
-			))
+			), "shiro.rememberme.decoded", 45))
 		}
 	}
 

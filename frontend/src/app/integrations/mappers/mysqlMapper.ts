@@ -1,10 +1,11 @@
 import type { MySQLAnalysis } from "../../core/types";
+import type { MySQLAnalysisWireDTO } from "../wire/protocolToolWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
 import { asMySQLSession } from "./mysqlRecordMapper";
 
 export function asMySQLAnalysis(input: unknown): MySQLAnalysis {
-  const payload = asPlainObject(input) ?? {};
+  const payload: MySQLAnalysisWireDTO = asPlainObject(input) ?? {};
   return {
     sessionCount: Number(payload.session_count ?? 0),
     loginCount: Number(payload.login_count ?? 0),

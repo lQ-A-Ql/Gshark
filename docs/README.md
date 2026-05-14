@@ -1,27 +1,19 @@
 # GShark-Sentinel 文档中心
 
-本目录是项目文档总入口。当前项目已经从早期 PRD / 实施方案阶段进入多方向并行开发阶段，阅读时建议优先从“当前状态与路线图”进入，再按方向查看合并摘要，最后按需追溯逐轮审计报告。
+本目录是项目文档总入口。当前项目已经从早期 PRD / 实施方案阶段进入多方向并行开发阶段，阅读时建议优先从“当前状态与路线图”进入，再按方向查看合并摘要。
 
 ## 推荐阅读顺序
 
 1. [项目根 README](../README.md)：了解产品定位、核心功能、启动方式和当前边界。
-2. [2026-05-13 归档索引](./audit-development-report-archive-2026-05-13/README.md)：查看 iterative-dev-governance spec 首轮治理日报，含 9 个架构缺陷闭环与 14 个设计属性 PBT 覆盖。
-3. [2026-05-11 归档索引](./audit-development-report-archive-2026-05-11/README.md)：查看 2026-05-11 工程治理日报拆分、主线回正、统一报告 schema 与回归门禁。
-4. [2026-05-05 归档索引](./audit-development-report-archive-2026-05-05/README.md)：查看主线收口、Evidence 范围澄清、Vehicle / USB 证据接入和验证结果。
-5. [2026-05-02 归档索引](./audit-development-report-archive-2026-05-02/README.md)：查看上一轮 C2 / APT / MISC 证据链产品化、前端模块化和验证结果。
-6. [当前开发态势与下一步规划](./audit-development-report-archive-2026-04-30/current-development-status-and-roadmap-2026-04-30.md)：查看上一轮跨方向状态、风险和建议优先级。
-7. [2026-04-30 归档索引](./audit-development-report-archive-2026-04-30/README.md)：查看前端一致性、MISC 风格基线、方向摘要和路线图。
+2. [治理缺陷登记表](./governance-defect-register.json)：查看版本化 Architecture_Defect 状态源和当前 open task。
+3. [MISC 模块接口文档](./misc-module-interface.md)：查看内建与 zip 自定义 MISC 模块接口。
+4. [插件接口文档](./plugin-interface.md)：查看威胁狩猎插件接口。
+5. [车机流量分析方案](./automotive-analysis-plan.md)：查看车机方向能力规划。
 
 ## 当前方向摘要
 
 - [治理缺陷登记表](./governance-defect-register.json)：机器可读的 Architecture_Defect 状态源，记录缺陷优先级、关闭提交、验证命令、证据测试和报告路径。
-- [2026-05-11 主线审计与路线图](./audit-development-report-archive-2026-05-11/mainline-audit-and-roadmap-2026-05-11.md)：记录从前端拆分主导切回主线能力闭环主导，落地统一调查报告 schema、桥接回归与公共样本门禁。
-- [主线收口与 Evidence 范围澄清报告](./audit-development-report-archive-2026-05-05/mainline-evidence-scope-and-validation-report-2026-05-05.md)：明确 MISC 不接入 Evidence，新增 Vehicle / USB 主线证据，修复前端模块归类，补齐验证与文档索引。
-- [C2 / APT / MISC 证据链产品化报告](./audit-development-report-archive-2026-05-02/c2-apt-misc-productization-report-2026-05-02.md)：C2 VShell、APT actor registry、MISC Payload / WebShell、误导文案清理、前端骨架审计与模块化拆分（types 目录拆分、feature hooks 提取、UI 组件收敛）、测试验证和下一步优先级。
-- [前端设计与交互开发合并摘要](./audit-development-report-archive-2026-04-30/merged-frontend-design-development-summary-2026-04-30.md)：MISC 浅色准线、共享组件、浮层、拖拽屏蔽、HEX 可读性、cancellable 请求与前端一致性。
-- [协议专项与 MISC 工具箱合并摘要](./audit-development-report-archive-2026-04-30/merged-protocol-misc-development-summary-2026-04-30.md)：HTTP 登录、SMTP、MySQL、Shiro、Payload / WebShell、WinRM、SMB3 与 MISC manifest 语义。
-- [C2 样本分析与 APT 组织画像合并摘要](./audit-development-report-archive-2026-04-30/merged-c2-apt-development-summary-2026-04-30.md)：C2 候选画像、APT 证据解释、弱信号 caveat 与证据链规划。
-- [车机与工控分析合并摘要](./audit-development-report-archive-2026-04-30/merged-vehicle-industrial-development-summary-2026-04-30.md)：CAN / J1939 / DoIP / UDS、Modbus、控制行为时间线与专项协议语义规划。
+- 本地开发报告：`docs/audit-development-report-archive-*` 仅用于本机逐轮记录，受 `.gitignore` 管理，不纳入远端；版本化当前事实以本 README、接口文档和 `governance-defect-register.json` 为准。
 
 ## 当前方向校准
 
@@ -37,20 +29,14 @@
 
 ## 历史材料
 
-早期 PRD、实施计划和重复补丁报告中已有大量内容被当前 README、路线图与方向合并摘要取代，本轮已清理顶层过期副本。历史逐轮证据链继续保留在归档目录中；当前事实以最新路线图、方向摘要和接口文档为准。
+早期 PRD、实施计划和重复补丁报告中已有大量内容被当前 README、治理缺陷登记表和接口文档取代。历史逐轮证据链可保留在本地归档目录中；当前事实以版本化文档为准。
 
 ## 归档说明
 
-- `audit-development-report-archive-2026-05-13/`：iterative-dev-governance spec 首轮治理日报，含 9 个架构缺陷闭环、14 个设计属性 PBT 覆盖。
-- `audit-development-report-archive-2026-05-11/`：2026-05-11 工程治理日报拆分、主线回正、统一报告 schema、桥接与公共样本回归。
-- `audit-development-report-archive-2026-05-05/`：主线收口、Evidence 范围澄清、Vehicle / USB 主线证据接入、验证记录与文档评审。
-- `audit-development-report-archive-2026-05-02/`：最新 C2 / APT / MISC 证据链产品化、WebShell 解码表达、前端模块化和验证报告。
-- `audit-development-report-archive-2026-04-29/`：上一日 C2 / APT 系列、前端设计 round16 至 round27 与 WinRM 历史补丁报告。
-- `audit-development-report-archive-2026-04-30/`：上一阶段归档，包含前端 round28 至 round37、四个方向合并摘要与跨方向路线图。
+- `audit-development-report-archive-*`：本地开发报告目录，默认被 `.gitignore` 忽略，不要求在干净 clone 或 CI 中存在。
 
 ## 维护规则
 
-- 新增逐轮报告时，放入对应日期归档目录，并更新该目录的 `README.md`。
-- 同一天内的同方向报告应优先汇总到方向合并摘要，避免文档继续无序膨胀。
-- 若新增或调整总体开发计划，优先更新 `current-development-status-and-roadmap-2026-04-30.md` 或新日期对应路线图。
-- 历史归档不要直接当作当前事实引用；如需引用，请同时说明其历史状态与当前差异。
+- 新增逐轮报告时，可放入本地日期归档目录，但不要作为版本化治理测试的硬依赖。
+- 若新增或调整总体开发计划，优先更新本 README、接口文档或 `governance-defect-register.json`。
+- 历史归档不要直接当作当前事实引用；需要远端可复现的事实必须沉淀到版本化文档中。

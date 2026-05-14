@@ -340,6 +340,8 @@ export function onRequest(input, ctx) {
 - `ctx.tsharkPath`: 当前 `tshark` 路径
 - `ctx.scanFields(fields, displayFilter?)`: 使用宿主 `tshark` 扫描当前抓包字段
 
+JavaScript 模块有执行超时保护，可中断模块内的 JS 死循环和长时间计算。该保护不是完整 sandbox，也不保证强制中断正在执行的 Go 宿主回调；例如 `ctx.scanFields()` 进入宿主 `tshark` 扫描后，需要宿主 API 自身支持取消才能立即停止。编写模块时应避免长时间阻塞 host API，并把重型能力升级为内置模块。
+
 `ctx.scanFields()` 返回结构：
 
 ```json

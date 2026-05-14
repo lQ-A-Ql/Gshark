@@ -18,24 +18,24 @@ func buildSMTPInvestigationReport(analysis model.SMTPAnalysis) model.Investigati
 	for _, session := range analysis.Sessions {
 		packetID := firstSMTPPacketID(session)
 		if session.AuthPasswordSeen && session.PossibleCleartext {
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("SMTP stream #%d 发现明文认证", session.StreamID),
 				fmt.Sprintf("AUTH %s / 用户 %s / 状态 %s", joinOrFallback(session.AuthMechanisms, "未知"), orDash(session.AuthUsername), joinOrFallback(session.StatusHints, "无")),
 				"high",
 				packetID,
 				session.StreamID,
 				"smtp", "auth",
-			))
+			), "smtp.auth.cleartext", 82))
 		}
 		if session.AttachmentHints > 0 {
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("SMTP stream #%d 存在附件线索", session.StreamID),
 				fmt.Sprintf("附件提示 %d / 收件人 %s", session.AttachmentHints, joinOrFallback(session.RcptTo, "无")),
 				"medium",
 				packetID,
 				session.StreamID,
 				"smtp", "attachment",
-			))
+			), "smtp.attachment.hint", 55))
 		}
 	}
 
@@ -74,24 +74,24 @@ func buildMySQLInvestigationReport(analysis model.MySQLAnalysis) model.Investiga
 			if severity == "" {
 				continue
 			}
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("MySQL stream #%d %s", session.StreamID, label),
 				fmt.Sprintf("用户 %s / DB %s / SQL %s", orDash(session.Username), orDash(firstNonEmptyText(query.Database, session.Database)), truncatePreview(strings.TrimSpace(query.SQL), 180)),
 				severity,
 				query.PacketID,
 				session.StreamID,
 				"mysql", "query",
-			))
+			), "mysql.query.risky", confidenceFromSeverity(severity)))
 		}
 		if session.ErrCount > 0 {
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("MySQL stream #%d 返回错误响应", session.StreamID),
 				fmt.Sprintf("错误 %d / 命令 %s", session.ErrCount, joinOrFallback(session.CommandTypes, "未知")),
 				"medium",
 				firstMySQLPacketID(session),
 				session.StreamID,
 				"mysql", "error",
-			))
+			), "mysql.error.response", 52))
 		}
 	}
 

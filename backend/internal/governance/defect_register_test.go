@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateDefectRegisterRequiresClosureEvidence(t *testing.T) {
@@ -104,5 +105,39 @@ func TestCanonicalDefectRegisterIsValid(t *testing.T) {
 	}
 	if err := ValidateDefectRegisterAgainstRoot(root, register); err != nil {
 		t.Fatalf("ValidateDefectRegisterAgainstRoot: %v", err)
+	}
+}
+
+func TestCanonicalDefectRegisterUpdatedAtIsVersionedGovernanceState(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	register, err := LoadDefectRegisterFile(filepath.Join(root, "docs", "governance-defect-register.json"))
+	if err != nil {
+		t.Fatalf("LoadDefectRegisterFile: %v", err)
+	}
+	updatedAt, err := time.Parse(time.RFC3339, register.UpdatedAt)
+	if err != nil {
+		t.Fatalf("register updatedAt must be RFC3339: %v", err)
+	}
+	if updatedAt.IsZero() {
+		t.Fatal("register updatedAt must be non-zero")
+	}
+}
+
+func TestDocsReadmeDeclaresLocalAuditArchivesAreIgnored(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	docsDir := filepath.Join(root, "docs")
+	body, err := os.ReadFile(filepath.Join(docsDir, "README.md"))
+	if err != nil {
+		t.Fatalf("read docs README: %v", err)
+	}
+	content := string(body)
+	for _, want := range []string{
+		"governance-defect-register.json",
+		"本地开发报告",
+		"不纳入远端",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("docs README must declare versioned governance state and ignored local reports; missing %q", want)
+		}
 	}
 }

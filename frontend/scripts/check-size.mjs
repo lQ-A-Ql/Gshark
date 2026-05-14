@@ -132,13 +132,19 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/wire/captureWireDtos.ts",
-    maxLines: 45,
-    reason: "capture wire DTOs should only describe capture status, packet, page, and locate payload fields",
+    maxLines: 85,
+    reason:
+      "capture wire DTOs should only describe capture status, packet, color features, page, and locate payload fields",
   },
   {
     path: "src/app/integrations/wire/protocolToolWireDtos.ts",
     maxLines: 45,
     reason: "protocol tool wire DTOs should only describe raw HTTP, SMTP, MySQL, and Shiro payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/shiroWireDtos.ts",
+    maxLines: 35,
+    reason: "Shiro wire DTOs should only describe nested rememberMe candidate and key result fields",
   },
   {
     path: "src/app/integrations/wire/sessionMaterialWireDtos.ts",
@@ -195,6 +201,11 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/wire/runtimeWireDtos.ts",
     maxLines: 75,
     reason: "runtime wire DTOs should only describe raw tool status and capability payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/trafficWireDtos.ts",
+    maxLines: 20,
+    reason: "traffic wire DTOs should only describe raw global traffic stats payload fields",
   },
   {
     path: "src/app/integrations/wire/mediaWireDtos.ts",

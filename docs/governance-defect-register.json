@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-13T10:20:36+08:00",
+  "updatedAt": "2026-05-14T18:56:26+08:00",
   "entries": [
     {
       "id": "P0-1",
@@ -488,10 +488,13 @@
     {
       "id": "P2-6",
       "priority": "P2",
-      "title": "mapper schema/codegen feasibility",
-      "description": "Evaluate whether Go response structs should generate JSON Schema/OpenAPI and TypeScript DTOs now that handwritten mapper entrypoints no longer use raw any.",
+      "title": "mapper schema/codegen feasibility after WireDTO gates",
+      "description": "Handwritten WireDTO/client/mapper gates are now in CI for the main integration surface; continue evaluating whether Go response structs should generate JSON Schema/OpenAPI and TypeScript DTOs after packet, stream, traffic, and protocol-tool mapper surfaces stabilize.",
       "keyFiles": [
+        "frontend/src/app/integrations/wire",
         "frontend/src/app/integrations/mappers",
+        "frontend/scripts/check-wire-any.mjs",
+        "frontend/scripts/check-client-any.mjs",
         "backend/internal/model"
       ],
       "status": "open"

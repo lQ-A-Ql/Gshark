@@ -1,8 +1,9 @@
 import type { GlobalTrafficStats } from "../../core/types";
+import type { GlobalTrafficStatsWireDTO } from "../wire/trafficWireDtos";
 import { asArray, asBucket, asPlainObject } from "./mapperPrimitives";
 
 export function asGlobalTrafficStats(input: unknown): GlobalTrafficStats {
-  const payload = asPlainObject(input) ?? {};
+  const payload: GlobalTrafficStatsWireDTO = asPlainObject(input) ?? {};
   return {
     totalPackets: Number(payload.total_packets ?? 0),
     protocolKinds: Number(payload.protocol_kinds ?? 0),

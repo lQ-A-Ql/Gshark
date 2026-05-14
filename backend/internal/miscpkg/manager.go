@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,14 @@ var (
 )
 
 const pythonHostBridgeModuleName = "gshark_misc_host"
+
+const (
+	maxModuleZipFiles      = 128
+	maxModuleZipFileBytes  = 8 << 20
+	maxModuleZipTotalBytes = 32 << 20
+)
+
+var miscModuleExecutionTimeout = 10 * time.Second
 
 const pythonHostBridgeSource = `import json
 import os
@@ -82,10 +91,11 @@ def run(handler):
 `
 
 type InvokeContext struct {
-	CapturePath string
-	PythonPath  string
-	TSharkPath  string
-	ScanFields  func(filePath string, fields []string, displayFilter string) ([]map[string]string, error)
+	CapturePath           string
+	PythonPath            string
+	TSharkPath            string
+	ScanFields            func(filePath string, fields []string, displayFilter string) ([]map[string]string, error)
+	ScanFieldsWithContext func(ctx context.Context, filePath string, fields []string, displayFilter string) ([]map[string]string, error)
 }
 
 type loadedModule struct {
@@ -266,7 +276,7 @@ func (m *Manager) Invoke(ctx context.Context, id string, req model.MiscModuleRun
 	var err error
 	switch strings.ToLower(filepath.Ext(module.backendPath)) {
 	case ".js", ".mjs", ".cjs":
-		result, err = invokeJavaScript(module.backendPath, input, runtime)
+		result, err = invokeJavaScript(ctx, module.backendPath, input, runtime)
 	case ".py":
 		if module.api.HostBridge {
 			result, err = invokePythonWithHostBridge(ctx, module.backendPath, input, runtime)
@@ -409,6 +419,8 @@ func readPackageManifest(reader *zip.Reader) (model.MiscModulePackageManifest, e
 
 func extractZipToDir(reader *zip.Reader, dir string) error {
 	root := detectZipRoot(reader)
+	fileCount := 0
+	var totalBytes uint64
 	for _, file := range reader.File {
 		relative := stripZipRoot(file.Name, root)
 		if relative == "" {
@@ -424,6 +436,13 @@ func extractZipToDir(reader *zip.Reader, dir string) error {
 			}
 			continue
 		}
+		fileCount++
+		if fileCount > maxModuleZipFiles {
+			return fmt.Errorf("misc module zip contains too many files: limit %d", maxModuleZipFiles)
+		}
+		if file.UncompressedSize64 > maxModuleZipFileBytes {
+			return fmt.Errorf("misc module zip file %q exceeds size limit %d bytes", relative, maxModuleZipFileBytes)
+		}
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return fmt.Errorf("create module file dir: %w", err)
 		}
@@ -431,10 +450,17 @@ func extractZipToDir(reader *zip.Reader, dir string) error {
 		if err != nil {
 			return fmt.Errorf("open zipped file: %w", err)
 		}
-		content, readErr := io.ReadAll(rc)
+		content, readErr := io.ReadAll(io.LimitReader(rc, int64(maxModuleZipFileBytes)+1))
 		_ = rc.Close()
 		if readErr != nil {
 			return fmt.Errorf("read zipped file: %w", readErr)
+		}
+		if len(content) > maxModuleZipFileBytes {
+			return fmt.Errorf("misc module zip file %q exceeds size limit %d bytes", relative, maxModuleZipFileBytes)
+		}
+		totalBytes += uint64(len(content))
+		if totalBytes > maxModuleZipTotalBytes {
+			return fmt.Errorf("misc module zip exceeds total uncompressed size limit %d bytes", maxModuleZipTotalBytes)
 		}
 		if err := os.WriteFile(targetPath, content, 0o644); err != nil {
 			return fmt.Errorf("write extracted file: %w", err)
@@ -443,15 +469,28 @@ func extractZipToDir(reader *zip.Reader, dir string) error {
 	return nil
 }
 
-func invokeJavaScript(path string, input map[string]any, runtime InvokeContext) (any, error) {
+func invokeJavaScript(ctx context.Context, path string, input map[string]any, runtime InvokeContext) (any, error) {
 	source, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+	execCtx, cancel := context.WithTimeout(ctx, miscModuleExecutionTimeout)
+	defer cancel()
+
 	vm := goja.New()
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-execCtx.Done():
+			vm.Interrupt(execCtx.Err())
+		case <-done:
+		}
+	}()
+
 	cleaned := moduleExportStripRE.ReplaceAllString(string(source), "")
 	if _, err := vm.RunString(cleaned); err != nil {
-		return nil, err
+		return nil, javascriptExecutionError(err)
 	}
 	value := vm.Get("onRequest")
 	callable, ok := goja.AssertFunction(value)
@@ -481,11 +520,7 @@ func invokeJavaScript(path string, input map[string]any, runtime InvokeContext) 
 		if err != nil {
 			panic(vm.NewGoError(err))
 		}
-		scanFn := runtime.ScanFields
-		if scanFn == nil {
-			scanFn = defaultScanFields
-		}
-		rows, err := scanFn(runtime.CapturePath, fields, displayFilter)
+		rows, err := runScanFields(execCtx, runtime, fields, displayFilter)
 		if err != nil {
 			panic(vm.NewGoError(err))
 		}
@@ -497,9 +532,35 @@ func invokeJavaScript(path string, input map[string]any, runtime InvokeContext) 
 	})
 	result, err := callable(goja.Undefined(), vm.ToValue(input), ctxObj)
 	if err != nil {
-		return nil, err
+		return nil, javascriptExecutionError(err)
 	}
 	return result.Export(), nil
+}
+
+func runScanFields(ctx context.Context, runtime InvokeContext, fields []string, displayFilter string) ([]map[string]string, error) {
+	if runtime.ScanFieldsWithContext != nil {
+		return runtime.ScanFieldsWithContext(ctx, runtime.CapturePath, fields, displayFilter)
+	}
+	if runtime.ScanFields != nil {
+		return runtime.ScanFields(runtime.CapturePath, fields, displayFilter)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return defaultScanFields(runtime.CapturePath, fields, displayFilter)
+}
+
+func javascriptExecutionError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("misc module javascript execution timed out")
+	}
+	if errors.Is(err, context.Canceled) {
+		return fmt.Errorf("misc module javascript execution canceled")
+	}
+	return err
 }
 
 func invokePython(ctx context.Context, path string, input map[string]any, pythonPath string) (any, error) {
@@ -616,7 +677,7 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 		}
 		switch strings.TrimSpace(asString(message["type"])) {
 		case "host_call":
-			response := handlePythonHostCall(message, runtime)
+			response := handlePythonHostCall(execCtx, message, runtime)
 			if _, err := io.WriteString(stdin, response+"\n"); err != nil {
 				return nil, err
 			}
@@ -740,7 +801,7 @@ func defaultScanFields(filePath string, fields []string, displayFilter string) (
 	return rows, nil
 }
 
-func handlePythonHostCall(message map[string]any, runtime InvokeContext) string {
+func handlePythonHostCall(ctx context.Context, message map[string]any, runtime InvokeContext) string {
 	id := strings.TrimSpace(asString(message["id"]))
 	method := strings.TrimSpace(asString(message["method"]))
 	params, _ := message["params"].(map[string]any)
@@ -768,11 +829,7 @@ func handlePythonHostCall(message map[string]any, runtime InvokeContext) string 
 			response["error"] = "scan_fields requires non-empty fields"
 			break
 		}
-		scanFn := runtime.ScanFields
-		if scanFn == nil {
-			scanFn = defaultScanFields
-		}
-		rows, err := scanFn(runtime.CapturePath, fields, displayFilter)
+		rows, err := runScanFields(ctx, runtime, fields, displayFilter)
 		if err != nil {
 			response["error"] = err.Error()
 			break

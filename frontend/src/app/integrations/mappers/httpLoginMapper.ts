@@ -1,10 +1,11 @@
 import type { HTTPLoginAnalysis } from "../../core/types";
+import type { HTTPLoginAnalysisWireDTO } from "../wire/protocolToolWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asHTTPLoginAttempt, asHTTPLoginEndpoint } from "./httpLoginRecordMapper";
 import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
 
 export function asHTTPLoginAnalysis(input: unknown): HTTPLoginAnalysis {
-  const payload = asPlainObject(input) ?? {};
+  const payload: HTTPLoginAnalysisWireDTO = asPlainObject(input) ?? {};
   return {
     totalAttempts: Number(payload.total_attempts ?? 0),
     candidateEndpoints: Number(payload.candidate_endpoints ?? 0),

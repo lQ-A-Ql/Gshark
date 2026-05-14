@@ -1,9 +1,11 @@
 import type { ShiroRememberMeAnalysis } from "../../core/types";
+import type { ShiroRememberMeAnalysisWireDTO } from "../wire/protocolToolWireDtos";
+import type { ShiroKeyResultWireDTO, ShiroRememberMeCandidateWireDTO } from "../wire/shiroWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asPlainObject, asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
 
 export function asShiroRememberMeAnalysis(input: unknown): ShiroRememberMeAnalysis {
-  const payload = asPlainObject(input) ?? {};
+  const payload: ShiroRememberMeAnalysisWireDTO = asPlainObject(input) ?? {};
   return {
     candidateCount: Number(payload.candidate_count ?? 0),
     hitCount: Number(payload.hit_count ?? 0),
@@ -14,7 +16,7 @@ export function asShiroRememberMeAnalysis(input: unknown): ShiroRememberMeAnalys
 }
 
 function asShiroRememberMeCandidate(input: unknown) {
-  const item = asPlainObject(input) ?? {};
+  const item: ShiroRememberMeCandidateWireDTO = asPlainObject(input) ?? {};
   return {
     packetId: Number(item.packet_id ?? 0),
     streamId: optionalNumber(item.stream_id),
@@ -39,7 +41,7 @@ function asShiroRememberMeCandidate(input: unknown) {
 }
 
 function asShiroKeyResult(input: unknown) {
-  const row = asPlainObject(input) ?? {};
+  const row: ShiroKeyResultWireDTO = asPlainObject(input) ?? {};
   return {
     label: String(row.label ?? ""),
     base64: optionalString(row.base64),

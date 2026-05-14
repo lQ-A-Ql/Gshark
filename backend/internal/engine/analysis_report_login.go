@@ -22,32 +22,32 @@ func buildHTTPLoginInvestigationReport(analysis model.HTTPLoginAnalysis) model.I
 		packetID := firstInt64(endpoint.SamplePacketIDs)
 		switch {
 		case endpoint.PossibleBruteforce:
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 疑似爆破", renderHTTPLoginEndpointReportTitle(endpoint)),
 				fmt.Sprintf("尝试 %d / 成功 %d / 失败 %d / 用户名变体 %d", endpoint.AttemptCount, endpoint.SuccessCount, endpoint.FailureCount, endpoint.UsernameVariants),
 				"high",
 				packetID,
 				0,
 				"login", "bruteforce",
-			))
+			), "http.login.bruteforce", 75))
 		case endpoint.UncertainCount > 0 && endpoint.SuccessCount == 0:
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 存在未决认证结果", renderHTTPLoginEndpointReportTitle(endpoint)),
 				fmt.Sprintf("失败 %d / 待确认 %d / 响应信号 %s", endpoint.FailureCount, endpoint.UncertainCount, joinOrFallback(endpoint.ResponseIndicators, "无")),
 				"medium",
 				packetID,
 				0,
 				"login", "uncertain",
-			))
+			), "http.login.uncertain", 50))
 		case endpoint.FailureCount > 0 && endpoint.SuccessCount == 0:
-			report.Evidence = append(report.Evidence, reportItem(
+			report.Evidence = append(report.Evidence, withReportRuleID(reportItem(
 				fmt.Sprintf("%s 连续失败", renderHTTPLoginEndpointReportTitle(endpoint)),
 				fmt.Sprintf("失败 %d 次 / 请求键 %s", endpoint.FailureCount, joinOrFallback(endpoint.RequestKeys, "无")),
 				"low",
 				packetID,
 				0,
 				"login", "failure",
-			))
+			), "http.login.failure", 42))
 		}
 	}
 

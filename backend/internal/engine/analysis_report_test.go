@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	reportrules "github.com/gshark/sentinel/backend/internal/report"
 )
 
 func TestBuildHTTPLoginAnalysisFromPacketsAddsStructuredReport(t *testing.T) {
@@ -65,6 +66,7 @@ func TestBuildHTTPLoginAnalysisFromPacketsAddsStructuredReport(t *testing.T) {
 	if analysis.Report.Evidence[0].PacketID == 0 || analysis.Report.Evidence[0].Severity == "" {
 		t.Fatalf("expected actionable HTTP evidence item, got %+v", analysis.Report.Evidence[0])
 	}
+	assertReportEvidenceHasRuleMetadata(t, analysis.Report.Evidence[0], "http.login.failure")
 }
 
 func TestBuildShiroRememberMeAnalysisAddsStructuredReport(t *testing.T) {
@@ -91,9 +93,63 @@ func TestBuildShiroRememberMeAnalysisAddsStructuredReport(t *testing.T) {
 	if len(analysis.Report.Evidence) == 0 || analysis.Report.Evidence[0].Severity != "high" {
 		t.Fatalf("expected high-severity Shiro report evidence, got %+v", analysis.Report)
 	}
+	assertReportEvidenceHasRuleMetadata(t, analysis.Report.Evidence[0], "shiro.rememberme.key_hit")
 	if len(analysis.Report.Recommendations) == 0 {
 		t.Fatalf("expected structured Shiro recommendations, got %+v", analysis.Report)
 	}
+}
+
+func TestBuildProtocolToolInvestigationReportsCaptureRuleMetadata(t *testing.T) {
+	smtpReport := buildSMTPInvestigationReport(model.SMTPAnalysis{
+		Sessions: []model.SMTPSession{{
+			StreamID:          10,
+			AuthMechanisms:    []string{"PLAIN"},
+			AuthUsername:      "alice",
+			AuthPasswordSeen:  true,
+			PossibleCleartext: true,
+			AttachmentHints:   1,
+			RcptTo:            []string{"bob@example.test"},
+			Commands:          []model.SMTPCommandRecord{{PacketID: 101}},
+		}},
+	})
+	if len(smtpReport.Evidence) < 2 {
+		t.Fatalf("expected SMTP auth and attachment evidence, got %+v", smtpReport)
+	}
+	assertReportEvidenceHasRuleMetadata(t, smtpReport.Evidence[0], "smtp.auth.cleartext")
+	assertReportEvidenceHasRuleMetadata(t, smtpReport.Evidence[1], "smtp.attachment.hint")
+
+	mysqlReport := buildMySQLInvestigationReport(model.MySQLAnalysis{
+		Sessions: []model.MySQLSession{{
+			StreamID:     20,
+			Username:     "root",
+			Database:     "app",
+			ErrCount:     1,
+			CommandTypes: []string{"QUERY"},
+			Queries: []model.MySQLQueryRecord{{
+				PacketID: 201,
+				SQL:      "select load_file('/etc/passwd')",
+			}},
+		}},
+	})
+	if len(mysqlReport.Evidence) < 2 {
+		t.Fatalf("expected MySQL query and error evidence, got %+v", mysqlReport)
+	}
+	assertReportEvidenceHasRuleMetadata(t, mysqlReport.Evidence[0], "mysql.query.risky")
+	assertReportEvidenceHasRuleMetadata(t, mysqlReport.Evidence[1], "mysql.error.response")
+
+	shiroReport := buildShiroInvestigationReport(model.ShiroRememberMeAnalysis{
+		Candidates: []model.ShiroRememberMeCandidate{
+			{PacketID: 301, StreamID: 30, CookieName: "rememberMe", Host: "app", HitCount: 1},
+			{PacketID: 302, StreamID: 31, CookieName: "rememberMe", Host: "app", CookieValue: "deleteMe"},
+			{PacketID: 303, StreamID: 32, CookieName: "rememberMe", Host: "app", DecodeOK: true, EncryptedLength: 64, PossibleCBC: true},
+		},
+	})
+	if len(shiroReport.Evidence) < 3 {
+		t.Fatalf("expected Shiro key hit, deleteMe, and decoded evidence, got %+v", shiroReport)
+	}
+	assertReportEvidenceHasRuleMetadata(t, shiroReport.Evidence[0], "shiro.rememberme.key_hit")
+	assertReportEvidenceHasRuleMetadata(t, shiroReport.Evidence[1], "shiro.rememberme.deleteme")
+	assertReportEvidenceHasRuleMetadata(t, shiroReport.Evidence[2], "shiro.rememberme.decoded")
 }
 
 func TestBuildUSBInvestigationReportCapturesWriteEvidence(t *testing.T) {
@@ -225,8 +281,18 @@ func TestReportRuleRegistryCoversMainlineEvidenceRules(t *testing.T) {
 		"industrial.rule.hit",
 		"industrial.modbus.write",
 		"vehicle.uds.security_access",
+		"http.login.bruteforce",
+		"http.login.uncertain",
+		"http.login.failure",
+		"smtp.auth.cleartext",
+		"smtp.attachment.hint",
+		"mysql.query.risky",
+		"mysql.error.response",
+		"shiro.rememberme.key_hit",
+		"shiro.rememberme.deleteme",
+		"shiro.rememberme.decoded",
 	} {
-		meta, ok := reportRuleRegistry[ruleID]
+		meta, ok := reportrules.RuleRegistry[ruleID]
 		if !ok {
 			t.Fatalf("expected report rule metadata for %q", ruleID)
 		}
@@ -237,6 +303,16 @@ func TestReportRuleRegistryCoversMainlineEvidenceRules(t *testing.T) {
 		if item.RuleID != ruleID || item.Reason == "" || item.Confidence != meta.DefaultConfidence || len(item.Caveats) == 0 {
 			t.Fatalf("expected rule metadata to populate report item for %q, got %+v", ruleID, item)
 		}
+	}
+}
+
+func TestUnknownReportRuleFallbackIsExplicitLowConfidence(t *testing.T) {
+	item := withReportRuleID(reportItem("title", "summary", "low", 1, 0), "unknown.rule", 0)
+	if item.RuleID != "unknown.rule" {
+		t.Fatalf("expected unknown rule id to be preserved, got %+v", item)
+	}
+	if item.Reason == "" || item.Confidence <= 0 || len(item.Caveats) == 0 {
+		t.Fatalf("expected explicit unknown-rule fallback metadata, got %+v", item)
 	}
 }
 

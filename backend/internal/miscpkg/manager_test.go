@@ -5,10 +5,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -133,6 +136,114 @@ func TestInvokeJavaScriptModuleCanUseScanFieldsHostAPI(t *testing.T) {
 	}
 }
 
+func TestInvokeJavaScriptModuleCancelsContextAwareScanFields(t *testing.T) {
+	oldTimeout := miscModuleExecutionTimeout
+	miscModuleExecutionTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { miscModuleExecutionTimeout = oldTimeout })
+
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	payload := createModuleZip(t, map[string]string{
+		"scan-timeout/manifest.json": `{"id":"scan-timeout","title":"Scan Timeout","summary":"scan timeout","backend":"backend.js"}`,
+		"scan-timeout/api.json":      `{"method":"POST","entry":"backend.js"}`,
+		"scan-timeout/form.json":     `{"fields":[{"name":"keyword","label":"Keyword","type":"text"}]}`,
+		"scan-timeout/backend.js": `export function onRequest(input, ctx) {
+  ctx.scanFields(["frame.number"], "tcp");
+  return { text: "unexpected" };
+}`,
+	})
+	if _, err := manager.ImportZipBytes(payload); err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+
+	_, err := manager.Invoke(context.Background(), "scan-timeout", model.MiscModuleRunRequest{}, InvokeContext{
+		CapturePath: "demo.pcapng",
+		ScanFieldsWithContext: func(ctx context.Context, filePath string, fields []string, displayFilter string) ([]map[string]string, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "javascript execution timed out") {
+		t.Fatalf("expected context-aware scan timeout error, got %v", err)
+	}
+}
+
+func TestInvokeJavaScriptModuleTimesOut(t *testing.T) {
+	oldTimeout := miscModuleExecutionTimeout
+	miscModuleExecutionTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { miscModuleExecutionTimeout = oldTimeout })
+
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	payload := createModuleZip(t, map[string]string{
+		"loop-demo/manifest.json": `{"id":"loop-demo","title":"Loop Demo","summary":"loop","backend":"backend.js"}`,
+		"loop-demo/api.json":      `{"method":"POST","entry":"backend.js"}`,
+		"loop-demo/form.json":     `{"fields":[{"name":"value","label":"Value","type":"text"}]}`,
+		"loop-demo/backend.js":    `export function onRequest(){ while (true) {} }`,
+	})
+	if _, err := manager.ImportZipBytes(payload); err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+
+	_, err := manager.Invoke(context.Background(), "loop-demo", model.MiscModuleRunRequest{}, InvokeContext{})
+	if err == nil || !strings.Contains(err.Error(), "javascript execution timed out") {
+		t.Fatalf("expected javascript timeout error, got %v", err)
+	}
+}
+
+func TestImportZipBytesRejectsTooManyFiles(t *testing.T) {
+	manager := NewManager()
+	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("many-files")
+	for i := 0; i < maxModuleZipFiles; i++ {
+		files[fmt.Sprintf("many-files/extra-%03d.txt", i)] = "x"
+	}
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "too many files") {
+		t.Fatalf("expected too many files error, got %v", err)
+	}
+}
+
+func TestImportZipBytesRejectsOversizedFile(t *testing.T) {
+	manager := NewManager()
+	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("large-file")
+	files["large-file/large.bin"] = strings.Repeat("x", maxModuleZipFileBytes+1)
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "exceeds size limit") {
+		t.Fatalf("expected oversized file error, got %v", err)
+	}
+}
+
+func TestImportZipBytesRejectsOversizedTotalUncompressedSize(t *testing.T) {
+	manager := NewManager()
+	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("large-total")
+	chunk := strings.Repeat("x", maxModuleZipFileBytes)
+	for i := 0; i < maxModuleZipTotalBytes/maxModuleZipFileBytes+1; i++ {
+		files[fmt.Sprintf("large-total/chunk-%02d.bin", i)] = chunk
+	}
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "total uncompressed size limit") {
+		t.Fatalf("expected total size error, got %v", err)
+	}
+}
+
 func TestInvokePythonModuleCanUseHostBridge(t *testing.T) {
 	pythonBin, err := exec.LookPath("python")
 	if err != nil {
@@ -197,6 +308,71 @@ if __name__ == "__main__":
 	}
 	if result.Table == nil || len(result.Table.Rows) != 1 || result.Table.Rows[0]["src"] != "192.168.1.9" {
 		t.Fatalf("unexpected table result: %+v", result.Table)
+	}
+}
+
+func TestInvokePythonHostBridgeUsesContextAwareScanFields(t *testing.T) {
+	pythonBin, err := exec.LookPath("python")
+	if err != nil {
+		t.Skip("python not available in PATH")
+	}
+
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	payload := createModuleZip(t, map[string]string{
+		"py-context-scan/manifest.json": `{"id":"py-context-scan","title":"Python Context Scan","summary":"python context scan","backend":"backend.py"}`,
+		"py-context-scan/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true}`,
+		"py-context-scan/form.json":     `{"fields":[{"name":"message","label":"Message","type":"text"}]}`,
+		"py-context-scan/backend.py": `from gshark_misc_host import run, scan_fields
+
+def on_request(payload):
+    rows = scan_fields(["frame.number", "dns.qry.name"], "dns").get("rows", [])
+    first = rows[0] if rows else {}
+    return {
+        "message": "ok",
+        "text": str(first.get("frame.number", "")) + "|" + str(first.get("dns.qry.name", ""))
+    }
+
+if __name__ == "__main__":
+    run(on_request)
+`,
+	})
+	if _, err := manager.ImportZipBytes(payload); err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+
+	called := false
+	result, err := manager.Invoke(context.Background(), "py-context-scan", model.MiscModuleRunRequest{}, InvokeContext{
+		CapturePath: "context-demo.pcapng",
+		PythonPath:  pythonBin,
+		ScanFieldsWithContext: func(ctx context.Context, filePath string, fields []string, displayFilter string) ([]map[string]string, error) {
+			called = true
+			if ctx == nil {
+				t.Fatalf("expected non-nil context")
+			}
+			if filePath != "context-demo.pcapng" {
+				t.Fatalf("unexpected capture path %q", filePath)
+			}
+			if strings.Join(fields, ",") != "frame.number,dns.qry.name" {
+				t.Fatalf("unexpected fields %+v", fields)
+			}
+			if displayFilter != "dns" {
+				t.Fatalf("unexpected display filter %q", displayFilter)
+			}
+			return []map[string]string{{"frame.number": "12", "dns.qry.name": "example.test"}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Invoke() error = %v", err)
+	}
+	if !called {
+		t.Fatalf("expected ScanFieldsWithContext to be called")
+	}
+	if result.Text != "12|example.test" {
+		t.Fatalf("unexpected text result: %+v", result)
 	}
 }
 
@@ -285,6 +461,15 @@ func createModuleZip(t *testing.T, files map[string]string) []byte {
 		t.Fatalf("zip Close() error = %v", err)
 	}
 	return buffer.Bytes()
+}
+
+func minimalModuleFiles(id string) map[string]string {
+	return map[string]string{
+		fmt.Sprintf("%s/manifest.json", id): fmt.Sprintf(`{"id":%q,"title":"Demo","summary":"demo","backend":"backend.js"}`, id),
+		fmt.Sprintf("%s/api.json", id):      `{"method":"POST","entry":"backend.js"}`,
+		fmt.Sprintf("%s/form.json", id):     `{"fields":[{"name":"value","label":"Value","type":"text"}]}`,
+		fmt.Sprintf("%s/backend.js", id):    `export function onRequest(){ return "ok"; }`,
+	}
 }
 
 func writeFile(t *testing.T, path string, payload any) {

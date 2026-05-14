@@ -1,14 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useRef,
-  type Dispatch,
-  type PropsWithChildren,
-  type SetStateAction,
-} from "react";
+import { createContext, useContext, useMemo, type PropsWithChildren } from "react";
 import { backendClients } from "../integrations/backendClients";
-import { createCaptureTaskScope } from "../utils/captureTaskScope";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
 import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
@@ -28,9 +19,9 @@ import { useCaptureReplacementPrepare } from "./hooks/useCaptureReplacementPrepa
 import { useCaptureStopWorkflow } from "./hooks/useCaptureStopWorkflow";
 import { useCaptureTaskScopeCleanup } from "./hooks/useCaptureTaskScopeCleanup";
 import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
-import { useStreamState } from "./hooks/useStreamState";
 import { useCaptureStartWorkflow } from "./hooks/useCaptureStartWorkflow";
-import { usePacketPageState } from "./hooks/usePacketPageState";
+import { useSentinelPacketStreamBundle } from "./hooks/useSentinelPacketStreamBundle";
+import { useSentinelRuntimeRefs } from "./hooks/useSentinelRuntimeRefs";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -48,7 +39,20 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const { captureTransaction, setCaptureTransaction, fileMeta, setFileMeta, captureRevision, setCaptureRevision } =
     useCaptureSessionState();
   const { displayFilter, setDisplayFilter } = useDisplayFilterState();
-  const threatAnalysisSeqRef = useRef(0);
+  const {
+    activeCapturePathRef,
+    captureSeqRef,
+    captureTaskScopeRef,
+    filterSeqRef,
+    parseErrorRef,
+    parseFinishedRef,
+    preloadingRef,
+    refreshAnalysisResultRef,
+    scheduleLoadMoreRef,
+    setSelectedPacketIdRef,
+    threatAnalysisSeqRef,
+    updateProgressFromStatusRef,
+  } = useSentinelRuntimeRefs();
   const {
     threatHits,
     isThreatAnalysisLoading,
@@ -63,20 +67,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   } = useAnalysisProgress(threatAnalysisSeqRef);
   const { recentCaptures, rememberRecentCapture } = useRecentCapturesState();
 
-  const captureTaskScopeRef = useRef(createCaptureTaskScope());
-  const parseFinishedRef = useRef(false);
-  const parseErrorRef = useRef("");
-  const preloadingRef = useRef(false);
-  const captureSeqRef = useRef(0);
-  const filterSeqRef = useRef(0);
   const { captureWaitersRef, wakeCaptureWaiters, waitForCaptureSignal } = useCaptureSignalWaiters();
-  const activeCapturePathRef = useRef("");
-  const scheduleLoadMoreRef = useRef<() => void>(() => undefined);
-  const setSelectedPacketIdRef = useRef<Dispatch<SetStateAction<number | null>>>(() => undefined);
-  const refreshAnalysisResultRef = useRef<
-    (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>
-  >(async () => {});
-  const updateProgressFromStatusRef = useRef<(message: string) => boolean>(() => false);
   const {
     backendConnected,
     backendStatus,
@@ -106,6 +97,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setIsThreatAnalysisLoading,
   });
 
+  const { packetPageState, streamState } = useSentinelPacketStreamBundle({
+    activeCapturePathRef,
+    backendConnected,
+    captureTaskScopeRef,
+    displayFilter,
+    setBackendStatus,
+    setDisplayFilter,
+  });
   const {
     httpStream,
     setHttpStream,
@@ -129,16 +128,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     refreshStreamIndex,
     setActiveStream,
     persistStreamPayloads,
-  } = useStreamState({
-    activeCapturePathRef,
-    backendConnected,
-    captureTaskScopeRef,
-    fetchHttpStream: backendClients.stream.getHttpStream,
-    fetchRawStreamPage: backendClients.stream.getRawStreamPage,
-    listStreamIds: backendClients.stream.listStreamIds,
-    setBackendStatus,
-    updateStreamPayloads: backendClients.stream.updateStreamPayloads,
-  });
+  } = streamState;
 
   const {
     packets,
@@ -182,19 +172,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     setSelectedPacketDetail,
     setSelectedPacketRawHex,
     setSelectedPacketLayers,
-  } = usePacketPageState({
-    activeCapturePathRef,
-    backendConnected,
-    captureTaskScopeRef,
-    displayFilter,
-    listPacketsPage: backendClients.packet.listPacketsPage,
-    locatePacketPage: backendClients.packet.locatePacketPage,
-    loadPacket: backendClients.packet.getPacket,
-    loadRawHex: backendClients.packet.getPacketRawHex,
-    loadLayers: backendClients.packet.getPacketLayers,
-    setBackendStatus,
-    setDisplayFilter,
-  });
+  } = packetPageState;
 
   const cancelAllFrontendCaptureTasks = useFrontendCaptureTaskReset({
     captureTaskScopeRef,

@@ -1,9 +1,10 @@
 import type { Packet } from "../../core/types";
+import type { PacketColorFeaturesWireDTO, PacketWireDTO } from "../wire/captureWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
 
 export function asPacket(input: unknown): Packet {
-  const payload = asPlainObject(input) ?? {};
-  const color = asPlainObject(payload.color_features) ?? {};
+  const payload: PacketWireDTO = asPlainObject(input) ?? {};
+  const color: PacketColorFeaturesWireDTO = asPlainObject(payload.color_features) ?? {};
   return {
     id: Number(payload.id ?? 0),
     time: normalizePacketTime(payload.timestamp),

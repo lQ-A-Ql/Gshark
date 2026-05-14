@@ -1,8 +1,14 @@
 import type { BinaryStream, HttpStream } from "../../core/types";
+import type {
+  BinaryStreamWireDTO,
+  HttpStreamWireDTO,
+  StreamChunkWireDTO,
+  StreamLoadMetaWireDTO,
+} from "../wire/streamPayloadWireDtos";
 import { asArray, asPlainObject } from "./mapperPrimitives";
 
 export function asHttpStream(input: unknown): HttpStream {
-  const payload = asPlainObject(input) ?? {};
+  const payload: HttpStreamWireDTO = asPlainObject(input) ?? {};
   const chunks = asStreamChunks(payload.chunks);
   const fallbackChunks = chunks.length
     ? chunks
@@ -27,7 +33,7 @@ export function asHttpStream(input: unknown): HttpStream {
 }
 
 export function asBinaryStream(input: unknown, protocol: "TCP" | "UDP"): BinaryStream {
-  const payload = asPlainObject(input) ?? {};
+  const payload: BinaryStreamWireDTO = asPlainObject(input) ?? {};
   const chunks = asStreamChunks(payload.chunks);
   return {
     id: Number(payload.stream_id ?? 1),
@@ -44,7 +50,7 @@ export function asBinaryStream(input: unknown, protocol: "TCP" | "UDP"): BinaryS
 
 function asStreamChunks(input: unknown): HttpStream["chunks"] {
   return asArray(input).map((value) => {
-    const chunk = asPlainObject(value) ?? {};
+    const chunk: StreamChunkWireDTO = asPlainObject(value) ?? {};
     return {
       packetId: Number(chunk.packet_id ?? 0),
       direction: chunk.direction === "server" ? "server" : "client",
@@ -54,10 +60,8 @@ function asStreamChunks(input: unknown): HttpStream["chunks"] {
 }
 
 function asStreamLoadMeta(input: unknown): HttpStream["loadMeta"] {
-  const payload = asPlainObject(input);
-  if (!payload) {
-    return undefined;
-  }
+  const payload: StreamLoadMetaWireDTO | undefined = asPlainObject(input);
+  if (!payload) return undefined;
   return {
     source: String(payload.source ?? "").trim() || undefined,
     loading: Boolean(payload.loading),
