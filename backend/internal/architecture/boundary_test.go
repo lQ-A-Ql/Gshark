@@ -57,6 +57,29 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 		}
 	})
 
+	t.Run("investigation report rule metadata stays registry owned", func(t *testing.T) {
+		allowed := map[string]struct{}{
+			"analysis_report_rules.go":  {},
+			"analysis_report_shared.go": {},
+		}
+		for _, path := range goFiles(t, filepath.Join(root, "internal", "engine")) {
+			name := filepath.Base(path)
+			if !strings.HasPrefix(name, "analysis_report") {
+				continue
+			}
+			if _, ok := allowed[name]; ok {
+				continue
+			}
+			body := readFile(t, path)
+			if strings.Contains(body, "withReportRule(") {
+				t.Fatalf("%s writes report rule metadata directly; use withReportRuleID and analysis_report_rules.go", rel(root, path))
+			}
+			if containsAny(body, []string{"RuleID:", "Reason:", "Caveats:"}) {
+				t.Fatalf("%s defines report rule metadata outside analysis_report_rules.go", rel(root, path))
+			}
+		}
+	})
+
 	t.Run("evidence files stay transport free", func(t *testing.T) {
 		for _, path := range goFiles(t, filepath.Join(root, "internal", "engine")) {
 			if !strings.HasPrefix(filepath.Base(path), "evidence") {
