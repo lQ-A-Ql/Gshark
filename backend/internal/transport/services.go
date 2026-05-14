@@ -77,8 +77,8 @@ type MediaService interface {
 // ToolRuntimeService groups tool runtime configuration (tshark / ffmpeg / TLS)
 // methods consumed by the transport layer.
 type ToolRuntimeService interface {
-	TSharkStatus() any
-	SetTSharkPath(path string) any
+	TSharkStatus() model.TSharkToolStatus
+	SetTSharkPath(path string) model.TSharkToolStatus
 	TSharkStatusPath() string
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot

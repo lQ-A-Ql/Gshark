@@ -121,10 +121,33 @@ type YaraToolStatus struct {
 
 type ToolRuntimeSnapshot struct {
 	Config ToolRuntimeConfig  `json:"config"`
-	TShark any                `json:"tshark"`
-	FFmpeg any                `json:"ffmpeg"`
+	TShark TSharkToolStatus   `json:"tshark"`
+	FFmpeg FFmpegToolStatus   `json:"ffmpeg"`
 	Speech SpeechToTextStatus `json:"speech"`
 	Yara   YaraToolStatus     `json:"yara"`
+}
+
+type TSharkToolStatus struct {
+	Available               bool     `json:"available"`
+	Path                    string   `json:"path"`
+	Message                 string   `json:"message"`
+	CustomPath              string   `json:"custom_path,omitempty"`
+	UsingCustomPath         bool     `json:"using_custom_path,omitempty"`
+	Version                 string   `json:"version,omitempty"`
+	FieldProfile            string   `json:"field_profile,omitempty"`
+	FieldCount              int      `json:"field_count,omitempty"`
+	MissingRequiredFields   []string `json:"missing_required_fields,omitempty"`
+	MissingOptionalFields   []string `json:"missing_optional_fields,omitempty"`
+	CapabilityMessage       string   `json:"capability_message,omitempty"`
+	CapabilityCheckDegraded bool     `json:"capability_check_degraded,omitempty"`
+}
+
+type FFmpegToolStatus struct {
+	Available       bool   `json:"available"`
+	Path            string `json:"path"`
+	Message         string `json:"message"`
+	CustomPath      string `json:"custom_path,omitempty"`
+	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
 }
 
 type CaptureStatus struct {

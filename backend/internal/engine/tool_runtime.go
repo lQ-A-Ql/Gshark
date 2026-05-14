@@ -89,25 +89,52 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
 	return model.ToolRuntimeSnapshot{
 		Config: s.ToolRuntimeConfig(),
-		TShark: tshark.CurrentStatus(),
-		FFmpeg: s.FFmpegStatus(),
+		TShark: toModelTSharkStatus(tshark.CurrentStatus()),
+		FFmpeg: toModelFFmpegStatus(s.FFmpegStatus()),
 		Speech: s.SpeechToTextStatus(),
 		Yara:   s.YaraStatus(),
 	}
 }
 
-func (s *Service) TSharkStatus() any {
-	return tshark.CurrentStatus()
+func toModelTSharkStatus(status tshark.Status) model.TSharkToolStatus {
+	return model.TSharkToolStatus{
+		Available:               status.Available,
+		Path:                    status.Path,
+		Message:                 status.Message,
+		CustomPath:              status.CustomPath,
+		UsingCustomPath:         status.UsingCustomPath,
+		Version:                 status.Version,
+		FieldProfile:            status.FieldProfile,
+		FieldCount:              status.FieldCount,
+		MissingRequiredFields:   append([]string(nil), status.MissingRequiredFields...),
+		MissingOptionalFields:   append([]string(nil), status.MissingOptionalFields...),
+		CapabilityMessage:       status.CapabilityMessage,
+		CapabilityCheckDegraded: status.CapabilityCheckDegraded,
+	}
+}
+
+func toModelFFmpegStatus(status FFmpegStatus) model.FFmpegToolStatus {
+	return model.FFmpegToolStatus{
+		Available:       status.Available,
+		Path:            status.Path,
+		Message:         status.Message,
+		CustomPath:      status.CustomPath,
+		UsingCustomPath: status.UsingCustomPath,
+	}
+}
+
+func (s *Service) TSharkStatus() model.TSharkToolStatus {
+	return toModelTSharkStatus(tshark.CurrentStatus())
 }
 
 // SetTSharkPath updates the tshark binary path. It takes s.toolRuntimeMu
 // so a concurrent SetToolRuntimeConfig cannot observe or clobber a
 // partially-applied tshark path.
-func (s *Service) SetTSharkPath(path string) any {
+func (s *Service) SetTSharkPath(path string) model.TSharkToolStatus {
 	s.toolRuntimeMu.Lock()
 	defer s.toolRuntimeMu.Unlock()
 	tshark.SetBinaryPath(strings.TrimSpace(path))
-	return tshark.CurrentStatus()
+	return toModelTSharkStatus(tshark.CurrentStatus())
 }
 
 func (s *Service) TSharkStatusPath() string {
