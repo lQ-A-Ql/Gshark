@@ -33,10 +33,12 @@ const (
 )
 
 var (
-	resolveSpeechPythonCommandFn = resolveSpeechPythonCommand
-	speechToTextStatusFn         = resolveSpeechToTextStatus
-	runSpeechToTextFn            = transcribeAudioFileWithPython
-	transcribeAudioArtifactFn    = transcribeAudioArtifact
+	resolveSpeechPythonCommandFn  = resolveSpeechPythonCommand
+	pythonCommandProbeFn          = pythonCommandCanStart
+	checkPythonVoskAvailabilityFn = checkPythonVoskAvailability
+	speechToTextStatusFn          = resolveSpeechToTextStatus
+	runSpeechToTextFn             = transcribeAudioFileWithPython
+	transcribeAudioArtifactFn     = transcribeAudioArtifact
 )
 
 type transcriptionAudioProfile struct {
@@ -434,7 +436,7 @@ func resolveSpeechToTextStatus() model.SpeechToTextStatus {
 	if status.PythonAvailable {
 		checkCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := checkPythonVoskAvailability(checkCtx, pythonCmd); err == nil {
+		if err := checkPythonVoskAvailabilityFn(checkCtx, pythonCmd); err == nil {
 			status.VoskAvailable = true
 		} else if status.Message == "" {
 			status.Message = buildSpeechModuleHint(pythonCmd, err)
@@ -448,37 +450,88 @@ func resolveSpeechToTextStatus() model.SpeechToTextStatus {
 }
 
 func resolveSpeechPythonCommand() ([]string, error) {
-	if raw := strings.TrimSpace(os.Getenv("GSHARK_PYTHON")); raw != "" {
-		if _, err := os.Stat(raw); err == nil {
-			return []string{raw}, nil
-		}
-	}
-
-	candidates := [][]string{
-		{"python3"},
-		{"python"},
-		{"py", "-3"},
-	}
-	if runtime.GOOS == "windows" {
-		candidates = [][]string{
-			{`C:\Users\QAQ\AppData\Local\Programs\Python\Python311\python.exe`},
-			{"py", "-3"},
-			{"python"},
-			{"python3"},
-		}
-	}
-	for _, candidate := range candidates {
-		if filepath.IsAbs(candidate[0]) {
-			if _, err := os.Stat(candidate[0]); err == nil {
-				return candidate, nil
-			}
+	pythonEnvConfigured := strings.TrimSpace(os.Getenv(pythonEnvVar)) != ""
+	var firstRunnable []string
+	for _, candidate := range speechPythonCandidates() {
+		if !pythonCommandExists(candidate) {
 			continue
 		}
-		if _, err := exec.LookPath(candidate[0]); err == nil {
-			return candidate, nil
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := pythonCommandProbeFn(ctx, candidate)
+		cancel()
+		if err == nil {
+			if pythonEnvConfigured {
+				return candidate, nil
+			}
+			if firstRunnable == nil {
+				firstRunnable = append([]string(nil), candidate...)
+			}
+			checkCtx, checkCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			hasVosk := checkPythonVoskAvailabilityFn(checkCtx, candidate) == nil
+			checkCancel()
+			if hasVosk {
+				return candidate, nil
+			}
 		}
 	}
+	if firstRunnable != nil {
+		return firstRunnable, nil
+	}
 	return nil, errors.New("python executable not found")
+}
+
+func speechPythonCandidates() [][]string {
+	var candidates [][]string
+	if raw := strings.TrimSpace(os.Getenv(pythonEnvVar)); raw != "" {
+		candidates = append(candidates, pythonPathCandidates(raw)...)
+	}
+	if runtime.GOOS == "windows" {
+		candidates = append(candidates, []string{"py", "-3"}, []string{"python"}, []string{"python3"})
+		candidates = append(candidates, windowsPythonInstallCandidates()...)
+		return candidates
+	}
+	return append(candidates, []string{"python3"}, []string{"python"})
+}
+
+func pythonPathCandidates(raw string) [][]string {
+	if info, err := os.Stat(raw); err == nil && info.IsDir() {
+		return [][]string{{filepath.Join(raw, "python.exe")}, {filepath.Join(raw, "python")}}
+	}
+	return [][]string{{raw}}
+}
+
+func windowsPythonInstallCandidates() [][]string {
+	var out [][]string
+	if localAppData := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); localAppData != "" {
+		if matches, err := filepath.Glob(filepath.Join(localAppData, "Programs", "Python", "Python3*", "python.exe")); err == nil {
+			for _, match := range matches {
+				out = append(out, []string{match})
+			}
+		}
+	}
+	if matches, err := filepath.Glob(`C:\Python3*\python.exe`); err == nil {
+		for _, match := range matches {
+			out = append(out, []string{match})
+		}
+	}
+	return out
+}
+
+func pythonCommandExists(candidate []string) bool {
+	if len(candidate) == 0 || strings.TrimSpace(candidate[0]) == "" {
+		return false
+	}
+	if filepath.IsAbs(candidate[0]) {
+		info, err := os.Stat(candidate[0])
+		return err == nil && !info.IsDir()
+	}
+	_, err := exec.LookPath(candidate[0])
+	return err == nil
+}
+
+func pythonCommandCanStart(ctx context.Context, pythonCmd []string) error {
+	args := append(append([]string{}, pythonCmd[1:]...), "--version")
+	return exec.CommandContext(ctx, pythonCmd[0], args...).Run()
 }
 
 func defaultSpeechModelPath() string {

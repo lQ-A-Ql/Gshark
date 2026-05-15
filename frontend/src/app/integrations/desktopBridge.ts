@@ -25,15 +25,15 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       }
       return String(await desktopApp.BackendStatus()).trim();
     },
-    async getToolRuntimeSnapshot() {
-      if (!desktopApp.GetToolRuntimeSnapshot) {
-        return await fallbackBridge.getToolRuntimeSnapshot();
+    async getToolRuntimeSnapshot(signal?: AbortSignal) {
+      if (signal || !desktopApp.GetToolRuntimeSnapshot) {
+        return await fallbackBridge.getToolRuntimeSnapshot(signal);
       }
       return asToolRuntimeSnapshot(await desktopApp.GetToolRuntimeSnapshot());
     },
-    async updateToolRuntimeConfig(config: ToolRuntimeConfig) {
-      if (!desktopApp.UpdateToolRuntimeConfig) {
-        return await fallbackBridge.updateToolRuntimeConfig(config);
+    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal) {
+      if (signal || !desktopApp.UpdateToolRuntimeConfig) {
+        return await fallbackBridge.updateToolRuntimeConfig(config, signal);
       }
       return asToolRuntimeSnapshot(await desktopApp.UpdateToolRuntimeConfig(toToolRuntimeRequest(config)));
     },

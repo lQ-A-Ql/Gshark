@@ -238,4 +238,20 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.startStreamingPackets).toHaveBeenCalledWith("C:/cases/no-ipc.pcapng", "");
     expect(fallbackBridge.getCaptureStatus).toHaveBeenCalled();
   });
+
+  it("uses the HTTP fallback for abortable runtime calls", async () => {
+    const controller = new AbortController();
+    const fallbackBridge = createFallbackBridge();
+    const desktopApp: DesktopTransportBinding = {
+      GetToolRuntimeSnapshot: vi.fn(async () => ({
+        config: { tshark_path: "desktop-tshark" },
+      })),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    await bridge.getToolRuntimeSnapshot(controller.signal);
+
+    expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(controller.signal);
+    expect(desktopApp.GetToolRuntimeSnapshot).not.toHaveBeenCalled();
+  });
 });

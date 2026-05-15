@@ -54,7 +54,7 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 		return
 	}
 	if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
-		fmt.Fprintln(os.Stdout, "release smoke check: ok")
+		writeReleaseSmokeResult("release smoke check: ok")
 		a.stopBackend()
 		os.Exit(0)
 	}
@@ -472,6 +472,21 @@ func generateBackendAuthToken() (string, error) {
 		return "", fmt.Errorf("generate backend auth token: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+func writeReleaseSmokeResult(message string) {
+	fmt.Fprintln(os.Stdout, message)
+	resultPath := strings.TrimSpace(os.Getenv("GSHARK_RELEASE_SMOKE_RESULT_PATH"))
+	if resultPath == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(resultPath), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "release smoke check: create result dir failed: %v\n", err)
+		return
+	}
+	if err := os.WriteFile(resultPath, []byte(message+"\n"), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "release smoke check: write result failed: %v\n", err)
+	}
 }
 
 func allowReuseExistingBackend() bool {

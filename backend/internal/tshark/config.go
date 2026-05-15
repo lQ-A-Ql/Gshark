@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -61,6 +62,14 @@ func ResolveBinary() (string, error) {
 }
 
 func CurrentStatus() Status {
+	return CurrentStatusWithContext(context.Background())
+}
+
+func CurrentStatusWithContext(ctx context.Context) Status {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	custom := ConfiguredBinaryPath()
 	if custom != "" {
 		resolved, err := resolveCustomBinary(custom)
@@ -71,7 +80,7 @@ func CurrentStatus() Status {
 				Message:         "ok",
 				CustomPath:      custom,
 				UsingCustomPath: true,
-				Capabilities:    CurrentCapabilities(context.Background(), resolved),
+				Capabilities:    CurrentCapabilities(ctx, resolved),
 			}
 		}
 
@@ -83,7 +92,7 @@ func CurrentStatus() Status {
 				Message:         fmt.Sprintf("custom tshark path is invalid; falling back to PATH (%s)", err),
 				CustomPath:      custom,
 				UsingCustomPath: false,
-				Capabilities:    CurrentCapabilities(context.Background(), fallback),
+				Capabilities:    CurrentCapabilities(ctx, fallback),
 			}
 		}
 
@@ -118,19 +127,38 @@ func CurrentStatus() Status {
 		Available:    true,
 		Path:         resolved,
 		Message:      "ok",
-		Capabilities: CurrentCapabilities(context.Background(), resolved),
+		Capabilities: CurrentCapabilities(ctx, resolved),
 	}
 }
 
 func resolvePathBinary(name string) (string, error) {
 	resolved, err := exec.LookPath(name)
-	if err != nil {
-		return "", fmt.Errorf("tshark was not found in PATH")
+	if err == nil {
+		if !isTSharkBinary(resolved) {
+			return "", fmt.Errorf("resolved binary is not tshark: %s", resolved)
+		}
+		return resolved, nil
 	}
-	if !isTSharkBinary(resolved) {
-		return "", fmt.Errorf("resolved binary is not tshark: %s", resolved)
+
+	for _, candidate := range defaultTSharkCandidates() {
+		resolved, candidateErr := resolveCandidate(candidate)
+		if candidateErr == nil {
+			return resolved, nil
+		}
 	}
-	return resolved, nil
+	return "", fmt.Errorf("tshark was not found in PATH")
+}
+
+var defaultWindowsTSharkCandidates = []string{
+	`C:\Program Files\Wireshark\tshark.exe`,
+	`C:\Program Files (x86)\Wireshark\tshark.exe`,
+}
+
+func defaultTSharkCandidates() []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	return append([]string(nil), defaultWindowsTSharkCandidates...)
 }
 
 func resolveCustomBinary(raw string) (string, error) {

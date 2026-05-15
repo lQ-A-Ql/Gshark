@@ -1,10 +1,16 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { DecryptionConfig, ToolRuntimeSnapshot } from "../../core/types";
+import type { ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
-import { isOperationTimeoutError, withTimeout } from "../../utils/asyncControl";
-import { STARTUP_TLS_CONFIG_TIMEOUT_MS, STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
-import { readToolRuntimeConfig, writeToolRuntimeConfig } from "../toolRuntimeStorage";
+import { isOperationTimeoutError, withAbortableTimeout } from "../../utils/asyncControl";
+import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
+import { readToolRuntimeConfigState, writeObservedToolRuntimeSnapshotConfig } from "../toolRuntimeStorage";
+import {
+  applyStartupRuntimeSnapshot,
+  startupToolRuntimeConfigForSync,
+  syncSavedToolRuntimeConfig,
+  toolRuntimeConfigsEqual,
+} from "./backendLifecycleToolRuntimeStartup";
 
 export async function getBackendUnavailableStatus() {
   const desktopStatus = await backendClients.runtime.getDesktopBackendStatus().catch(() => "");
@@ -35,27 +41,37 @@ export async function loadStartupToolRuntime({
   setIsToolRuntimeLoading(true);
   setToolRuntimeCheckDegraded(false);
 
+  let isSyncingSavedConfig = false;
   try {
-    const savedConfig = readToolRuntimeConfig();
-    const snapshot = await withTimeout(
-      backendClients.runtime.updateToolRuntimeConfig(savedConfig),
+    const savedState = readToolRuntimeConfigState();
+    const snapshot = await withAbortableTimeout(
+      (signal) => backendClients.runtime.getToolRuntimeSnapshot(signal),
       STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
       "startup tool runtime check timed out",
     );
-    setToolRuntimeSnapshot(snapshot);
-    setTsharkStatus({
-      available: snapshot.tshark.available,
-      path: snapshot.tshark.path,
-      message: snapshot.tshark.message,
-      customPath: snapshot.tshark.customPath ?? "",
-      usingCustomPath: snapshot.tshark.usingCustomPath,
+    const syncConfig = startupToolRuntimeConfigForSync(savedState, snapshot.config);
+    const shouldSyncSavedConfig = syncConfig !== null && !toolRuntimeConfigsEqual(syncConfig, snapshot.config);
+    applyStartupRuntimeSnapshot({
+      isCancelled,
+      setBackendStatus,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+      snapshot,
     });
-    if (!isCancelled()) writeToolRuntimeConfig(snapshot.config);
-    if (!isCancelled() && snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
-      setBackendStatus(snapshot.tshark.message);
-    }
-    if (!isCancelled() && !snapshot.tshark.available) {
-      setBackendStatus(snapshot.tshark.message || "未检测到 tshark，请先配置路径");
+    if (!isCancelled() && !shouldSyncSavedConfig) writeObservedToolRuntimeSnapshotConfig(snapshot.config);
+
+    if (!isCancelled() && shouldSyncSavedConfig) {
+      isSyncingSavedConfig = true;
+      void syncSavedToolRuntimeConfig({
+        explicitFields: savedState.explicitFields,
+        isCancelled,
+        savedConfig: syncConfig,
+        setBackendStatus,
+        setIsToolRuntimeLoading,
+        setToolRuntimeCheckDegraded,
+        setToolRuntimeSnapshot,
+        setTsharkStatus,
+      });
     }
   } catch (error) {
     if (!isCancelled()) {
@@ -70,25 +86,9 @@ export async function loadStartupToolRuntime({
   } finally {
     if (!isCancelled()) {
       setIsTSharkChecking(false);
-      setIsToolRuntimeLoading(false);
-    }
-  }
-}
-
-export async function loadStartupTLSConfig(
-  setDecryptionConfig: Dispatch<SetStateAction<DecryptionConfig>>,
-  setBackendStatus: Dispatch<SetStateAction<string>>,
-) {
-  try {
-    const tls = await withTimeout(
-      backendClients.securityMaterial.getTLSConfig(),
-      STARTUP_TLS_CONFIG_TIMEOUT_MS,
-      "startup TLS config check timed out",
-    );
-    if (tls) setDecryptionConfig(tls);
-  } catch (error) {
-    if (!isOperationTimeoutError(error)) {
-      setBackendStatus("后端初始化失败");
+      if (!isSyncingSavedConfig) {
+        setIsToolRuntimeLoading(false);
+      }
     }
   }
 }

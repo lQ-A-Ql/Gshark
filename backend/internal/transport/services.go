@@ -82,10 +82,13 @@ type MediaService interface {
 // methods consumed by the transport layer.
 type ToolRuntimeService interface {
 	TSharkStatus() model.TSharkToolStatus
+	TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus
 	SetTSharkPath(path string) model.TSharkToolStatus
+	SetTSharkPathWithContext(ctx context.Context, path string) model.TSharkToolStatus
 	TSharkStatusPath() string
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot
+	ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot
 	SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig
 	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig

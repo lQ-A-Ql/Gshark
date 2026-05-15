@@ -1,7 +1,6 @@
 import { type ReactNode } from "react";
 import { Cog, LoaderCircle, type LucideIcon } from "lucide-react";
-import { EMPTY_SELECT_VALUE } from "./StreamDecoderWorkbenchUtils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { SelectField, type SelectOption } from "./ui/select";
 
 export function DecoderButton({
   icon: Icon,
@@ -116,23 +115,21 @@ export function LabeledSelect({
   options: Array<[string, string]>;
   onChange: (value: string) => void;
 }) {
-  const selectedValue = value === "" ? EMPTY_SELECT_VALUE : value;
+  const selectOptions: SelectOption[] = options.map(([optionValue, optionLabel]) => ({
+    value: optionValue,
+    label: optionLabel,
+  }));
+
   return (
-    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <Select value={selectedValue} onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}>
-        <SelectTrigger className="h-9 rounded-md border-border bg-background text-xs text-foreground focus:border-blue-500 focus:ring-blue-100">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map(([optionValue, optionLabel]) => (
-            <SelectItem key={optionValue || EMPTY_SELECT_VALUE} value={optionValue || EMPTY_SELECT_VALUE}>
-              {optionLabel}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <SelectField
+      label={label}
+      value={value}
+      onValueChange={onChange}
+      options={selectOptions}
+      tone="blue"
+      labelClassName="font-medium text-muted-foreground"
+      triggerClassName="rounded-md border-border bg-background text-xs text-foreground"
+    />
   );
 }
 

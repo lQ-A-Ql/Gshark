@@ -30,7 +30,7 @@ export function TSharkCapabilityDetails({ status }: { status?: TSharkRuntimeStat
         <div className="mt-1 break-all text-rose-700">缺少必需字段：{missingRequired.join(", ")}</div>
       ) : null}
       {missingOptional.length > 0 ? (
-        <div className="mt-1 break-all text-amber-700">降级可选字段：{missingOptional.join(", ")}</div>
+        <div className="mt-1 break-all text-amber-700">部分分析降级字段：{missingOptional.join(", ")}</div>
       ) : null}
     </div>
   );

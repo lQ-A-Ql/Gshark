@@ -39,6 +39,8 @@ if (-not $SkipBuild) {
   wails build
 }
 
+& powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts/check-desktop-assets.ps1")
+
 if (-not (Test-Path $bundledBackendPath)) {
   throw "required bundled backend is missing: $bundledBackendPath"
 }
@@ -96,14 +98,54 @@ if (-not $NoRepoManifestUpdate) {
 }
 
 Write-Host "[gshark] running release smoke check" -ForegroundColor Cyan
-$smokeOutput = & $releaseExePath 2>&1
-$smokeExitCode = $LASTEXITCODE
+$previousSmokeCheck = $env:GSHARK_RELEASE_SMOKE_CHECK
+$previousSmokeResultPath = $env:GSHARK_RELEASE_SMOKE_RESULT_PATH
+$smokeResultPath = Join-Path $OutputDir "release-smoke-result.txt"
+$smokeStdoutPath = Join-Path $OutputDir "release-smoke-stdout.txt"
+$smokeStderrPath = Join-Path $OutputDir "release-smoke-stderr.txt"
+if (Test-Path -LiteralPath $smokeResultPath) {
+  Remove-Item -LiteralPath $smokeResultPath -Force
+}
+if (Test-Path -LiteralPath $smokeStdoutPath) {
+  Remove-Item -LiteralPath $smokeStdoutPath -Force
+}
+if (Test-Path -LiteralPath $smokeStderrPath) {
+  Remove-Item -LiteralPath $smokeStderrPath -Force
+}
+try {
+  $env:GSHARK_RELEASE_SMOKE_CHECK = "1"
+  $env:GSHARK_RELEASE_SMOKE_RESULT_PATH = $smokeResultPath
+  $smokeProcess = Start-Process -FilePath $releaseExePath -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $smokeStdoutPath -RedirectStandardError $smokeStderrPath
+  $smokeExitCode = $smokeProcess.ExitCode
+} finally {
+  if ($null -eq $previousSmokeCheck) {
+    Remove-Item Env:\GSHARK_RELEASE_SMOKE_CHECK -ErrorAction SilentlyContinue
+  } else {
+    $env:GSHARK_RELEASE_SMOKE_CHECK = $previousSmokeCheck
+  }
+  if ($null -eq $previousSmokeResultPath) {
+    Remove-Item Env:\GSHARK_RELEASE_SMOKE_RESULT_PATH -ErrorAction SilentlyContinue
+  } else {
+    $env:GSHARK_RELEASE_SMOKE_RESULT_PATH = $previousSmokeResultPath
+  }
+}
+$smokeText = ""
+if (Test-Path -LiteralPath $smokeStdoutPath) {
+  $smokeText = $smokeText + (Get-Content -LiteralPath $smokeStdoutPath -Raw)
+}
+if (Test-Path -LiteralPath $smokeStderrPath) {
+  $smokeText = $smokeText + "`n" + (Get-Content -LiteralPath $smokeStderrPath -Raw)
+}
+if (Test-Path -LiteralPath $smokeResultPath) {
+  $smokeText = $smokeText + "`n" + (Get-Content -LiteralPath $smokeResultPath -Raw)
+}
 if ($smokeExitCode -ne 0) {
-  throw "release smoke check failed with exit code $smokeExitCode: $smokeOutput"
+  throw "release smoke check failed with exit code ${smokeExitCode}: $smokeText"
 }
-if (-not ($smokeOutput -join "`n").Contains("release smoke check: ok")) {
-  throw "release smoke check did not confirm bundled backend bootstrap: $smokeOutput"
+if (-not $smokeText.Contains("release smoke check: ok")) {
+  throw "release smoke check did not confirm bundled backend bootstrap: $smokeText"
 }
+Write-Host "release smoke check: ok" -ForegroundColor Green
 
 Write-Host "[gshark] release package ready" -ForegroundColor Green
 Write-Host "[gshark] asset: $releaseExePath" -ForegroundColor Cyan

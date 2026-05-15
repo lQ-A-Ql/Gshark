@@ -27,7 +27,7 @@ describe("TSharkCapabilityDetails", () => {
     expect(screen.getByText("字段数: 4321")).toBeInTheDocument();
     expect(screen.getByText(/能力探测：optional tshark fields/)).toBeInTheDocument();
     expect(screen.getByText("缺少必需字段：frame.protocols")).toBeInTheDocument();
-    expect(screen.getByText("降级可选字段：usb.capdata, modbus.func_code")).toBeInTheDocument();
+    expect(screen.getByText("部分分析降级字段：usb.capdata, modbus.func_code")).toBeInTheDocument();
   });
 
   it("stays hidden when no capability details are available", () => {

@@ -20,7 +20,13 @@ describe("runtimeMapper", () => {
 
   it("maps runtime snapshot", () => {
     const result = asToolRuntimeSnapshot({
-      config: { tshark_path: "tshark.exe", yara_timeout_ms: 123 },
+      config: {
+        tshark_path: "tshark.exe",
+        ffmpeg_path: "ffmpeg.exe",
+        python_path: "python.exe",
+        vosk_model_path: "models/vosk",
+        yara_timeout_ms: 123,
+      },
       tshark: {
         available: true,
         path: "t",
@@ -36,7 +42,13 @@ describe("runtimeMapper", () => {
     });
 
     expect(result).toMatchObject({
-      config: { tsharkPath: "tshark.exe", yaraTimeoutMs: 123 },
+      config: {
+        tsharkPath: "tshark.exe",
+        ffmpegPath: "ffmpeg.exe",
+        pythonPath: "python.exe",
+        voskModelPath: "models/vosk",
+        yaraTimeoutMs: 123,
+      },
       tshark: {
         available: true,
         path: "t",

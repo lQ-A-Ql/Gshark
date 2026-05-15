@@ -3,7 +3,7 @@ import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
 import { buildOfflineToolRuntimeSnapshot } from "../toolRuntimeOfflineSnapshot";
-import { readToolRuntimeConfig, writeToolRuntimeConfig } from "../toolRuntimeStorage";
+import { readToolRuntimeConfig, writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
 
 const EMPTY_TSHARK_STATUS: TSharkStatus = {
   available: false,
@@ -23,10 +23,13 @@ export function useToolRuntime() {
   const setTSharkPath = useCallback(
     async (path: string, backendConnected: boolean, setBackendStatus: (status: string) => void) => {
       const nextPath = path.trim();
-      writeToolRuntimeConfig({
-        ...(toolRuntimeSnapshot?.config ?? readToolRuntimeConfig()),
-        tsharkPath: nextPath,
-      });
+      writeUserToolRuntimeConfig(
+        {
+          ...(toolRuntimeSnapshot?.config ?? readToolRuntimeConfig()),
+          tsharkPath: nextPath,
+        },
+        { tsharkPath: true },
+      );
       if (!backendConnected) {
         setTsharkStatus((prev) => ({
           ...prev,
@@ -112,7 +115,7 @@ export function useToolRuntime() {
         yaraTimeoutMs: Number(patch.yaraTimeoutMs ?? base.yaraTimeoutMs ?? 25000) || 25000,
       };
 
-      writeToolRuntimeConfig(nextConfig);
+      writeUserToolRuntimeConfig(nextConfig);
       if (!backendConnected) {
         const offlineSnapshot = buildOfflineToolRuntimeSnapshot(nextConfig);
         setToolRuntimeSnapshot(offlineSnapshot);
@@ -127,6 +130,7 @@ export function useToolRuntime() {
       setIsToolRuntimeLoading(true);
       try {
         const snapshot = await backendClients.runtime.updateToolRuntimeConfig(nextConfig);
+        writeUserToolRuntimeConfig(snapshot.config);
         setToolRuntimeCheckDegraded(false);
         setToolRuntimeSnapshot(snapshot);
         setTsharkStatus({

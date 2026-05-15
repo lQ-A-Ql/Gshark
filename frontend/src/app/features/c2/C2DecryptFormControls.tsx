@@ -1,6 +1,6 @@
 import { FileKey2, Info } from "lucide-react";
 import type { ReactNode } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { SelectField, type SelectOption } from "../../components/ui/select";
 import type { C2DecryptRequest } from "../../core/types";
 
 type VShellMode = NonNullable<NonNullable<C2DecryptRequest["vshell"]>["mode"]>;
@@ -213,21 +213,19 @@ function LabeledSelect({
   onChange: (value: string) => void;
   options: Array<[string, string]>;
 }) {
+  const selectOptions: SelectOption[] = options.map(([optionValue, optionLabel]) => ({
+    value: optionValue,
+    label: optionLabel,
+  }));
+
   return (
-    <div className="block text-xs">
-      <div className="mb-1 block font-semibold text-slate-600">{label}</div>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map(([optionValue, optionLabel]) => (
-            <SelectItem key={optionValue} value={optionValue}>
-              {optionLabel}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <SelectField
+      label={label}
+      value={value}
+      onValueChange={onChange}
+      options={selectOptions}
+      tone="rose"
+      labelClassName="text-slate-600"
+    />
   );
 }

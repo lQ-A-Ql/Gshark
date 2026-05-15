@@ -35,8 +35,8 @@ export interface ToolRuntimeClient {
   checkTShark(): Promise<TSharkStatus>;
   checkFFmpeg(): Promise<FFmpegStatus>;
   checkSpeechToText(): Promise<SpeechToTextStatus>;
-  getToolRuntimeSnapshot(): Promise<ToolRuntimeSnapshot>;
-  updateToolRuntimeConfig(config: ToolRuntimeConfig): Promise<ToolRuntimeSnapshot>;
+  getToolRuntimeSnapshot(signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
+  updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
 }
 
@@ -72,14 +72,18 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
       };
     },
 
-    async getToolRuntimeSnapshot() {
-      const payload = await request<ToolRuntimeSnapshotWireDTO>("/api/tools/runtime-config");
+    async getToolRuntimeSnapshot(signal?: AbortSignal) {
+      const payload = await request<ToolRuntimeSnapshotWireDTO>(
+        "/api/tools/runtime-config",
+        signal ? { signal } : undefined,
+      );
       return asToolRuntimeSnapshot(payload);
     },
 
-    async updateToolRuntimeConfig(config: ToolRuntimeConfig) {
+    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal) {
       const payload = await request<ToolRuntimeSnapshotWireDTO>("/api/tools/runtime-config", {
         method: "POST",
+        signal,
         body: JSON.stringify({
           tshark_path: config.tsharkPath,
           ffmpeg_path: config.ffmpegPath,

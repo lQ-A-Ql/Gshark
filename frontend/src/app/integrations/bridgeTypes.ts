@@ -60,8 +60,8 @@ export interface RuntimeClient {
   checkTShark(): Promise<TSharkStatus>;
   checkFFmpeg(): Promise<FFmpegStatus>;
   checkSpeechToText(): Promise<SpeechToTextStatus>;
-  getToolRuntimeSnapshot(): Promise<ToolRuntimeSnapshot>;
-  updateToolRuntimeConfig(config: ToolRuntimeConfig): Promise<ToolRuntimeSnapshot>;
+  getToolRuntimeSnapshot(signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
+  updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }

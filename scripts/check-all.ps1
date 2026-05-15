@@ -13,9 +13,19 @@ function Invoke-Step {
   & $Action
 }
 
+Invoke-Step "Desktop assets build for embed tests" {
+  Set-Location (Join-Path $root "frontend")
+  pnpm run build:wails
+}
+
 Invoke-Step "Desktop shell dev-tag tests" {
   Set-Location $root
   go test -tags dev ./...
+}
+
+Invoke-Step "Desktop shell production-tag tests" {
+  Set-Location $root
+  go test -tags production ./...
 }
 
 Invoke-Step "Backend fmt check" {
@@ -97,9 +107,9 @@ Invoke-Step "Frontend wire any check" {
   pnpm run wire:any:check
 }
 
-Invoke-Step "Frontend build" {
+Invoke-Step "Frontend Wails build and desktop asset check" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run build
+  pnpm run build:wails
 }
 
 Write-Host ""

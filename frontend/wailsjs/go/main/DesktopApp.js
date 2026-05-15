@@ -5,3 +5,67 @@
 export function BackendStatus() {
   return window['go']['main']['DesktopApp']['BackendStatus']();
 }
+
+export function CheckAppUpdate() {
+  return window['go']['main']['DesktopApp']['CheckAppUpdate']();
+}
+
+export function CloseCapture() {
+  return window['go']['main']['DesktopApp']['CloseCapture']();
+}
+
+export function GetBackendAuthToken() {
+  return window['go']['main']['DesktopApp']['GetBackendAuthToken']();
+}
+
+export function GetCaptureStatus() {
+  return window['go']['main']['DesktopApp']['GetCaptureStatus']();
+}
+
+export function GetTLSConfig() {
+  return window['go']['main']['DesktopApp']['GetTLSConfig']();
+}
+
+export function GetToolRuntimeSnapshot() {
+  return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshot']();
+}
+
+export function InstallAppUpdate() {
+  return window['go']['main']['DesktopApp']['InstallAppUpdate']();
+}
+
+export function IsBackendReady() {
+  return window['go']['main']['DesktopApp']['IsBackendReady']();
+}
+
+export function OpenCaptureDialog() {
+  return window['go']['main']['DesktopApp']['OpenCaptureDialog']();
+}
+
+export function OpenDBCDialog() {
+  return window['go']['main']['DesktopApp']['OpenDBCDialog']();
+}
+
+export function PrepareCaptureReplacement() {
+  return window['go']['main']['DesktopApp']['PrepareCaptureReplacement']();
+}
+
+export function SetTSharkPath(path) {
+  return window['go']['main']['DesktopApp']['SetTSharkPath'](path);
+}
+
+export function StartCapture(filePath, filter) {
+  return window['go']['main']['DesktopApp']['StartCapture'](filePath, filter);
+}
+
+export function StopCapture() {
+  return window['go']['main']['DesktopApp']['StopCapture']();
+}
+
+export function UpdateTLSConfig(cfg) {
+  return window['go']['main']['DesktopApp']['UpdateTLSConfig'](cfg);
+}
+
+export function UpdateToolRuntimeConfig(cfg) {
+  return window['go']['main']['DesktopApp']['UpdateToolRuntimeConfig'](cfg);
+}

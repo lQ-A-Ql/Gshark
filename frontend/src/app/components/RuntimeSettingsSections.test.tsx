@@ -65,12 +65,12 @@ describe("RuntimeSettingsSections", () => {
 
     expect(screen.getByText("抓包与解析")).toBeInTheDocument();
     expect(screen.getByText("字段档案: compat")).toBeInTheDocument();
-    expect(screen.getByText("降级可选字段：usb.capdata")).toBeInTheDocument();
+    expect(screen.getByText("部分分析降级字段：usb.capdata")).toBeInTheDocument();
     expect(screen.getByText("媒体播放与转码")).toBeInTheDocument();
     expect(screen.getByText("YARA 狩猎")).toBeInTheDocument();
     expect(screen.getByText(/当前使用的规则文件/)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("YARA 可执行路径"), { target: { value: "new-yara.exe" } });
+    fireEvent.change(screen.getByLabelText(/YARA 可执行路径/), { target: { value: "new-yara.exe" } });
     const update = props.setForm.mock.calls[0][0] as (prev: ToolRuntimeConfig) => ToolRuntimeConfig;
     expect(update(form).yaraBin).toBe("new-yara.exe");
   });

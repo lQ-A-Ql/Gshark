@@ -81,6 +81,7 @@ describe("RuntimeSettingsSidebarParts", () => {
   it("maps dependency status tones", () => {
     expect(statusTone(true)).toContain("emerald");
     expect(statusTone(false)).toContain("rose");
+    expect(statusTone(undefined)).toContain("slate");
     expect(statusTone(true, false)).toContain("slate");
   });
 

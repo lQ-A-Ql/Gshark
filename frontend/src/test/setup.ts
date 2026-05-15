@@ -8,6 +8,17 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
+class PointerEventMock extends MouseEvent {
+  pointerId: number;
+  pointerType: string;
+
+  constructor(type: string, props: PointerEventInit = {}) {
+    super(type, props);
+    this.pointerId = props.pointerId ?? 1;
+    this.pointerType = props.pointerType ?? "mouse";
+  }
+}
+
 const localStorageMock = {
   getItem: () => null,
   setItem: () => {},
@@ -32,3 +43,24 @@ Object.defineProperty(window, "localStorage", {
   writable: true,
   value: localStorageMock,
 });
+
+Object.defineProperty(window, "PointerEvent", {
+  writable: true,
+  value: PointerEventMock,
+});
+
+if (!HTMLElement.prototype.hasPointerCapture) {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+}
+
+if (!HTMLElement.prototype.setPointerCapture) {
+  HTMLElement.prototype.setPointerCapture = () => {};
+}
+
+if (!HTMLElement.prototype.releasePointerCapture) {
+  HTMLElement.prototype.releasePointerCapture = () => {};
+}
+
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}

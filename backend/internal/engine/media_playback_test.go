@@ -3,6 +3,9 @@ package engine
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -50,5 +53,38 @@ func TestMediaPlaybackWithContextHonorsCanceledContext(t *testing.T) {
 	_, _, err := svc.MediaPlaybackWithContext(ctx, "any-token")
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected canceled context, got %v", err)
+	}
+}
+
+func TestResolveFFmpegBinaryFindsWinGetPackage(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific FFmpeg fallback")
+	}
+	t.Setenv("PATH", t.TempDir())
+	localAppData := t.TempDir()
+	t.Setenv("LOCALAPPDATA", localAppData)
+	ffmpegPath := filepath.Join(
+		localAppData,
+		"Microsoft",
+		"WinGet",
+		"Packages",
+		"Gyan.FFmpeg_Test",
+		"ffmpeg-8.0.1-full_build",
+		"bin",
+		"ffmpeg.exe",
+	)
+	if err := os.MkdirAll(filepath.Dir(ffmpegPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ffmpegPath, []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := resolveFFmpegBinary("")
+	if err != nil {
+		t.Fatalf("resolveFFmpegBinary() error = %v", err)
+	}
+	if got != ffmpegPath {
+		t.Fatalf("resolveFFmpegBinary() = %q, want %q", got, ffmpegPath)
 	}
 }

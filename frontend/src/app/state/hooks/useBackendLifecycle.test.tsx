@@ -9,7 +9,9 @@ import {
   type MediaAnalysisProgress,
   type ThreatAnalysisProgress,
 } from "./useAnalysisProgress";
+import { loadStartupToolRuntime } from "./backendLifecycleStartup";
 import { useBackendLifecycle } from "./useBackendLifecycle";
+import { readToolRuntimeConfig } from "../toolRuntimeStorage";
 
 const bridgeMocks = vi.hoisted(() => {
   let handlers: EventHandlers | null = null;
@@ -95,6 +97,49 @@ function createToolRuntimeSnapshot(): ToolRuntimeSnapshot {
   };
 }
 
+function createEnvConfiguredToolRuntimeSnapshot(): ToolRuntimeSnapshot {
+  const snapshot = createToolRuntimeSnapshot();
+  snapshot.config = {
+    tsharkPath: "",
+    ffmpegPath: "C:/Env/ffmpeg.exe",
+    pythonPath: "C:/Env/python.exe",
+    voskModelPath: "C:/Env/vosk-model",
+    yaraEnabled: true,
+    yaraBin: "C:/Env/yara.exe",
+    yaraRules: "C:/Env/default.yar",
+    yaraTimeoutMs: 45000,
+  };
+  snapshot.ffmpeg = {
+    available: true,
+    path: "C:/Env/ffmpeg.exe",
+    message: "ok",
+    customPath: "C:/Env/ffmpeg.exe",
+    usingCustomPath: true,
+  };
+  snapshot.speech = {
+    ...snapshot.speech,
+    available: true,
+    pythonAvailable: true,
+    pythonCommand: "C:/Env/python.exe",
+    ffmpegAvailable: true,
+    voskAvailable: true,
+    modelAvailable: true,
+    modelPath: "C:/Env/vosk-model",
+    message: "ok",
+  };
+  snapshot.yara = {
+    available: true,
+    enabled: true,
+    path: "C:/Env/yara.exe",
+    rulePath: "C:/Env/default.yar",
+    message: "ok",
+    usingCustomBin: true,
+    usingCustomRules: true,
+    timeoutMs: 45000,
+  };
+  return snapshot;
+}
+
 function createPacket(id: number): Packet {
   return {
     id,
@@ -174,6 +219,19 @@ async function renderConnectedLifecycle(options?: HarnessOptions) {
   return result;
 }
 
+function installRuntimeLocalStorage() {
+  const values = new Map<string, string>();
+  vi.spyOn(window.localStorage, "getItem").mockImplementation((key) => values.get(key) ?? null);
+  vi.spyOn(window.localStorage, "setItem").mockImplementation((key, value) => {
+    values.set(key, value);
+  });
+  vi.spyOn(window.localStorage, "removeItem").mockImplementation((key) => {
+    values.delete(key);
+  });
+  vi.spyOn(window.localStorage, "clear").mockImplementation(() => values.clear());
+  return values;
+}
+
 describe("useBackendLifecycle", () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -195,6 +253,7 @@ describe("useBackendLifecycle", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     bridgeMocks.clearHandlers();
   });
@@ -213,10 +272,221 @@ describe("useBackendLifecycle", () => {
       privateKeyPath: "C:/keys/server.pem",
       privateKeyIpPort: "10.0.0.1:443",
     });
-    expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledTimes(1);
+    expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledTimes(1);
+    expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
     expect(bridgeMocks.subscribeEvents).toHaveBeenCalledTimes(1);
 
     unmount();
+  });
+
+  it("syncs saved runtime config after the initial startup snapshot when it differs", async () => {
+    const storedConfig = JSON.stringify({
+      tsharkPath: "C:/Saved/tshark.exe",
+      ffmpegPath: "",
+      pythonPath: "",
+      voskModelPath: "",
+      yaraEnabled: true,
+      yaraBin: "",
+      yaraRules: "",
+      yaraTimeoutMs: 25000,
+    });
+    const getItemSpy = vi.spyOn(window.localStorage, "getItem").mockImplementation((key: string) => {
+      return key === "gshark.tool-runtime.v1" ? storedConfig : null;
+    });
+    const syncedSnapshot = createToolRuntimeSnapshot();
+    syncedSnapshot.config.tsharkPath = "C:/Saved/tshark.exe";
+    syncedSnapshot.tshark = {
+      available: true,
+      path: "C:/Saved/tshark.exe",
+      message: "ok",
+      customPath: "C:/Saved/tshark.exe",
+      usingCustomPath: true,
+    };
+    bridgeMocks.updateToolRuntimeConfig.mockResolvedValue(syncedSnapshot);
+    expect(readToolRuntimeConfig().tsharkPath).toBe("C:/Saved/tshark.exe");
+
+    const setTsharkStatus = vi.fn();
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus,
+    });
+
+    await waitFor(() => {
+      expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ tsharkPath: "C:/Saved/tshark.exe" }),
+        expect.any(AbortSignal),
+      );
+    });
+    expect(setTsharkStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        available: true,
+        path: "C:/Saved/tshark.exe",
+        usingCustomPath: true,
+      }),
+    );
+    getItemSpy.mockRestore();
+  });
+
+  it("trusts the backend env snapshot on first startup instead of posting empty defaults", async () => {
+    installRuntimeLocalStorage();
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus: vi.fn(),
+    });
+
+    expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
+    expect(readToolRuntimeConfig()).toEqual(envSnapshot.config);
+  });
+
+  it("migrates legacy all-empty runtime storage without clearing backend env config", async () => {
+    installRuntimeLocalStorage();
+    window.localStorage.setItem("gshark.tool-runtime.v1", JSON.stringify(createToolRuntimeSnapshot().config));
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus: vi.fn(),
+    });
+
+    expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
+    expect(readToolRuntimeConfig()).toEqual(envSnapshot.config);
+  });
+
+  it("merges legacy tshark storage with the backend env config during startup sync", async () => {
+    installRuntimeLocalStorage();
+    window.localStorage.setItem("gshark.tshark-path.v1", "C:/Legacy/tshark.exe");
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+    bridgeMocks.updateToolRuntimeConfig.mockResolvedValue({
+      ...envSnapshot,
+      config: {
+        ...envSnapshot.config,
+        tsharkPath: "C:/Legacy/tshark.exe",
+      },
+      tshark: {
+        ...envSnapshot.tshark,
+        path: "C:/Legacy/tshark.exe",
+        customPath: "C:/Legacy/tshark.exe",
+        usingCustomPath: true,
+      },
+    });
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus: vi.fn(),
+    });
+
+    await waitFor(() => {
+      expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
+        {
+          ...envSnapshot.config,
+          tsharkPath: "C:/Legacy/tshark.exe",
+        },
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
+  it("lets a stored complete runtime config override backend env config", async () => {
+    installRuntimeLocalStorage();
+    window.localStorage.setItem(
+      "gshark.tool-runtime.v1",
+      JSON.stringify({
+        tsharkPath: "C:/Stored/tshark.exe",
+        ffmpegPath: "C:/Stored/ffmpeg.exe",
+        pythonPath: "C:/Stored/python.exe",
+        voskModelPath: "C:/Stored/vosk-model",
+        yaraEnabled: false,
+        yaraBin: "C:/Stored/yara.exe",
+        yaraRules: "C:/Stored/rules",
+        yaraTimeoutMs: 32000,
+      }),
+    );
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus: vi.fn(),
+    });
+
+    await waitFor(() => {
+      expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tsharkPath: "C:/Stored/tshark.exe",
+          ffmpegPath: "C:/Stored/ffmpeg.exe",
+          pythonPath: "C:/Stored/python.exe",
+          voskModelPath: "C:/Stored/vosk-model",
+          yaraEnabled: false,
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
+  it("lets v2 explicit empty fields clear backend env config without clearing other env fields", async () => {
+    installRuntimeLocalStorage();
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    window.localStorage.setItem(
+      "gshark.tool-runtime.v1",
+      JSON.stringify({
+        version: 2,
+        source: "stored-runtime-config",
+        config: { ...envSnapshot.config, ffmpegPath: "" },
+        explicitFields: { ffmpegPath: true },
+      }),
+    );
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus: vi.fn(),
+    });
+
+    await waitFor(() => {
+      expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
+        {
+          ...envSnapshot.config,
+          ffmpegPath: "",
+        },
+        expect.any(AbortSignal),
+      );
+    });
   });
 
   it("schedules packet pagination and debounced analysis refresh outside preload", async () => {

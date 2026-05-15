@@ -53,6 +53,15 @@ const storageOperation: USBMassStorageOperation = {
   summary: "WRITE(10)",
 };
 
+async function chooseFilter(label: string, optionLabel: string) {
+  fireEvent.pointerDown(screen.getByRole("combobox", { name: label }), {
+    button: 0,
+    ctrlKey: false,
+    pointerType: "mouse",
+  });
+  fireEvent.keyDown(await screen.findByRole("option", { name: optionLabel }), { key: "Enter" });
+}
+
 describe("Usb split tables", () => {
   it("renders HID keyboard and mouse rows through the compatibility barrel", () => {
     render(
@@ -68,7 +77,7 @@ describe("Usb split tables", () => {
     expect(screen.getByText("press Left / move=(+8,+2)")).toBeInTheDocument();
   });
 
-  it("renders mass-storage filters and operation details", () => {
+  it("renders mass-storage filters and operation details", async () => {
     const onDeviceChange = vi.fn();
     const onLunChange = vi.fn();
 
@@ -86,8 +95,8 @@ describe("Usb split tables", () => {
       </>,
     );
 
-    fireEvent.change(screen.getByLabelText("设备"), { target: { value: "Disk A" } });
-    fireEvent.change(screen.getByLabelText("LUN"), { target: { value: "LUN 0" } });
+    await chooseFilter("设备", "Disk A");
+    await chooseFilter("LUN", "LUN 0");
 
     expect(onDeviceChange).toHaveBeenCalledWith("Disk A");
     expect(onLunChange).toHaveBeenCalledWith("LUN 0");

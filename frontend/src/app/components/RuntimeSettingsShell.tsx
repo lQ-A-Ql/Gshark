@@ -3,15 +3,18 @@ import { RefreshCw, Save, Sparkles, X } from "lucide-react";
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
 import { MiniStatus } from "./RuntimeSettingsSidebarParts";
 
-export function RuntimeSettingsHeader({
-  form,
-  snapshot,
-  onClose,
-}: {
+type RuntimeSettingsHeaderProps = {
   form: ToolRuntimeConfig;
   snapshot?: ToolRuntimeSnapshot | null;
   onClose: () => void;
-}) {
+};
+
+export function RuntimeSettingsHeader({ form, snapshot, onClose }: RuntimeSettingsHeaderProps) {
+  const known = Boolean(snapshot);
+  const tsharkDegraded = Boolean(
+    snapshot?.tshark.available &&
+    (snapshot.tshark.capabilityCheckDegraded || (snapshot.tshark.missingOptionalFields?.length ?? 0) > 0),
+  );
   return (
     <div className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.92),rgba(255,255,255,0.98))] px-5 py-5">
       <div className="flex items-start justify-between gap-3">
@@ -19,8 +22,7 @@ export function RuntimeSettingsHeader({
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600">Runtime Settings</div>
           <div className="mt-2 text-[22px] font-semibold leading-none text-slate-900">运行时组件设置</div>
           <p className="mt-2 max-w-md text-xs leading-5 text-slate-600">
-            这里统一管理抓包、YARA、媒体播放和离线语音转写依赖的本地组件路径。
-            保存之后会立即重新检测，方便直接确认当前环境是否已经接好。
+            输入框只代表显式配置路径；下方状态卡显示当前探测路径。保存后会立即重新检测。
           </p>
         </div>
         <button
@@ -34,13 +36,14 @@ export function RuntimeSettingsHeader({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <MiniStatus label="TShark" available={snapshot?.tshark.available ?? false} />
-        <MiniStatus label="FFmpeg" available={snapshot?.ffmpeg.available ?? false} />
-        <MiniStatus label="Speech" available={snapshot?.speech.available ?? false} />
+        <MiniStatus label="TShark" available={snapshot?.tshark.available} known={known} degraded={tsharkDegraded} />
+        <MiniStatus label="FFmpeg" available={snapshot?.ffmpeg.available} known={known} />
+        <MiniStatus label="Speech" available={snapshot?.speech.available} known={known} />
         <MiniStatus
           label="YARA"
-          available={snapshot?.yara.available ?? false}
+          available={snapshot?.yara.available}
           enabled={snapshot?.yara.enabled ?? form.yaraEnabled}
+          known={known}
         />
       </div>
     </div>
@@ -92,7 +95,7 @@ export function RuntimeSettingsFooter({ notice, backendConnected }: { notice: st
         <div>
           {notice ||
             (backendConnected
-              ? "路径修改后会立即应用到当前桌面端运行时，重启后也会自动重新加载这些设置。"
+              ? "路径修改后会立即应用到当前后端进程。清空并保存 FFmpeg、Python 或 Vosk 字段会移除本进程对应的 GSHARK_* 显式配置；刷新超时或后端不可达时会在这里显示原因。"
               : "后端暂时未连接，不过可以先填写路径，待后端连上后会自动重新应用。")}
         </div>
       </div>

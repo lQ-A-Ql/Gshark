@@ -1,5 +1,3 @@
-import type { LucideIcon } from "lucide-react";
-
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
 
 export function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeConfig {
@@ -15,8 +13,11 @@ export function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeC
   };
 }
 
-export function statusTone(available: boolean, enabled = true) {
+export function statusTone(available?: boolean, enabled = true) {
   if (!enabled) {
+    return "border-slate-200 bg-slate-50 text-slate-500";
+  }
+  if (available === undefined) {
     return "border-slate-200 bg-slate-50 text-slate-500";
   }
   return available ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700";
@@ -55,27 +56,37 @@ export function StatusLine({
   message,
   path,
   enabled = true,
+  known = true,
+  degraded = false,
   preferMessageWhenUnavailable = false,
 }: {
   label: string;
-  available: boolean;
+  available?: boolean;
   message: string;
   path?: string;
   enabled?: boolean;
+  known?: boolean;
+  degraded?: boolean;
   preferMessageWhenUnavailable?: boolean;
 }) {
-  const resolvedText = !enabled
-    ? message || "当前组件已关闭"
-    : !available && preferMessageWhenUnavailable
-      ? message || "等待检测"
-      : path?.trim()
-        ? path
-        : message || "等待检测";
+  const ready = Boolean(available);
+  const resolvedText = !known
+    ? message || "等待检测"
+    : !enabled
+      ? message || "当前组件已关闭"
+      : !ready && preferMessageWhenUnavailable
+        ? message || "等待检测"
+        : path?.trim()
+          ? path
+          : message || "等待检测";
+  const stateText = !known ? "未检测" : !enabled ? "已关闭" : degraded ? "部分降级" : ready ? "已就绪" : "未就绪";
   return (
-    <div className={`rounded-xl border px-3 py-2 ${statusTone(available, enabled)}`}>
+    <div
+      className={`rounded-xl border px-3 py-2 ${degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known)}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[11px]">{!enabled ? "已关闭" : available ? "已就绪" : "未就绪"}</span>
+        <span className="text-[11px]">{stateText}</span>
       </div>
       <div className="mt-1 break-all text-[11px] leading-5">{resolvedText}</div>
     </div>
@@ -86,37 +97,22 @@ export function MiniStatus({
   label,
   available,
   enabled = true,
+  known = true,
+  degraded = false,
 }: {
   label: string;
-  available: boolean;
+  available?: boolean;
   enabled?: boolean;
+  known?: boolean;
+  degraded?: boolean;
 }) {
-  const tone = statusTone(available, enabled);
+  const ready = Boolean(available);
+  const tone = degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known);
+  const text = !known ? "未检测" : !enabled ? "已关闭" : degraded ? "降级" : ready ? "就绪" : "缺失";
   return (
     <div className={`rounded-2xl border px-3 py-2 ${tone}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</div>
-      <div className="mt-1 text-sm font-semibold">{!enabled ? "已关闭" : available ? "就绪" : "缺失"}</div>
-    </div>
-  );
-}
-
-export function RuntimeDependencyCard({
-  label,
-  value,
-  available,
-  Icon,
-}: {
-  label: string;
-  value: string;
-  available: boolean;
-  Icon: LucideIcon;
-}) {
-  return (
-    <div className={`rounded-xl border px-3 py-2 ${statusTone(available)}`}>
-      <div className="flex items-center gap-1 text-xs font-semibold">
-        <Icon className="h-3.5 w-3.5" /> {label}
-      </div>
-      <div className="mt-1 break-all text-[11px] leading-5">{value}</div>
+      <div className="mt-1 text-sm font-semibold">{text}</div>
     </div>
   );
 }

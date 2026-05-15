@@ -15,7 +15,7 @@ import {
   type ThreatAnalysisProgress,
 } from "./useAnalysisProgress";
 import { useToolRuntime } from "./useToolRuntime";
-import { loadStartupTLSConfig } from "./backendLifecycleStartup";
+import { loadStartupTLSConfig } from "./backendLifecycleTLSStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";
 import { useBackendLifecycleControls } from "./useBackendLifecycleControls";
 import { useBackendLifecycleStartupEffect } from "./useBackendLifecycleStartupEffect";

@@ -3,7 +3,7 @@ import { router } from './routes';
 import { SentinelProvider, useSentinel } from './state/SentinelContext';
 import { useEffect, useState } from 'react';
 
-function StartupGate() {
+export function StartupGate() {
   const {
     backendConnected,
     backendStatus,
@@ -28,18 +28,13 @@ function StartupGate() {
       return;
     }
 
-    if (isTSharkChecking || (!tsharkStatus.available && !toolRuntimeCheckDegraded)) {
-      setEnterMain(false);
-      return;
-    }
-
     const timer = window.setTimeout(() => {
       setEnterMain(true);
     }, 300);
     return () => {
       window.clearTimeout(timer);
     };
-  }, [backendConnected, isTSharkChecking, toolRuntimeCheckDegraded, tsharkStatus.available]);
+  }, [backendConnected]);
 
   const handleSavePath = async (nextPath = pathInput) => {
     setSavingPath(true);
@@ -82,23 +77,23 @@ function StartupGate() {
               <div className={`text-xs break-all ${tsharkStatus.available ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {tsharkStatus.available
                   ? `已检测到: ${tsharkStatus.path || 'tshark'}`
-                  : (tsharkStatus.message || (toolRuntimeCheckDegraded ? '检测暂时未完成，可进入主界面后刷新状态' : '未检测到 tshark'))}
+                  : (tsharkStatus.message || (toolRuntimeCheckDegraded ? '检测暂时未完成，可进入主界面后刷新状态' : '未检测到 TShark，可在设置中配置'))}
               </div>
             )}
           </div>
 
           {backendConnected && !isTSharkChecking && !tsharkStatus.available && !toolRuntimeCheckDegraded && (
-            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
-              <div className="text-sm font-medium text-rose-700">请先配置 tshark 路径</div>
-              <p className="mt-1 text-xs text-rose-600">
-                可以直接填写 `tshark.exe` 的绝对路径，或者填写 Wireshark 安装目录。
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="text-sm font-medium text-amber-800">未检测到 TShark，可在设置中配置</div>
+              <p className="mt-1 text-xs text-amber-700">
+                可以直接填写 tshark.exe 的绝对路径，或者填写 Wireshark 安装目录。
               </p>
               <div className="mt-3 flex gap-2">
                 <input
                   value={pathInput}
                   onChange={(event) => setPathInput(event.target.value)}
                   placeholder="C:\\Program Files\\Wireshark\\tshark.exe"
-                  className="flex-1 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-500"
+                  className="flex-1 rounded-md border border-amber-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-500"
                 />
                 <button
                   onClick={() => void handleSavePath()}
@@ -125,7 +120,7 @@ function StartupGate() {
           )}
 
           <div className="mt-5 h-1.5 w-full overflow-hidden rounded bg-slate-200">
-            <div className={`h-full rounded bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected && (tsharkStatus.available || toolRuntimeCheckDegraded) ? 'w-full' : backendConnected ? 'w-5/6' : 'w-2/3 animate-pulse'}`} />
+            <div className={`h-full rounded bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected ? 'w-full' : 'w-2/3 animate-pulse'}`} />
           </div>
         </div>
       </div>

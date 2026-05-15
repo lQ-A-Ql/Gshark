@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -87,9 +88,13 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 // manage their own locking on independent mutexes, so the snapshot is
 // coherent for the configuration slice without re-locking them here.
 func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
+	return s.ToolRuntimeSnapshotWithContext(context.Background())
+}
+
+func (s *Service) ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot {
 	return model.ToolRuntimeSnapshot{
 		Config: s.ToolRuntimeConfig(),
-		TShark: toModelTSharkStatus(tshark.CurrentStatus()),
+		TShark: toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx)),
 		FFmpeg: s.FFmpegStatus(),
 		Speech: s.SpeechToTextStatus(),
 		Yara:   s.YaraStatus(),
@@ -124,17 +129,25 @@ func toModelFFmpegStatus(status FFmpegStatus) model.FFmpegToolStatus {
 }
 
 func (s *Service) TSharkStatus() model.TSharkToolStatus {
-	return toModelTSharkStatus(tshark.CurrentStatus())
+	return s.TSharkStatusWithContext(context.Background())
+}
+
+func (s *Service) TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus {
+	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
 }
 
 // SetTSharkPath updates the tshark binary path. It takes s.toolRuntimeMu
 // so a concurrent SetToolRuntimeConfig cannot observe or clobber a
 // partially-applied tshark path.
 func (s *Service) SetTSharkPath(path string) model.TSharkToolStatus {
+	return s.SetTSharkPathWithContext(context.Background(), path)
+}
+
+func (s *Service) SetTSharkPathWithContext(ctx context.Context, path string) model.TSharkToolStatus {
 	s.toolRuntimeMu.Lock()
 	defer s.toolRuntimeMu.Unlock()
 	tshark.SetBinaryPath(strings.TrimSpace(path))
-	return toModelTSharkStatus(tshark.CurrentStatus())
+	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
 }
 
 func (s *Service) TSharkStatusPath() string {

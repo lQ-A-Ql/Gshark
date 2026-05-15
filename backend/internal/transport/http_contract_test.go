@@ -126,6 +126,49 @@ func TestToolRuntimeConfigContract(t *testing.T) {
 	requireJSONKeys(t, yara, "available", "enabled", "message", "using_custom_bin", "using_custom_rules", "timeout_ms")
 }
 
+func TestToolRuntimeConfigHandlerPreservesGetAndAcceptsEmptyPostContract(t *testing.T) {
+	runtime := &recordingToolRuntimeService{
+		config: model.ToolRuntimeConfig{
+			FFmpegPath:    "env-ffmpeg",
+			PythonPath:    "env-python",
+			VoskModelPath: "env-vosk",
+			YaraEnabled:   true,
+			YaraTimeoutMS: 25000,
+		},
+	}
+	server := &Server{toolRuntime: runtime}
+
+	getRec := httptest.NewRecorder()
+	server.handleToolRuntimeConfig(getRec, httptest.NewRequest(http.MethodGet, "/api/tools/runtime-config", nil))
+	requireStatus(t, getRec, http.StatusOK)
+	getPayload := decodeJSONMap(t, getRec)
+	getConfig := requireJSONNestedObject(t, getPayload, "config")
+	if getConfig["ffmpeg_path"] != "env-ffmpeg" || getConfig["python_path"] != "env-python" || getConfig["vosk_model_path"] != "env-vosk" {
+		t.Fatalf("GET config did not expose env-backed paths: %#v", getConfig)
+	}
+
+	postRec := httptest.NewRecorder()
+	server.handleToolRuntimeConfig(postRec, httptest.NewRequest(http.MethodPost, "/api/tools/runtime-config", strings.NewReader(`{
+		"tshark_path":"",
+		"ffmpeg_path":"",
+		"python_path":"",
+		"vosk_model_path":"",
+		"yara_enabled":true,
+		"yara_bin":"",
+		"yara_rules":"",
+		"yara_timeout_ms":25000
+	}`)))
+	requireStatus(t, postRec, http.StatusOK)
+	if runtime.config.FFmpegPath != "" || runtime.config.PythonPath != "" || runtime.config.VoskModelPath != "" {
+		t.Fatalf("POST empty config was not passed through: %+v", runtime.config)
+	}
+	postPayload := decodeJSONMap(t, postRec)
+	postConfig := requireJSONNestedObject(t, postPayload, "config")
+	if postConfig["ffmpeg_path"] != "" || postConfig["python_path"] != "" || postConfig["vosk_model_path"] != "" {
+		t.Fatalf("POST response config did not reflect empty env-backed paths: %#v", postConfig)
+	}
+}
+
 func TestGlobalTrafficStatsContract(t *testing.T) {
 	server := &Server{analysis: contractAnalysisService{}}
 	rec := httptest.NewRecorder()
@@ -513,7 +556,15 @@ func (contractToolRuntimeService) TSharkStatus() model.TSharkToolStatus {
 	return model.TSharkToolStatus{Available: true, Path: "tshark", Message: "ok"}
 }
 
+func (contractToolRuntimeService) TSharkStatusWithContext(context.Context) model.TSharkToolStatus {
+	return contractToolRuntimeService{}.TSharkStatus()
+}
+
 func (contractToolRuntimeService) SetTSharkPath(string) model.TSharkToolStatus {
+	return contractToolRuntimeService{}.TSharkStatus()
+}
+
+func (contractToolRuntimeService) SetTSharkPathWithContext(context.Context, string) model.TSharkToolStatus {
 	return contractToolRuntimeService{}.TSharkStatus()
 }
 
@@ -540,8 +591,35 @@ func (contractToolRuntimeService) ToolRuntimeSnapshot() model.ToolRuntimeSnapsho
 	}
 }
 
+func (contractToolRuntimeService) ToolRuntimeSnapshotWithContext(context.Context) model.ToolRuntimeSnapshot {
+	return contractToolRuntimeService{}.ToolRuntimeSnapshot()
+}
+
 func (contractToolRuntimeService) SetToolRuntimeConfig(model.ToolRuntimeConfig) model.ToolRuntimeConfig {
 	return contractToolRuntimeService{}.ToolRuntimeSnapshot().Config
+}
+
+type recordingToolRuntimeService struct {
+	contractToolRuntimeService
+	config model.ToolRuntimeConfig
+}
+
+func (s *recordingToolRuntimeService) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
+	snapshot := s.contractToolRuntimeService.ToolRuntimeSnapshot()
+	snapshot.Config = s.config
+	snapshot.FFmpeg.Path = s.config.FFmpegPath
+	snapshot.Speech.PythonCommand = s.config.PythonPath
+	snapshot.Speech.ModelPath = s.config.VoskModelPath
+	return snapshot
+}
+
+func (s *recordingToolRuntimeService) ToolRuntimeSnapshotWithContext(context.Context) model.ToolRuntimeSnapshot {
+	return s.ToolRuntimeSnapshot()
+}
+
+func (s *recordingToolRuntimeService) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig {
+	s.config = cfg
+	return cfg
 }
 
 func (contractToolRuntimeService) FFmpegStatus() model.FFmpegToolStatus {

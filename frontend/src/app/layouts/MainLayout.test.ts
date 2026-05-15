@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { installBrowserPageDragGuard, preventBrowserPageDrag } from "./MainLayout";
+import { getRouteMotionDirection, installBrowserPageDragGuard, preventBrowserPageDrag } from "./MainLayout";
 
 describe("MainLayout drag guard", () => {
   it("prevents native browser drag navigation", () => {
@@ -49,5 +49,14 @@ describe("MainLayout drag guard", () => {
     document.body.dispatchEvent(dragEvent);
 
     expect(dragEvent.defaultPrevented).toBe(false);
+  });
+});
+
+describe("MainLayout route motion", () => {
+  it("computes stable route motion directions from navigation order", () => {
+    expect(getRouteMotionDirection("/", "/c2-analysis")).toBe("forward");
+    expect(getRouteMotionDirection("/c2-analysis", "/traffic-graph")).toBe("back");
+    expect(getRouteMotionDirection("/c2-analysis", "/c2-analysis")).toBe("neutral");
+    expect(getRouteMotionDirection("/unknown", "/c2-analysis")).toBe("neutral");
   });
 });

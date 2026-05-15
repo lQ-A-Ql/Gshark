@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -272,5 +273,93 @@ func TestBuildSpeechFFmpegArgsAddsVoiceEnhancement(t *testing.T) {
 	}
 	if !strings.Contains(joined, "-ac 1") || !strings.Contains(joined, "-ar 16000") {
 		t.Fatalf("expected mono 16k output in args, got %q", joined)
+	}
+}
+
+func TestResolveSpeechPythonCommandFindsLocalAppDataPython(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific Python fallback")
+	}
+	oldProbe := pythonCommandProbeFn
+	oldCheck := checkPythonVoskAvailabilityFn
+	t.Cleanup(func() {
+		pythonCommandProbeFn = oldProbe
+		checkPythonVoskAvailabilityFn = oldCheck
+	})
+	pythonCommandProbeFn = func(context.Context, []string) error { return nil }
+	checkPythonVoskAvailabilityFn = func(context.Context, []string) error { return nil }
+	t.Setenv(pythonEnvVar, "")
+	t.Setenv("PATH", t.TempDir())
+	localAppData := t.TempDir()
+	t.Setenv("LOCALAPPDATA", localAppData)
+	pythonPath := filepath.Join(localAppData, "Programs", "Python", "Python311", "python.exe")
+	if err := os.MkdirAll(filepath.Dir(pythonPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pythonPath, []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := resolveSpeechPythonCommand()
+	if err != nil {
+		t.Fatalf("resolveSpeechPythonCommand() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != pythonPath {
+		t.Fatalf("resolveSpeechPythonCommand() = %v, want [%q]", got, pythonPath)
+	}
+}
+
+func TestResolveSpeechPythonCommandPrefersCandidateWithVoskWhenEnvUnset(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific Python launcher fallback")
+	}
+	oldProbe := pythonCommandProbeFn
+	oldCheck := checkPythonVoskAvailabilityFn
+	t.Cleanup(func() {
+		pythonCommandProbeFn = oldProbe
+		checkPythonVoskAvailabilityFn = oldCheck
+	})
+	pythonCommandProbeFn = func(context.Context, []string) error { return nil }
+	checkPythonVoskAvailabilityFn = func(_ context.Context, cmd []string) error {
+		if len(cmd) > 0 && cmd[0] == "python" {
+			return nil
+		}
+		return errors.New("No module named 'vosk'")
+	}
+	binDir := t.TempDir()
+	t.Setenv(pythonEnvVar, "")
+	t.Setenv("PATH", binDir)
+	for _, name := range []string{"py.exe", "python.exe"} {
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte("fake"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := resolveSpeechPythonCommand()
+	if err != nil {
+		t.Fatalf("resolveSpeechPythonCommand() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != "python" {
+		t.Fatalf("resolveSpeechPythonCommand() = %v, want [python]", got)
+	}
+}
+
+func TestResolveSpeechToTextStatusReportsModelMissingAfterPythonAndVoskReady(t *testing.T) {
+	oldResolve := resolveSpeechPythonCommandFn
+	oldCheck := checkPythonVoskAvailabilityFn
+	t.Cleanup(func() {
+		resolveSpeechPythonCommandFn = oldResolve
+		checkPythonVoskAvailabilityFn = oldCheck
+	})
+	resolveSpeechPythonCommandFn = func() ([]string, error) { return []string{"python"}, nil }
+	checkPythonVoskAvailabilityFn = func(context.Context, []string) error { return nil }
+	t.Setenv(voskModelEnvVar, filepath.Join(t.TempDir(), "missing-model"))
+
+	status := resolveSpeechToTextStatus()
+	if !status.PythonAvailable || !status.VoskAvailable || status.ModelAvailable {
+		t.Fatalf("unexpected speech status: %+v", status)
+	}
+	if !strings.Contains(status.Message, "Vosk 中文模型") {
+		t.Fatalf("expected model missing message, got %q", status.Message)
 	}
 }

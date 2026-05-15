@@ -140,6 +140,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 
 - 如果系统 `PATH` 中找不到 `tshark`，应用启动后会要求填写 `tshark.exe` 路径或 Wireshark 安装目录。
 - 如果 `PATH` 中已有可用 `tshark`，应用会直接使用。
+- 后端进程会读取 `GSHARK_FFMPEG`、`GSHARK_PYTHON`、`GSHARK_VOSK_MODEL` 作为 FFmpeg、Python 与 Vosk 模型目录的显式配置；这些值会显示在运行时组件设置的“显式配置”输入框中。
+- 运行时组件设置里的输入框为空，不等于组件不可用。输入框代表用户固定保存的显式路径；下方状态卡显示后端从环境变量、`PATH` 或默认目录探测到的当前实际路径。
+- 保存空的 FFmpeg / Python / Vosk 字段会清除当前后端进程中的对应 `GSHARK_*` 显式配置，随后回到 `PATH` 或默认目录探测。
+- 旧版前端可能留下全空的运行时配置缓存；新版启动会把这类缓存迁移为“自动观测配置”，不会再用空值覆盖后端进程已经读取到的 `GSHARK_*` 环境变量。只有用户在设置侧栏点击“保存并应用”的字段才会作为显式配置写回后端。
+- `tshark` 能力探测中出现 `profile=compat` 或缺少 `usbms.scsi.opcode` 等可选字段时，表示部分专项分析降级，不表示 `tshark` 不可用。抓包入口只以 `tshark.available` 作为可用判断。
+- 语音转写状态会拆分显示 Python、`vosk` 包、Vosk 模型目录和 FFmpeg。Python 已就绪但默认模型目录不存在时，`speech.available=false` 是模型缺失，不是 Python 不可读。
 - Wails 配置默认使用 `pnpm install` 和 `pnpm run build:wails`。
 
 ## 快速启动
@@ -190,11 +196,19 @@ cd frontend
 pnpm run build
 ```
 
+说明：`pnpm run build` 只执行 Vite 静态前端构建，不能作为桌面运行验收。它不会保证 `frontend/dist` 中存在内嵌后端二进制和 YARA 规则。
+
 桌面资源构建：
 
 ```powershell
 cd frontend
 pnpm run build:wails
+```
+
+`build:wails` 会在 Vite 构建后生成并复制 `sentinel-backend.exe` 与 `rules/yara/default.yar`，随后执行桌面资源检查。也可以单独运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-desktop-assets.ps1
 ```
 
 ## 构建与发布

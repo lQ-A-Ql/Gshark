@@ -1,4 +1,5 @@
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
+import { SelectField as GlobalSelectField, type SelectOption } from "../../components/ui/select";
 import type { USBMassStorageOperation } from "../../core/types";
 import {
   USB_MONO_CELL_CLASS,
@@ -55,21 +56,21 @@ function SelectField({
   options: string[];
   labels?: Record<string, string>;
 }) {
+  const selectOptions: SelectOption[] = options.map((option) => ({
+    value: option,
+    label: labels[option] ?? option,
+  }));
+
   return (
-    <label className="flex flex-col gap-2 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none ring-0 transition-colors focus:border-blue-500"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {labels[option] ?? option}
-          </option>
-        ))}
-      </select>
-    </label>
+    <GlobalSelectField
+      label={label}
+      value={value}
+      onValueChange={onChange}
+      options={selectOptions}
+      tone="blue"
+      triggerClassName="bg-background text-sm"
+      labelClassName="font-medium text-muted-foreground"
+    />
   );
 }
 

@@ -1,47 +1,54 @@
 import type { ToolRuntimeConfig } from "../core/types";
+import {
+  createToolRuntimeStorageRecord,
+  explicitFieldsForUserConfig,
+  legacyTSharkToolRuntimeConfigState,
+  missingToolRuntimeConfigState,
+  normalizeExplicitFields,
+  normalizeToolRuntimeConfigState,
+} from "./toolRuntimeStorageConfig";
+import type { ToolRuntimeConfigExplicitFields, ToolRuntimeConfigState } from "./toolRuntimeStorageConfig";
 
 const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
 const TOOL_RUNTIME_STORAGE_KEY = "gshark.tool-runtime.v1";
 
-export const EMPTY_TOOL_RUNTIME_CONFIG: ToolRuntimeConfig = {
-  tsharkPath: "",
-  ffmpegPath: "",
-  pythonPath: "",
-  voskModelPath: "",
-  yaraEnabled: true,
-  yaraBin: "",
-  yaraRules: "",
-  yaraTimeoutMs: 25000,
-};
-
 export function readToolRuntimeConfig(): ToolRuntimeConfig {
-  if (typeof window === "undefined") return { ...EMPTY_TOOL_RUNTIME_CONFIG };
+  return readToolRuntimeConfigState().config;
+}
+
+export function readToolRuntimeConfigState(): ToolRuntimeConfigState {
+  if (typeof window === "undefined") return missingToolRuntimeConfigState();
   try {
     const raw = window.localStorage.getItem(TOOL_RUNTIME_STORAGE_KEY);
     if (!raw) {
       const legacyTsharkPath = window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY)?.trim() ?? "";
-      return { ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: legacyTsharkPath };
+      return legacyTsharkPath ? legacyTSharkToolRuntimeConfigState(legacyTsharkPath) : missingToolRuntimeConfigState();
     }
     const parsed = JSON.parse(raw);
-    return {
-      tsharkPath: String(parsed?.tsharkPath ?? window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY) ?? "").trim(),
-      ffmpegPath: String(parsed?.ffmpegPath ?? "").trim(),
-      pythonPath: String(parsed?.pythonPath ?? "").trim(),
-      voskModelPath: String(parsed?.voskModelPath ?? "").trim(),
-      yaraEnabled: parsed?.yaraEnabled !== false,
-      yaraBin: String(parsed?.yaraBin ?? "").trim(),
-      yaraRules: String(parsed?.yaraRules ?? "").trim(),
-      yaraTimeoutMs: Number(parsed?.yaraTimeoutMs ?? 25000) || 25000,
-    };
+    const legacyTsharkPath = window.localStorage.getItem(TSHARK_PATH_STORAGE_KEY)?.trim() ?? "";
+    return normalizeToolRuntimeConfigState(parsed, legacyTsharkPath);
   } catch {
-    return { ...EMPTY_TOOL_RUNTIME_CONFIG };
+    return missingToolRuntimeConfigState();
   }
 }
 
-export function writeToolRuntimeConfig(config: ToolRuntimeConfig) {
+export function writeObservedToolRuntimeSnapshotConfig(config: ToolRuntimeConfig) {
+  writeRuntimeConfigRecord(config, "observed-backend-snapshot", {});
+}
+
+export function writeUserToolRuntimeConfig(config: ToolRuntimeConfig, explicitFields = explicitFieldsForUserConfig()) {
+  writeRuntimeConfigRecord(config, "stored-runtime-config", normalizeExplicitFields(explicitFields));
+}
+
+function writeRuntimeConfigRecord(
+  config: ToolRuntimeConfig,
+  source: "observed-backend-snapshot" | "stored-runtime-config",
+  explicitFields: ToolRuntimeConfigExplicitFields,
+) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(TOOL_RUNTIME_STORAGE_KEY, JSON.stringify(config));
+    const record = createToolRuntimeStorageRecord(config, source, explicitFields);
+    window.localStorage.setItem(TOOL_RUNTIME_STORAGE_KEY, JSON.stringify(record));
     if (config.tsharkPath) {
       window.localStorage.setItem(TSHARK_PATH_STORAGE_KEY, config.tsharkPath);
     }

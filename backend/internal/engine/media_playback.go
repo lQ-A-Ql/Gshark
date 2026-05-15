@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -250,21 +251,8 @@ func compressedAudioPlaybackProfile(inputFormat string) playbackProfile {
 }
 
 func resolveFFmpegBinary(custom string) (string, error) {
-	custom = strings.TrimSpace(custom)
-	if custom == "" {
-		return exec.LookPath("ffmpeg")
-	}
-
-	candidates := []string{custom}
-	if info, err := os.Stat(custom); err == nil && info.IsDir() {
-		candidates = append(candidates,
-			filepath.Join(custom, "ffmpeg.exe"),
-			filepath.Join(custom, "ffmpeg"),
-		)
-	}
-
 	var lastErr error
-	for _, candidate := range candidates {
+	for _, candidate := range ffmpegBinaryCandidates(custom) {
 		if resolved, err := exec.LookPath(candidate); err == nil {
 			return resolved, nil
 		} else {
@@ -281,4 +269,31 @@ func resolveFFmpegBinary(custom string) (string, error) {
 		return "", lastErr
 	}
 	return "", exec.ErrNotFound
+}
+
+func ffmpegBinaryCandidates(custom string) []string {
+	custom = strings.TrimSpace(custom)
+	if custom != "" {
+		candidates := []string{custom}
+		if info, err := os.Stat(custom); err == nil && info.IsDir() {
+			candidates = append(candidates, filepath.Join(custom, "ffmpeg.exe"), filepath.Join(custom, "ffmpeg"))
+		}
+		return candidates
+	}
+
+	candidates := []string{"ffmpeg"}
+	if runtime.GOOS != "windows" {
+		return candidates
+	}
+	if localAppData := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); localAppData != "" {
+		candidates = append(candidates, filepath.Join(localAppData, "Microsoft", "WinGet", "Links", "ffmpeg.exe"))
+		for _, pattern := range []string{
+			filepath.Join(localAppData, "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg_*", "ffmpeg-*", "bin", "ffmpeg.exe"),
+		} {
+			if matches, err := filepath.Glob(pattern); err == nil {
+				candidates = append(candidates, matches...)
+			}
+		}
+	}
+	return append(candidates, `C:\ffmpeg\bin\ffmpeg.exe`, `C:\Program Files\ffmpeg\bin\ffmpeg.exe`)
 }

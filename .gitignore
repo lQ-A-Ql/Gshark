@@ -23,6 +23,7 @@ frontend/.vite/
 frontend/package-lock.json
 
 # Go / binaries
+.gocache/
 *.exe
 *.dll
 *.so
@@ -45,6 +46,10 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+backend/internal/transport/plugins/misc/
 
 # Local development reports
 /docs/audit*
+
+# Local component gallery / design scratchpad
+/component-gallery/

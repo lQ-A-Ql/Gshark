@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ToolRuntimeConfig } from "../core/types";
+import { EMPTY_TOOL_RUNTIME_CONFIG } from "./toolRuntimeStorageConfig";
 
-import { EMPTY_TOOL_RUNTIME_CONFIG, readToolRuntimeConfig, writeToolRuntimeConfig } from "./toolRuntimeStorage";
+import {
+  readToolRuntimeConfig,
+  readToolRuntimeConfigState,
+  writeObservedToolRuntimeSnapshotConfig,
+  writeUserToolRuntimeConfig,
+} from "./toolRuntimeStorage";
 
 describe("toolRuntimeStorage", () => {
   const values = new Map<string, string>();
@@ -27,6 +33,29 @@ describe("toolRuntimeStorage", () => {
       tsharkPath: "C:/Tools/tshark.exe",
       yaraEnabled: true,
       yaraTimeoutMs: 25000,
+    });
+    expect(readToolRuntimeConfigState()).toMatchObject({
+      source: "legacy-tshark-only",
+      config: { tsharkPath: "C:/Tools/tshark.exe" },
+      explicitFields: { tsharkPath: true },
+    });
+  });
+
+  it("marks missing storage separately from a saved empty config", () => {
+    expect(readToolRuntimeConfigState()).toEqual({
+      config: EMPTY_TOOL_RUNTIME_CONFIG,
+      source: "missing",
+      explicitFields: {},
+    });
+  });
+
+  it("migrates a legacy all-empty runtime config to observed state", () => {
+    window.localStorage.setItem("gshark.tool-runtime.v1", JSON.stringify(EMPTY_TOOL_RUNTIME_CONFIG));
+
+    expect(readToolRuntimeConfigState()).toEqual({
+      config: EMPTY_TOOL_RUNTIME_CONFIG,
+      source: "observed-backend-snapshot",
+      explicitFields: {},
     });
   });
 
@@ -55,10 +84,33 @@ describe("toolRuntimeStorage", () => {
       yaraRules: "C:/rules",
       yaraTimeoutMs: 30000,
     });
+    expect(readToolRuntimeConfigState()).toMatchObject({
+      source: "stored-runtime-config",
+      explicitFields: {
+        tsharkPath: true,
+        ffmpegPath: true,
+        pythonPath: true,
+        voskModelPath: true,
+        yaraEnabled: true,
+        yaraBin: true,
+        yaraRules: true,
+        yaraTimeoutMs: true,
+      },
+    });
+  });
+
+  it("treats malformed runtime config as missing so startup can trust the backend snapshot", () => {
+    window.localStorage.setItem("gshark.tool-runtime.v1", "{not-json");
+
+    expect(readToolRuntimeConfigState()).toEqual({
+      config: EMPTY_TOOL_RUNTIME_CONFIG,
+      source: "missing",
+      explicitFields: {},
+    });
   });
 
   it("writes current and legacy tshark path", () => {
-    writeToolRuntimeConfig({
+    writeUserToolRuntimeConfig({
       tsharkPath: "C:/Wireshark/tshark.exe",
       ffmpegPath: "",
       pythonPath: "",
@@ -71,7 +123,29 @@ describe("toolRuntimeStorage", () => {
 
     expect(window.localStorage.getItem("gshark.tshark-path.v1")).toBe("C:/Wireshark/tshark.exe");
     expect(JSON.parse(window.localStorage.getItem("gshark.tool-runtime.v1") ?? "{}")).toMatchObject({
-      tsharkPath: "C:/Wireshark/tshark.exe",
+      version: 2,
+      source: "stored-runtime-config",
+      config: { tsharkPath: "C:/Wireshark/tshark.exe" },
+      explicitFields: { tsharkPath: true, ffmpegPath: true },
+    });
+  });
+
+  it("writes observed snapshots without explicit fields", () => {
+    writeObservedToolRuntimeSnapshotConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, ffmpegPath: "C:/Env/ffmpeg.exe" });
+
+    expect(readToolRuntimeConfigState()).toEqual({
+      config: { ...EMPTY_TOOL_RUNTIME_CONFIG, ffmpegPath: "C:/Env/ffmpeg.exe" },
+      source: "observed-backend-snapshot",
+      explicitFields: {},
+    });
+  });
+
+  it("preserves explicit empty fields for v2 user-saved config", () => {
+    writeUserToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, ffmpegPath: "" }, { ffmpegPath: true });
+
+    expect(readToolRuntimeConfigState()).toMatchObject({
+      source: "stored-runtime-config",
+      explicitFields: { ffmpegPath: true },
     });
   });
 
@@ -87,14 +161,14 @@ describe("toolRuntimeStorage", () => {
       yaraTimeoutMs: 30000,
     };
 
-    writeToolRuntimeConfig(config);
+    writeUserToolRuntimeConfig(config);
 
     expect(readToolRuntimeConfig()).toEqual(config);
   });
 
   it("later writes overwrite earlier writes of the same key", () => {
-    writeToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: "first.exe" });
-    writeToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: "second.exe" });
+    writeUserToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: "first.exe" });
+    writeUserToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: "second.exe" });
 
     expect(readToolRuntimeConfig().tsharkPath).toBe("second.exe");
     expect(window.localStorage.getItem("gshark.tshark-path.v1")).toBe("second.exe");

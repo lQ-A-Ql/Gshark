@@ -16,20 +16,26 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
-	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
 func newTestServerWithTempMiscPackages(t *testing.T) *Server {
 	t.Helper()
 
-	server := NewServer(engine.NewService(nil, nil), NewHub())
-	manager := miscpkg.NewManager()
-	if err := manager.LoadFromDir(t.TempDir()); err != nil {
-		t.Fatalf("LoadFromDir(temp misc package dir) error = %v", err)
+	return NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
+}
+
+func TestResolveMiscPackageDirUsesOverrideAndEnv(t *testing.T) {
+	overrideDir := filepath.Join(t.TempDir(), "override")
+	if got := resolveMiscPackageDir(overrideDir); got != overrideDir {
+		t.Fatalf("resolveMiscPackageDir(override) = %q, want %q", got, overrideDir)
 	}
-	server.miscPkgMgr = manager
-	return server
+
+	envDir := filepath.Join(t.TempDir(), "env")
+	t.Setenv(miscPackageDirEnvVar, envDir)
+	if got := resolveMiscPackageDir(""); got != envDir {
+		t.Fatalf("resolveMiscPackageDir(env) = %q, want %q", got, envDir)
+	}
 }
 
 func TestWithCORSAllowsLoopbackDeletePreflight(t *testing.T) {
@@ -93,6 +99,48 @@ func TestWithAuthRequiresMatchingToken(t *testing.T) {
 	handler.ServeHTTP(authorizedRec, authorized)
 	if authorizedRec.Code != http.StatusOK {
 		t.Fatalf("expected authorized request to succeed, got %d", authorizedRec.Code)
+	}
+}
+
+func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
+	server := NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
+	server.SetAuthToken("secret-token")
+	handler := server.Handler()
+
+	badReq := httptest.NewRequest(http.MethodGet, "/api/events?access_token=wrong-token", nil)
+	badRec := httptest.NewRecorder()
+	handler.ServeHTTP(badRec, badReq)
+	if badRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong event token to fail, got %d", badRec.Code)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	goodReq := httptest.NewRequest(http.MethodGet, "/api/events?access_token=secret-token", nil).WithContext(ctx)
+	goodRec := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		handler.ServeHTTP(goodRec, goodReq)
+		close(done)
+	}()
+
+	deadline := time.After(2 * time.Second)
+	for !strings.Contains(goodRec.Body.String(), "event: ready") {
+		select {
+		case <-deadline:
+			cancel()
+			t.Fatalf("timed out waiting for SSE ready event, body=%q", goodRec.Body.String())
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("event stream did not stop after request context cancellation")
+	}
+	if goodRec.Code != http.StatusOK {
+		t.Fatalf("expected authorized event stream to connect, got %d body=%s", goodRec.Code, goodRec.Body.String())
 	}
 }
 
@@ -324,6 +372,51 @@ func TestHandlerRegistersStreamMutationRoutes(t *testing.T) {
 				if _, ok := payload[key]; !ok {
 					t.Fatalf("%s response missing key %q: %#v", tt.name, key, payload)
 				}
+			}
+		})
+	}
+}
+
+func TestHandlerRegistersToolRoutes(t *testing.T) {
+	server := NewServer(nil, NewHub())
+	server.toolAnalysis = contractToolAnalysisService{}
+	handler := server.Handler()
+	tests := []struct {
+		name        string
+		path        string
+		badMethod   string
+		goodMethod  string
+		payload     string
+		wantStatus  int
+		wantContent string
+	}{
+		{name: "ntlm sessions", path: "/api/tools/ntlm-sessions", badMethod: http.MethodPost, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `[]`},
+		{name: "http login", path: "/api/tools/http-login-analysis", badMethod: http.MethodPost, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `{`},
+		{name: "smtp", path: "/api/tools/smtp-analysis", badMethod: http.MethodPost, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `{`},
+		{name: "mysql", path: "/api/tools/mysql-analysis", badMethod: http.MethodPost, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `{`},
+		{name: "shiro get", path: "/api/tools/shiro-rememberme", badMethod: http.MethodPut, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `{`},
+		{name: "winrm decrypt", path: "/api/tools/winrm-decrypt", badMethod: http.MethodGet, goodMethod: http.MethodPost, payload: `{}`, wantStatus: http.StatusOK, wantContent: `{`},
+		{name: "smb3 candidates", path: "/api/tools/smb3-session-candidates", badMethod: http.MethodPost, goodMethod: http.MethodGet, wantStatus: http.StatusOK, wantContent: `[]`},
+		{name: "smb3 random key", path: "/api/tools/smb3-random-session-key", badMethod: http.MethodGet, goodMethod: http.MethodPost, payload: `{}`, wantStatus: http.StatusOK, wantContent: `{`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" rejects bad method", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.badMethod, tt.path, nil))
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.badMethod, tt.path, rec.Code, http.StatusMethodNotAllowed, rec.Body.String())
+			}
+		})
+
+		t.Run(tt.name+" accepts good method", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.goodMethod, tt.path, strings.NewReader(tt.payload)))
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.goodMethod, tt.path, rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if body := strings.TrimSpace(rec.Body.String()); !strings.HasPrefix(body, tt.wantContent) {
+				t.Fatalf("%s %s body = %s, want prefix %s", tt.goodMethod, tt.path, body, tt.wantContent)
 			}
 		})
 	}

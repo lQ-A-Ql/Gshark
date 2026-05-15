@@ -1,8 +1,21 @@
 import { Archive, Download, FileDown, Filter, Search } from "lucide-react";
+import { SelectControl, type SelectOption } from "../../components/ui/select";
 import { cn } from "../../components/ui/utils";
 import type { ExtractedObject } from "../../core/types";
 import { formatBytes } from "../../state/formatBytes";
 import { classifyObject, type ObjectGroup, type ObjectKind } from "./objectExportRules";
+
+const OBJECT_TYPE_OPTIONS: SelectOption[] = [
+  { value: "all", label: "全部类型" },
+  { value: "image", label: "图片" },
+  { value: "text", label: "文本" },
+  { value: "archive", label: "压缩包" },
+  { value: "document", label: "文档" },
+  { value: "executable", label: "可执行" },
+  { value: "audio", label: "音频" },
+  { value: "video", label: "视频" },
+  { value: "unknown", label: "其他" },
+];
 
 interface ObjectExportHeroProps {
   tags: string[];
@@ -71,21 +84,15 @@ export function ObjectExportToolbar({
       </div>
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-muted-foreground" />
-        <select
+        <SelectControl
+          aria-label="对象类型"
           value={typeFilter}
-          onChange={(event) => onTypeFilterChange(event.target.value as ObjectKind | "all")}
-          className="cursor-pointer rounded-md border border-border bg-accent px-2.5 py-1.5 text-xs text-foreground outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-        >
-          <option value="all">全部类型</option>
-          <option value="image">图片</option>
-          <option value="text">文本</option>
-          <option value="archive">压缩包</option>
-          <option value="document">文档</option>
-          <option value="executable">可执行</option>
-          <option value="audio">音频</option>
-          <option value="video">视频</option>
-          <option value="unknown">其他</option>
-        </select>
+          onValueChange={(next) => onTypeFilterChange(next as ObjectKind | "all")}
+          options={OBJECT_TYPE_OPTIONS}
+          size="sm"
+          tone="slate"
+          triggerClassName="min-w-28 bg-accent text-foreground"
+        />
       </div>
       <div className="ml-auto text-xs text-muted-foreground">匹配 {count} 个对象</div>
     </div>

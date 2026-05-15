@@ -1,0 +1,1735 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GShark Frontend Page Mock</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f9fc;
+        --panel: rgba(255, 255, 255, 0.94);
+        --panel-solid: #ffffff;
+        --line: #dbe5f0;
+        --line-soft: #edf2f7;
+        --text: #102033;
+        --muted: #617087;
+        --muted-2: #8a97a8;
+        --blue: #2563eb;
+        --blue-soft: #eff6ff;
+        --cyan: #0891b2;
+        --cyan-soft: #ecfeff;
+        --rose: #e11d48;
+        --rose-soft: #fff1f2;
+        --emerald: #059669;
+        --emerald-soft: #ecfdf5;
+        --amber: #b45309;
+        --amber-soft: #fffbeb;
+        --violet: #6d28d9;
+        --violet-soft: #f5f3ff;
+        --shadow: 0 26px 80px -54px rgba(15, 23, 42, 0.54);
+        --radius-xl: 24px;
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        font-family:
+          "Bahnschrift",
+          "Segoe UI Variable",
+          "Microsoft YaHei UI",
+          "Microsoft YaHei",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background:
+          linear-gradient(rgba(37, 99, 235, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(37, 99, 235, 0.035) 1px, transparent 1px),
+          linear-gradient(180deg, #f8fbff 0%, var(--bg) 52%, #f4f8fb 100%);
+        background-size:
+          24px 24px,
+          24px 24px,
+          auto;
+        color: var(--text);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app-shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-rows: 52px minmax(0, 1fr) 28px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 0 16px;
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 11px;
+      }
+
+      .brand-mark {
+        display: grid;
+        height: 31px;
+        width: 31px;
+        place-items: center;
+        border: 1px solid #bfdbfe;
+        border-radius: 11px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .brand-title {
+        min-width: 0;
+      }
+
+      .brand-title strong {
+        display: block;
+        overflow: hidden;
+        font-size: 13px;
+        line-height: 17px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand-title span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 13px;
+      }
+
+      .top-actions {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .status-pill,
+      .chip {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .status-pill {
+        min-height: 28px;
+        padding: 0 10px;
+      }
+
+      .chip {
+        min-height: 21px;
+        padding: 0 7px;
+      }
+
+      .chip.blue {
+        border-color: #bfdbfe;
+        background: var(--blue-soft);
+        color: #1d4ed8;
+      }
+
+      .chip.cyan {
+        border-color: #a5f3fc;
+        background: var(--cyan-soft);
+        color: #0e7490;
+      }
+
+      .chip.rose {
+        border-color: #fecdd3;
+        background: var(--rose-soft);
+        color: #be123c;
+      }
+
+      .chip.emerald {
+        border-color: #bbf7d0;
+        background: var(--emerald-soft);
+        color: #047857;
+      }
+
+      .chip.amber {
+        border-color: #fde68a;
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .chip.violet {
+        border-color: #ddd6fe;
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .dot {
+        display: inline-block;
+        height: 7px;
+        width: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .shell-body {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: 64px minmax(0, 1fr);
+      }
+
+      .rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+        padding: 12px 8px;
+      }
+
+      .rail-button {
+        display: grid;
+        height: 38px;
+        width: 38px;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 13px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 10.5px;
+        font-weight: 850;
+      }
+
+      .rail-button.active {
+        border-color: #bfdbfe;
+        background: var(--blue-soft);
+        color: var(--blue);
+        box-shadow: 0 10px 28px -20px rgba(37, 99, 235, 0.7);
+      }
+
+      .content {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .approval-ruler {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .ruler-item {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px 10px;
+        box-shadow: 0 14px 34px -30px rgba(15, 23, 42, 0.6);
+      }
+
+      .ruler-item strong {
+        overflow: hidden;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ruler-item span {
+        color: var(--muted);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .page-tabs {
+        display: flex;
+        gap: 7px;
+        min-width: 0;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 7px;
+      }
+
+      .page-tab {
+        display: inline-flex;
+        height: 30px;
+        flex: 0 0 auto;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fff;
+        color: var(--muted);
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .page-tab.active {
+        border-color: #bfdbfe;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .page-stage {
+        min-width: 0;
+        min-height: 0;
+        overflow: auto;
+      }
+
+      .mock-page {
+        display: none;
+        min-height: 100%;
+      }
+
+      .mock-page.active {
+        display: grid;
+      }
+
+      .page-frame {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        align-content: start;
+        gap: 12px;
+      }
+
+      .page-header {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--panel);
+        padding: 12px 14px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .page-heading {
+        min-width: 0;
+      }
+
+      .page-heading strong {
+        display: block;
+        overflow: hidden;
+        font-size: 16px;
+        line-height: 20px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .page-heading span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 16px;
+      }
+
+      .panel,
+      .surface {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .surface {
+        border-radius: var(--radius-lg);
+        box-shadow: 0 22px 60px -50px rgba(15, 23, 42, 0.56);
+      }
+
+      .panel-header,
+      .surface-header {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 10px 12px;
+      }
+
+      .panel-title,
+      .surface-title {
+        min-width: 0;
+      }
+
+      .panel-title strong,
+      .surface-title strong {
+        display: block;
+        overflow: hidden;
+        font-size: 13px;
+        line-height: 17px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-title span,
+      .surface-title span {
+        display: block;
+        color: var(--muted);
+        font-size: 10.5px;
+        line-height: 15px;
+      }
+
+      .panel-body,
+      .surface-body {
+        padding: 12px;
+      }
+
+      .btn {
+        display: inline-flex;
+        height: 32px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fff;
+        color: var(--text);
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.danger {
+        border-color: #fecdd3;
+        background: var(--rose-soft);
+        color: var(--rose);
+      }
+
+      .input {
+        min-width: 0;
+        height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #f8fafc;
+        color: var(--text);
+        padding: 0 10px;
+        outline: none;
+      }
+
+      .mono {
+        font-family:
+          "Cascadia Mono",
+          Consolas,
+          monospace;
+      }
+
+      .welcome-page-grid {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: minmax(0, 1.28fr) 340px;
+      }
+
+      .welcome-main {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        border-right: 1px solid var(--line-soft);
+        padding: 26px 28px 22px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid #bfdbfe;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        padding: 5px 9px;
+      }
+
+      .welcome-main h1 {
+        position: relative;
+        z-index: 1;
+        max-width: 720px;
+        margin: 12px 0 9px;
+        color: #081827;
+        font-size: clamp(26px, 4vw, 42px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .welcome-main p {
+        position: relative;
+        z-index: 1;
+        max-width: 720px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.78;
+      }
+
+      .capture-row {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .guide-strip {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 15px;
+      }
+
+      .guide-card {
+        min-width: 0;
+        border: 1px solid var(--line-soft);
+        border-radius: 15px;
+        background: rgba(248, 250, 252, 0.82);
+        padding: 10px;
+      }
+
+      .guide-card strong {
+        display: block;
+        overflow: hidden;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .guide-card span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      .watermark-logo {
+        pointer-events: none;
+        position: absolute;
+        right: 32px;
+        bottom: -42px;
+        z-index: 0;
+        width: min(54%, 440px);
+        opacity: 0.1;
+        mix-blend-mode: multiply;
+        filter: drop-shadow(0 4px 7px rgba(15, 23, 42, 0.12));
+        user-select: none;
+      }
+
+      .welcome-side {
+        display: grid;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .mini-stack {
+        display: grid;
+        gap: 8px;
+      }
+
+      .mini-line {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .mini-line strong {
+        overflow: hidden;
+        color: var(--text);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .recent-item {
+        display: grid;
+        gap: 3px;
+        border-top: 1px solid var(--line-soft);
+        padding: 8px 0 0;
+        margin-top: 8px;
+      }
+
+      .recent-item:first-of-type {
+        border-top: 0;
+        margin-top: 0;
+        padding-top: 0;
+      }
+
+      .recent-item strong,
+      .recent-item span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .recent-item strong {
+        font-size: 11px;
+      }
+
+      .recent-item span {
+        color: var(--muted);
+        font-size: 9.5px;
+      }
+
+      .workbench {
+        display: grid;
+        min-height: 620px;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .filter-bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 8px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 9px 10px;
+      }
+
+      .workbench-shape {
+        display: grid;
+        min-height: 0;
+        grid-template-rows: minmax(170px, 0.96fr) 6px minmax(220px, 1.04fr);
+      }
+
+      .packet-scroll,
+      .hex-panel,
+      .table-wrap {
+        overflow: auto;
+      }
+
+      .table-head,
+      .packet-row {
+        display: grid;
+        grid-template-columns: 54px 72px 1fr 1fr 72px minmax(160px, 1.3fr);
+        align-items: center;
+        gap: 8px;
+        min-width: 760px;
+        padding: 0 11px;
+      }
+
+      .table-head {
+        height: 27px;
+        border-bottom: 1px solid var(--line-soft);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .packet-row {
+        min-height: 28px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #233044;
+        font-size: 10.5px;
+      }
+
+      .packet-row.active {
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+
+      .resize-line {
+        background: linear-gradient(90deg, transparent, #bfdbfe, transparent);
+      }
+
+      .lower-panels {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: minmax(210px, 0.58fr) 6px minmax(0, 1.42fr);
+      }
+
+      .tree-line {
+        display: flex;
+        height: 27px;
+        align-items: center;
+        gap: 7px;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 0 10px;
+        color: var(--muted);
+        font-size: 10.5px;
+      }
+
+      .tree-line.active {
+        background: #ecfeff;
+        color: var(--cyan);
+        font-weight: 900;
+      }
+
+      .hex-grid {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr) minmax(120px, 0.42fr);
+        min-width: 620px;
+        padding: 10px;
+        gap: 12px;
+        color: #233044;
+        font-size: 10.5px;
+        line-height: 1.9;
+      }
+
+      .hex-offset {
+        color: var(--muted-2);
+      }
+
+      .hex-byte mark {
+        border-radius: 4px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        padding: 1px 2px;
+      }
+
+      .grid-2,
+      .grid-3,
+      .grid-4 {
+        display: grid;
+        min-width: 0;
+        gap: 12px;
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .span-2 {
+        grid-column: span 2;
+      }
+
+      .metric {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 15px;
+        background: #f8fafc;
+        padding: 10px;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .metric strong {
+        font-size: 17px;
+        line-height: 1;
+      }
+
+      .dense-card {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      .dense-card.expanded {
+        border-color: #a5f3fc;
+      }
+
+      .dense-head {
+        display: grid;
+        min-height: 58px;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 9px;
+      }
+
+      .dense-icon {
+        display: grid;
+        height: 34px;
+        width: 34px;
+        place-items: center;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .dense-main {
+        min-width: 0;
+      }
+
+      .dense-title,
+      .dense-summary,
+      .dense-actions {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dense-title {
+        margin-bottom: 4px;
+      }
+
+      .dense-title strong {
+        overflow: hidden;
+        font-size: 12px;
+        line-height: 15px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dense-summary {
+        color: var(--muted);
+        font-size: 10.5px;
+      }
+
+      .dense-summary span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dense-actions {
+        justify-content: flex-end;
+      }
+
+      .count-box {
+        display: grid;
+        min-width: 46px;
+        place-items: center;
+        border: 1px solid #fecdd3;
+        border-radius: 12px;
+        background: var(--rose-soft);
+        color: var(--rose);
+        padding: 5px 7px;
+      }
+
+      .count-box strong {
+        font-size: 13px;
+        line-height: 14px;
+      }
+
+      .count-box span {
+        font-size: 9px;
+        line-height: 10px;
+      }
+
+      .toggle {
+        height: 32px;
+        min-width: 32px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .dense-body {
+        border-top: 1px solid var(--line-soft);
+        background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+        padding: 9px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .field .select-like {
+        display: flex;
+        height: 31px;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: var(--text);
+        padding: 0 9px;
+        font-size: 11px;
+      }
+
+      .result-line {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        margin-top: 8px;
+        border: 1px solid #dbeafe;
+        border-radius: 12px;
+        background: var(--blue-soft);
+        padding: 8px 9px;
+        color: #1e3a8a;
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+
+      .route-map {
+        display: grid;
+        gap: 8px;
+      }
+
+      .route-row {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 35px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+
+      .route-row strong,
+      .route-row span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .route-row span {
+        color: var(--muted);
+      }
+
+      .mock-table {
+        min-width: 620px;
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 11px;
+      }
+
+      .mock-table th,
+      .mock-table td {
+        border-bottom: 1px solid var(--line-soft);
+        padding: 8px 9px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .mock-table th {
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .mock-table td {
+        color: #253247;
+      }
+
+      .split-page {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .stream-body {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        gap: 12px;
+      }
+
+      .graph-canvas {
+        min-height: 320px;
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+        background:
+          radial-gradient(circle at 28% 42%, rgba(37, 99, 235, 0.18), transparent 22%),
+          radial-gradient(circle at 66% 52%, rgba(8, 145, 178, 0.2), transparent 24%),
+          linear-gradient(135deg, #f8fbff, #eef6ff);
+      }
+
+      .node {
+        position: absolute;
+        display: grid;
+        height: 46px;
+        min-width: 92px;
+        place-items: center;
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        background: #fff;
+        color: #1d4ed8;
+        font-size: 11px;
+        font-weight: 900;
+        box-shadow: 0 18px 40px -30px rgba(37, 99, 235, 0.9);
+      }
+
+      .node:nth-child(1) {
+        left: 10%;
+        top: 18%;
+      }
+
+      .node:nth-child(2) {
+        left: 45%;
+        top: 35%;
+        border-color: #fecdd3;
+        color: var(--rose);
+      }
+
+      .node:nth-child(3) {
+        right: 12%;
+        top: 18%;
+        border-color: #a5f3fc;
+        color: var(--cyan);
+      }
+
+      .node:nth-child(4) {
+        left: 30%;
+        bottom: 15%;
+        border-color: #bbf7d0;
+        color: var(--emerald);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 8px;
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+        padding: 8px;
+        font-size: 11px;
+      }
+
+      .timeline-row span {
+        color: var(--muted);
+      }
+
+      .footer {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.84);
+        padding: 0 12px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      @media (max-width: 1180px) {
+        .approval-ruler,
+        .grid-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-3,
+        .grid-2,
+        .split-page,
+        .stream-body {
+          grid-template-columns: 1fr;
+        }
+
+        .span-2 {
+          grid-column: auto;
+        }
+      }
+
+      @media (max-width: 820px) {
+        .app-shell {
+          grid-template-rows: auto minmax(0, 1fr) auto;
+        }
+
+        .topbar,
+        .footer,
+        .page-header,
+        .panel-header,
+        .surface-header {
+          flex-wrap: wrap;
+          padding: 8px 10px;
+        }
+
+        .shell-body {
+          grid-template-columns: 48px minmax(0, 1fr);
+        }
+
+        .rail {
+          padding-inline: 5px;
+        }
+
+        .rail-button {
+          width: 34px;
+        }
+
+        .approval-ruler,
+        .grid-4,
+        .welcome-page-grid,
+        .capture-row,
+        .guide-strip,
+        .filter-bar,
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .welcome-main {
+          border-right: 0;
+          border-bottom: 1px solid var(--line-soft);
+        }
+
+        .dense-head {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+
+        .dense-actions {
+          grid-column: 1 / -1;
+          justify-content: flex-start;
+        }
+
+        .lower-panels {
+          grid-template-columns: 1fr;
+          grid-template-rows: minmax(150px, auto) 6px minmax(210px, auto);
+        }
+
+        .watermark-logo {
+          right: 18px;
+          width: min(66%, 360px);
+        }
+
+        .route-row,
+        .timeline-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .mock-page.active .panel,
+        .mock-page.active .surface {
+          animation: lift-in 360ms ease both;
+        }
+
+        @keyframes lift-in {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">GS</div>
+          <div class="brand-title">
+            <strong>GShark Sentinel</strong>
+            <span>route-level approval mock · static html</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span class="status-pill"><span class="dot" style="color: var(--emerald)"></span>Backend connected</span>
+          <span class="status-pill"><span class="dot" style="color: var(--blue)"></span>Mock routes 18/18</span>
+          <button class="btn" type="button" data-target="welcome">欢迎页</button>
+        </div>
+      </header>
+
+      <div class="shell-body">
+        <aside class="rail" aria-label="main navigation">
+          <button class="rail-button active" type="button" title="Welcome" data-target="welcome">WE</button>
+          <button class="rail-button" type="button" title="Workspace" data-target="workspace">WK</button>
+          <button class="rail-button" type="button" title="Cockpit" data-target="analysis-cockpit">CP</button>
+          <button class="rail-button" type="button" title="HTTP Stream" data-target="http-stream">HT</button>
+          <button class="rail-button" type="button" title="Hunting" data-target="hunting">TH</button>
+          <button class="rail-button" type="button" title="Objects" data-target="objects">OB</button>
+          <button class="rail-button" type="button" title="MISC" data-target="misc">MI</button>
+          <button class="rail-button" type="button" title="Evidence" data-target="evidence">EV</button>
+        </aside>
+
+        <main class="content">
+          <section class="approval-ruler" aria-label="approval locks">
+            <div class="ruler-item">
+              <strong>Welcome and workspace split</strong>
+              <span>两个独立页面</span>
+            </div>
+            <div class="ruler-item">
+              <strong>Logo position locked</strong>
+              <span>欢迎页水印不移动</span>
+            </div>
+            <div class="ruler-item">
+              <strong>Workspace 品字形 locked</strong>
+              <span>上 1 / 下 2</span>
+            </div>
+            <div class="ruler-item">
+              <strong>Dense module cards</strong>
+              <span>审批候选样式</span>
+            </div>
+          </section>
+
+          <nav class="page-tabs" aria-label="mock page tabs">
+            <button class="page-tab active" type="button" data-target="welcome">欢迎页</button>
+            <button class="page-tab" type="button" data-target="workspace">主工作区</button>
+            <button class="page-tab" type="button" data-target="analysis-cockpit">分析驾驶舱</button>
+            <button class="page-tab" type="button" data-target="http-stream">HTTP Stream</button>
+            <button class="page-tab" type="button" data-target="tcp-stream">TCP Stream</button>
+            <button class="page-tab" type="button" data-target="udp-stream">UDP Stream</button>
+            <button class="page-tab" type="button" data-target="hunting">威胁狩猎</button>
+            <button class="page-tab" type="button" data-target="objects">对象导出</button>
+            <button class="page-tab" type="button" data-target="misc">MISC</button>
+            <button class="page-tab" type="button" data-target="updates">更新中心</button>
+            <button class="page-tab" type="button" data-target="traffic-graph">流量图谱</button>
+            <button class="page-tab" type="button" data-target="c2-analysis">C2</button>
+            <button class="page-tab" type="button" data-target="apt-analysis">APT</button>
+            <button class="page-tab" type="button" data-target="industrial-analysis">工控</button>
+            <button class="page-tab" type="button" data-target="vehicle-analysis">车机</button>
+            <button class="page-tab" type="button" data-target="media-analysis">媒体</button>
+            <button class="page-tab" type="button" data-target="usb-analysis">USB</button>
+            <button class="page-tab" type="button" data-target="evidence">证据链</button>
+          </nav>
+
+          <section class="page-stage">
+            <article class="mock-page active" id="page-welcome" data-page="welcome">
+              <div class="page-frame">
+                <div class="page-header">
+                  <div class="page-heading">
+                    <strong>欢迎页 / Capture Welcome</strong>
+                    <span>独立于主工作区，保留当前 logo 图片水印位置，只展示打开抓包与状态入口。</span>
+                  </div>
+                  <div class="top-actions">
+                    <span class="chip blue">Logo position locked</span>
+                    <span class="chip cyan">No workspace table here</span>
+                  </div>
+                </div>
+
+                <section class="panel welcome-page-grid">
+                  <div class="welcome-main">
+                    <span class="eyebrow">GSHARK QUICK START</span>
+                    <h1>先帮你找到方向，再进入流量细节。</h1>
+                    <p>
+                      欢迎页只承担打开抓包、展示运行状态和最近文件入口。主工作区不再和欢迎页同屏混排，
+                      审批时可以单独确认 logo 水印没有移动。
+                    </p>
+                    <div class="capture-row">
+                      <input class="input mono" value="D:\samples\apt-c2-session.pcapng" aria-label="capture path" />
+                      <button class="btn primary" type="button">选择文件</button>
+                      <button class="btn" type="button">路径打开</button>
+                    </div>
+                    <div class="guide-strip">
+                      <div class="guide-card">
+                        <strong>快速找可疑流量</strong>
+                        <span>打开抓包后进入分析驾驶舱或主工作区。</span>
+                      </div>
+                      <div class="guide-card">
+                        <strong>筛选上下文</strong>
+                        <span>推荐过滤器回填到独立主工作区。</span>
+                      </div>
+                      <div class="guide-card">
+                        <strong>解码 Payload</strong>
+                        <span>从包、流或模块卡片进入工具。</span>
+                      </div>
+                    </div>
+                    <img class="watermark-logo" src="src/assets/logo.png" alt="GShark Background" />
+                  </div>
+
+                  <div class="welcome-side">
+                    <div class="surface">
+                      <div class="surface-header">
+                        <div class="surface-title">
+                          <strong>ENGINE STATUS</strong>
+                          <span>后端与工具链状态</span>
+                        </div>
+                      </div>
+                      <div class="surface-body mini-stack">
+                        <div class="mini-line"><span>backend</span><strong>connected</strong></div>
+                        <div class="mini-line"><span>tshark</span><strong>C:\Tools\tshark.exe</strong></div>
+                        <div class="mini-line"><span>ffmpeg</span><strong>ready</strong></div>
+                        <div class="mini-line"><span>last task</span><strong>idle</strong></div>
+                      </div>
+                    </div>
+                    <div class="surface">
+                      <div class="surface-header">
+                        <div class="surface-title">
+                          <strong>RECENT FILES</strong>
+                          <span>最近打开的抓包</span>
+                        </div>
+                      </div>
+                      <div class="surface-body">
+                        <div class="recent-item">
+                          <strong>apt-c2-session.pcapng</strong>
+                          <span class="mono">D:\samples\apt-c2-session.pcapng</span>
+                        </div>
+                        <div class="recent-item">
+                          <strong>usb-exfil-lab.pcapng</strong>
+                          <span class="mono">D:\samples\usb-exfil-lab.pcapng</span>
+                        </div>
+                        <div class="recent-item">
+                          <strong>industrial-modbus-anomaly.pcap</strong>
+                          <span class="mono">D:\samples\industrial-modbus-anomaly.pcap</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-workspace" data-page="workspace">
+              <div class="page-frame">
+                <div class="page-header">
+                  <div class="page-heading">
+                    <strong>主工作区 / Packet Workspace</strong>
+                    <span>独立页面，继续保持上方包表、下方左协议树与右 Hex/ASCII 的品字形布局。</span>
+                  </div>
+                  <div class="top-actions">
+                    <span class="chip blue">142,618 packets</span>
+                    <span class="chip cyan">品字形 locked</span>
+                  </div>
+                </div>
+
+                <section class="panel workbench">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <strong>流量工作区</strong>
+                      <span>apt-c2-session.pcapng · packet table and byte-level evidence</span>
+                    </div>
+                    <div class="top-actions">
+                      <button class="btn" type="button">上一页</button>
+                      <button class="btn" type="button">下一页</button>
+                      <button class="btn danger" type="button">停止加载</button>
+                    </div>
+                  </div>
+                  <div class="filter-bar">
+                    <input class="input mono" value='http.request or frame contains "cmd="' aria-label="display filter" />
+                    <button class="btn primary" type="button">应用过滤</button>
+                    <button class="btn" type="button">清除</button>
+                  </div>
+                  <div class="workbench-shape">
+                    <div class="packet-scroll">
+                      <div class="table-head mono">
+                        <span>No.</span><span>Time</span><span>Source</span><span>Destination</span><span>Proto</span><span>Info</span>
+                      </div>
+                      <div class="packet-row mono"><span>2401</span><span>12.842</span><span>10.1.8.22</span><span>185.32.19.6</span><span>HTTP</span><span>POST /api/login.php shell payload</span></div>
+                      <div class="packet-row active mono"><span>2402</span><span>12.901</span><span>10.1.8.22</span><span>185.32.19.6</span><span>TCP</span><span>PSH, ACK len=884 stream=7</span></div>
+                      <div class="packet-row mono"><span>2403</span><span>13.010</span><span>185.32.19.6</span><span>10.1.8.22</span><span>HTTP</span><span>200 OK encrypted response</span></div>
+                      <div class="packet-row mono"><span>2404</span><span>14.334</span><span>10.1.8.22</span><span>185.32.19.6</span><span>DNS</span><span>TXT beacon metadata</span></div>
+                      <div class="packet-row mono"><span>2405</span><span>15.778</span><span>10.1.8.22</span><span>10.1.8.1</span><span>ARP</span><span>who has gateway</span></div>
+                    </div>
+                    <div class="resize-line" aria-hidden="true"></div>
+                    <div class="lower-panels">
+                      <div>
+                        <div class="tree-line">Frame 2402 · 944 bytes</div>
+                        <div class="tree-line">Ethernet II</div>
+                        <div class="tree-line">Internet Protocol v4</div>
+                        <div class="tree-line active">Transmission Control Protocol</div>
+                        <div class="tree-line">HTTP payload fragment</div>
+                      </div>
+                      <div class="resize-line" aria-hidden="true"></div>
+                      <div class="hex-panel">
+                        <div class="hex-grid mono">
+                          <div class="hex-offset">0000<br />0010<br />0020<br />0030<br />0040</div>
+                          <div class="hex-byte">
+                            47 45 54 20 2f 61 70 69 20 48 54 54 50 2f 31 2e<br />
+                            31 0d 0a 48 6f 73 74 3a 20 31 38 35 2e 33 32<br />
+                            <mark>63 6d 64 3d 77 68 6f 61 6d 69</mark> 26 6b 65 79 3d<br />
+                            39 66 61 63 2d 62 65 61 63 6f 6e 2d 73 65 73<br />
+                            73 69 6f 6e 0d 0a 0d 0a
+                          </div>
+                          <div>GET /api HTTP/1.1<br />Host: 185.32<br />cmd=whoami&key=<br />9fac-beacon-ses<br />sion</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-analysis-cockpit" data-page="analysis-cockpit">
+              <div class="page-frame">
+                <div class="page-header">
+                  <div class="page-heading">
+                    <strong>分析驾驶舱 / Mission Control</strong>
+                    <span>抓包已打开后的入口页：概览、快速过滤器、推荐路径、可疑命中和 payload shortcut。</span>
+                  </div>
+                  <div class="top-actions">
+                    <span class="chip rose">12 high risk</span>
+                    <span class="chip blue">36 streams</span>
+                    <span class="chip cyan">dense cards</span>
+                  </div>
+                </div>
+                <section class="grid-4">
+                  <div class="metric"><span>Packets</span><strong>142k</strong></div>
+                  <div class="metric"><span>Streams</span><strong>36</strong></div>
+                  <div class="metric"><span>Objects</span><strong>88</strong></div>
+                  <div class="metric"><span>Threat hits</span><strong>27</strong></div>
+                </section>
+                <section class="grid-2">
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div class="panel-title"><strong>推荐分析路径</strong><span>高密度工作模块卡片候选</span></div>
+                    </div>
+                    <div class="panel-body mini-stack">
+                      <div class="dense-card expanded">
+                        <div class="dense-head">
+                          <div class="dense-icon">C2</div>
+                          <div class="dense-main">
+                            <div class="dense-title"><strong>C2 解密工作台</strong><span class="chip rose">High</span><span class="chip cyan">可中断</span></div>
+                            <div class="dense-summary"><span>对选中 stream 进行 key mode / transform mode 组合验证</span><span class="chip">stream 7</span></div>
+                          </div>
+                          <div class="dense-actions"><span class="count-box"><strong>12</strong><span>hits</span></span><button class="toggle" type="button">⌃</button></div>
+                        </div>
+                        <div class="dense-body">
+                          <div class="form-grid">
+                            <div class="field"><label>Mode</label><div class="select-like"><span>VShell 3-KDF</span><span>⌄</span></div></div>
+                            <div class="field"><label>Key source</label><div class="select-like"><span>selected stream</span><span>⌄</span></div></div>
+                            <div class="field"><label>Transform</label><div class="select-like"><span>auto detect</span><span>⌄</span></div></div>
+                            <button class="btn primary" type="button">运行</button>
+                          </div>
+                          <div class="result-line"><span>2 条高置信度解密候选包含命令回显与 beacon session key。</span><span class="chip blue">open stream</span></div>
+                        </div>
+                      </div>
+                      <div class="dense-card">
+                        <div class="dense-head">
+                          <div class="dense-icon">EV</div>
+                          <div class="dense-main">
+                            <div class="dense-title"><strong>证据链聚合</strong><span class="chip blue">Evidence</span><span class="chip rose">critical 2</span></div>
+                            <div class="dense-summary"><span>从 hunting / C2 / APT / industrial / object 归并证据</span><span class="chip">export ready</span></div>
+                          </div>
+                          <div class="dense-actions"><span class="count-box"><strong>27</strong><span>items</span></span><button class="toggle" type="button">⌄</button></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div class="panel-title"><strong>可疑命中</strong><span>命中可跳包、开流、进入狩猎</span></div>
+                    </div>
+                    <div class="panel-body table-wrap">
+                      <table class="mock-table">
+                        <thead><tr><th>Level</th><th>Packet</th><th>Rule</th><th>Action</th></tr></thead>
+                        <tbody>
+                          <tr><td><span class="chip rose">high</span></td><td>2402</td><td>webshell command marker</td><td>open stream</td></tr>
+                          <tr><td><span class="chip amber">medium</span></td><td>2404</td><td>DNS TXT beacon</td><td>apply filter</td></tr>
+                          <tr><td><span class="chip blue">info</span></td><td>2488</td><td>object export candidate</td><td>objects</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-http-stream" data-page="http-stream">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>HTTP Stream</strong><span>请求响应、payload 解码、对象与命中上下文。</span></div><div class="top-actions"><span class="chip blue">stream 7</span><span class="chip rose">webshell marker</span></div></div>
+                <section class="stream-body">
+                  <div class="panel">
+                    <div class="panel-header"><div class="panel-title"><strong>HTTP 会话列表</strong><span>按 URI / status / risk 扫读</span></div></div>
+                    <div class="panel-body route-map">
+                      <div class="route-row"><strong>GET /index</strong><span>200 · text/html · stream 2</span><span class="chip emerald">ok</span></div>
+                      <div class="route-row"><strong>POST /api/login.php</strong><span>884 bytes · command payload</span><span class="chip rose">high</span></div>
+                      <div class="route-row"><strong>GET /download</strong><span>application/octet-stream</span><span class="chip amber">object</span></div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-header"><div class="panel-title"><strong>请求/响应详情</strong><span>正文、headers、payload 解码并列</span></div><button class="btn primary" type="button">发送到解码器</button></div>
+                    <div class="panel-body grid-2">
+                      <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Request</strong><span class="mono">POST /api/login.php</span></div></div><div class="surface-body mono">cmd=whoami&key=9fac-beacon-session<br />Cookie: PHPSESSID=...</div></div>
+                      <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Decoded</strong><span>confidence 0.91</span></div></div><div class="surface-body mono">uid=www-data<br />hostname=web-01<br />cwd=/var/www/html</div></div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-tcp-stream" data-page="tcp-stream">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>TCP Stream</strong><span>双向重组、方向切换、raw/ASCII/hex 对照。</span></div><div class="top-actions"><span class="chip cyan">36 TCP streams</span><span class="chip blue">payload inspector</span></div></div>
+                <section class="stream-body">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>Stream Index</strong><span>排序保留密度</span></div></div><div class="panel-body route-map"><div class="route-row"><strong>tcp.stream 7</strong><span>10.1.8.22:51822 -> 185.32.19.6:443</span><span class="chip rose">suspicious</span></div><div class="route-row"><strong>tcp.stream 11</strong><span>10.1.8.40:50981 -> 10.1.8.1:445</span><span class="chip amber">smb</span></div><div class="route-row"><strong>tcp.stream 18</strong><span>media control channel</span><span class="chip">normal</span></div></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>Reassembled Payload</strong><span>direction: client to server</span></div><button class="btn primary" type="button">跟随当前包</button></div><div class="panel-body mono">0000  16 03 01 02 00 01 00 01 fc 03 03 ...<br />0030  extension server_name suspicious-c2.example<br />0060  application data fragment len=884</div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-udp-stream" data-page="udp-stream">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>UDP Stream</strong><span>DNS、RTP、工业协议与短会话聚合。</span></div><div class="top-actions"><span class="chip cyan">12 UDP streams</span><span class="chip amber">TXT beacon</span></div></div>
+                <section class="grid-3">
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>DNS TXT</strong><span>beacon candidates</span></div></div><div class="surface-body mono">_t.9fac.example TXT "c2=185.32.19.6;id=web01"</div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>RTP</strong><span>media extraction</span></div></div><div class="surface-body">2 audio flows ready for media page.</div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Industrial UDP</strong><span>Modbus/UDP watch</span></div></div><div class="surface-body">3 function-code anomalies queued.</div></div>
+                </section>
+                <section class="panel"><div class="panel-header"><div class="panel-title"><strong>UDP Timeline</strong><span>短流按时间线归并</span></div></div><div class="panel-body timeline"><div class="timeline-row"><span>12.884</span><strong>DNS TXT beacon</strong><span class="chip amber">medium</span></div><div class="timeline-row"><span>13.430</span><strong>RTP payload burst</strong><span class="chip blue">media</span></div><div class="timeline-row"><span>14.090</span><strong>Modbus read coils</strong><span class="chip cyan">industrial</span></div></div></section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-hunting" data-page="hunting">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>威胁狩猎</strong><span>规则、插件、YARA 和命中表的高密度工作面。</span></div><div class="top-actions"><span class="chip rose">27 hits</span><span class="chip violet">3 plugins</span></div></div>
+                <section class="grid-3">
+                  <div class="metric"><span>Rules enabled</span><strong>84</strong></div>
+                  <div class="metric"><span>Plugin warnings</span><strong>1</strong></div>
+                  <div class="metric"><span>Critical hits</span><strong>2</strong></div>
+                </section>
+                <section class="panel"><div class="panel-header"><div class="panel-title"><strong>命中表</strong><span>定位包、打开流、归入证据链</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Level</th><th>Rule</th><th>Packet</th><th>Preview</th><th>Action</th></tr></thead><tbody><tr><td><span class="chip rose">critical</span></td><td>webshell.exec</td><td>2402</td><td>cmd=whoami</td><td>locate</td></tr><tr><td><span class="chip rose">high</span></td><td>c2.beacon</td><td>2404</td><td>TXT beacon</td><td>stream</td></tr><tr><td><span class="chip amber">medium</span></td><td>plugin.ioc</td><td>2520</td><td>mimikatz string</td><td>evidence</td></tr></tbody></table></div></section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-objects" data-page="objects">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>对象导出</strong><span>对象类型筛选、证据预览、批量导出。</span></div><div class="top-actions"><span class="chip blue">88 objects</span><span class="chip cyan">global select style</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>筛选区</strong><span>类型、MIME、大小、风险</span></div></div><div class="panel-body form-grid"><div class="field"><label>Type</label><div class="select-like"><span>All object types</span><span>⌄</span></div></div><div class="field"><label>Risk</label><div class="select-like"><span>Suspicious only</span><span>⌄</span></div></div><div class="field"><label>Search</label><input class="input" value="php|zip|exe" /></div><button class="btn primary" type="button">过滤</button></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>导出队列</strong><span>保留密集对象清单</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Name</th><th>MIME</th><th>Size</th><th>Risk</th></tr></thead><tbody><tr><td>login.php</td><td>text/x-php</td><td>8.2 KB</td><td><span class="chip rose">high</span></td></tr><tr><td>stage.bin</td><td>application/octet-stream</td><td>144 KB</td><td><span class="chip amber">medium</span></td></tr><tr><td>report.pdf</td><td>application/pdf</td><td>64 KB</td><td><span class="chip">normal</span></td></tr></tbody></table></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-misc" data-page="misc">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>MISC 工具区</strong><span>内建模块和 zip 自定义模块统一以高密度卡片呈现。</span></div><div class="top-actions"><span class="chip cyan">host rendered</span><span class="chip amber">trusted local extension</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>模块清单</strong><span>折叠态压缩为一行扫读</span></div></div><div class="panel-body mini-stack">
+                    <div class="dense-card"><div class="dense-head"><div class="dense-icon">WR</div><div class="dense-main"><div class="dense-title"><strong>WinRM Decrypt</strong><span class="chip blue">builtin</span><span class="chip cyan">capture.read</span></div><div class="dense-summary"><span>解密 WinRM SOAP / PSRP 会话材料</span><span class="chip">field.scan</span></div></div><div class="dense-actions"><span class="count-box"><strong>5</strong><span>rows</span></span><button class="toggle" type="button">⌄</button></div></div></div>
+                    <div class="dense-card expanded"><div class="dense-head"><div class="dense-icon">IO</div><div class="dense-main"><div class="dense-title"><strong>IOC Demo</strong><span class="chip emerald">custom</span><span class="chip cyan">host.bridge</span></div><div class="dense-summary"><span>统一表单渲染，不允许模块自带前端样式</span><span class="chip">python</span></div></div><div class="dense-actions"><span class="count-box"><strong>0</strong><span>hits</span></span><button class="toggle" type="button">⌃</button></div></div><div class="dense-body"><div class="form-grid"><div class="field"><label>Keyword</label><input class="input" value="mimikatz" /></div><div class="field"><label>Mode</label><div class="select-like"><span>Regex</span><span>⌄</span></div></div><div class="field"><label>Source</label><div class="select-like"><span>Current capture</span><span>⌄</span></div></div><button class="btn primary" type="button">运行</button></div></div></div>
+                  </div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>信任边界提示</strong><span>来自接口文档的 UI 表达</span></div></div><div class="panel-body route-map"><div class="route-row"><strong>exec.local</strong><span>本地可信扩展点，不是强沙箱</span><span class="chip amber">review</span></div><div class="route-row"><strong>capture.read</strong><span>读取当前抓包或派生数据</span><span class="chip cyan">capability</span></div><div class="route-row"><strong>field.scan</strong><span>允许 host-backed field scans</span><span class="chip blue">scan</span></div></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-updates" data-page="updates">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>更新中心</strong><span>版本状态、发布说明、下载与校验。</span></div><div class="top-actions"><span class="chip emerald">current 0.9.8</span><span class="chip blue">signed</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>版本状态</strong><span>检查、下载、校验分离</span></div></div><div class="panel-body mini-stack"><div class="metric"><span>Current</span><strong>0.9.8</strong></div><div class="metric"><span>Latest</span><strong>0.9.9</strong></div><button class="btn primary" type="button">检查更新</button></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>Release Notes</strong><span>可信 markdown 来源才渲染</span></div></div><div class="panel-body timeline"><div class="timeline-row"><span>0.9.9</span><strong>Mapper schema pilot notes</strong><span class="chip blue">planned</span></div><div class="timeline-row"><span>0.9.8</span><strong>MISC permission model docs</strong><span class="chip emerald">done</span></div></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-traffic-graph" data-page="traffic-graph">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>流量图谱</strong><span>主机、协议、会话和风险边的关系视图。</span></div><div class="top-actions"><span class="chip blue">18 nodes</span><span class="chip rose">4 risky edges</span></div></div>
+                <section class="grid-2">
+                  <div class="panel span-2"><div class="panel-header"><div class="panel-title"><strong>Graph Canvas</strong><span>审批稿只表达布局，不实现真实图引擎</span></div></div><div class="panel-body"><div class="graph-canvas"><div class="node">10.1.8.22</div><div class="node">C2 Host</div><div class="node">DNS TXT</div><div class="node">File Server</div></div></div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Selection</strong><span>185.32.19.6</span></div></div><div class="surface-body mini-stack"><div class="mini-line"><span>risk</span><strong>high</strong></div><div class="mini-line"><span>streams</span><strong>7</strong></div><div class="mini-line"><span>evidence</span><strong>4</strong></div></div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Filters</strong><span>协议/风险/时间</span></div></div><div class="surface-body form-grid"><div class="field"><label>Protocol</label><div class="select-like"><span>HTTP + DNS</span><span>⌄</span></div></div><div class="field"><label>Risk</label><div class="select-like"><span>medium+</span><span>⌄</span></div></div><button class="btn primary" type="button">应用</button></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-c2-analysis" data-page="c2-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>C2 分析</strong><span>家族识别、会话聚类、解密候选与证据输出。</span></div><div class="top-actions"><span class="chip rose">VShell</span><span class="chip blue">Cobalt Strike candidate</span></div></div>
+                <section class="grid-3">
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Families</strong><span>分类摘要</span></div></div><div class="surface-body mini-stack"><span class="chip rose">VShell 7</span><span class="chip amber">CS beacon 2</span><span class="chip">unknown 3</span></div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Decrypt</strong><span>key mode</span></div></div><div class="surface-body form-grid"><div class="field"><label>Mode</label><div class="select-like"><span>auto</span><span>⌄</span></div></div><button class="btn primary" type="button">尝试</button></div></div>
+                  <div class="surface"><div class="surface-header"><div class="surface-title"><strong>Evidence</strong><span>可加入证据链</span></div></div><div class="surface-body">4 records ready.</div></div>
+                </section>
+                <section class="panel"><div class="panel-header"><div class="panel-title"><strong>会话候选</strong><span>命令、beacon、回显、密钥上下文</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Stream</th><th>Family</th><th>Confidence</th><th>Reason</th></tr></thead><tbody><tr><td>tcp 7</td><td>VShell</td><td>0.91</td><td>3-KDF salt pattern</td></tr><tr><td>http 12</td><td>CS</td><td>0.72</td><td>beacon interval</td></tr></tbody></table></div></section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-apt-analysis" data-page="apt-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>APT 分析</strong><span>IOC、攻击阶段、会话关系和证据串联。</span></div><div class="top-actions"><span class="chip rose">intrusion chain</span><span class="chip blue">IOC table</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>阶段时间线</strong><span>侦察、投递、回连、横向</span></div></div><div class="panel-body timeline"><div class="timeline-row"><span>12:41</span><strong>Initial webshell command</strong><span class="chip rose">exec</span></div><div class="timeline-row"><span>12:44</span><strong>DNS TXT beacon</strong><span class="chip amber">c2</span></div><div class="timeline-row"><span>12:50</span><strong>SMB access attempt</strong><span class="chip blue">lateral</span></div></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>IOC 清单</strong><span>可复制、过滤、加入证据</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Type</th><th>Value</th><th>Source</th></tr></thead><tbody><tr><td>IP</td><td>185.32.19.6</td><td>HTTP stream</td></tr><tr><td>Domain</td><td>c2.example</td><td>DNS TXT</td></tr><tr><td>File</td><td>stage.bin</td><td>Object export</td></tr></tbody></table></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-industrial-analysis" data-page="industrial-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>工控分析</strong><span>Modbus、S7、DNP3 等协议事件与异常会话。</span></div><div class="top-actions"><span class="chip cyan">Modbus</span><span class="chip rose">write anomaly</span></div></div>
+                <section class="grid-3">
+                  <div class="metric"><span>Modbus packets</span><strong>3,420</strong></div>
+                  <div class="metric"><span>Write ops</span><strong>18</strong></div>
+                  <div class="metric"><span>Alerts</span><strong>6</strong></div>
+                </section>
+                <section class="panel"><div class="panel-header"><div class="panel-title"><strong>寄存器/线圈事件</strong><span>面向取证的高密度表格</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Time</th><th>Function</th><th>Unit</th><th>Address</th><th>Risk</th></tr></thead><tbody><tr><td>13.090</td><td>Write Multiple Registers</td><td>1</td><td>40021</td><td><span class="chip rose">high</span></td></tr><tr><td>13.210</td><td>Read Coils</td><td>1</td><td>00012</td><td><span class="chip">normal</span></td></tr></tbody></table></div></section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-vehicle-analysis" data-page="vehicle-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>车机分析</strong><span>CAN、J1939、DoIP、UDS 的专项视图。</span></div><div class="top-actions"><span class="chip cyan">CAN</span><span class="chip violet">UDS</span></div></div>
+                <section class="grid-4">
+                  <div class="metric"><span>CAN IDs</span><strong>128</strong></div>
+                  <div class="metric"><span>UDS services</span><strong>9</strong></div>
+                  <div class="metric"><span>DoIP sessions</span><strong>3</strong></div>
+                  <div class="metric"><span>Alerts</span><strong>5</strong></div>
+                </section>
+                <section class="grid-2"><div class="panel"><div class="panel-header"><div class="panel-title"><strong>UDS 服务</strong><span>诊断请求与响应</span></div></div><div class="panel-body timeline"><div class="timeline-row"><span>0x10</span><strong>Diagnostic Session Control</strong><span class="chip blue">session</span></div><div class="timeline-row"><span>0x27</span><strong>Security Access</strong><span class="chip rose">risk</span></div></div></div><div class="panel"><div class="panel-header"><div class="panel-title"><strong>CAN 热点</strong><span>ID 频率与周期异常</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>ID</th><th>Count</th><th>Period</th><th>Status</th></tr></thead><tbody><tr><td>0x7E0</td><td>282</td><td>24ms</td><td><span class="chip amber">burst</span></td></tr><tr><td>0x18DAF110</td><td>88</td><td>120ms</td><td><span class="chip">normal</span></td></tr></tbody></table></div></div></section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-media-analysis" data-page="media-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>媒体分析</strong><span>RTP 媒体、播放、导出、转写与批处理状态。</span></div><div class="top-actions"><span class="chip blue">2 audio</span><span class="chip cyan">transcription ready</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>媒体资源</strong><span>播放控制和导出</span></div></div><div class="panel-body route-map"><div class="route-row"><strong>rtp-audio-01.wav</strong><span>stream 18 · 00:42</span><span class="chip blue">play</span></div><div class="route-row"><strong>rtp-audio-02.wav</strong><span>stream 19 · 01:08</span><span class="chip cyan">transcribe</span></div></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>转写结果</strong><span>长任务状态与取消</span></div><button class="btn danger" type="button">取消任务</button></div><div class="panel-body">疑似语音内容包含外联地址、凭据片段和时间约定，建议加入证据链复核。</div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-usb-analysis" data-page="usb-analysis">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>USB 分析</strong><span>Mass Storage、HID、文件操作和 LUN 筛选。</span></div><div class="top-actions"><span class="chip blue">3 devices</span><span class="chip amber">write path</span></div></div>
+                <section class="grid-2">
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>设备/LUN 筛选</strong><span>全局 Select 审批语义保留</span></div></div><div class="panel-body form-grid"><div class="field"><label>Device</label><div class="select-like"><span>USB Mass Storage 02</span><span>⌄</span></div></div><div class="field"><label>LUN</label><div class="select-like"><span>LUN 0</span><span>⌄</span></div></div><div class="field"><label>Operation</label><div class="select-like"><span>write/delete</span><span>⌄</span></div></div><button class="btn primary" type="button">过滤</button></div></div>
+                  <div class="panel"><div class="panel-header"><div class="panel-title"><strong>操作记录</strong><span>文件名、块地址、风险</span></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Time</th><th>Device</th><th>Op</th><th>Path</th><th>Risk</th></tr></thead><tbody><tr><td>10.210</td><td>02</td><td>WRITE</td><td>\secret.zip</td><td><span class="chip amber">medium</span></td></tr><tr><td>10.442</td><td>02</td><td>DELETE</td><td>\temp.log</td><td><span class="chip rose">high</span></td></tr></tbody></table></div></div>
+                </section>
+              </div>
+            </article>
+
+            <article class="mock-page" id="page-evidence" data-page="evidence">
+              <div class="page-frame">
+                <div class="page-header"><div class="page-heading"><strong>证据链</strong><span>跨模块证据、过滤、导出和调查笔记。</span></div><div class="top-actions"><span class="chip rose">critical 2</span><span class="chip blue">27 records</span><span class="chip emerald">export ready</span></div></div>
+                <section class="grid-3">
+                  <div class="metric"><span>Hunting</span><strong>9</strong></div>
+                  <div class="metric"><span>C2/APT</span><strong>11</strong></div>
+                  <div class="metric"><span>Objects</span><strong>7</strong></div>
+                </section>
+                <section class="panel"><div class="panel-header"><div class="panel-title"><strong>证据记录</strong><span>统一 schema 的高密度取证视图</span></div><div class="top-actions"><button class="btn" type="button">过滤模块</button><button class="btn primary" type="button">导出报告</button></div></div><div class="panel-body table-wrap"><table class="mock-table"><thead><tr><th>Level</th><th>Module</th><th>Packet</th><th>Evidence</th><th>Action</th></tr></thead><tbody><tr><td><span class="chip rose">critical</span></td><td>hunting</td><td>2402</td><td>webshell command execution</td><td>locate</td></tr><tr><td><span class="chip rose">high</span></td><td>c2</td><td>stream 7</td><td>VShell decrypt candidate</td><td>open</td></tr><tr><td><span class="chip amber">medium</span></td><td>usb</td><td>record 18</td><td>write/delete sequence</td><td>review</td></tr></tbody></table></div></section>
+              </div>
+            </article>
+          </section>
+        </main>
+      </div>
+
+      <footer class="footer">
+        <span id="footer-page">当前审批页：欢迎页</span>
+        <span>static mock · no React/Vite route · no dependency · open frontend/mock.html directly</span>
+      </footer>
+    </div>
+
+    <script>
+      const buttons = Array.from(document.querySelectorAll("[data-target]"));
+      const pages = Array.from(document.querySelectorAll(".mock-page"));
+      const footerPage = document.getElementById("footer-page");
+      const pageLabels = {
+        welcome: "欢迎页",
+        workspace: "主工作区",
+        "analysis-cockpit": "分析驾驶舱",
+        "http-stream": "HTTP Stream",
+        "tcp-stream": "TCP Stream",
+        "udp-stream": "UDP Stream",
+        hunting: "威胁狩猎",
+        objects: "对象导出",
+        misc: "MISC 工具区",
+        updates: "更新中心",
+        "traffic-graph": "流量图谱",
+        "c2-analysis": "C2 分析",
+        "apt-analysis": "APT 分析",
+        "industrial-analysis": "工控分析",
+        "vehicle-analysis": "车机分析",
+        "media-analysis": "媒体分析",
+        "usb-analysis": "USB 分析",
+        evidence: "证据链",
+      };
+
+      function activate(target) {
+        const exists = pages.some((page) => page.dataset.page === target);
+        const next = exists ? target : "welcome";
+        pages.forEach((page) => page.classList.toggle("active", page.dataset.page === next));
+        buttons.forEach((button) => button.classList.toggle("active", button.dataset.target === next));
+        if (footerPage) {
+          footerPage.textContent = `当前审批页：${pageLabels[next] || next}`;
+        }
+        if (location.hash.slice(1) !== next) {
+          history.replaceState(null, "", `#${next}`);
+        }
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => activate(button.dataset.target));
+      });
+
+      activate(location.hash.slice(1) || "welcome");
+    </script>
+  </body>
+</html>

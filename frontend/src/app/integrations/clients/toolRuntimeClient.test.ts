@@ -43,7 +43,16 @@ describe("toolRuntimeClient", () => {
   it("maps runtime snapshot and update payload shape", async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path === "/api/tools/runtime-config" && !init) {
-        return { config: { tshark_path: "tshark.exe" }, tshark: { available: true }, yara: { timeout_ms: 1000 } };
+        return {
+          config: {
+            tshark_path: "tshark.exe",
+            ffmpeg_path: "env-ffmpeg.exe",
+            python_path: "env-python.exe",
+            vosk_model_path: "env-model",
+          },
+          tshark: { available: true },
+          yara: { timeout_ms: 1000 },
+        };
       }
       expect(path).toBe("/api/tools/runtime-config");
       expect(init?.method).toBe("POST");
@@ -63,7 +72,14 @@ describe("toolRuntimeClient", () => {
     }) as unknown as JsonRequest;
 
     const client = createToolRuntimeClient(request);
-    expect(await client.getToolRuntimeSnapshot()).toMatchObject({ config: { tsharkPath: "tshark.exe" } });
+    expect(await client.getToolRuntimeSnapshot()).toMatchObject({
+      config: {
+        tsharkPath: "tshark.exe",
+        ffmpegPath: "env-ffmpeg.exe",
+        pythonPath: "env-python.exe",
+        voskModelPath: "env-model",
+      },
+    });
     expect(
       await client.updateToolRuntimeConfig({
         tsharkPath: "t.exe",

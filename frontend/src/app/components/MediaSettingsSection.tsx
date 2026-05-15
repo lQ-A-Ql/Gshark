@@ -1,5 +1,6 @@
 import { AudioLines } from "lucide-react";
 
+import { ffmpegPathHint } from "./RuntimeSettingsHints";
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 
@@ -13,15 +14,16 @@ export function MediaSettingsSection({ backendConnected, form, snapshot, setForm
         媒体播放与转码
       </div>
       <Field
-        label="ffmpeg 路径"
-        hint="这里会同时影响媒体播放、音频试听，以及离线转写前的 wav 转换。"
+        label="显式配置：ffmpeg 路径"
+        hint={ffmpegPathHint(snapshot, form.ffmpegPath)}
         value={form.ffmpegPath}
         onChange={(value) => setForm((prev) => ({ ...prev, ffmpegPath: value }))}
         placeholder="C:\\ffmpeg\\bin\\ffmpeg.exe"
       />
       <StatusLine
         label="FFmpeg"
-        available={snapshot?.ffmpeg.available ?? false}
+        available={snapshot?.ffmpeg.available}
+        known={Boolean(snapshot)}
         message={snapshot?.ffmpeg.message ?? (backendConnected ? "等待检测" : "后端未连接")}
         path={snapshot?.ffmpeg.path}
       />

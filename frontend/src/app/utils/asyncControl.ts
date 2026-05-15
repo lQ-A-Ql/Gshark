@@ -43,3 +43,29 @@ export function withTimeout<T>(
     }
   });
 }
+
+export function withAbortableTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  message = `operation timed out after ${timeoutMs}ms`,
+): Promise<T> {
+  const controller = new AbortController();
+
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return operation(controller.signal);
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(new OperationTimeoutError(message, timeoutMs));
+      reject(new OperationTimeoutError(message, timeoutMs));
+    }, timeoutMs);
+  });
+
+  return Promise.race([operation(controller.signal), timeout]).finally(() => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  });
+}

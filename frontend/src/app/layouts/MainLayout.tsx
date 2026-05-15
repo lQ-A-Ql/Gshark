@@ -8,10 +8,23 @@ import { installBrowserPageDragGuard, preventBrowserPageDrag } from "./dragGuard
 import { themeForPath } from "./mainLayoutConfig";
 import { MainFooter, MainHeader, MainSettingsChrome, MainSidebarNav } from "./MainLayoutChrome";
 
-type BackgroundFadeState = {
-  key: string;
-  style: CSSProperties;
-};
+type BackgroundFadeState = { key: string; style: CSSProperties };
+
+const ROUTE_MOTION_ORDER =
+  "/,/analysis-cockpit,/traffic-graph,/hunting,/c2-analysis,/apt-analysis,/industrial-analysis,/vehicle-analysis,/usb-analysis,/media-analysis,/objects,/misc,/evidence,/http-stream,/tcp-stream,/udp-stream,/updates".split(
+    ",",
+  );
+
+export type RouteMotionDirection = "forward" | "back" | "neutral";
+
+export function getRouteMotionDirection(previousPath: string, nextPath: string): RouteMotionDirection {
+  const previousIndex = ROUTE_MOTION_ORDER.indexOf(previousPath);
+  const nextIndex = ROUTE_MOTION_ORDER.indexOf(nextPath);
+  if (previousPath === nextPath || previousIndex < 0 || nextIndex < 0) {
+    return "neutral";
+  }
+  return nextIndex > previousIndex ? "forward" : "back";
+}
 
 export function MainLayout() {
   const location = useLocation();
@@ -127,6 +140,7 @@ export function MainLayout() {
   };
 
   const activeTheme = themeForPath(location.pathname);
+  const routeMotion = getRouteMotionDirection(backgroundRouteRef.current, location.pathname);
   const pageThemeStyle = {
     "--gshark-bg-base": activeTheme.base,
     "--gshark-bg-top": activeTheme.top,
@@ -201,6 +215,7 @@ export function MainLayout() {
             ) : null}
             <div
               key={`route-${location.pathname}`}
+              data-route-motion={routeMotion}
               className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               <Outlet />

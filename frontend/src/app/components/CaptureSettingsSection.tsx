@@ -1,5 +1,6 @@
 import { SearchCode } from "lucide-react";
 
+import { capturePathHint } from "./RuntimeSettingsHints";
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 import { TSharkCapabilityDetails } from "./TSharkCapabilityDetails";
@@ -14,15 +15,20 @@ export function CaptureSettingsSection({ backendConnected, form, snapshot, setFo
         抓包与解析
       </div>
       <Field
-        label="tshark 路径"
-        hint="这里可以直接填写 tshark.exe，也可以填写 Wireshark 安装目录，程序会自动尝试定位。"
+        label="显式配置：tshark 路径"
+        hint={capturePathHint(snapshot, form.tsharkPath)}
         value={form.tsharkPath}
         onChange={(value) => setForm((prev) => ({ ...prev, tsharkPath: value }))}
         placeholder="C:\\Program Files\\Wireshark\\tshark.exe"
       />
       <StatusLine
         label="TShark"
-        available={snapshot?.tshark.available ?? false}
+        available={snapshot?.tshark.available}
+        known={Boolean(snapshot)}
+        degraded={Boolean(
+          snapshot?.tshark.available &&
+          (snapshot.tshark.capabilityCheckDegraded || (snapshot.tshark.missingOptionalFields?.length ?? 0) > 0),
+        )}
         message={snapshot?.tshark.message ?? (backendConnected ? "等待检测" : "后端未连接")}
         path={snapshot?.tshark.path}
       />

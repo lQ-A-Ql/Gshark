@@ -1,6 +1,8 @@
 import { Bot, FolderCog, MicVocal } from "lucide-react";
 
-import { Field, RuntimeDependencyCard, StatusLine } from "./RuntimeSettingsSidebarParts";
+import { RuntimeDependencyCard } from "./RuntimeDependencyCard";
+import { pythonPathHint, voskModelPathHint } from "./RuntimeSettingsHints";
+import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { SpeechSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 
 export function SpeechSettingsSection({
@@ -20,15 +22,15 @@ export function SpeechSettingsSection({
       </div>
       <div className="grid grid-cols-1 gap-3">
         <Field
-          label="Python 路径"
-          hint="这里用于调用本地 Vosk 识别脚本。留空时会优先尝试默认的 Python 3。"
+          label="显式配置：Python 路径"
+          hint={pythonPathHint(snapshot, form.pythonPath)}
           value={form.pythonPath}
           onChange={(value) => setForm((prev) => ({ ...prev, pythonPath: value }))}
           placeholder="C:\\Users\\QAQ\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"
         />
         <Field
-          label="Vosk 模型目录"
-          hint="这里填写模型根目录本身，也就是里面能看到 am、conf、graph 等子目录的那一层。"
+          label="显式配置：Vosk 模型目录"
+          hint={voskModelPathHint(snapshot, form.voskModelPath)}
           value={form.voskModelPath}
           onChange={(value) => setForm((prev) => ({ ...prev, voskModelPath: value }))}
           placeholder="C:\\Users\\QAQ\\AppData\\Local\\gshark-sentinel\\models\\vosk\\zh-CN"
@@ -36,7 +38,8 @@ export function SpeechSettingsSection({
       </div>
       <StatusLine
         label="Speech To Text"
-        available={snapshot?.speech.available ?? false}
+        available={snapshot?.speech.available}
+        known={Boolean(snapshot)}
         message={speechSummary}
         path={snapshot?.speech.pythonCommand || snapshot?.speech.modelPath}
         preferMessageWhenUnavailable
@@ -58,12 +61,14 @@ export function SpeechSettingsSection({
           label="Python"
           Icon={FolderCog}
           available={snapshot?.speech.pythonAvailable ?? false}
+          known={Boolean(snapshot)}
           value={snapshot?.speech.pythonCommand || "等待检测"}
         />
         <RuntimeDependencyCard
           label="Vosk 模型"
           Icon={MicVocal}
           available={snapshot?.speech.modelAvailable ?? false}
+          known={Boolean(snapshot)}
           value={snapshot?.speech.modelPath || form.voskModelPath || "等待检测"}
         />
       </div>

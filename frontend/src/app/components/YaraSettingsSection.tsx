@@ -1,5 +1,6 @@
 import { ShieldAlert } from "lucide-react";
 
+import { yaraBinHint, yaraRulesHint } from "./RuntimeSettingsHints";
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 
@@ -30,13 +31,15 @@ export function YaraSettingsSection({ backendConnected, form, snapshot, setForm 
       </div>
       <div className="grid grid-cols-1 gap-3">
         <Field
-          label="YARA 可执行路径"
+          label="显式配置：YARA 可执行路径"
+          hint={yaraBinHint(snapshot, form.yaraBin)}
           value={form.yaraBin}
           onChange={(value) => setForm((prev) => ({ ...prev, yaraBin: value }))}
           placeholder="C:\\tools\\yara64.exe"
         />
         <Field
-          label="YARA 规则文件"
+          label="显式配置：YARA 规则文件"
+          hint={yaraRulesHint(snapshot, form.yaraRules)}
           value={form.yaraRules}
           onChange={(value) => setForm((prev) => ({ ...prev, yaraRules: value }))}
           placeholder="C:\\rules\\default.yar 或 C:\\rules\\traffic-pack\\"
@@ -55,8 +58,9 @@ export function YaraSettingsSection({ backendConnected, form, snapshot, setForm 
       </div>
       <StatusLine
         label="YARA"
-        available={snapshot?.yara.available ?? false}
+        available={snapshot?.yara.available}
         enabled={snapshot?.yara.enabled ?? form.yaraEnabled}
+        known={Boolean(snapshot)}
         message={snapshot?.yara.message ?? (backendConnected ? "等待检测" : "后端未连接")}
         path={snapshot?.yara.path}
       />
