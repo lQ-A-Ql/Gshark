@@ -1166,6 +1166,171 @@ Deferred tasks:
 - Upload helper extraction remains deferred until upload-specific route tests exist.
 - Broad `engine.Service` owner struct extraction remains deferred until stream/media reset seams have more focused tests.
 
+## 55. Packet/Stream Route Baseline
+
+Status: `BE-TRANSPORT-2.3` baseline slice completed on 2026-05-15 12:02:00 +08:00.
+
+This slice adds route-level coverage for packet and basic stream endpoints before moving any handlers.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- `TestHandlerRegistersPacketStreamRoutes` exercises routes through `Server.Handler()` with a fake `CaptureService`.
+- Covered packet routes: `/api/packets`, `/api/packets/page`, `/api/packets/locate`, `/api/packet`, `/api/packet/raw`, `/api/packet/layers`.
+- Covered stream routes: `/api/streams/index`, `/api/streams/http`, `/api/streams/raw`, `/api/streams/raw/page`, `/api/streams/payload-sources`.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegisters(PacketStreamRoutes|CoreReadRoutes)$" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- The test uses route registration rather than direct handler calls, so it protects the next split from route drift.
+
+## 56. Packet/Stream Handler Split
+
+Status: `BE-TRANSPORT-2.3` split slice completed on 2026-05-15 12:07:00 +08:00.
+
+This slice moved packet and basic stream read handlers into `http_packet_stream.go`. POST decode/inspect/payload mutation handlers stay in `http_server.go` until their method/payload baselines are stronger.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_packet_stream.go`
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- Moved packet handlers: packets list/page/locate/detail/raw/layers.
+- Moved basic stream handlers: index, HTTP stream, raw stream, raw stream page, payload sources.
+- Route registrations remain unchanged in `Server.Handler()`.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegistersPacketStreamRoutes|Test(PacketDetail|PacketLocate|PacketRaw|PacketLayers|StreamIndex|PacketsPage)Contract$|TestHandleStreamPayloadSourcesReturnsInitializedPayload" -count=1` — PASS.
+- `cd backend && go test ./internal/architecture -count=1` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- The split is behavior-preserving and intentionally excludes higher-risk POST stream mutation handlers.
+
+## 57. Stream Cache Owner Invariants
+
+Status: `BE-ENGINE-4.3` guardrail slice completed on 2026-05-15 12:13:00 +08:00.
+
+This slice adds stream cache and override invariants before any owner-struct extraction.
+
+Changed file:
+
+- `backend/internal/engine/stream_cache_test.go`
+
+Coverage:
+
+- `TestCacheStreamStoresClone` proves cached streams do not alias caller-owned chunks or metadata.
+- `TestCacheStreamEvictsOldestBeyondLimit` covers LRU size enforcement.
+- `TestCacheStreamRefreshesExistingOrder` covers refreshing an existing cache entry before eviction.
+- `TestStreamWithOverridesUsesClones` proves overrides do not mutate the source stream.
+
+Validation:
+
+- `cd backend && go test ./internal/engine -run "Test(CacheStream|StreamWithOverrides)" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- Runtime behavior was not changed; this creates the guardrail needed before future stream owner extraction.
+
+## 58. Dynamic Boundary Contract Helper
+
+Status: `BE-CONTRACT-1.7` first slice completed on 2026-05-15 12:16:00 +08:00.
+
+This slice adds an explicit contract helper for dynamic JSON object boundaries and applies it to packet layer output.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage:
+
+- `requireDynamicJSONObject` documents that a JSON object is intentionally dynamic rather than a fully static contract surface.
+- `TestPacketLayersContract` now uses this helper for `layers`, matching the model boundary inventory.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestPacketLayersContract|TestPacketInlineContractRejectsInvalidID" -count=1` — PASS.
+
+Self-review:
+
+- Score: 93/100, Gold.
+- This does not broaden the contract; it makes the intentional dynamic boundary explicit for future schema/codegen decisions.
+
+## 59. NTLM Tool Cancellation Regression
+
+Status: `BE-CONTEXT-3.6` tool-analysis slice completed on 2026-05-15 12:20:00 +08:00.
+
+This slice adds a lightweight tool-analysis cancellation regression and aligns NTLM cancellation response handling with C2/media behavior.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- `TestHandleNTLMSessionMaterialsUsesCanceledRequestContext` passes a canceled request context to `/api/tools/ntlm-sessions`.
+- The fake `ToolAnalysisService` records `ctx.Err()` and returns it.
+- The handler now maps `context.Canceled` to `408 Request Timeout`.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandleNTLMSessionMaterialsUsesCanceledRequestContext|TestHandleMediaArtifactTranscriptionUsesCanceledRequestContext" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- This is a narrow consistency fix on an already context-aware endpoint.
+
+## 60. Thirty-Nine-Round Backend Engineering Approval
+
+Status: cycle 4 approval completed on 2026-05-15 12:24:00 +08:00.
+
+Cycle scope:
+
+- R31 packet/stream route baselines.
+- R32 packet/basic-stream handler split.
+- R33 stream cache owner invariant tests.
+- R34 dynamic-boundary contract helper for packet layers.
+- R35 NTLM tool cancellation regression.
+- R36 backend governance evidence update in this spec.
+- R37 docs/self-review.
+- R38 final backend validation.
+- R39 cycle approval and commit prep.
+
+Validation:
+
+- `cd backend && gofmt -l .` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+- `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
+
+Cycle approval result:
+
+- Approved.
+- The cycle continued transport decomposition only after route-level baselines, added stream owner guardrails before extraction, and extended cancellation consistency without frontend changes.
+- Average effective score: Gold.
+
+Optimized next task order:
+
+1. Add POST baselines for `/api/streams/decode`, `/api/streams/inspect`, and `/api/streams/payloads` before moving remaining stream mutation handlers.
+2. Consider extracting a package-private stream cache owner helper only if current invariants remain green after final validation.
+3. Apply `requireDynamicJSONObject` or equivalent helpers to decoder option hints and extension output contract tests when those surfaces receive producer tests.
+4. Add SMB3 or WinRM cancellation response consistency only if a compact fake avoids broad test scaffolding.
+5. Keep full schema/codegen deferred while `P2-6` remains open.
+
 ## 39. Mutating Route Method Policy Baseline
 
 Status: `BE-TRANSPORT-2.1b` completed on 2026-05-15 02:31:18 +08:00.

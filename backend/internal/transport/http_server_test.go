@@ -223,6 +223,38 @@ func TestHandlerRegistersMutatingRouteMethodPolicy(t *testing.T) {
 	}
 }
 
+func TestHandlerRegistersPacketStreamRoutes(t *testing.T) {
+	server := NewServer(nil, NewHub())
+	server.capture = contractCaptureService{}
+	handler := server.Handler()
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "packets", path: "/api/packets"},
+		{name: "packets page", path: "/api/packets/page?cursor=0&limit=1"},
+		{name: "packet locate", path: "/api/packets/locate?id=7&limit=1"},
+		{name: "packet detail", path: "/api/packet?id=7"},
+		{name: "packet raw", path: "/api/packet/raw?id=7"},
+		{name: "packet layers", path: "/api/packet/layers?id=7"},
+		{name: "stream index", path: "/api/streams/index?protocol=tcp"},
+		{name: "http stream", path: "/api/streams/http?streamId=3"},
+		{name: "raw stream", path: "/api/streams/raw?protocol=tcp&streamId=3"},
+		{name: "raw stream page", path: "/api/streams/raw/page?protocol=tcp&streamId=3&cursor=0&limit=1"},
+		{name: "payload sources", path: "/api/streams/payload-sources?limit=1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s status = %d, want %d body=%s", tt.path, rec.Code, http.StatusOK, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestHandlerRegistersPluginWriteRoutes(t *testing.T) {
 	plugins := &fakePluginService{}
 	server := &Server{plugins: plugins}
@@ -513,6 +545,84 @@ func (contractMediaService) ExportMediaBatchTranscription() model.MediaTranscrip
 
 func (contractMediaService) SpeechToTextStatus() model.SpeechToTextStatus {
 	return model.SpeechToTextStatus{}
+}
+
+func TestHandleNTLMSessionMaterialsUsesCanceledRequestContext(t *testing.T) {
+	toolAnalysis := &canceledToolAnalysisService{}
+	server := &Server{toolAnalysis: toolAnalysis}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/tools/ntlm-sessions", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	server.handleNTLMSessionMaterials(rec, req)
+
+	if rec.Code != http.StatusRequestTimeout {
+		t.Fatalf("expected canceled NTLM session request to return %d, got %d body=%s", http.StatusRequestTimeout, rec.Code, rec.Body.String())
+	}
+	if toolAnalysis.ctxErr != context.Canceled {
+		t.Fatalf("tool ctx error = %v, want %v", toolAnalysis.ctxErr, context.Canceled)
+	}
+}
+
+type canceledToolAnalysisService struct {
+	contractToolAnalysisService
+	ctxErr error
+}
+
+func (s *canceledToolAnalysisService) ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error) {
+	s.ctxErr = ctx.Err()
+	return nil, s.ctxErr
+}
+
+type contractToolAnalysisService struct{}
+
+func (contractToolAnalysisService) ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error) {
+	return []model.NTLMSessionMaterial{}, nil
+}
+
+func (contractToolAnalysisService) ListNTLMSessionMaterialsWithContext(context.Context) ([]model.NTLMSessionMaterial, error) {
+	return []model.NTLMSessionMaterial{}, nil
+}
+
+func (contractToolAnalysisService) HTTPLoginAnalysis(context.Context) (model.HTTPLoginAnalysis, error) {
+	return model.HTTPLoginAnalysis{}, nil
+}
+
+func (contractToolAnalysisService) SMTPAnalysis(context.Context) (model.SMTPAnalysis, error) {
+	return model.SMTPAnalysis{}, nil
+}
+
+func (contractToolAnalysisService) MySQLAnalysis(context.Context) (model.MySQLAnalysis, error) {
+	return model.MySQLAnalysis{}, nil
+}
+
+func (contractToolAnalysisService) ShiroRememberMeAnalysis(context.Context, model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error) {
+	return model.ShiroRememberMeAnalysis{}, nil
+}
+
+func (contractToolAnalysisService) ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, error) {
+	return []model.SMB3SessionCandidate{}, nil
+}
+
+func (contractToolAnalysisService) ListSMB3SessionCandidatesWithContext(context.Context) ([]model.SMB3SessionCandidate, error) {
+	return []model.SMB3SessionCandidate{}, nil
+}
+
+func (contractToolAnalysisService) GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest) (model.SMB3RandomSessionKeyResult, error) {
+	return model.SMB3RandomSessionKeyResult{}, nil
+}
+
+func (contractToolAnalysisService) RunWinRMDecrypt(model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	return model.WinRMDecryptResult{}, nil
+}
+
+func (contractToolAnalysisService) RunWinRMDecryptWithContext(context.Context, model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	return model.WinRMDecryptResult{}, nil
+}
+
+func (contractToolAnalysisService) WinRMExportFile(string) (string, string, error) {
+	return "", "", nil
 }
 
 func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {

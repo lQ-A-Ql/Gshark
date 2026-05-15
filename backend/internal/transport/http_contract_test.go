@@ -219,7 +219,7 @@ func TestPacketLayersContract(t *testing.T) {
 	payload := decodeJSONMap(t, rec)
 	requireJSONKeys(t, payload, "packet_id", "layers")
 	requireJSONNumber(t, payload, "packet_id")
-	requireJSONObject(t, payload, "layers")
+	requireDynamicJSONObject(t, payload, "layers")
 }
 
 func TestIndustrialAnalysisContract(t *testing.T) {
@@ -614,6 +614,15 @@ func requireJSONObject(t *testing.T, payload map[string]any, key string) {
 	if _, ok := payload[key].(map[string]any); !ok {
 		t.Fatalf("JSON key %q = %#v, want object", key, payload[key])
 	}
+}
+
+func requireDynamicJSONObject(t *testing.T, payload map[string]any, key string) map[string]any {
+	t.Helper()
+	value, ok := payload[key].(map[string]any)
+	if !ok {
+		t.Fatalf("dynamic JSON boundary %q = %#v, want object", key, payload[key])
+	}
+	return value
 }
 
 func requireJSONNestedObject(t *testing.T, payload map[string]any, key string) map[string]any {
