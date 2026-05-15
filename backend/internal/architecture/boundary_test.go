@@ -156,7 +156,9 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 	})
 
 	t.Run("transport handlers use context-aware long running service calls", func(t *testing.T) {
-		body := readFile(t, filepath.Join(root, "internal", "transport", "http_server.go"))
+		transportFiles := goFiles(t, filepath.Join(root, "internal", "transport"))
+		assertFileCovered(t, root, transportFiles, filepath.Join("internal", "transport", "http_server.go"))
+		assertFileCovered(t, root, transportFiles, filepath.Join("internal", "transport", "http_capture.go"))
 		forbidden := []string{
 			"s.analysis.GlobalTrafficStats()",
 			"s.analysis.IndustrialAnalysis()",
@@ -167,12 +169,26 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 			"s.toolAnalysis.ListSMB3SessionCandidates()",
 			"s.toolAnalysis.RunWinRMDecrypt(req)",
 		}
-		for _, call := range forbidden {
-			if strings.Contains(body, call) {
-				t.Fatalf("http_server.go calls %s; transport handlers must pass request context to long-running service methods", call)
+		for _, path := range transportFiles {
+			body := readFile(t, path)
+			for _, call := range forbidden {
+				if strings.Contains(body, call) {
+					t.Fatalf("%s calls %s; transport handlers must pass request context to long-running service methods", rel(root, path), call)
+				}
 			}
 		}
 	})
+}
+
+func assertFileCovered(t *testing.T, root string, files []string, relative string) {
+	t.Helper()
+	want := filepath.ToSlash(relative)
+	for _, path := range files {
+		if rel(root, path) == want {
+			return
+		}
+	}
+	t.Fatalf("architecture scan did not cover %s", want)
 }
 
 func backendRoot(t *testing.T) string {

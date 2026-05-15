@@ -170,6 +170,51 @@ func TestClearCaptureResetsPacketStore(t *testing.T) {
 	}
 }
 
+func TestClearCaptureResetsDerivedAnalysisState(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	svc.mu.Lock()
+	svc.pcap = "demo.pcap"
+	svc.displayFilterCache = map[string]*filteredPacketIndex{"tcp": newFilteredPacketIndex(nil)}
+	svc.displayFilterCacheOrder = []string{"tcp"}
+	svc.globalTrafficStats = &model.GlobalTrafficStats{}
+	svc.industrialAnalysis = &model.IndustrialAnalysis{}
+	svc.vehicleAnalysis = &model.VehicleAnalysis{}
+	svc.mediaAnalysis = &model.MediaAnalysis{}
+	svc.usbAnalysis = &model.USBAnalysis{}
+	svc.c2Analysis = &model.C2SampleAnalysis{}
+	svc.aptAnalysis = &model.APTAnalysis{}
+	svc.mediaArtifacts = map[string]string{"artifact": "path"}
+	svc.mediaPlayback = map[string]string{"artifact": "path"}
+	svc.mediaSpeech = map[string]model.MediaTranscription{"artifact": {Token: "artifact"}}
+	svc.speechBatch = &model.SpeechBatchTaskStatus{Running: 1}
+	svc.streamCache = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
+	svc.streamCacheOrder = []string{"tcp:1"}
+	svc.rawStreamIndex = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
+	svc.streamOverrides = map[string]map[int]string{"tcp:1": {0: "override"}}
+	svc.mu.Unlock()
+
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+
+	svc.mu.RLock()
+	defer svc.mu.RUnlock()
+	if svc.pcap != "" || len(svc.displayFilterCache) != 0 || len(svc.displayFilterCacheOrder) != 0 {
+		t.Fatalf("expected capture/filter state to reset, pcap=%q cache=%d order=%d", svc.pcap, len(svc.displayFilterCache), len(svc.displayFilterCacheOrder))
+	}
+	if svc.globalTrafficStats != nil || svc.industrialAnalysis != nil || svc.vehicleAnalysis != nil || svc.mediaAnalysis != nil || svc.usbAnalysis != nil || svc.c2Analysis != nil || svc.aptAnalysis != nil {
+		t.Fatal("expected cached analysis results to reset")
+	}
+	if len(svc.mediaArtifacts) != 0 || len(svc.mediaPlayback) != 0 || len(svc.mediaSpeech) != 0 || svc.speechBatch != nil {
+		t.Fatalf("expected media and speech state to reset, artifacts=%d playback=%d speech=%d batch=%v", len(svc.mediaArtifacts), len(svc.mediaPlayback), len(svc.mediaSpeech), svc.speechBatch)
+	}
+	if len(svc.streamCache) != 0 || len(svc.streamCacheOrder) != 0 || len(svc.rawStreamIndex) != 0 || len(svc.streamOverrides) != 0 {
+		t.Fatalf("expected stream state to reset, cache=%d order=%d raw=%d overrides=%d", len(svc.streamCache), len(svc.streamCacheOrder), len(svc.rawStreamIndex), len(svc.streamOverrides))
+	}
+}
+
 func TestPrepareCaptureReplacementInvalidatesActiveRun(t *testing.T) {
 	svc := NewService(NopEmitter{}, nil)
 	defer svc.packetStore.Close()

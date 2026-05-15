@@ -443,6 +443,78 @@ func (s *canceledC2AnalysisService) C2SampleAnalysis(ctx context.Context) (model
 	return model.C2SampleAnalysis{}, s.ctxErr
 }
 
+func TestHandleMediaArtifactTranscriptionUsesCanceledRequestContext(t *testing.T) {
+	media := &canceledMediaTranscriptionService{}
+	server := &Server{media: media}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/api/analysis/media/transcribe", strings.NewReader(`{"token":"audio-1","force":true}`)).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	server.handleMediaArtifactTranscription(rec, req)
+
+	if rec.Code != http.StatusRequestTimeout {
+		t.Fatalf("expected canceled media transcription request to return %d, got %d body=%s", http.StatusRequestTimeout, rec.Code, rec.Body.String())
+	}
+	if media.ctxErr != context.Canceled {
+		t.Fatalf("media ctx error = %v, want %v", media.ctxErr, context.Canceled)
+	}
+}
+
+type canceledMediaTranscriptionService struct {
+	contractMediaService
+	ctxErr error
+}
+
+func (s *canceledMediaTranscriptionService) TranscribeMediaArtifactWithContext(ctx context.Context, _ string, _ bool) (model.MediaTranscription, error) {
+	s.ctxErr = ctx.Err()
+	return model.MediaTranscription{}, s.ctxErr
+}
+
+type contractMediaService struct{}
+
+func (contractMediaService) MediaAnalysis() (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, nil
+}
+
+func (contractMediaService) RefreshMediaAnalysis() (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, nil
+}
+
+func (contractMediaService) MediaArtifact(string) (string, string, error) { return "", "", nil }
+
+func (contractMediaService) MediaPlaybackWithContext(context.Context, string) (string, string, error) {
+	return "", "", nil
+}
+
+func (contractMediaService) TranscribeMediaArtifact(string, bool) (model.MediaTranscription, error) {
+	return model.MediaTranscription{}, nil
+}
+
+func (contractMediaService) TranscribeMediaArtifactWithContext(context.Context, string, bool) (model.MediaTranscription, error) {
+	return model.MediaTranscription{}, nil
+}
+
+func (contractMediaService) MediaBatchTranscriptionStatus() model.SpeechBatchTaskStatus {
+	return model.SpeechBatchTaskStatus{}
+}
+
+func (contractMediaService) StartMediaBatchTranscription(bool) (model.SpeechBatchTaskStatus, error) {
+	return model.SpeechBatchTaskStatus{}, nil
+}
+
+func (contractMediaService) CancelMediaBatchTranscription() model.SpeechBatchTaskStatus {
+	return model.SpeechBatchTaskStatus{}
+}
+
+func (contractMediaService) ExportMediaBatchTranscription() model.MediaTranscriptionBatchExport {
+	return model.MediaTranscriptionBatchExport{}
+}
+
+func (contractMediaService) SpeechToTextStatus() model.SpeechToTextStatus {
+	return model.SpeechToTextStatus{}
+}
+
 func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
 	server := NewServer(engine.NewService(nil, nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/apt-analysis", nil)

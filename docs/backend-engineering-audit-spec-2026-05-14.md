@@ -974,6 +974,198 @@ Deferred tasks:
 - Deep TShark field-scan subprocess cancellation remains deferred.
 - Broad `engine.Service` extraction remains deferred until more focused owner tests exist.
 
+## 48. Capture Handler Split
+
+Status: `BE-TRANSPORT-2.2` completed on 2026-05-15 11:16:00 +08:00.
+
+This slice moved capture lifecycle and upload handlers behind the existing route and method baselines without changing route registrations or handler names.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_capture.go`
+
+Coverage:
+
+- `handleCaptureStart`, `handleCaptureStop`, `handleCapturePrepareReplacement`, `handleCaptureClose`, `handleCaptureStatus`, and `handleCaptureUpload` now live in `http_capture.go`.
+- `Server.Handler()` registrations remain unchanged in `http_server.go`.
+- Upload cleanup helpers remain in `http_server.go` for now; this keeps the slice limited to handler movement.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegisters(MutatingRouteMethodPolicy|CoreReadRoutes)$|TestHandleCapture(PrepareReplacement|StatusReportsEmptyCapture)$" -count=1` — PASS.
+- `cd backend && gofmt -l internal/transport/http_server.go internal/transport/http_capture.go` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- The change is behavior-preserving and route-level tests already cover the moved capture endpoints.
+- Residual risk: upload helper ownership is still mixed into `http_server.go`; defer until more upload-specific tests exist.
+
+## 49. Split Handler Architecture Gate
+
+Status: `BE-CONTEXT-3.2` follow-up completed on 2026-05-15 11:24:00 +08:00.
+
+The context-aware handler boundary test now scans every non-test Go file under `backend/internal/transport` instead of only `http_server.go`. This prevents future handler moves from bypassing the no-context-call regression gate.
+
+Changed file:
+
+- `backend/internal/architecture/boundary_test.go`
+
+Coverage:
+
+- The architecture test explicitly confirms `internal/transport/http_server.go` and `internal/transport/http_capture.go` are included in the scan.
+- The forbidden long-running no-context service calls are checked across all transport implementation files.
+
+Validation:
+
+- `cd backend && go test ./internal/architecture -count=1` — PASS.
+
+Self-review:
+
+- Score: 96/100, Gold.
+- This is a low-risk test hardening step that directly addresses the risk introduced by handler file splits.
+
+## 50. Capture Analysis Reset Seam
+
+Status: `BE-ENGINE-4.2` guardrail slice completed on 2026-05-15 11:30:00 +08:00.
+
+This slice avoided a broad owner-struct extraction because capture reset currently crosses analysis caches, stream state, media/speech state, and display-filter state under shared locks. Instead, it extracted the reset block into a focused helper and added a regression test for the reset surface.
+
+Changed files:
+
+- `backend/internal/engine/service.go`
+- `backend/internal/engine/page_filter_test.go`
+
+Coverage:
+
+- `resetCaptureAnalysisStateLocked` now owns the in-memory derived-state reset performed by `ClearCapture`.
+- `TestClearCaptureResetsDerivedAnalysisState` seeds analysis, media/speech, stream, and display-filter state, then asserts `ClearCapture` resets them.
+
+Validation:
+
+- `cd backend && go test ./internal/engine -run "TestNewServiceInitializesOwnerState|TestClearCaptureResets(PacketStore|DerivedAnalysisState)$" -count=1` — PASS.
+
+Self-review:
+
+- Score: 93/100, Gold.
+- This improves the seam without relocating locks or changing public behavior.
+- Residual risk: a real owner struct is still deferred until capture reset and stream/media owners have stronger isolated tests.
+
+## 51. Global Traffic Producer Contract
+
+Status: `BE-CONTRACT-1.6` follow-up completed on 2026-05-15 11:33:00 +08:00.
+
+This slice expanded backend producer contract coverage to `/api/stats/traffic/global`, adding a stable top-level shape check alongside existing industrial, vehicle, USB, and C2 analysis contract tests.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage:
+
+- `TestGlobalTrafficStatsContract` checks stable keys and basic JSON types for global traffic stats.
+- The contract fake now returns initialized traffic buckets for representative global fields.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "Test(GlobalTrafficStats|IndustrialAnalysis|VehicleAnalysis|USBAnalysis|C2Analysis)Contract$" -count=1` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- This strengthens `P2-6` backend evidence without promoting full schema/codegen.
+
+## 52. Media Transcription Cancellation Regression
+
+Status: `BE-CONTEXT-3.6` follow-up completed on 2026-05-15 11:36:00 +08:00.
+
+This slice added a media-path request cancellation regression and aligned media transcription cancellation error handling with the existing C2 behavior.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- `TestHandleMediaArtifactTranscriptionUsesCanceledRequestContext` passes a canceled request context into `/api/analysis/media/transcribe`.
+- The fake media service records `ctx.Err()` and returns it.
+- The handler now returns `408 Request Timeout` for `context.Canceled` instead of a generic bad request.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandleMediaArtifactTranscriptionUsesCanceledRequestContext|TestHandleC2AnalysisUsesCanceledRequestContext" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- Behavior is more consistent for request-scoped cancellation and does not alter successful transcription payloads.
+
+## 53. `P2-6` Backend Evidence Update
+
+Status: governance evidence updated on 2026-05-15 11:40:00 +08:00.
+
+`docs/governance-defect-register.json` keeps `P2-6` open because the issue is explicitly about mapper schema/codegen feasibility after WireDTO gates and still has frontend-facing promotion criteria. Backend-side evidence now supports the deferred decision:
+
+- Full OpenAPI / JSON Schema / TypeScript DTO generation remains deferred.
+- Producer contract pilots now cover `/api/streams/index`, `/api/evidence`, `/api/tools/runtime-config`, `/api/stats/traffic/global`, and representative analysis endpoints.
+- Dynamic boundaries remain documented rather than hidden by generated schemas.
+
+Validation:
+
+- `cd backend && go test ./internal/governance -count=1` — planned for final cycle validation.
+
+Self-review:
+
+- Score: 92/100, Gold.
+- The register schema intentionally rejects ad-hoc open-defect notes, so the evidence is recorded here instead of extending the register format mid-cycle.
+
+## 54. Thirty-Round Backend Engineering Approval
+
+Status: cycle 3 approval completed on 2026-05-15 11:48:00 +08:00.
+
+Cycle scope:
+
+- R21 `BE-TRANSPORT-2.2`: moved capture handlers into `http_capture.go` after route baselines existed.
+- R22 `BE-CONTEXT-3.2` follow-up: upgraded architecture context scan to cover split transport files.
+- R23 `BE-ENGINE-4.2` guardrail slice: extracted derived capture reset helper and added reset invariant coverage.
+- R24 `BE-CONTRACT-1.6` follow-up: added `/api/stats/traffic/global` producer contract.
+- R25 route/auth/audit reassessment: confirmed split-handler architecture coverage instead of adding redundant route assertions.
+- R26 `BE-CONTEXT-3.6` follow-up: added media transcription request-cancellation regression and `408` cancellation mapping.
+- R27 governance evidence update: kept `P2-6` open and recorded backend-side evidence here because the canonical register schema disallows open-defect notes.
+- R28 docs/self-review: validated governance, formatting, and whitespace.
+- R29 final validation: selected backend package suite passed.
+- R30 cycle approval and commit prep.
+
+Validation:
+
+- `cd backend && gofmt -l .` — PASS.
+- `cd backend && go test ./internal/governance -count=1` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/governance-defect-register.json` — PASS.
+- `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
+
+Cycle approval result:
+
+- Approved.
+- The cycle reduced `http_server.go` capture-handler scope, strengthened architecture coverage for split transport files, improved capture reset ownership safety, expanded backend producer contracts, and added a second request-cancellation regression.
+- Average effective score: Gold.
+- No round remained below the 90 approval threshold after self-review.
+
+Optimized next task order:
+
+1. `BE-TRANSPORT-2.3`: move packet/stream handlers only if route baselines cover the selected endpoints first.
+2. `BE-ENGINE-4.3`: consider stream cache owner extraction, starting with tests for cache/override invariants.
+3. `BE-CONTRACT-1.7`: add explicit dynamic-boundary contract helper for packet layers and decoder options.
+4. `BE-CONTEXT-3.6`: add one tool-analysis cancellation regression if a lightweight fake stays small.
+5. `BE-TSHARK-6.2`: defer capability matrix expansion until a new field-scan path changes.
+
+Deferred tasks:
+
+- Full schema/codegen remains deferred while `P2-6` stays open.
+- Upload helper extraction remains deferred until upload-specific route tests exist.
+- Broad `engine.Service` owner struct extraction remains deferred until stream/media reset seams have more focused tests.
+
 ## 39. Mutating Route Method Policy Baseline
 
 Status: `BE-TRANSPORT-2.1b` completed on 2026-05-15 02:31:18 +08:00.

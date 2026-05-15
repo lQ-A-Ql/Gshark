@@ -712,6 +712,19 @@ func (s *Service) ClearCapture() error {
 	if s.pcap != "" {
 		tshark.ClearFieldScanCache(s.pcap)
 	}
+	s.resetCaptureAnalysisStateLocked()
+	s.cancelSpeechBatchLocked()
+	s.mu.Unlock()
+
+	s.yaraMu.Lock()
+	s.yaraLoaded = false
+	s.yaraHits = nil
+	s.yaraLastError = ""
+	s.yaraMu.Unlock()
+	return nil
+}
+
+func (s *Service) resetCaptureAnalysisStateLocked() {
 	s.pcap = ""
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
@@ -725,20 +738,11 @@ func (s *Service) ClearCapture() error {
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}
-	s.cancelSpeechBatchLocked()
 	s.speechBatch = nil
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = map[string]model.ReassembledStream{}
 	s.streamOverrides = map[string]map[int]string{}
-	s.mu.Unlock()
-
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
-	return nil
 }
 
 func (s *Service) CaptureStatus() model.CaptureStatus {

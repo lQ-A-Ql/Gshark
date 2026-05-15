@@ -126,6 +126,22 @@ func TestToolRuntimeConfigContract(t *testing.T) {
 	requireJSONKeys(t, yara, "available", "enabled", "message", "using_custom_bin", "using_custom_rules", "timeout_ms")
 }
 
+func TestGlobalTrafficStatsContract(t *testing.T) {
+	server := &Server{analysis: contractAnalysisService{}}
+	rec := httptest.NewRecorder()
+
+	server.handleGlobalTrafficStats(rec, httptest.NewRequest(http.MethodGet, "/api/stats/traffic/global", nil))
+
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "total_packets", "protocol_kinds", "timeline", "protocol_dist", "top_talkers", "top_hostnames", "top_domains", "top_src_ips", "top_dst_ips", "top_computer_names", "top_dest_ports", "top_src_ports")
+	requireJSONNumber(t, payload, "total_packets")
+	requireJSONNumber(t, payload, "protocol_kinds")
+	requireJSONArray(t, payload, "timeline")
+	requireJSONArray(t, payload, "protocol_dist")
+	requireJSONArray(t, payload, "top_talkers")
+}
+
 func TestPacketInlineContractRejectsInvalidID(t *testing.T) {
 	server := NewServer(engine.NewService(nil, nil), NewHub())
 	tests := []struct {
@@ -362,11 +378,23 @@ func contractPacket() model.Packet {
 type contractAnalysisService struct{}
 
 func (contractAnalysisService) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
-	return model.GlobalTrafficStats{}, nil
+	return contractAnalysisService{}.GlobalTrafficStatsWithContext(context.Background())
 }
 
 func (contractAnalysisService) GlobalTrafficStatsWithContext(context.Context) (model.GlobalTrafficStats, error) {
-	return model.GlobalTrafficStats{}, nil
+	return model.GlobalTrafficStats{
+		TotalPackets:  1,
+		ProtocolKinds: 1,
+		Timeline:      []model.TrafficBucket{{Label: "2026-05-14T23:25:00+08:00", Count: 1}},
+		ProtocolDist:  []model.TrafficBucket{{Label: "HTTP", Count: 1}},
+		TopTalkers:    []model.TrafficBucket{{Label: "10.0.0.1 -> 10.0.0.2", Count: 1}},
+		TopHostnames:  []model.TrafficBucket{},
+		TopDomains:    []model.TrafficBucket{},
+		TopSrcIPs:     []model.TrafficBucket{{Label: "10.0.0.1", Count: 1}},
+		TopDstIPs:     []model.TrafficBucket{{Label: "10.0.0.2", Count: 1}},
+		TopDestPorts:  []model.TrafficBucket{{Label: "80", Count: 1}},
+		TopSrcPorts:   []model.TrafficBucket{},
+	}, nil
 }
 
 func (contractAnalysisService) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
