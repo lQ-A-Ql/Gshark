@@ -73,7 +73,7 @@ export function RuntimeSettingsActions({
         className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${busy || loading ? "animate-spin" : ""}`} />
-        刷新状态
+        重新探测工具
       </button>
       <button
         onClick={onSave}

@@ -349,7 +349,7 @@ func logTSharkMissingOptionalOnce(scope string, missing []string) {
 		return
 	}
 	tsharkCapabilityLogSeen[key] = struct{}{}
-	log.Printf("tshark capability: %s — missing optional fields: %s", scope, strings.Join(sorted, ", "))
+	log.Printf("tshark capability degraded: %s — optional fields missing: %s (tshark remains available)", scope, strings.Join(sorted, ", "))
 }
 
 // logCapabilityMissingOptionalFields emits a single log line naming every

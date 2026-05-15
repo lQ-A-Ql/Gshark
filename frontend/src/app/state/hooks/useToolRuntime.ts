@@ -3,6 +3,7 @@ import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
 import { buildOfflineToolRuntimeSnapshot } from "../toolRuntimeOfflineSnapshot";
+import { toTSharkStatus } from "../tsharkStatusState";
 import { readToolRuntimeConfig, writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
 
 const EMPTY_TSHARK_STATUS: TSharkStatus = {
@@ -54,6 +55,13 @@ export function useToolRuntime() {
                 message: status.message,
                 customPath: status.customPath || undefined,
                 usingCustomPath: status.usingCustomPath,
+                version: status.version,
+                fieldProfile: status.fieldProfile,
+                fieldCount: status.fieldCount,
+                missingRequiredFields: status.missingRequiredFields,
+                missingOptionalFields: status.missingOptionalFields,
+                capabilityMessage: status.capabilityMessage,
+                capabilityCheckDegraded: status.capabilityCheckDegraded,
               },
             }
           : prev,
@@ -82,13 +90,7 @@ export function useToolRuntime() {
       const snapshot = await backendClients.runtime.getToolRuntimeSnapshot();
       setToolRuntimeCheckDegraded(false);
       setToolRuntimeSnapshot(snapshot);
-      setTsharkStatus({
-        available: snapshot.tshark.available,
-        path: snapshot.tshark.path,
-        message: snapshot.tshark.message,
-        customPath: snapshot.tshark.customPath ?? "",
-        usingCustomPath: snapshot.tshark.usingCustomPath,
-      });
+      setTsharkStatus(toTSharkStatus(snapshot.tshark));
       return snapshot;
     } finally {
       setIsToolRuntimeLoading(false);
@@ -133,13 +135,7 @@ export function useToolRuntime() {
         writeUserToolRuntimeConfig(snapshot.config);
         setToolRuntimeCheckDegraded(false);
         setToolRuntimeSnapshot(snapshot);
-        setTsharkStatus({
-          available: snapshot.tshark.available,
-          path: snapshot.tshark.path,
-          message: snapshot.tshark.message,
-          customPath: snapshot.tshark.customPath ?? "",
-          usingCustomPath: snapshot.tshark.usingCustomPath,
-        });
+        setTsharkStatus(toTSharkStatus(snapshot.tshark));
         if (snapshot.tshark.available) {
           setBackendStatus(
             snapshot.tshark.message && snapshot.tshark.message !== "ok" ? snapshot.tshark.message : "工具路径已更新",

@@ -1,3 +1,8 @@
+param(
+	[switch]$NoClean,
+	[switch]$CleanGoCache
+)
+
 $ErrorActionPreference = "Stop"
 
 function Stop-PortProcess($port) {
@@ -19,9 +24,51 @@ function Stop-PortProcess($port) {
 	}
 }
 
+function Remove-FileIfExists($path, $label) {
+	$target = [System.IO.Path]::GetFullPath($path)
+	if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+		return
+	}
+	Remove-Item -LiteralPath $target -Force
+	Write-Host "[gshark] removed stale $label`: $target" -ForegroundColor DarkYellow
+}
+
+function Remove-DirectoryIfExists($path, $label, $allowedRoot) {
+	$target = [System.IO.Path]::GetFullPath($path)
+	if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+		return
+	}
+	$allowed = [System.IO.Path]::GetFullPath($allowedRoot)
+	if (-not $target.StartsWith($allowed, [System.StringComparison]::OrdinalIgnoreCase)) {
+		throw "Refusing to remove $label outside allowed root: $target"
+	}
+	Remove-Item -LiteralPath $target -Recurse -Force
+	Write-Host "[gshark] removed stale $label`: $target" -ForegroundColor DarkYellow
+}
+
+function Clear-WailsBackendCaches {
+	$root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+	$tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+
+	Remove-FileIfExists (Join-Path $root "frontend\dist\sentinel-backend.exe") "frontend backend asset"
+	Remove-FileIfExists (Join-Path $root "build\bin\sentinel-backend.exe") "build backend binary"
+	Remove-DirectoryIfExists (Join-Path $tempRoot "gshark-sentinel\backend") "extracted backend cache" $tempRoot
+
+	if ($CleanGoCache) {
+		Write-Host "[gshark] clearing Go build cache" -ForegroundColor DarkYellow
+		go clean -cache
+	}
+}
+
 Stop-PortProcess 34115
 Stop-PortProcess 17891
 
 Set-Location "$PSScriptRoot\.."
+if (-not $NoClean) {
+	Clear-WailsBackendCaches
+} else {
+	Write-Host "[gshark] backend cache cleanup skipped (-NoClean)" -ForegroundColor DarkYellow
+}
+
 Write-Host "[gshark] starting wails dev mode" -ForegroundColor Cyan
 wails dev

@@ -4,6 +4,7 @@ import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient"
 import { backendClients } from "../../integrations/backendClients";
 import { isOperationTimeoutError, withAbortableTimeout } from "../../utils/asyncControl";
 import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
+import { toTSharkStatus } from "../tsharkStatusState";
 import { writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
 import {
   TOOL_RUNTIME_CONFIG_FIELDS,
@@ -29,13 +30,7 @@ export function applyStartupRuntimeSnapshot({
 }: ApplyStartupRuntimeSnapshotOptions) {
   if (isCancelled()) return;
   setToolRuntimeSnapshot(snapshot);
-  setTsharkStatus({
-    available: snapshot.tshark.available,
-    path: snapshot.tshark.path,
-    message: snapshot.tshark.message,
-    customPath: snapshot.tshark.customPath ?? "",
-    usingCustomPath: snapshot.tshark.usingCustomPath,
-  });
+  setTsharkStatus(toTSharkStatus(snapshot.tshark));
   if (snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
     setBackendStatus(snapshot.tshark.message);
   }

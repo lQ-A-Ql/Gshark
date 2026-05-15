@@ -166,6 +166,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 
 - 项目当前是桌面端优先工作流。
 - `scripts/start-dev.ps1` 会委托给 `scripts/start-wails-dev.ps1`。
+- `start-wails-dev.ps1` 默认会清理旧的内嵌后端缓存：`frontend/dist/sentinel-backend.exe`、`build/bin/sentinel-backend.exe` 和 `%TEMP%\gshark-sentinel\backend`，避免 Wails dev 复用过期后端。需要跳过清理时可传 `-NoClean`；怀疑 Go 构建缓存命中旧产物时可额外传 `-CleanGoCache`。
+- 启动页和运行时组件设置都提供“重新探测工具”，用于重新读取 TShark、FFmpeg、Python/Vosk 与 YARA 状态。`tshark capability degraded ... optional fields missing ... (tshark remains available)` 只表示可选字段降级，不表示 TShark 不可用。
 
 ## 测试与验证
 

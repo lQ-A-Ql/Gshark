@@ -352,6 +352,42 @@ describe("useBackendLifecycle", () => {
     expect(readToolRuntimeConfig()).toEqual(envSnapshot.config);
   });
 
+  it("keeps TShark capability metadata from the startup runtime snapshot", async () => {
+    installRuntimeLocalStorage();
+    const snapshot = createToolRuntimeSnapshot();
+    snapshot.tshark = {
+      ...snapshot.tshark,
+      version: "TShark 4.6.5",
+      fieldProfile: "compat",
+      fieldCount: 3600,
+      missingOptionalFields: ["usbms.scsi.opcode"],
+      capabilityMessage: "optional fields missing",
+      capabilityCheckDegraded: true,
+    };
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(snapshot);
+    const setTsharkStatus = vi.fn();
+
+    await loadStartupToolRuntime({
+      isCancelled: () => false,
+      setBackendStatus: vi.fn(),
+      setIsTSharkChecking: vi.fn(),
+      setIsToolRuntimeLoading: vi.fn(),
+      setToolRuntimeCheckDegraded: vi.fn(),
+      setToolRuntimeSnapshot: vi.fn(),
+      setTsharkStatus,
+    });
+
+    expect(setTsharkStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        available: true,
+        fieldProfile: "compat",
+        missingOptionalFields: ["usbms.scsi.opcode"],
+        capabilityCheckDegraded: true,
+      }),
+    );
+    expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
+  });
+
   it("migrates legacy all-empty runtime storage without clearing backend env config", async () => {
     installRuntimeLocalStorage();
     window.localStorage.setItem("gshark.tool-runtime.v1", JSON.stringify(createToolRuntimeSnapshot().config));
