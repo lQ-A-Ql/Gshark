@@ -1331,6 +1331,157 @@ Optimized next task order:
 4. Add SMB3 or WinRM cancellation response consistency only if a compact fake avoids broad test scaffolding.
 5. Keep full schema/codegen deferred while `P2-6` remains open.
 
+## 61. Stream Mutation Route Baseline
+
+Status: `BE-TRANSPORT-2.4` baseline slice completed on 2026-05-15 12:39:00 +08:00.
+
+This slice adds POST route baselines for remaining stream mutation/utility endpoints before moving their handlers.
+
+Changed file:
+
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- `TestHandlerRegistersStreamMutationRoutes` validates `/api/streams/decode`, `/api/streams/inspect`, and `/api/streams/payloads` through `Server.Handler()`.
+- Each route rejects `GET` with `405` and accepts a minimal valid `POST` payload.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegistersStreamMutationRoutes|TestHandlerRegistersPacketStreamRoutes" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- This catches route registration, method policy, and minimal payload compatibility before handler movement.
+
+## 62. Remaining Stream Handler Split
+
+Status: `BE-TRANSPORT-2.4` split slice completed on 2026-05-15 12:43:00 +08:00.
+
+This slice moved `/api/streams/decode`, `/api/streams/inspect`, and `/api/streams/payloads` handlers into `http_packet_stream.go`, completing packet/basic stream handler decomposition while preserving routes.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_packet_stream.go`
+- `backend/internal/transport/http_server_test.go`
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandlerRegisters(StreamMutationRoutes|PacketStreamRoutes)$|TestHandleStreamPayloadSourcesReturnsInitializedPayload|TestStreamIndexContract" -count=1` — PASS.
+- `cd backend && go test ./internal/architecture -count=1` — PASS.
+
+Self-review:
+
+- Score: 94/100, Gold.
+- The move is route-preserving and the architecture context scan still covers split transport files.
+
+## 63. Stream Cache Helper Extraction
+
+Status: `BE-ENGINE-4.3` helper slice completed on 2026-05-15 12:47:00 +08:00.
+
+This slice keeps full stream cache owner extraction deferred, but extracts cache-order refresh into `markStreamCacheKeyNewestLocked` under existing locks.
+
+Changed file:
+
+- `backend/internal/engine/service.go`
+
+Validation:
+
+- `cd backend && go test ./internal/engine -run "Test(CacheStream|StreamWithOverrides)" -count=1` — PASS.
+
+Self-review:
+
+- Score: 93/100, Gold.
+- The helper reduces duplicated ordering logic without moving lock ownership or changing cache behavior.
+
+## 64. Dynamic Boundary Helper Coverage
+
+Status: `BE-CONTRACT-1.7` helper coverage completed on 2026-05-15 12:50:00 +08:00.
+
+This slice adds direct coverage for the dynamic JSON boundary helper rather than inventing unstable endpoint fixtures for decoder option hints.
+
+Changed file:
+
+- `backend/internal/transport/http_contract_test.go`
+
+Coverage:
+
+- `TestDynamicJSONBoundaryContractHelper` verifies the helper returns the dynamic object map.
+- Packet layer contract coverage continues to use the helper for `layers`.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestDynamicJSONBoundaryContractHelper|TestPacketLayersContract" -count=1` — PASS.
+
+Self-review:
+
+- Score: 92/100, Gold.
+- This documents helper semantics without locking protocol-dependent payload source fixtures too early.
+
+## 65. Tool Cancellation Consistency Expansion
+
+Status: `BE-CONTEXT-3.6` tool consistency slice completed on 2026-05-15 12:55:00 +08:00.
+
+This slice expands request-cancellation consistency from NTLM to SMB3 candidate listing and WinRM decrypt.
+
+Changed files:
+
+- `backend/internal/transport/http_server.go`
+- `backend/internal/transport/http_server_test.go`
+
+Coverage:
+
+- `TestHandleSMB3SessionCandidatesUsesCanceledRequestContext` verifies canceled request propagation and `408` mapping.
+- `TestHandleWinRMDecryptUsesCanceledRequestContext` verifies canceled request propagation and `408` mapping.
+- Existing NTLM cancellation regression remains covered by the same fake service.
+
+Validation:
+
+- `cd backend && go test ./internal/transport -run "TestHandle(NTLMSessionMaterials|SMB3SessionCandidates|WinRMDecrypt)UsesCanceledRequestContext" -count=1` — PASS.
+
+Self-review:
+
+- Score: 95/100, Gold.
+- This is a narrow consistency improvement on already context-aware tool endpoints.
+
+## 66. Forty-Eight-Round Backend Engineering Approval
+
+Status: cycle 5 approval completed on 2026-05-15 12:59:00 +08:00.
+
+Cycle scope:
+
+- R40 stream POST route baselines.
+- R41 remaining stream handler split.
+- R42 stream cache helper extraction.
+- R43 dynamic-boundary helper coverage.
+- R44 SMB3 and WinRM cancellation consistency.
+- R45 backend governance evidence update in this spec.
+- R46 docs/self-review.
+- R47 final backend validation.
+- R48 cycle approval and commit prep.
+
+Validation:
+
+- `cd backend && gofmt -l .` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md` — PASS.
+- `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
+
+Cycle approval result:
+
+- Approved.
+- The cycle completed stream handler decomposition, added route-level POST baselines first, made stream cache ordering clearer under existing locks, and expanded cancellation consistency.
+- Average effective score: Gold.
+
+Optimized next task order:
+
+1. Split tool handlers into a dedicated transport file only after route/method baselines cover WinRM, SMB3, NTLM, HTTP-login, SMTP, MySQL, and Shiro.
+2. Consider extracting packet handler tests into grouped table helpers if transport tests become too long.
+3. Add one producer contract for stream decode/inspect response shapes if those response DTOs are stable enough.
+4. Keep stream cache owner struct extraction deferred until cache/raw-index mutation paths can be isolated behind a small interface.
+5. Keep full schema/codegen deferred while `P2-6` remains open.
+
 ## 39. Mutating Route Method Policy Baseline
 
 Status: `BE-TRANSPORT-2.1b` completed on 2026-05-15 02:31:18 +08:00.

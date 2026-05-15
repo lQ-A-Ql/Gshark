@@ -222,6 +222,18 @@ func TestPacketLayersContract(t *testing.T) {
 	requireDynamicJSONObject(t, payload, "layers")
 }
 
+func TestDynamicJSONBoundaryContractHelper(t *testing.T) {
+	payload := map[string]any{
+		"decoder_options_hint": map[string]any{
+			"key": "secret",
+		},
+	}
+	boundary := requireDynamicJSONObject(t, payload, "decoder_options_hint")
+	if boundary["key"] != "secret" {
+		t.Fatalf("dynamic boundary helper returned %#v", boundary)
+	}
+}
+
 func TestIndustrialAnalysisContract(t *testing.T) {
 	server := &Server{analysis: contractAnalysisService{}}
 	rec := httptest.NewRecorder()

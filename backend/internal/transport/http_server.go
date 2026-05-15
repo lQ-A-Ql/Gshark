@@ -251,6 +251,10 @@ func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.toolAnalysis.RunWinRMDecryptWithContext(r.Context(), req)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			writeError(w, http.StatusRequestTimeout, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -308,6 +312,10 @@ func (s *Server) handleSMB3SessionCandidates(w http.ResponseWriter, r *http.Requ
 	}
 	rows, err := s.toolAnalysis.ListSMB3SessionCandidatesWithContext(r.Context())
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			writeError(w, http.StatusRequestTimeout, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -826,69 +834,6 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
-}
-
-func (s *Server) handleStreamDecode(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	body := http.MaxBytesReader(w, r.Body, maxStreamDecodeBodySize)
-	defer body.Close()
-
-	var payload engine.StreamDecodeRequest
-	if err := json.NewDecoder(body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-	result, err := engine.DecodeStreamPayload(payload)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
-}
-
-func (s *Server) handleStreamInspect(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	body := http.MaxBytesReader(w, r.Body, maxStreamDecodeBodySize)
-	defer body.Close()
-
-	var payload struct {
-		Payload string `json:"payload"`
-	}
-	if err := json.NewDecoder(body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-	writeJSON(w, http.StatusOK, engine.InspectStreamPayload(payload.Payload))
-}
-
-func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var payload struct {
-		Protocol string                   `json:"protocol"`
-		StreamID int64                    `json:"stream_id"`
-		Patches  []model.StreamChunkPatch `json:"patches"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-
-	stream, err := s.capture.UpdateStreamPayloads(r.Context(), payload.Protocol, payload.StreamID, payload.Patches)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, stream)
 }
 
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {

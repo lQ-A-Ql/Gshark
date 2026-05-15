@@ -255,6 +255,80 @@ func TestHandlerRegistersPacketStreamRoutes(t *testing.T) {
 	}
 }
 
+func TestHandlerRegistersStreamMutationRoutes(t *testing.T) {
+	server := NewServer(nil, NewHub())
+	server.capture = contractCaptureService{}
+	handler := server.Handler()
+	tests := []struct {
+		name       string
+		path       string
+		payload    string
+		wantKeys   []string
+		badMethod  string
+		goodMethod string
+		goodStatus int
+		badStatus  int
+	}{
+		{
+			name:       "stream decode",
+			path:       "/api/streams/decode",
+			payload:    `{"payload":"SGVsbG8=","decoder":"base64"}`,
+			wantKeys:   []string{"decoder", "summary", "text", "bytes_hex", "encoding"},
+			badMethod:  http.MethodGet,
+			goodMethod: http.MethodPost,
+			goodStatus: http.StatusOK,
+			badStatus:  http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "stream inspect",
+			path:       "/api/streams/inspect",
+			payload:    `{"payload":"cmd=whoami"}`,
+			wantKeys:   []string{"candidates"},
+			badMethod:  http.MethodGet,
+			goodMethod: http.MethodPost,
+			goodStatus: http.StatusOK,
+			badStatus:  http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "stream payloads",
+			path:       "/api/streams/payloads",
+			payload:    `{"protocol":"tcp","stream_id":3,"patches":[{"index":0,"body":"patched"}]}`,
+			wantKeys:   []string{"stream_id", "protocol", "chunks"},
+			badMethod:  http.MethodGet,
+			goodMethod: http.MethodPost,
+			goodStatus: http.StatusOK,
+			badStatus:  http.StatusMethodNotAllowed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" rejects bad method", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.badMethod, tt.path, nil))
+			if rec.Code != tt.badStatus {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.badMethod, tt.path, rec.Code, tt.badStatus, rec.Body.String())
+			}
+		})
+
+		t.Run(tt.name+" accepts post", func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tt.goodMethod, tt.path, strings.NewReader(tt.payload)))
+			if rec.Code != tt.goodStatus {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.goodMethod, tt.path, rec.Code, tt.goodStatus, rec.Body.String())
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode %s response: %v body=%s", tt.name, err, rec.Body.String())
+			}
+			for _, key := range tt.wantKeys {
+				if _, ok := payload[key]; !ok {
+					t.Fatalf("%s response missing key %q: %#v", tt.name, key, payload)
+				}
+			}
+		})
+	}
+}
+
 func TestHandlerRegistersPluginWriteRoutes(t *testing.T) {
 	plugins := &fakePluginService{}
 	server := &Server{plugins: plugins}
@@ -565,6 +639,42 @@ func TestHandleNTLMSessionMaterialsUsesCanceledRequestContext(t *testing.T) {
 	}
 }
 
+func TestHandleSMB3SessionCandidatesUsesCanceledRequestContext(t *testing.T) {
+	toolAnalysis := &canceledToolAnalysisService{}
+	server := &Server{toolAnalysis: toolAnalysis}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/tools/smb3-session-candidates", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	server.handleSMB3SessionCandidates(rec, req)
+
+	if rec.Code != http.StatusRequestTimeout {
+		t.Fatalf("expected canceled SMB3 candidates request to return %d, got %d body=%s", http.StatusRequestTimeout, rec.Code, rec.Body.String())
+	}
+	if toolAnalysis.ctxErr != context.Canceled {
+		t.Fatalf("tool ctx error = %v, want %v", toolAnalysis.ctxErr, context.Canceled)
+	}
+}
+
+func TestHandleWinRMDecryptUsesCanceledRequestContext(t *testing.T) {
+	toolAnalysis := &canceledToolAnalysisService{}
+	server := &Server{toolAnalysis: toolAnalysis}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/api/tools/winrm-decrypt", strings.NewReader(`{}`)).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	server.handleWinRMDecrypt(rec, req)
+
+	if rec.Code != http.StatusRequestTimeout {
+		t.Fatalf("expected canceled WinRM decrypt request to return %d, got %d body=%s", http.StatusRequestTimeout, rec.Code, rec.Body.String())
+	}
+	if toolAnalysis.ctxErr != context.Canceled {
+		t.Fatalf("tool ctx error = %v, want %v", toolAnalysis.ctxErr, context.Canceled)
+	}
+}
+
 type canceledToolAnalysisService struct {
 	contractToolAnalysisService
 	ctxErr error
@@ -573,6 +683,16 @@ type canceledToolAnalysisService struct {
 func (s *canceledToolAnalysisService) ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error) {
 	s.ctxErr = ctx.Err()
 	return nil, s.ctxErr
+}
+
+func (s *canceledToolAnalysisService) ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error) {
+	s.ctxErr = ctx.Err()
+	return nil, s.ctxErr
+}
+
+func (s *canceledToolAnalysisService) RunWinRMDecryptWithContext(ctx context.Context, _ model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	s.ctxErr = ctx.Err()
+	return model.WinRMDecryptResult{}, s.ctxErr
 }
 
 type contractToolAnalysisService struct{}

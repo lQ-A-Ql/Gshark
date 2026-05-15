@@ -1447,18 +1447,18 @@ func (s *Service) cacheStream(key string, stream model.ReassembledStream) {
 	if s.streamCache == nil {
 		s.streamCache = map[string]model.ReassembledStream{}
 	}
-	if _, exists := s.streamCache[key]; exists {
-		s.removeStreamCacheOrderLocked(key)
-	}
 	s.streamCache[key] = cloneReassembledStream(stream)
-	s.streamCacheOrder = append(s.streamCacheOrder, key)
-
-	limit := streamCacheLimitValue()
-	for len(s.streamCacheOrder) > limit {
+	s.markStreamCacheKeyNewestLocked(key)
+	for len(s.streamCacheOrder) > streamCacheLimitValue() {
 		oldest := s.streamCacheOrder[0]
 		s.streamCacheOrder = s.streamCacheOrder[1:]
 		delete(s.streamCache, oldest)
 	}
+}
+
+func (s *Service) markStreamCacheKeyNewestLocked(key string) {
+	s.removeStreamCacheOrderLocked(key)
+	s.streamCacheOrder = append(s.streamCacheOrder, key)
 }
 
 func (s *Service) removeStreamCacheOrderLocked(key string) {
