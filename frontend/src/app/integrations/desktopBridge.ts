@@ -11,7 +11,7 @@ import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapp
 import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
-import { createIpcBackendTransport } from "./ipcBackendTransport";
+import { createIpcBackendTransport, withDesktopIpcControls } from "./ipcBackendTransport";
 
 interface DesktopBridgeContext {
   desktopApp: DesktopTransportBinding;
@@ -19,6 +19,8 @@ interface DesktopBridgeContext {
 }
 
 const FAST_RUNTIME_IPC_TIMEOUT_MS = 2000;
+const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
+const START_CAPTURE_IPC_TIMEOUT_MS = 15000;
 
 export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridgeContext): BackendBridge {
   const ipcTransport = desktopApp.InvokeBackendJSON ? createIpcBackendTransport(desktopApp) : null;
@@ -59,8 +61,12 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         return await dataBridge.getToolRuntimeSnapshot(signal, mode);
       }
       try {
-        const payload =
-          mode === "fast" ? await withIpcTimeout(ipcSnapshot(), FAST_RUNTIME_IPC_TIMEOUT_MS) : await ipcSnapshot();
+        const payload = await withDesktopIpcControls(ipcSnapshot, {
+          endpoint: `DesktopApp.GetToolRuntimeSnapshot(${mode})`,
+          responseKind: "typed-ipc",
+          signal,
+          timeoutMs: mode === "fast" ? FAST_RUNTIME_IPC_TIMEOUT_MS : DEFAULT_TYPED_IPC_TIMEOUT_MS,
+        });
         return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
       } catch (error) {
         if (!ipcTransport) {
@@ -77,10 +83,12 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         return await dataBridge.updateToolRuntimeConfig(config, signal, mode);
       }
       try {
-        const payload =
-          mode === "fast"
-            ? await withIpcTimeout(ipcUpdate(toToolRuntimeRequest(config)), FAST_RUNTIME_IPC_TIMEOUT_MS)
-            : await ipcUpdate(toToolRuntimeRequest(config));
+        const payload = await withDesktopIpcControls(() => ipcUpdate(toToolRuntimeRequest(config)), {
+          endpoint: `DesktopApp.UpdateToolRuntimeConfig(${mode})`,
+          responseKind: "typed-ipc",
+          signal,
+          timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+        });
         return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
       } catch (error) {
         if (!ipcTransport) {
@@ -95,7 +103,11 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       if (!desktopApp.SetTSharkPath) {
         return await dataBridge.setTSharkPath(path);
       }
-      const payload = await desktopApp.SetTSharkPath(path);
+      const payload = await withDesktopIpcControls(() => desktopApp.SetTSharkPath!(path), {
+        endpoint: "DesktopApp.SetTSharkPath",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
       return {
         available: Boolean((payload as any)?.available),
         path: String((payload as any)?.path ?? ""),
@@ -104,35 +116,60 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         usingCustomPath: Boolean((payload as any)?.using_custom_path),
       };
     },
-    async startStreamingPackets(filePath: string, filter: string) {
+    async startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal) {
       if (!desktopApp.StartCapture) {
-        return await dataBridge.startStreamingPackets(filePath, filter);
+        return signal
+          ? await dataBridge.startStreamingPackets(filePath, filter, signal)
+          : await dataBridge.startStreamingPackets(filePath, filter);
       }
-      await desktopApp.StartCapture(filePath, filter);
+      await withDesktopIpcControls(() => desktopApp.StartCapture!(filePath, filter), {
+        endpoint: "DesktopApp.StartCapture",
+        responseKind: "typed-ipc",
+        signal,
+        timeoutMs: START_CAPTURE_IPC_TIMEOUT_MS,
+      });
     },
     async stopStreamingPackets() {
       if (!desktopApp.StopCapture) {
         return await dataBridge.stopStreamingPackets();
       }
-      await desktopApp.StopCapture();
+      await withDesktopIpcControls(() => desktopApp.StopCapture!(), {
+        endpoint: "DesktopApp.StopCapture",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
     },
     async prepareCaptureReplacement() {
       if (!desktopApp.PrepareCaptureReplacement) {
         return await dataBridge.prepareCaptureReplacement();
       }
-      await desktopApp.PrepareCaptureReplacement();
+      await withDesktopIpcControls(() => desktopApp.PrepareCaptureReplacement!(), {
+        endpoint: "DesktopApp.PrepareCaptureReplacement",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
     },
     async closeCapture() {
       if (!desktopApp.CloseCapture) {
         return await dataBridge.closeCapture();
       }
-      await desktopApp.CloseCapture();
+      await withDesktopIpcControls(() => desktopApp.CloseCapture!(), {
+        endpoint: "DesktopApp.CloseCapture",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
     },
-    async getCaptureStatus() {
+    async getCaptureStatus(signal?: AbortSignal) {
       if (!desktopApp.GetCaptureStatus) {
-        return await dataBridge.getCaptureStatus();
+        return await dataBridge.getCaptureStatus(signal);
       }
-      return withCaptureStatusMeta(asCaptureStatus(await desktopApp.GetCaptureStatus()), "desktop-ipc");
+      const payload = await withDesktopIpcControls(() => desktopApp.GetCaptureStatus!(), {
+        endpoint: "DesktopApp.GetCaptureStatus",
+        responseKind: "typed-ipc",
+        signal,
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return withCaptureStatusMeta(asCaptureStatus(payload), "desktop-ipc");
     },
     async listPacketsPage(cursor: number, limit: number, filter = "", signal?: AbortSignal) {
       if (!desktopApp.ListPacketsPage) {
@@ -140,8 +177,14 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
           ? await dataBridge.listPacketsPage(cursor, limit, filter, signal)
           : await dataBridge.listPacketsPage(cursor, limit, filter);
       }
+      const payload = await withDesktopIpcControls(() => desktopApp.ListPacketsPage!(cursor, limit, filter), {
+        endpoint: "DesktopApp.ListPacketsPage",
+        responseKind: "typed-ipc",
+        signal,
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
       return withPacketsPageMeta(
-        asPacketsPageResult(await desktopApp.ListPacketsPage(cursor, limit, filter)),
+        asPacketsPageResult(payload),
         "desktop-ipc",
       );
     },
@@ -149,13 +192,23 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       if (!desktopApp.GetTLSConfig) {
         return await dataBridge.getTLSConfig();
       }
-      return asDecryptionConfig(await desktopApp.GetTLSConfig());
+      return asDecryptionConfig(
+        await withDesktopIpcControls(() => desktopApp.GetTLSConfig!(), {
+          endpoint: "DesktopApp.GetTLSConfig",
+          responseKind: "typed-ipc",
+          timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+        }),
+      );
     },
     async updateTLSConfig(cfg: DecryptionConfig) {
       if (!desktopApp.UpdateTLSConfig) {
         return await dataBridge.updateTLSConfig(cfg);
       }
-      await desktopApp.UpdateTLSConfig(toDecryptionConfigRequest(cfg));
+      await withDesktopIpcControls(() => desktopApp.UpdateTLSConfig!(toDecryptionConfigRequest(cfg)), {
+        endpoint: "DesktopApp.UpdateTLSConfig",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
     },
   };
 }
@@ -178,16 +231,6 @@ function runtimeConfigUpdateMethod(
     return desktopApp.UpdateToolRuntimeConfigFast ?? desktopApp.UpdateToolRuntimeConfig;
   }
   return desktopApp.UpdateToolRuntimeConfigFull ?? desktopApp.UpdateToolRuntimeConfig;
-}
-
-function withIpcTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Wails IPC 快速探测超时（${timeoutMs}ms）`)), timeoutMs);
-  });
-  return Promise.race([operation, timeout]).finally(() => {
-    if (timer !== undefined) window.clearTimeout(timer);
-  });
 }
 
 function toToolRuntimeRequest(config: ToolRuntimeConfig) {

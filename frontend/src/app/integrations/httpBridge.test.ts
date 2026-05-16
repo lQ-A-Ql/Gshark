@@ -82,6 +82,25 @@ describe("httpBridge transport helpers", () => {
     );
   });
 
+  it("uses Wails-specific guidance for HTTP fallback auth failures", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(
+      requestJSON(
+        "/api/tools/runtime-config",
+        { headers: { Authorization: "Bearer caller-token" } },
+        () => ({ GetBackendAuthToken: vi.fn(async () => "desktop-token") }),
+      ),
+    ).rejects.toThrow("旧 binding");
+  });
+
   it("normalizes browser fetch failures into an actionable backend connectivity message", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockRejectedValueOnce(new Error("Failed to fetch"));

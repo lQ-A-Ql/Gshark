@@ -6,6 +6,17 @@ import { EventsOn } from "../../../wailsjs/runtime";
 
 type DesktopBackendMethod = "GET" | "POST" | "DELETE";
 type DesktopBackendBodyKind = "none" | "json" | "multipart";
+type DesktopIpcResponseKind = "json" | "blob" | "text" | "typed-ipc";
+
+export type DesktopIpcErrorCode =
+  | "ipc_unavailable"
+  | "ipc_timeout"
+  | "invalid_request"
+  | "backend_proxy_failed"
+  | "backend_error"
+  | "blob_too_large";
+
+export const DESKTOP_IPC_BLOB_MAX_BYTES = 50 * 1024 * 1024;
 
 interface DesktopBackendRequest {
   method: DesktopBackendMethod;
@@ -39,22 +50,32 @@ export interface IpcBackendTransport {
 }
 
 export class DesktopIpcRequestError extends Error {
+  readonly code: DesktopIpcErrorCode;
   readonly endpoint: string;
   readonly durationMs: number;
+  readonly transport = "desktop-ipc";
 
-  constructor(message: string, endpoint: string, durationMs: number) {
+  constructor(code: DesktopIpcErrorCode, message: string, endpoint: string, durationMs: number) {
     super(message);
     this.name = "DesktopIpcRequestError";
+    this.code = code;
     this.endpoint = endpoint;
     this.durationMs = durationMs;
   }
+}
+
+export interface DesktopIpcControlsOptions {
+  endpoint: string;
+  responseKind: DesktopIpcResponseKind;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): IpcBackendTransport {
   return {
     async requestJSON<T>(path: string, init?: RequestInit) {
       if (!desktopApp.InvokeBackendJSON) {
-        throw new DesktopIpcRequestError("Wails binding 缺少 InvokeBackendJSON", path, 0);
+        throw new DesktopIpcRequestError("ipc_unavailable", "Wails binding 缺少 InvokeBackendJSON", path, 0);
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
@@ -64,14 +85,14 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
         init?.signal ?? undefined,
         request.timeout_ms,
         startedAt,
-        "JSON",
+        "json",
       );
-      return attachIpcMeta(payload as T, path, startedAt);
+      return attachIpcMeta(payload as T, path, startedAt, "json", request.timeout_ms);
     },
 
     async requestBlob(path: string, init?: RequestInit) {
       if (!desktopApp.InvokeBackendBlob) {
-        throw new DesktopIpcRequestError("Wails binding 缺少 InvokeBackendBlob", path, 0);
+        throw new DesktopIpcRequestError("ipc_unavailable", "Wails binding 缺少 InvokeBackendBlob", path, 0);
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
@@ -81,14 +102,21 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
         init?.signal ?? undefined,
         request.timeout_ms,
         startedAt,
-        "Blob",
+        "blob",
       )) as DesktopBackendBlob;
-      return attachIpcMeta(base64ToBlob(payload.data_base64, payload.content_type), path, startedAt);
+      assertDesktopBlobWithinLimit(payload, path, elapsedMs(startedAt));
+      return attachIpcMeta(
+        base64ToBlob(payload.data_base64, payload.content_type),
+        path,
+        startedAt,
+        "blob",
+        request.timeout_ms,
+      );
     },
 
     async requestText(path: string, init?: RequestInit) {
       if (!desktopApp.InvokeBackendText) {
-        throw new DesktopIpcRequestError("Wails binding 缺少 InvokeBackendText", path, 0);
+        throw new DesktopIpcRequestError("ipc_unavailable", "Wails binding 缺少 InvokeBackendText", path, 0);
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
@@ -98,7 +126,7 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
         init?.signal ?? undefined,
         request.timeout_ms,
         startedAt,
-        "Text",
+        "text",
       );
       return String(text ?? "");
     },
@@ -110,7 +138,7 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
 }
 
 async function toDesktopBackendRequest(path: string, init?: RequestInit): Promise<DesktopBackendRequest> {
-  const method = normalizeMethod(init?.method);
+  const method = normalizeMethod(path, init?.method);
   const timeout_ms = requestTimeoutMs(path, method);
   const body = init?.body;
   if (!body) {
@@ -134,17 +162,27 @@ async function toDesktopBackendRequest(path: string, init?: RequestInit): Promis
       timeout_ms,
     };
   }
-  throw new DesktopIpcRequestError(`Wails IPC 暂不支持该请求体类型：${Object.prototype.toString.call(body)}`, path, 0);
+  throw new DesktopIpcRequestError(
+    "invalid_request",
+    `Wails IPC 暂不支持该请求体类型：${Object.prototype.toString.call(body)}`,
+    path,
+    0,
+  );
 }
 
-function normalizeMethod(method: string | undefined): DesktopBackendMethod {
+function normalizeMethod(path: string, method: string | undefined): DesktopBackendMethod {
   const normalized = String(method ?? "GET")
     .trim()
     .toUpperCase();
-  if (normalized === "POST" || normalized === "DELETE") {
+  if (normalized === "GET" || normalized === "POST" || normalized === "DELETE") {
     return normalized;
   }
-  return "GET";
+  throw new DesktopIpcRequestError(
+    "invalid_request",
+    `Wails IPC 请求方法不受支持：${normalized || "(empty)"} ${path}`,
+    path,
+    0,
+  );
 }
 
 function parseJSONBody(body: string): unknown {
@@ -183,8 +221,32 @@ async function invokeWithLocalControls<T>(
   signal: AbortSignal | undefined,
   timeoutMs: number | undefined,
   startedAt: number,
-  responseKind: string,
+  responseKind: DesktopIpcResponseKind,
 ): Promise<T> {
+  return withDesktopIpcControls(
+    async () => {
+      const result = await operation();
+      if (result === undefined) {
+        throw new DesktopIpcRequestError(
+          "ipc_unavailable",
+          `Wails binding 未返回 ${responseKind} 响应`,
+          path,
+          elapsedMs(startedAt),
+        );
+      }
+      return result;
+    },
+    { endpoint: path, responseKind, signal, timeoutMs },
+    startedAt,
+  );
+}
+
+export async function withDesktopIpcControls<T>(
+  operation: () => Promise<T>,
+  options: DesktopIpcControlsOptions,
+  startedAt = performanceNow(),
+): Promise<T> {
+  const { endpoint, responseKind, signal, timeoutMs } = options;
   if (signal?.aborted) {
     throw new DOMException("The operation was aborted.", "AbortError");
   }
@@ -199,23 +261,42 @@ async function invokeWithLocalControls<T>(
     }
     if (timeoutMs && timeoutMs > 0) {
       timer = setTimeout(() => {
-        reject(new OperationTimeoutError(`Wails IPC ${responseKind} 请求超时：${path}`, timeoutMs));
+        reject(
+          new DesktopIpcRequestError(
+            "ipc_timeout",
+            `Wails IPC ${responseKind} 请求超时：${endpoint}（${timeoutMs}ms）`,
+            endpoint,
+            elapsedMs(startedAt),
+          ),
+        );
       }, timeoutMs);
     }
   });
 
   try {
-    const result = await Promise.race([Promise.resolve().then(operation), controls]);
-    if (result === undefined) {
-      throw new Error(`Wails binding 未返回 ${responseKind} 响应`);
-    }
-    return result;
+    return await Promise.race([Promise.resolve().then(operation), controls]);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
+    if (error instanceof DesktopIpcRequestError) {
+      throw error;
+    }
+    if (error instanceof OperationTimeoutError) {
+      throw new DesktopIpcRequestError(
+        "ipc_timeout",
+        `Wails IPC ${responseKind} 请求超时：${endpoint}（${error.timeoutMs}ms）`,
+        endpoint,
+        elapsedMs(startedAt),
+      );
+    }
     const message = error instanceof Error && error.message.trim() ? error.message : "Wails IPC 数据面请求失败";
-    throw new DesktopIpcRequestError(`Wails IPC 数据面不可用：${path}。${message}`, path, elapsedMs(startedAt));
+    throw new DesktopIpcRequestError(
+      "backend_proxy_failed",
+      `Wails IPC 数据面不可用：${endpoint}。${message}`,
+      endpoint,
+      elapsedMs(startedAt),
+    );
   } finally {
     if (timer !== undefined) {
       clearTimeout(timer);
@@ -267,6 +348,34 @@ function subscribeDesktopEvents(handlers: EventHandlers): () => void {
   };
 }
 
+function assertDesktopBlobWithinLimit(payload: DesktopBackendBlob, path: string, durationMs: number): void {
+  const declaredSize = Number(payload.size ?? 0);
+  if (declaredSize > DESKTOP_IPC_BLOB_MAX_BYTES) {
+    throw blobTooLargeError(path, durationMs);
+  }
+  const dataBase64 = String(payload.data_base64 ?? "");
+  const estimatedBytes = estimateBase64DecodedBytes(dataBase64);
+  if (estimatedBytes > DESKTOP_IPC_BLOB_MAX_BYTES) {
+    throw blobTooLargeError(path, durationMs);
+  }
+}
+
+function blobTooLargeError(path: string, durationMs: number): DesktopIpcRequestError {
+  return new DesktopIpcRequestError(
+    "blob_too_large",
+    `桌面 IPC blob 响应过大：${path} 超过 50MB，请使用原生导出或缩小选择范围。`,
+    path,
+    durationMs,
+  );
+}
+
+function estimateBase64DecodedBytes(dataBase64: string): number {
+  const normalized = dataBase64.replace(/\s/g, "");
+  if (!normalized) return 0;
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.floor((normalized.length * 3) / 4) - padding;
+}
+
 function base64ToBlob(dataBase64: string, contentType: string): Blob {
   const binary = atob(dataBase64 || "");
   const bytes = new Uint8Array(binary.length);
@@ -299,7 +408,13 @@ function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   });
 }
 
-function attachIpcMeta<T>(payload: T, endpoint: string, startedAt: number): T {
+function attachIpcMeta<T>(
+  payload: T,
+  endpoint: string,
+  startedAt: number,
+  responseKind: DesktopIpcResponseKind,
+  timeoutMs: number | undefined,
+): T {
   if ((typeof payload !== "object" && typeof payload !== "function") || payload === null) {
     return payload;
   }
@@ -311,6 +426,8 @@ function attachIpcMeta<T>(payload: T, endpoint: string, startedAt: number): T {
       endpoint,
       durationMs: elapsedMs(startedAt),
       authState: "desktop-proxy",
+      responseKind,
+      timeoutMs,
     },
   });
   return payload;

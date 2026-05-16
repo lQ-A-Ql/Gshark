@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { createIpcBackendTransport } from "./ipcBackendTransport";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  DESKTOP_IPC_BLOB_MAX_BYTES,
+  createIpcBackendTransport,
+} from "./ipcBackendTransport";
 import type { DesktopTransportBinding } from "./desktopTransportBinding";
 
 vi.mock("../../../wailsjs/runtime", () => ({
@@ -7,6 +10,10 @@ vi.mock("../../../wailsjs/runtime", () => ({
 }));
 
 describe("ipcBackendTransport", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("sends JSON requests through InvokeBackendJSON with desktop proxy metadata", async () => {
     const invoke = vi.fn(async (request: unknown) => {
       expect(request).toMatchObject({
@@ -103,6 +110,67 @@ describe("ipcBackendTransport", () => {
     await expect(transport.requestJSON("/api/analysis/industrial")).rejects.toThrow(
       "Wails IPC 数据面不可用：/api/analysis/industrial",
     );
+  });
+
+  it("rejects unsupported methods before calling the Wails binding", async () => {
+    const invoke = vi.fn(async () => ({ ok: true }));
+    const transport = createIpcBackendTransport({ InvokeBackendJSON: invoke } as DesktopTransportBinding);
+
+    await expect(
+      transport.requestJSON("/api/analysis/industrial", {
+        method: "PATCH",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      endpoint: "/api/analysis/industrial",
+      transport: "desktop-ipc",
+    });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("preserves AbortError for caller-side IPC cancellation", async () => {
+    const invoke = vi.fn(async () => ({ ok: true }));
+    const transport = createIpcBackendTransport({ InvokeBackendJSON: invoke } as DesktopTransportBinding);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(transport.requestJSON("/api/capture/status", { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("times out pending IPC requests with a structured ipc_timeout error", async () => {
+    vi.useFakeTimers();
+    const transport = createIpcBackendTransport({
+      InvokeBackendJSON: vi.fn(async () => new Promise<unknown>(() => undefined)),
+    } as DesktopTransportBinding);
+
+    const request = transport.requestJSON("/api/capture/status");
+    const expectation = expect(request).rejects.toMatchObject({
+      code: "ipc_timeout",
+      endpoint: "/api/capture/status",
+      transport: "desktop-ipc",
+    });
+    await vi.advanceTimersByTimeAsync(15000);
+
+    await expectation;
+  });
+
+  it("rejects oversized desktop blob responses before base64 decoding", async () => {
+    const transport = createIpcBackendTransport({
+      InvokeBackendBlob: vi.fn(async () => ({
+        data_base64: "",
+        content_type: "application/zip",
+        size: DESKTOP_IPC_BLOB_MAX_BYTES + 1,
+      })),
+    } as DesktopTransportBinding);
+
+    await expect(transport.requestBlob("/api/objects/download")).rejects.toMatchObject({
+      code: "blob_too_large",
+      endpoint: "/api/objects/download",
+      transport: "desktop-ipc",
+    });
   });
 });
 

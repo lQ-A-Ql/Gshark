@@ -157,6 +157,40 @@ func TestDesktopInvokeBackendBlobAndText(t *testing.T) {
 	}
 }
 
+func TestBackendProxyClientBlobReadLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/blob/exact":
+			_, _ = w.Write([]byte("123"))
+		case "/api/blob/over":
+			_, _ = w.Write([]byte("1234"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := newBackendProxyClientWithBaseURL(server.URL, "")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	raw, err := client.doRawLimited(ctx, http.MethodGet, "/api/blob/exact", nil, "", 3)
+	if err != nil {
+		t.Fatalf("doRawLimited exact limit error = %v", err)
+	}
+	if string(raw.Body) != "123" {
+		t.Fatalf("unexpected exact limit body %q", raw.Body)
+	}
+
+	_, err = client.doRawLimited(ctx, http.MethodGet, "/api/blob/over", nil, "", 3)
+	if err == nil {
+		t.Fatal("expected blob size limit error")
+	}
+	if !strings.Contains(err.Error(), "桌面 IPC blob 响应过大") || !strings.Contains(err.Error(), "/api/blob/over") {
+		t.Fatalf("unexpected blob size error: %v", err)
+	}
+}
+
 func TestDesktopInvokeBackendMultipart(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reader, err := r.MultipartReader()

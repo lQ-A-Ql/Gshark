@@ -20,6 +20,7 @@ import (
 )
 
 const backendBaseURL = "http://127.0.0.1:17891"
+const desktopBackendBlobMaxBytes int64 = 50 * 1024 * 1024
 
 type backendProxyClient struct {
 	baseURL   string
@@ -153,6 +154,10 @@ func (c *backendProxyClient) doJSON(ctx context.Context, method, path string, pa
 }
 
 func (c *backendProxyClient) doRaw(ctx context.Context, method, path string, body io.Reader, contentType string) (backendProxyRawResponse, error) {
+	return c.doRawLimited(ctx, method, path, body, contentType, 0)
+}
+
+func (c *backendProxyClient) doRawLimited(ctx context.Context, method, path string, body io.Reader, contentType string, maxBytes int64) (backendProxyRawResponse, error) {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	if method == "" {
 		method = http.MethodGet
@@ -177,9 +182,16 @@ func (c *backendProxyClient) doRaw(ctx context.Context, method, path string, bod
 	}
 	defer res.Body.Close()
 
-	raw, err := io.ReadAll(res.Body)
+	reader := res.Body
+	if maxBytes > 0 {
+		reader = io.NopCloser(io.LimitReader(res.Body, maxBytes+1))
+	}
+	raw, err := io.ReadAll(reader)
 	if err != nil {
 		return backendProxyRawResponse{}, fmt.Errorf("read backend response: %w", err)
+	}
+	if maxBytes > 0 && int64(len(raw)) > maxBytes {
+		return backendProxyRawResponse{}, fmt.Errorf("桌面 IPC blob 响应过大：%s 超过 50MB，请使用原生导出或缩小选择范围。", path)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return backendProxyRawResponse{}, normalizeBackendProxyError(res.StatusCode, raw)
@@ -320,7 +332,11 @@ func (a *DesktopApp) invokeBackendRaw(req desktopBackendRequest, responseKind st
 	timeout := desktopBackendRequestTimeout(req, method, path)
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
-	raw, err := a.backendProxy().doRaw(ctx, method, path, body, contentType)
+	var maxBytes int64
+	if responseKind == "blob" {
+		maxBytes = desktopBackendBlobMaxBytes
+	}
+	raw, err := a.backendProxy().doRawLimited(ctx, method, path, body, contentType, maxBytes)
 	if err != nil {
 		return backendProxyRawResponse{}, fmt.Errorf("desktop IPC backend %s request failed for %s %s: %w", responseKind, method, path, err)
 	}

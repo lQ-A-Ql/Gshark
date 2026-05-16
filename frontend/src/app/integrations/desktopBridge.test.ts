@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createDesktopBridge } from "./desktopBridge";
 
@@ -64,6 +64,10 @@ function createFallbackBridge(overrides: Partial<BackendBridge> = {}): BackendBr
 }
 
 describe("createDesktopBridge", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("routes supported desktop control-plane calls through Wails IPC", async () => {
     const desktopApp: DesktopTransportBinding = {
       IsBackendReady: vi.fn(async () => true),
@@ -370,6 +374,61 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listPacketsPage).not.toHaveBeenCalled();
   });
 
+  it("times out typed capture status IPC calls instead of pending forever", async () => {
+    vi.useFakeTimers();
+    const fallbackBridge = createFallbackBridge({
+      getCaptureStatus: vi.fn(async () => ({
+        filePath: "fallback.pcapng",
+        hasCapture: true,
+        packetCount: 1,
+      })),
+    });
+    const bridge = createDesktopBridge({
+      desktopApp: {
+        InvokeBackendJSON: vi.fn(),
+        GetCaptureStatus: vi.fn(async () => new Promise<unknown>(() => undefined)),
+      },
+      fallbackBridge,
+    });
+
+    const request = bridge.getCaptureStatus();
+    const expectation = expect(request).rejects.toMatchObject({
+      code: "ipc_timeout",
+      endpoint: "DesktopApp.GetCaptureStatus",
+      transport: "desktop-ipc",
+    });
+    await vi.advanceTimersByTimeAsync(10000);
+
+    await expectation;
+    expect(fallbackBridge.getCaptureStatus).not.toHaveBeenCalled();
+  });
+
+  it("lets packet page callers abort typed IPC without browser HTTP fallback", async () => {
+    const fallbackBridge = createFallbackBridge({
+      listPacketsPage: vi.fn(async () => ({
+        items: [],
+        nextCursor: 0,
+        total: 0,
+        hasMore: false,
+      })),
+    });
+    const controller = new AbortController();
+    const bridge = createDesktopBridge({
+      desktopApp: {
+        InvokeBackendJSON: vi.fn(),
+        ListPacketsPage: vi.fn(async () => new Promise<unknown>(() => undefined)),
+      },
+      fallbackBridge,
+    });
+
+    const request = bridge.listPacketsPage(0, 50, "", controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fallbackBridge.listPacketsPage).not.toHaveBeenCalled();
+  });
+
+
   it("falls back per method when a desktop control-plane binding is missing", async () => {
     const fallbackBridge = createFallbackBridge({
       startStreamingPackets: vi.fn(async () => undefined),
@@ -426,7 +485,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "full");
     expect(snapshot.config.tsharkPath).toBe("fallback-tshark");
     expect(snapshot.transport).toBe("http-fallback");
-    expect(snapshot.transportError).toBe("runtime ipc unavailable");
+    expect(snapshot.transportError).toContain("runtime ipc unavailable");
   });
 
   it("falls back to HTTP fast snapshot when Wails IPC does not return within the fast budget", async () => {
@@ -445,7 +504,7 @@ describe("createDesktopBridge", () => {
       expect(desktopApp.GetToolRuntimeSnapshotFast).toHaveBeenCalledTimes(1);
       expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(undefined, "fast");
       expect(snapshot.transport).toBe("http-fallback");
-      expect(snapshot.transportError).toContain("快速探测超时");
+      expect(snapshot.transportError).toContain("GetToolRuntimeSnapshot");
     } finally {
       vi.useRealTimers();
     }
@@ -511,6 +570,6 @@ describe("createDesktopBridge", () => {
     expect(desktopApp.UpdateToolRuntimeConfig).toHaveBeenCalledTimes(1);
     expect(fallbackBridge.updateToolRuntimeConfig).toHaveBeenCalledWith(config, expect.any(AbortSignal), "full");
     expect(snapshot.transport).toBe("http-fallback");
-    expect(snapshot.transportError).toBe("runtime config ipc unavailable");
+    expect(snapshot.transportError).toContain("runtime config ipc unavailable");
   });
 });

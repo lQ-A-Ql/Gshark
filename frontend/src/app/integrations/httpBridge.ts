@@ -74,7 +74,8 @@ async function sendJSONRequest(
   getDesktopAppBinding: () => DesktopTransportBinding | undefined,
   forceAuthRefresh: boolean,
   startedAt: number,
-): Promise<{ response: Response; authState: string }> {
+): Promise<{ response: Response; authState: string; isDesktopFallback: boolean }> {
+  const isDesktopFallback = Boolean(getDesktopAppBinding());
   const auth = await buildAuthorizedHeadersInternal(path, init?.headers, init?.body, getDesktopAppBinding, {
     forceAuthRefresh,
   });
@@ -92,11 +93,11 @@ async function sendJSONRequest(
   } catch (error) {
     throw normalizeTransportError(error, path, elapsedMs(startedAt));
   }
-  return { response, authState: auth.authState };
+  return { response, authState: auth.authState, isDesktopFallback };
 }
 
 async function decodeJSONResponse<T>(
-  attempt: { response: Response; authState: string },
+  attempt: { response: Response; authState: string; isDesktopFallback: boolean },
   path: string,
   startedAt: number,
 ): Promise<T> {
@@ -108,7 +109,7 @@ async function decodeJSONResponse<T>(
       resetBackendAuthTokenCache();
       throw new BackendRequestError(
         "auth_failed",
-        detail && detail !== "unauthorized" ? detail : "后端鉴权失败：token 不匹配或已过期，请重启 Wails dev 后重试。",
+        detail && detail !== "unauthorized" ? detail : authFailureMessage(attempt.isDesktopFallback),
         { endpoint: path, status: res.status, durationMs },
       );
     }
@@ -150,7 +151,8 @@ async function sendBlobRequest(
   getDesktopAppBinding: () => DesktopTransportBinding | undefined,
   forceAuthRefresh: boolean,
   startedAt: number,
-): Promise<{ response: Response; authState: string }> {
+): Promise<{ response: Response; authState: string; isDesktopFallback: boolean }> {
+  const isDesktopFallback = Boolean(getDesktopAppBinding());
   const auth = await buildAuthorizedHeadersInternal(path, init?.headers, init?.body, getDesktopAppBinding, {
     forceAuthRefresh,
   });
@@ -168,11 +170,11 @@ async function sendBlobRequest(
   } catch (error) {
     throw normalizeTransportError(error, path, elapsedMs(startedAt));
   }
-  return { response, authState: auth.authState };
+  return { response, authState: auth.authState, isDesktopFallback };
 }
 
 async function decodeBlobResponse(
-  attempt: { response: Response; authState: string },
+  attempt: { response: Response; authState: string; isDesktopFallback: boolean },
   path: string,
   startedAt: number,
 ): Promise<Blob> {
@@ -184,7 +186,7 @@ async function decodeBlobResponse(
       resetBackendAuthTokenCache();
       throw new BackendRequestError(
         "auth_failed",
-        detail && detail !== "unauthorized" ? detail : "后端鉴权失败：token 不匹配或已过期，请重启 Wails dev 后重试。",
+        detail && detail !== "unauthorized" ? detail : authFailureMessage(attempt.isDesktopFallback),
         { endpoint: path, status: res.status, durationMs },
       );
     }
@@ -357,6 +359,13 @@ function normalizeTransportError(error: unknown, path: string, durationMs?: numb
     });
   }
   return new BackendRequestError("backend_unreachable", fallback, { endpoint: path, durationMs });
+}
+
+function authFailureMessage(isDesktopFallback: boolean): string {
+  if (isDesktopFallback) {
+    return "后端鉴权失败：Wails token 不匹配或旧 binding 未同步，请清理桌面缓存、重新 build:wails 或重启 Wails dev 后重试。";
+  }
+  return "后端鉴权失败：token 不匹配或缺失，请检查 VITE_BACKEND_TOKEN、GSHARK_BACKEND_TOKEN、请求 Origin 或 127.0.0.1:17891 后端端口。";
 }
 
 function isAbortError(error: unknown): error is Error {
