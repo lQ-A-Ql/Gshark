@@ -17,6 +17,9 @@ const sentinelState = vi.hoisted(() => ({
   },
   isTSharkChecking: true,
   toolRuntimeCheckDegraded: false,
+  toolRuntimeProbeState: "ready",
+  toolRuntimeProbeTransport: "desktop-ipc",
+  lastToolRuntimeProbeError: "",
   setTSharkPath: vi.fn(),
   toolRuntimeSnapshot: {
     config: {
@@ -78,6 +81,52 @@ vi.mock("./state/SentinelContext", () => ({
   SentinelProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+function createToolRuntimeSnapshot() {
+  return {
+    config: {
+      tsharkPath: "",
+      ffmpegPath: "",
+      pythonPath: "",
+      voskModelPath: "",
+      yaraEnabled: true,
+      yaraBin: "",
+      yaraRules: "",
+      yaraTimeoutMs: 25000,
+    },
+    tshark: {
+      available: true,
+      path: "C:/Program Files/Wireshark/tshark.exe",
+      message: "ok",
+      usingCustomPath: false,
+    },
+    ffmpeg: {
+      available: true,
+      path: "C:/ffmpeg/bin/ffmpeg.exe",
+      message: "ok",
+      usingCustomPath: false,
+    },
+    speech: {
+      available: false,
+      engine: "vosk",
+      language: "zh-CN",
+      pythonAvailable: true,
+      pythonCommand: "python",
+      ffmpegAvailable: true,
+      voskAvailable: true,
+      modelAvailable: false,
+      message: "未检测到 Vosk 中文模型",
+    },
+    yara: {
+      available: true,
+      enabled: true,
+      message: "ok",
+      usingCustomBin: false,
+      usingCustomRules: false,
+      timeoutMs: 25000,
+    },
+  };
+}
+
 describe("StartupGate", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -88,10 +137,14 @@ describe("StartupGate", () => {
     sentinelState.tsharkStatus.path = "";
     sentinelState.tsharkStatus.missingOptionalFields = undefined;
     sentinelState.tsharkStatus.capabilityCheckDegraded = undefined;
+    sentinelState.toolRuntimeSnapshot = createToolRuntimeSnapshot();
     sentinelState.toolRuntimeSnapshot.ffmpeg.available = true;
     sentinelState.toolRuntimeSnapshot.speech.pythonAvailable = true;
     sentinelState.toolRuntimeSnapshot.speech.modelAvailable = false;
     sentinelState.isToolRuntimeLoading = false;
+    sentinelState.toolRuntimeProbeState = "ready";
+    sentinelState.toolRuntimeProbeTransport = "desktop-ipc";
+    sentinelState.lastToolRuntimeProbeError = "";
     sentinelState.refreshToolRuntimeSnapshot.mockResolvedValue(sentinelState.toolRuntimeSnapshot);
   });
 
@@ -139,5 +192,18 @@ describe("StartupGate", () => {
 
     expect(screen.getByText(/可用，部分分析降级/)).toBeInTheDocument();
     expect(screen.getByText(/缺少可选字段：usbms.scsi.opcode/)).toBeInTheDocument();
+  });
+
+  it("shows runtime probe failures instead of reporting every tool as missing", () => {
+    sentinelState.isTSharkChecking = false;
+    sentinelState.toolRuntimeSnapshot = null as any;
+    sentinelState.toolRuntimeProbeState = "failed";
+    sentinelState.toolRuntimeProbeTransport = "desktop-ipc";
+    sentinelState.lastToolRuntimeProbeError = "Wails IPC runtime snapshot failed";
+
+    render(<StartupGate />);
+
+    expect(screen.getByText(/探测失败 · Wails IPC：Wails IPC runtime snapshot failed/)).toBeInTheDocument();
+    expect(screen.getByText(/FFmpeg：探测失败/)).toBeInTheDocument();
   });
 });

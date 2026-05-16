@@ -66,6 +66,21 @@ describe("httpBridge transport helpers", () => {
     );
   });
 
+  it("normalizes bare 401 responses into an actionable token mismatch message", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(requestJSON("/api/tools/runtime-config", undefined, () => undefined)).rejects.toThrow(
+      "token 不匹配",
+    );
+  });
+
   it("normalizes browser fetch failures into an actionable backend connectivity message", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockRejectedValueOnce(new Error("Failed to fetch"));

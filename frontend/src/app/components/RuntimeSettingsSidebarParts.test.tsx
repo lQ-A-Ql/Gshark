@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
-import { buildSpeechIssues, normalizeConfig, statusTone } from "./RuntimeSettingsSidebarParts";
+import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
+import { normalizeConfig, statusTone } from "./RuntimeSettingsSidebarParts";
 
 const completeConfig: ToolRuntimeConfig = {
   tsharkPath: "C:\\Wireshark\\tshark.exe",

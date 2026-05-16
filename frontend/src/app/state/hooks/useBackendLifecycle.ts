@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
+import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
 import {
   type MediaAnalysisProgress,
   type ThreatAnalysisProgress,
@@ -46,6 +47,9 @@ export interface BackendLifecycleState {
   tsharkStatus: TSharkStatus;
   isTSharkChecking: boolean;
   toolRuntimeCheckDegraded: boolean;
+  toolRuntimeProbeState: ToolRuntimeProbeState;
+  toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
+  lastToolRuntimeProbeError: string;
   setTSharkPath: (path: string) => Promise<void>;
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;
@@ -78,6 +82,12 @@ export function useBackendLifecycle({
     setIsToolRuntimeLoading,
     toolRuntimeCheckDegraded,
     setToolRuntimeCheckDegraded,
+    toolRuntimeProbeState,
+    setToolRuntimeProbeState,
+    toolRuntimeProbeTransport,
+    setToolRuntimeProbeTransport,
+    lastToolRuntimeProbeError,
+    setLastToolRuntimeProbeError,
     setTSharkPath: setTSharkPathImpl,
     refreshToolRuntimeSnapshot: refreshToolRuntimeSnapshotImpl,
     saveToolRuntimeConfig: saveToolRuntimeConfigImpl,
@@ -113,6 +123,9 @@ export function useBackendLifecycle({
       setToolRuntimeCheckDegraded,
       setToolRuntimeSnapshot,
       setTsharkStatus,
+      setToolRuntimeProbeState,
+      setToolRuntimeProbeTransport,
+      setLastToolRuntimeProbeError,
     }),
     [
       setBackendStatus,
@@ -121,6 +134,9 @@ export function useBackendLifecycle({
       setToolRuntimeCheckDegraded,
       setToolRuntimeSnapshot,
       setTsharkStatus,
+      setToolRuntimeProbeState,
+      setToolRuntimeProbeTransport,
+      setLastToolRuntimeProbeError,
     ],
   );
 
@@ -162,6 +178,9 @@ export function useBackendLifecycle({
     tsharkStatus,
     isTSharkChecking,
     toolRuntimeCheckDegraded,
+    toolRuntimeProbeState,
+    toolRuntimeProbeTransport,
+    lastToolRuntimeProbeError,
     setTSharkPath,
     toolRuntimeSnapshot,
     isToolRuntimeLoading,

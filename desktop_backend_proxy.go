@@ -24,10 +24,14 @@ type backendProxyClient struct {
 }
 
 type runtimeIdentity struct {
-	Service     string `json:"service"`
-	Version     string `json:"version"`
-	BuildCommit string `json:"build_commit,omitempty"`
-	AuthEnabled bool   `json:"auth_enabled"`
+	Service        string `json:"service"`
+	Version        string `json:"version"`
+	BuildCommit    string `json:"build_commit,omitempty"`
+	AuthEnabled    bool   `json:"auth_enabled"`
+	BuildID        string `json:"build_id,omitempty"`
+	ExecutablePath string `json:"executable_path,omitempty"`
+	WorkingDir     string `json:"working_dir,omitempty"`
+	StartedAt      string `json:"started_at,omitempty"`
 }
 
 type captureStartRequest struct {

@@ -24,6 +24,20 @@ function Stop-PortProcess($port) {
 	}
 }
 
+function Write-PortProbeSummary($port) {
+	$connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+	if (-not $connections) {
+		Write-Host "[gshark] probe: port $port is free" -ForegroundColor DarkGray
+		return
+	}
+
+	foreach ($connection in $connections) {
+		$process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+		$name = if ($process) { $process.ProcessName } else { "unknown" }
+		Write-Host "[gshark] probe: port $port still owned by pid=$($connection.OwningProcess) process=$name" -ForegroundColor DarkYellow
+	}
+}
+
 function Remove-FileIfExists($path, $label) {
 	$target = [System.IO.Path]::GetFullPath($path)
 	if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
@@ -62,6 +76,8 @@ function Clear-WailsBackendCaches {
 
 Stop-PortProcess 34115
 Stop-PortProcess 17891
+Write-PortProbeSummary 34115
+Write-PortProbeSummary 17891
 
 Set-Location "$PSScriptRoot\.."
 if (-not $NoClean) {
@@ -70,5 +86,7 @@ if (-not $NoClean) {
 	Write-Host "[gshark] backend cache cleanup skipped (-NoClean)" -ForegroundColor DarkYellow
 }
 
+Write-Host "[gshark] probe: Wails runtime snapshot uses desktop IPC first; HTTP is fallback for non-Wails browser mode." -ForegroundColor DarkGray
+Write-Host "[gshark] probe: if old 'tshark capability:' log text appears, a stale backend binary/process is still running." -ForegroundColor DarkGray
 Write-Host "[gshark] starting wails dev mode" -ForegroundColor Cyan
 wails dev

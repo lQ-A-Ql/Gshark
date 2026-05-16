@@ -1,5 +1,5 @@
 import type { DecryptionConfig, ToolRuntimeConfig } from "../core/types";
-import { asCaptureStatus } from "./clients/captureClient";
+import { asCaptureStatus, withCaptureStatusMeta } from "./clients/captureClient";
 import type { TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
@@ -26,13 +26,13 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       return String(await desktopApp.BackendStatus()).trim();
     },
     async getToolRuntimeSnapshot(signal?: AbortSignal) {
-      if (signal || !desktopApp.GetToolRuntimeSnapshot) {
+      if (!desktopApp.GetToolRuntimeSnapshot) {
         return await fallbackBridge.getToolRuntimeSnapshot(signal);
       }
       return asToolRuntimeSnapshot(await desktopApp.GetToolRuntimeSnapshot());
     },
     async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal) {
-      if (signal || !desktopApp.UpdateToolRuntimeConfig) {
+      if (!desktopApp.UpdateToolRuntimeConfig) {
         return await fallbackBridge.updateToolRuntimeConfig(config, signal);
       }
       return asToolRuntimeSnapshot(await desktopApp.UpdateToolRuntimeConfig(toToolRuntimeRequest(config)));
@@ -78,7 +78,13 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       if (!desktopApp.GetCaptureStatus) {
         return await fallbackBridge.getCaptureStatus();
       }
-      return asCaptureStatus(await desktopApp.GetCaptureStatus());
+      try {
+        return withCaptureStatusMeta(asCaptureStatus(await desktopApp.GetCaptureStatus()), "desktop-ipc");
+      } catch (error) {
+        const fallbackStatus = await fallbackBridge.getCaptureStatus();
+        const message = error instanceof Error ? error.message : "Wails IPC 状态确认失败";
+        return withCaptureStatusMeta(fallbackStatus, "http-fallback", message);
+      }
     },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {

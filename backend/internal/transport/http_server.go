@@ -37,6 +37,8 @@ const (
 	miscPackageDirEnvVar    = "GSHARK_MISC_PACKAGE_DIR"
 )
 
+var runtimeIdentityStartedAt = time.Now().UTC().Format(time.RFC3339)
+
 type ServerOptions struct {
 	MiscPackageDir string
 }
@@ -212,11 +214,21 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	authEnabled := strings.TrimSpace(s.authToken) != ""
 	s.mu.Unlock()
+	executablePath, _ := os.Executable()
+	workingDir, _ := os.Getwd()
+	buildID := strings.TrimSpace(os.Getenv("GSHARK_BACKEND_BUILD_ID"))
+	if buildID == "" {
+		buildID = "dev"
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"service":      "gshark-sentinel",
-		"version":      "dev",
-		"build_commit": "",
-		"auth_enabled": authEnabled,
+		"service":         "gshark-sentinel",
+		"version":         "dev",
+		"build_commit":    "",
+		"auth_enabled":    authEnabled,
+		"build_id":        buildID,
+		"executable_path": executablePath,
+		"working_dir":     workingDir,
+		"started_at":      runtimeIdentityStartedAt,
 	})
 }
 

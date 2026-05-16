@@ -267,6 +267,8 @@ describe("useBackendLifecycle", () => {
       path: "C:/Tools/tshark.exe",
       message: "ok",
     });
+    expect(result.current.toolRuntimeProbeState).toBe("ready");
+    expect(result.current.lastToolRuntimeProbeError).toBe("");
     expect(result.current.decryptionConfig).toEqual({
       sslKeyLogPath: "C:/logs/ssl.log",
       privateKeyPath: "C:/keys/server.pem",
@@ -277,6 +279,24 @@ describe("useBackendLifecycle", () => {
     expect(bridgeMocks.subscribeEvents).toHaveBeenCalledTimes(1);
 
     unmount();
+  });
+
+  it("keeps backend connected and exposes a probe failure when the startup snapshot fails", async () => {
+    bridgeMocks.getToolRuntimeSnapshot.mockRejectedValue(new Error("unauthorized"));
+    const result = renderHook(() => useBackendLifecycleHarness());
+
+    await waitFor(() => {
+      expect(result.result.current.backendConnected).toBe(true);
+    });
+    await waitFor(() => {
+      expect(result.result.current.toolRuntimeProbeState).toBe("failed");
+    });
+
+    expect(result.result.current.toolRuntimeCheckDegraded).toBe(true);
+    expect(result.result.current.lastToolRuntimeProbeError).toContain("token 不匹配");
+    expect(result.result.current.backendStatus).toContain("运行时组件检测失败");
+
+    result.unmount();
   });
 
   it("syncs saved runtime config after the initial startup snapshot when it differs", async () => {
@@ -315,6 +335,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus,
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     await waitFor(() => {
@@ -346,6 +369,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus: vi.fn(),
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
@@ -375,6 +401,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus,
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     expect(setTsharkStatus).toHaveBeenCalledWith(
@@ -402,6 +431,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus: vi.fn(),
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
@@ -435,6 +467,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus: vi.fn(),
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     await waitFor(() => {
@@ -474,6 +509,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus: vi.fn(),
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     await waitFor(() => {
@@ -512,6 +550,9 @@ describe("useBackendLifecycle", () => {
       setToolRuntimeCheckDegraded: vi.fn(),
       setToolRuntimeSnapshot: vi.fn(),
       setTsharkStatus: vi.fn(),
+      setToolRuntimeProbeState: vi.fn(),
+      setToolRuntimeProbeTransport: vi.fn(),
+      setLastToolRuntimeProbeError: vi.fn(),
     });
 
     await waitFor(() => {
@@ -578,6 +619,36 @@ describe("useBackendLifecycle", () => {
     expect(result.current.updateProgressFromStatus).toHaveBeenCalledWith("__progress__:counting:1:10");
     expect(waiter).toHaveBeenCalledTimes(1);
     expect(result.current.backendStatus).toBe("后端已连接，等待打开文件");
+
+    unmount();
+  });
+
+  it("forwards preload progress before the first capture has an active path", async () => {
+    const { result, unmount } = await renderConnectedLifecycle({ preloading: true });
+    const waiter = vi.fn();
+
+    act(() => {
+      result.current.captureWaitersRef.current.add(waiter);
+      bridgeMocks.handlers?.status?.("__progress__:parsing:7:10");
+    });
+
+    expect(result.current.updateProgressFromStatus).toHaveBeenCalledWith("__progress__:parsing:7:10");
+    expect(waiter).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it("marks first-capture parsing complete before the active path is committed", async () => {
+    const { result, unmount } = await renderConnectedLifecycle({ preloading: true });
+
+    act(() => {
+      result.current.parseFinishedRef.current = false;
+      bridgeMocks.handlers?.status?.("解析完成");
+    });
+
+    expect(result.current.parseFinishedRef.current).toBe(true);
+    expect(result.current.parseErrorRef.current).toBe("");
+    expect(result.current.backendStatus).toBe("解析完成");
 
     unmount();
   });

@@ -3,6 +3,7 @@ import type { BinaryStream, HttpStream, Packet, StreamSwitchMetrics } from "../.
 import { isAbortLikeError } from "../../utils/asyncControl";
 import type { CaptureTaskScope } from "../../utils/captureTaskScope";
 import { buildOpenedCaptureFromPath, type CaptureFileMeta, type OpenedCapture } from "../captureOpenState";
+import { createCapturePreloadDiagnostics, type CapturePreloadDiagnostics } from "../capturePreloadDiagnostics";
 import { stopCapturePreloading } from "../captureParseRuntimeState";
 import { getCaptureOpenDisconnectedStatus } from "../capturePreloadStatus";
 import { resolveCapturePreloadFirstPage } from "../capturePreloadProbe";
@@ -52,6 +53,7 @@ export interface CaptureStartSetters {
   readonly setBackendStatus: (status: string) => void;
   readonly setCaptureRevision: Setter<number>;
   readonly setCaptureTransaction: Setter<CaptureTransactionStatus>;
+  readonly setCapturePreloadDiagnostics: Setter<CapturePreloadDiagnostics | null>;
   readonly setFileMeta: Setter<CaptureFileMeta>;
   readonly setHasMorePackets: Setter<boolean>;
   readonly setHasPrevPackets: Setter<boolean>;
@@ -120,6 +122,7 @@ export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions)
       try {
         const opened = await resolveOpenedCapture({ filePath, openPcapFile: clients.openPcapFile });
         pendingCapture = opened;
+        setters.setCapturePreloadDiagnostics(createCapturePreloadDiagnostics({ phase: "starting", openedPath: opened.filePath }));
 
         const started = await prepareAndStartOpenedCapture({
           opened,
@@ -161,10 +164,12 @@ export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions)
           waitForCaptureSignal: hooks.waitForCaptureSignal,
           setTotalPackets: setters.setTotalPackets,
           setPreloadProcessed: setters.setPreloadProcessed,
+          hadActiveCapture,
+          onDiagnostics: setters.setCapturePreloadDiagnostics,
         });
         if (!validatedFirstPage) return false;
 
-        return finalizeOpenedCapture({
+        const finalized = await finalizeOpenedCapture({
           opened,
           validatedFirstPage,
           captureSeq,
@@ -200,6 +205,10 @@ export function useCaptureStartWorkflow(options: UseCaptureStartWorkflowOptions)
           setBackendStatus: setters.setBackendStatus,
           refreshAnalysisResult: hooks.refreshAnalysisResult,
         });
+        if (finalized) {
+          setters.setCapturePreloadDiagnostics(null);
+        }
+        return finalized;
       } catch (error) {
         if (isAbortLikeError(error)) return false;
         if (captureSeq === refs.captureSeqRef.current) {

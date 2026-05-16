@@ -1,4 +1,4 @@
-import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
+import type { ToolRuntimeConfig } from "../core/types";
 
 export function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeConfig {
   return {
@@ -58,6 +58,7 @@ export function StatusLine({
   enabled = true,
   known = true,
   degraded = false,
+  unknownStateText = "未检测",
   preferMessageWhenUnavailable = false,
 }: {
   label: string;
@@ -67,6 +68,7 @@ export function StatusLine({
   enabled?: boolean;
   known?: boolean;
   degraded?: boolean;
+  unknownStateText?: string;
   preferMessageWhenUnavailable?: boolean;
 }) {
   const ready = Boolean(available);
@@ -79,7 +81,15 @@ export function StatusLine({
         : path?.trim()
           ? path
           : message || "等待检测";
-  const stateText = !known ? "未检测" : !enabled ? "已关闭" : degraded ? "部分降级" : ready ? "已就绪" : "未就绪";
+  const stateText = !known
+    ? unknownStateText
+    : !enabled
+      ? "已关闭"
+      : degraded
+        ? "部分降级"
+        : ready
+          ? "已就绪"
+          : "未就绪";
   return (
     <div
       className={`rounded-xl border px-3 py-2 ${degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known)}`}
@@ -99,41 +109,22 @@ export function MiniStatus({
   enabled = true,
   known = true,
   degraded = false,
+  unknownLabel = "未检测",
 }: {
   label: string;
   available?: boolean;
   enabled?: boolean;
   known?: boolean;
   degraded?: boolean;
+  unknownLabel?: string;
 }) {
   const ready = Boolean(available);
   const tone = degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known);
-  const text = !known ? "未检测" : !enabled ? "已关闭" : degraded ? "降级" : ready ? "就绪" : "缺失";
+  const text = !known ? unknownLabel : !enabled ? "已关闭" : degraded ? "降级" : ready ? "就绪" : "缺失";
   return (
     <div className={`rounded-2xl border px-3 py-2 ${tone}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</div>
       <div className="mt-1 text-sm font-semibold">{text}</div>
     </div>
   );
-}
-
-export function buildSpeechIssues(snapshot?: ToolRuntimeSnapshot | null) {
-  const speech = snapshot?.speech;
-  if (!speech) {
-    return [];
-  }
-  const issues: string[] = [];
-  if (!speech.pythonAvailable) {
-    issues.push("Python 不可用");
-  }
-  if (!speech.voskAvailable) {
-    issues.push("vosk 模块缺失");
-  }
-  if (!speech.modelAvailable) {
-    issues.push("Vosk 模型目录缺失");
-  }
-  if (!speech.ffmpegAvailable) {
-    issues.push("ffmpeg 不可用");
-  }
-  return issues;
 }

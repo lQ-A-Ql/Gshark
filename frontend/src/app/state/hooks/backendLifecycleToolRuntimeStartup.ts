@@ -5,6 +5,12 @@ import { backendClients } from "../../integrations/backendClients";
 import { isOperationTimeoutError, withAbortableTimeout } from "../../utils/asyncControl";
 import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
 import { toTSharkStatus } from "../tsharkStatusState";
+import {
+  describeToolRuntimeProbeError,
+  detectToolRuntimeProbeTransport,
+  type ToolRuntimeProbeState,
+  type ToolRuntimeProbeTransport,
+} from "../toolRuntimeProbeState";
 import { writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
 import {
   TOOL_RUNTIME_CONFIG_FIELDS,
@@ -18,6 +24,8 @@ interface ApplyStartupRuntimeSnapshotOptions {
   readonly setBackendStatus: Dispatch<SetStateAction<string>>;
   readonly setToolRuntimeSnapshot: Dispatch<SetStateAction<ToolRuntimeSnapshot | null>>;
   readonly setTsharkStatus: Dispatch<SetStateAction<TSharkStatus>>;
+  readonly setToolRuntimeProbeState: Dispatch<SetStateAction<ToolRuntimeProbeState>>;
+  readonly setLastToolRuntimeProbeError: Dispatch<SetStateAction<string>>;
   readonly snapshot: ToolRuntimeSnapshot;
 }
 
@@ -26,11 +34,15 @@ export function applyStartupRuntimeSnapshot({
   setBackendStatus,
   setToolRuntimeSnapshot,
   setTsharkStatus,
+  setToolRuntimeProbeState,
+  setLastToolRuntimeProbeError,
   snapshot,
 }: ApplyStartupRuntimeSnapshotOptions) {
   if (isCancelled()) return;
   setToolRuntimeSnapshot(snapshot);
   setTsharkStatus(toTSharkStatus(snapshot.tshark));
+  setToolRuntimeProbeState("ready");
+  setLastToolRuntimeProbeError("");
   if (snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
     setBackendStatus(snapshot.tshark.message);
   }
@@ -39,11 +51,47 @@ export function applyStartupRuntimeSnapshot({
   }
 }
 
+interface MarkRuntimeProbeFailureOptions {
+  readonly error: unknown;
+  readonly isCancelled: () => boolean;
+  readonly timeoutPrefix: string;
+  readonly failurePrefix: string;
+  readonly retryMessage: string;
+  readonly setBackendStatus: Dispatch<SetStateAction<string>>;
+  readonly setToolRuntimeCheckDegraded: Dispatch<SetStateAction<boolean>>;
+  readonly setToolRuntimeProbeState: Dispatch<SetStateAction<ToolRuntimeProbeState>>;
+  readonly setLastToolRuntimeProbeError: Dispatch<SetStateAction<string>>;
+  readonly setTsharkStatus: Dispatch<SetStateAction<TSharkStatus>>;
+}
+
+export function markRuntimeProbeFailure({
+  error,
+  failurePrefix,
+  isCancelled,
+  retryMessage,
+  setBackendStatus,
+  setLastToolRuntimeProbeError,
+  setToolRuntimeCheckDegraded,
+  setToolRuntimeProbeState,
+  setTsharkStatus,
+  timeoutPrefix,
+}: MarkRuntimeProbeFailureOptions) {
+  if (isCancelled()) return;
+  const prefix = isOperationTimeoutError(error) ? timeoutPrefix : failurePrefix;
+  const detail = describeToolRuntimeProbeError(error);
+  setToolRuntimeCheckDegraded(true);
+  setToolRuntimeProbeState("failed");
+  setLastToolRuntimeProbeError(detail);
+  setBackendStatus(`${prefix}：${detail} ${retryMessage}`);
+  setTsharkStatus((prev) => ({ ...prev, message: `${prefix}：${detail}` }));
+}
+
 interface SyncSavedToolRuntimeConfigOptions extends Omit<ApplyStartupRuntimeSnapshotOptions, "snapshot"> {
   readonly explicitFields: ToolRuntimeConfigExplicitFields;
   readonly savedConfig: ToolRuntimeConfig;
   readonly setIsToolRuntimeLoading: Dispatch<SetStateAction<boolean>>;
   readonly setToolRuntimeCheckDegraded: Dispatch<SetStateAction<boolean>>;
+  readonly setToolRuntimeProbeTransport: Dispatch<SetStateAction<ToolRuntimeProbeTransport>>;
 }
 
 export async function syncSavedToolRuntimeConfig({
@@ -55,9 +103,15 @@ export async function syncSavedToolRuntimeConfig({
   setToolRuntimeCheckDegraded,
   setToolRuntimeSnapshot,
   setTsharkStatus,
+  setToolRuntimeProbeState,
+  setToolRuntimeProbeTransport,
+  setLastToolRuntimeProbeError,
 }: SyncSavedToolRuntimeConfigOptions) {
   if (isCancelled()) return;
   setIsToolRuntimeLoading(true);
+  setToolRuntimeProbeState("probing");
+  setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
+  setLastToolRuntimeProbeError("");
   try {
     const snapshot = await withAbortableTimeout(
       (signal) => backendClients.runtime.updateToolRuntimeConfig(savedConfig, signal),
@@ -65,15 +119,29 @@ export async function syncSavedToolRuntimeConfig({
       "startup tool runtime config sync timed out",
     );
     setToolRuntimeCheckDegraded(false);
-    applyStartupRuntimeSnapshot({ isCancelled, setBackendStatus, setToolRuntimeSnapshot, setTsharkStatus, snapshot });
+    applyStartupRuntimeSnapshot({
+      isCancelled,
+      setBackendStatus,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+      setToolRuntimeProbeState,
+      setLastToolRuntimeProbeError,
+      snapshot,
+    });
     if (!isCancelled()) writeUserToolRuntimeConfig(snapshot.config, explicitFields);
   } catch (error) {
-    if (!isCancelled()) {
-      const prefix = isOperationTimeoutError(error) ? "运行时组件配置同步超时" : "运行时组件配置同步失败";
-      setToolRuntimeCheckDegraded(true);
-      setBackendStatus(`${prefix}；已先进入主界面，可在设置侧栏重试`);
-      setTsharkStatus((prev) => ({ ...prev, message: `${prefix}，请稍后在设置侧栏刷新状态` }));
-    }
+    markRuntimeProbeFailure({
+      error,
+      failurePrefix: "运行时组件配置同步失败",
+      isCancelled,
+      retryMessage: "已先进入主界面，可在设置侧栏重试",
+      setBackendStatus,
+      setLastToolRuntimeProbeError,
+      setToolRuntimeCheckDegraded,
+      setToolRuntimeProbeState,
+      setTsharkStatus,
+      timeoutPrefix: "运行时组件配置同步超时",
+    });
   } finally {
     if (!isCancelled()) setIsToolRuntimeLoading(false);
   }

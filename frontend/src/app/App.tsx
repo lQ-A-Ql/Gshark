@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { router } from "./routes";
 import { SentinelProvider, useSentinel } from "./state/SentinelContext";
 import { useEffect, useState } from "react";
+import { toolRuntimeProbeStateText, toolRuntimeProbeTransportText } from "./state/toolRuntimeProbeState";
 
 export function StartupGate() {
   const {
@@ -15,6 +16,9 @@ export function StartupGate() {
     toolRuntimeSnapshot,
     isToolRuntimeLoading,
     refreshToolRuntimeSnapshot,
+    toolRuntimeProbeState,
+    toolRuntimeProbeTransport,
+    lastToolRuntimeProbeError,
   } = useSentinel();
   const [enterMain, setEnterMain] = useState(false);
   const [pathInput, setPathInput] = useState("");
@@ -61,7 +65,7 @@ export function StartupGate() {
       const snapshot = await refreshToolRuntimeSnapshot();
       setProbeNotice(snapshot ? "已重新探测工具状态。" : "后端未连接，暂时无法探测工具。");
     } catch (error) {
-      setProbeNotice(error instanceof Error ? error.message : "工具状态探测失败。");
+      setProbeNotice(lastToolRuntimeProbeError || (error instanceof Error ? error.message : "工具状态探测失败。"));
     }
   };
   const tsharkDegraded = Boolean(
@@ -70,7 +74,7 @@ export function StartupGate() {
   );
   const speech = toolRuntimeSnapshot?.speech;
   const speechStatusText = !toolRuntimeSnapshot
-    ? "未检测"
+    ? toolRuntimeProbeStateText(toolRuntimeProbeState)
     : speech?.available
       ? "可用"
       : speech?.pythonAvailable
@@ -106,18 +110,33 @@ export function StartupGate() {
                     ? tsharkDegraded
                       ? "可用，部分分析降级"
                       : "可用"
-                    : toolRuntimeCheckDegraded
-                      ? "稍后重试"
-                      : "不可用"}
+                    : toolRuntimeProbeState === "failed"
+                      ? "探测失败"
+                      : toolRuntimeCheckDegraded
+                        ? "稍后重试"
+                        : "不可用"}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                FFmpeg：{toolRuntimeSnapshot ? (toolRuntimeSnapshot.ffmpeg.available ? "可用" : "未就绪") : "未检测"}
+                FFmpeg：
+                {toolRuntimeSnapshot
+                  ? toolRuntimeSnapshot.ffmpeg.available
+                    ? "可用"
+                    : "未就绪"
+                  : toolRuntimeProbeStateText(toolRuntimeProbeState)}
               </div>
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">Speech：{speechStatusText}</div>
             </div>
             <div className="text-xs text-slate-500 break-all">{backendStatus || "等待状态..."}</div>
+            {!toolRuntimeSnapshot && backendConnected && (
+              <div
+                className={`text-xs break-all ${toolRuntimeProbeState === "failed" ? "text-rose-600" : "text-slate-500"}`}
+              >
+                {toolRuntimeProbeStateText(toolRuntimeProbeState)} · {toolRuntimeProbeTransportText(toolRuntimeProbeTransport)}
+                {lastToolRuntimeProbeError ? `：${lastToolRuntimeProbeError}` : ""}
+              </div>
+            )}
             {backendConnected && !isTSharkChecking && (
               <div
                 className={`text-xs break-all ${tsharkStatus.available ? (tsharkDegraded ? "text-amber-700" : "text-emerald-600") : "text-rose-600"}`}

@@ -1,32 +1,16 @@
-import type { Dispatch, SetStateAction } from "react";
-import type { ToolRuntimeSnapshot } from "../../core/types";
-import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
-import { isOperationTimeoutError, withAbortableTimeout } from "../../utils/asyncControl";
+import { withAbortableTimeout } from "../../utils/asyncControl";
 import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
+import { detectToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
 import { readToolRuntimeConfigState, writeObservedToolRuntimeSnapshotConfig } from "../toolRuntimeStorage";
 import {
   applyStartupRuntimeSnapshot,
+  markRuntimeProbeFailure,
   startupToolRuntimeConfigForSync,
   syncSavedToolRuntimeConfig,
   toolRuntimeConfigsEqual,
 } from "./backendLifecycleToolRuntimeStartup";
-
-export async function getBackendUnavailableStatus() {
-  const desktopStatus = await backendClients.runtime.getDesktopBackendStatus().catch(() => "");
-  const detail = desktopStatus.trim();
-  return detail && detail !== "not-started" && detail !== "starting" ? detail : "桌面后端未连接，请启动或重启桌面应用";
-}
-
-interface StartupToolRuntimeOptions {
-  readonly isCancelled: () => boolean;
-  readonly setBackendStatus: Dispatch<SetStateAction<string>>;
-  readonly setIsTSharkChecking: Dispatch<SetStateAction<boolean>>;
-  readonly setIsToolRuntimeLoading: Dispatch<SetStateAction<boolean>>;
-  readonly setToolRuntimeCheckDegraded: Dispatch<SetStateAction<boolean>>;
-  readonly setToolRuntimeSnapshot: Dispatch<SetStateAction<ToolRuntimeSnapshot | null>>;
-  readonly setTsharkStatus: Dispatch<SetStateAction<TSharkStatus>>;
-}
+import type { StartupToolRuntimeOptions } from "./backendLifecycleStartupTypes";
 
 export async function loadStartupToolRuntime({
   isCancelled,
@@ -36,10 +20,16 @@ export async function loadStartupToolRuntime({
   setToolRuntimeCheckDegraded,
   setToolRuntimeSnapshot,
   setTsharkStatus,
+  setToolRuntimeProbeState,
+  setToolRuntimeProbeTransport,
+  setLastToolRuntimeProbeError,
 }: StartupToolRuntimeOptions) {
   setIsTSharkChecking(true);
   setIsToolRuntimeLoading(true);
   setToolRuntimeCheckDegraded(false);
+  setToolRuntimeProbeState("probing");
+  setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
+  setLastToolRuntimeProbeError("");
 
   let isSyncingSavedConfig = false;
   try {
@@ -57,6 +47,8 @@ export async function loadStartupToolRuntime({
       setToolRuntimeSnapshot,
       setTsharkStatus,
       snapshot,
+      setToolRuntimeProbeState,
+      setLastToolRuntimeProbeError,
     });
     if (!isCancelled() && !shouldSyncSavedConfig) writeObservedToolRuntimeSnapshotConfig(snapshot.config);
 
@@ -71,18 +63,24 @@ export async function loadStartupToolRuntime({
         setToolRuntimeCheckDegraded,
         setToolRuntimeSnapshot,
         setTsharkStatus,
+        setToolRuntimeProbeState,
+        setToolRuntimeProbeTransport,
+        setLastToolRuntimeProbeError,
       });
     }
   } catch (error) {
-    if (!isCancelled()) {
-      const prefix = isOperationTimeoutError(error) ? "运行时组件检测超时" : "运行时组件检测失败";
-      setToolRuntimeCheckDegraded(true);
-      setBackendStatus(`${prefix}，已先进入主界面；可在设置侧栏刷新状态`);
-      setTsharkStatus((prev) => ({
-        ...prev,
-        message: `${prefix}，请稍后在设置侧栏刷新状态`,
-      }));
-    }
+    markRuntimeProbeFailure({
+      error,
+      failurePrefix: "运行时组件检测失败",
+      isCancelled,
+      retryMessage: "已先进入主界面；可在设置侧栏刷新状态",
+      setBackendStatus,
+      setLastToolRuntimeProbeError,
+      setToolRuntimeCheckDegraded,
+      setToolRuntimeProbeState,
+      setTsharkStatus,
+      timeoutPrefix: "运行时组件检测超时",
+    });
   } finally {
     if (!isCancelled()) {
       setIsTSharkChecking(false);

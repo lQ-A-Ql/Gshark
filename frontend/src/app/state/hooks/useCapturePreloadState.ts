@@ -1,5 +1,6 @@
 import { useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useSyncedRefValue } from "./useSyncedRefValue";
+import type { CapturePreloadDiagnostics } from "../capturePreloadDiagnostics";
 
 export interface UseCapturePreloadStateResult {
   readonly isPreloadingCapture: boolean;
@@ -7,9 +8,11 @@ export interface UseCapturePreloadStateResult {
   readonly preloadTotal: number;
   readonly preloadProcessedRef: MutableRefObject<number>;
   readonly preloadTotalRef: MutableRefObject<number>;
+  readonly capturePreloadDiagnostics: CapturePreloadDiagnostics | null;
   readonly setIsPreloadingCapture: Dispatch<SetStateAction<boolean>>;
   readonly setPreloadProcessed: Dispatch<SetStateAction<number>>;
   readonly setPreloadTotal: Dispatch<SetStateAction<number>>;
+  readonly setCapturePreloadDiagnostics: Dispatch<SetStateAction<CapturePreloadDiagnostics | null>>;
 }
 
 /**
@@ -23,6 +26,7 @@ export function useCapturePreloadState(): UseCapturePreloadStateResult {
   const [isPreloadingCapture, setIsPreloadingCapture] = useState(false);
   const [preloadProcessed, setPreloadProcessed] = useState(0);
   const [preloadTotal, setPreloadTotal] = useState(0);
+  const [capturePreloadDiagnostics, setCapturePreloadDiagnostics] = useState<CapturePreloadDiagnostics | null>(null);
 
   const preloadProcessedRef = useRef(preloadProcessed);
   const preloadTotalRef = useRef(preloadTotal);
@@ -36,8 +40,10 @@ export function useCapturePreloadState(): UseCapturePreloadStateResult {
     preloadTotal,
     preloadProcessedRef,
     preloadTotalRef,
+    capturePreloadDiagnostics,
     setIsPreloadingCapture,
     setPreloadProcessed,
     setPreloadTotal,
+    setCapturePreloadDiagnostics,
   };
 }

@@ -28,6 +28,8 @@ export interface CaptureStatus {
   filePath: string;
   hasCapture: boolean;
   packetCount: number;
+  transport?: "desktop-ipc" | "http-fallback" | "unknown";
+  transportError?: string;
 }
 
 export interface PacketLocateResult {
@@ -117,7 +119,7 @@ export function createCaptureClient(
 
     async getCaptureStatus(signal?: AbortSignal) {
       const payload = await request<CaptureStatusWireDTO>("/api/capture/status", { signal });
-      return asCaptureStatus(payload);
+      return withCaptureStatusMeta(asCaptureStatus(payload), "http-fallback");
     },
 
     async listPackets() {
@@ -177,6 +179,26 @@ export function asCaptureStatus(input: unknown): CaptureStatus {
     hasCapture: Boolean(payload?.has_capture ?? payload?.hasCapture),
     packetCount: Number(payload?.packet_count ?? payload?.packetCount ?? 0),
   };
+}
+
+export function withCaptureStatusMeta(
+  status: CaptureStatus,
+  transport: NonNullable<CaptureStatus["transport"]>,
+  transportError = "",
+): CaptureStatus {
+  Object.defineProperties(status, {
+    transport: {
+      configurable: true,
+      enumerable: false,
+      value: transport,
+    },
+    transportError: {
+      configurable: true,
+      enumerable: false,
+      value: transportError,
+    },
+  });
+  return status;
 }
 
 async function selectLocalFile(): Promise<File> {

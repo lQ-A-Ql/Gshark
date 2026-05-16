@@ -14,7 +14,9 @@ import type {
 import type { TSharkStatus } from "../integrations/clients/toolRuntimeClient";
 import type { MediaAnalysisProgress, ThreatAnalysisProgress } from "./hooks/useAnalysisProgress";
 import type { CaptureFileMeta } from "./captureOpenState";
+import type { CapturePreloadDiagnostics } from "./capturePreloadDiagnostics";
 import type { StreamIds } from "./streamState";
+import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "./toolRuntimeProbeState";
 
 export interface PreparedPacketStream {
   packet: Packet | null;
@@ -39,6 +41,7 @@ export interface SentinelContextValue {
   isPreloadingCapture: boolean;
   preloadProcessed: number;
   preloadTotal: number;
+  capturePreloadDiagnostics: CapturePreloadDiagnostics | null;
   filteredPackets: Packet[];
   hasMorePackets: boolean;
   hasPrevPackets: boolean;
@@ -83,6 +86,7 @@ export interface SentinelContextValue {
   recentCaptures: RecentCapture[];
   openCapture: (filePath?: string) => Promise<boolean>;
   stopCapture: () => Promise<void>;
+  retryCapturePreloadConfirm: () => Promise<boolean>;
   preparePacketStream: (
     packetId: number,
     preferredProtocol?: "HTTP" | "TCP" | "UDP",
@@ -94,6 +98,9 @@ export interface SentinelContextValue {
   tsharkStatus: TSharkStatus;
   isTSharkChecking: boolean;
   toolRuntimeCheckDegraded: boolean;
+  toolRuntimeProbeState: ToolRuntimeProbeState;
+  toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
+  lastToolRuntimeProbeError: string;
   setTSharkPath: (path: string) => Promise<void>;
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;

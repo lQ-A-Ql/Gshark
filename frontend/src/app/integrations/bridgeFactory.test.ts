@@ -57,9 +57,10 @@ describe("createBridge", () => {
       BackendStatus: vi.fn(async () => "running"),
     };
 
-    createBridge({
+    const bridge = createBridge({
       getDesktopAppBinding: () => binding,
     });
+    void (bridge as any).id;
 
     expect(mocks.createDesktopBridge).toHaveBeenCalledTimes(1);
     const args = mocks.createDesktopBridge.mock.calls[0]?.[0] as {
@@ -70,5 +71,19 @@ describe("createBridge", () => {
     expect(typeof (args.fallbackBridge as any).getEvidenceWithFilter).toBe("function");
     expect(typeof (args.fallbackBridge as any).listObjects).toBe("function");
     expect(typeof (args.fallbackBridge as any).listThreatHits).toBe("function");
+  });
+
+  it("resolves a Wails binding that appears after bridge creation", async () => {
+    const { createBridge } = await import("./bridgeFactory");
+    const bindingState: { binding?: DesktopTransportBinding } = {};
+    const bridge = createBridge({
+      getDesktopAppBinding: () => bindingState.binding,
+    });
+
+    expect((bridge as any).id).toBe("http");
+    bindingState.binding = { BackendStatus: vi.fn(async () => "running") };
+
+    expect((bridge as any).id).toBe("desktop");
+    expect(mocks.createDesktopBridge).toHaveBeenCalledTimes(1);
   });
 });

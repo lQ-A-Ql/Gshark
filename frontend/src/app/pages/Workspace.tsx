@@ -5,11 +5,13 @@ import { WorkbenchTitleBar } from "../components/DesignSystem";
 import { CaptureTransactionBanner } from "../components/workspace/CaptureTransactionBanner";
 import { CaptureTransactionErrorPanel } from "../components/workspace/CaptureTransactionErrorPanel";
 import { WorkspaceFilterSection } from "../components/workspace/WorkspaceFilterSection";
-import { WorkspacePanels, WorkspacePreloadProgress } from "../components/workspace/WorkspacePanels";
+import { WorkspacePanels } from "../components/workspace/WorkspacePanels";
+import { WorkspacePreloadProgress } from "../components/workspace/WorkspacePreloadProgress";
 import { WorkspaceTitleActions } from "../components/workspace/WorkspaceTitleActions";
 import { useWorkspaceFilterProgress } from "../components/workspace/useWorkspaceFilterProgress";
 import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
 import { useWorkspaceProtocolSelection } from "../components/workspace/useWorkspaceProtocolSelection";
+import { usePreloadElapsedMs } from "../components/workspace/usePreloadElapsedMs";
 import { useSentinel } from "../state/SentinelContext";
 import { useWorkspaceFilterAction } from "./useWorkspaceFilterAction";
 import { useWorkspaceStreamNavigation } from "./useWorkspaceStreamNavigation";
@@ -21,7 +23,6 @@ import {
 } from "./workspaceStatus";
 import {
   getWorkspacePagerItems,
-  getWorkspacePreloadPercent,
   shouldShowWorkspaceFilterLoadingBlankState,
 } from "./workspaceViewRules";
 
@@ -38,6 +39,7 @@ export default function Workspace() {
     isPreloadingCapture,
     preloadProcessed,
     preloadTotal,
+    capturePreloadDiagnostics,
     hasMorePackets,
     hasPrevPackets,
     isPageLoading,
@@ -57,6 +59,7 @@ export default function Workspace() {
     fileMeta,
     openCapture,
     stopCapture,
+    retryCapturePreloadConfirm,
     setActiveStream,
     backendConnected,
     backendStatus,
@@ -105,11 +108,6 @@ export default function Workspace() {
     return () => window.removeEventListener("gshark:focus-filter", handler);
   }, []);
 
-  const preloadPercent = useMemo(
-    () => getWorkspacePreloadPercent(preloadProcessed, preloadTotal),
-    [preloadProcessed, preloadTotal],
-  );
-  const hasDeterministicPreloadProgress = preloadTotal > 0;
   const hasOpenedCapture = Boolean(fileMeta.path);
   const showFilterLoadingBlankState = useMemo(
     () => shouldShowWorkspaceFilterLoadingBlankState(filteredPackets.length, isFilterLoading, isPreloadingCapture),
@@ -120,6 +118,7 @@ export default function Workspace() {
     [backendStatus, displayFilter],
   );
   const pagerItems = useMemo(() => getWorkspacePagerItems(currentPage, totalPages), [currentPage, totalPages]);
+  const preloadElapsedMs = usePreloadElapsedMs(isPreloadingCapture, captureTransaction.pendingCapturePath);
 
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
 
@@ -187,14 +186,15 @@ export default function Workspace() {
         onClear={clearFilter}
         onClearHistory={clearFilterHistory}
       />
-
       {isPreloadingCapture && (
         <WorkspacePreloadProgress
           preloadProcessed={preloadProcessed}
           preloadTotal={preloadTotal}
           totalPackets={totalPackets}
-          preloadPercent={preloadPercent}
-          hasDeterministicPreloadProgress={hasDeterministicPreloadProgress}
+          diagnostics={capturePreloadDiagnostics}
+          elapsedMs={preloadElapsedMs}
+          onRetryConfirm={() => void retryCapturePreloadConfirm()}
+          onStop={() => void stopCapture()}
         />
       )}
 

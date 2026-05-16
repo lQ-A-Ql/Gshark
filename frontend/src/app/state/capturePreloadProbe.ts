@@ -1,13 +1,20 @@
 import type { CaptureTaskScope } from "../utils/captureTaskScope";
 import type { CaptureStatus, PacketsPageResult } from "../integrations/clients/captureClient";
 import { PAGE_SIZE, PRELOAD_POLL_INTERVAL_MS, PRELOAD_SIGNAL_WAIT_MS } from "./captureConstants";
-import { isCommittedCaptureStatusForPath } from "./captureCommitStatus";
-import type { OpenedCapture } from "./captureOpenState";
+import type { CapturePreloadDiagnostics } from "./capturePreloadDiagnostics";
 import {
-  CAPTURE_PRELOAD_TIMEOUT_MS,
-  getCaptureEmptyParseError,
-  getCapturePreloadTimeoutError,
-} from "./capturePreloadStatus";
+  applyProbePageState,
+  canUseDegradedFirstPage,
+  getCapturePreloadTimeoutErrorWithDiagnostics,
+  getParseFinishedProbeError,
+  getProbePhase,
+  probeCapturePage,
+  publishDiagnostics,
+  publishReadyDiagnostics,
+  type ProbeResult,
+} from "./capturePreloadProbeStep";
+import type { OpenedCapture } from "./captureOpenState";
+import { CAPTURE_PRELOAD_TIMEOUT_MS } from "./capturePreloadStatus";
 
 type Ref<T> = { current: T };
 type Setter<T> = (value: T | ((prev: T) => T)) => void;
@@ -24,6 +31,8 @@ interface CapturePreloadProbeOptions {
   readonly parseErrorRef: Ref<string>;
   readonly preloadProcessedRef: Ref<number>;
   readonly preloadTotalRef: Ref<number>;
+  readonly hadActiveCapture?: boolean;
+  readonly onDiagnostics?: (diagnostics: CapturePreloadDiagnostics) => void;
   readonly listPacketsPage: (
     cursor: number,
     limit: number,
@@ -41,12 +50,6 @@ interface CapturePreloadProbeOptions {
   readonly now?: () => number;
 }
 
-interface ProbeResult {
-  readonly stale: boolean;
-  readonly page: PacketsPageResult | null;
-  readonly activeCaptureConfirmed: boolean;
-}
-
 export async function resolveCapturePreloadFirstPage({
   opened,
   filter,
@@ -57,6 +60,8 @@ export async function resolveCapturePreloadFirstPage({
   parseErrorRef,
   preloadProcessedRef,
   preloadTotalRef,
+  hadActiveCapture = false,
+  onDiagnostics,
   listPacketsPage,
   getCaptureStatus,
   waitForCaptureSignal,
@@ -69,15 +74,19 @@ export async function resolveCapturePreloadFirstPage({
   now = Date.now,
 }: CapturePreloadProbeOptions): Promise<CapturePreloadFirstPage | null> {
   const waitDeadline = now() + timeoutMs;
-  let firstPageLoaded = false;
   let activeCaptureConfirmed = false;
-  let validatedFirstPage: CapturePreloadFirstPage | null = null;
+  let pageState = {
+    firstPageLoaded: false,
+    candidateFirstPage: null as CapturePreloadFirstPage | null,
+    validatedFirstPage: null as CapturePreloadFirstPage | null,
+  };
+  let lastProbe: ProbeResult | null = null;
 
   while (now() < waitDeadline && captureSeq === captureSeqRef.current) {
     const probe = await probeCapturePage({
       opened,
       filter,
-      limit: firstPageLoaded ? 1 : pageSize,
+      limit: pageState.firstPageLoaded ? 1 : pageSize,
       captureSeq,
       captureSeqRef,
       captureTaskScopeRef,
@@ -85,25 +94,29 @@ export async function resolveCapturePreloadFirstPage({
       getCaptureStatus,
     });
     if (probe.stale) return null;
+    lastProbe = probe;
 
     activeCaptureConfirmed = probe.activeCaptureConfirmed;
-    const page = probe.page;
-    if (page && activeCaptureConfirmed && page.total > 0) {
-      setTotalPackets(page.total);
-      if (preloadTotalRef.current <= 0) {
-        setPreloadProcessed(page.total);
-        preloadProcessedRef.current = page.total;
-      }
-    }
-    if (!firstPageLoaded && page && activeCaptureConfirmed && page.total > 0) {
-      validatedFirstPage = toFirstPage(page);
-      firstPageLoaded = true;
-    }
+    pageState = applyProbePageState({
+      page: probe.page,
+      activeCaptureConfirmed,
+      state: pageState,
+      preloadProcessedRef,
+      preloadTotalRef,
+      setTotalPackets,
+      setPreloadProcessed,
+    });
+    publishDiagnostics({
+      opened,
+      probe,
+      phase: getProbePhase(probe, activeCaptureConfirmed, Boolean(pageState.candidateFirstPage)),
+      onDiagnostics,
+    });
 
-    if (activeCaptureConfirmed && firstPageLoaded) break;
+    if (activeCaptureConfirmed && pageState.firstPageLoaded) break;
     if (parseFinishedRef.current) break;
 
-    await waitForCaptureSignal(firstPageLoaded ? signalWaitMs : pollIntervalMs);
+    await waitForCaptureSignal(pageState.firstPageLoaded ? signalWaitMs : pollIntervalMs);
   }
 
   if (captureSeq !== captureSeqRef.current) return null;
@@ -111,7 +124,7 @@ export async function resolveCapturePreloadFirstPage({
   const finalProbe = await probeCapturePage({
     opened,
     filter,
-    limit: firstPageLoaded ? 1 : pageSize,
+    limit: pageState.firstPageLoaded ? 1 : pageSize,
     captureSeq,
     captureSeqRef,
     captureTaskScopeRef,
@@ -119,65 +132,50 @@ export async function resolveCapturePreloadFirstPage({
     getCaptureStatus,
   });
   if (finalProbe.stale) return null;
+  lastProbe = finalProbe;
 
   activeCaptureConfirmed = finalProbe.activeCaptureConfirmed;
-  const finalPage = finalProbe.page;
-  if (!firstPageLoaded && finalPage && activeCaptureConfirmed && finalPage.total > 0) {
-    validatedFirstPage = toFirstPage(finalPage);
-    firstPageLoaded = true;
+  pageState = applyProbePageState({
+    page: finalProbe.page,
+    activeCaptureConfirmed,
+    state: pageState,
+    preloadProcessedRef,
+    preloadTotalRef,
+    setTotalPackets,
+    setPreloadProcessed,
+  });
+  publishDiagnostics({
+    opened,
+    probe: finalProbe,
+    phase: getProbePhase(finalProbe, activeCaptureConfirmed, Boolean(pageState.candidateFirstPage)),
+    onDiagnostics,
+  });
+
+  if (
+    canUseDegradedFirstPage({
+      hadActiveCapture,
+      parseFinished: parseFinishedRef.current,
+      parseError: parseErrorRef.current,
+      candidateFirstPage: pageState.candidateFirstPage,
+      probe: finalProbe,
+    })
+  ) {
+    publishReadyDiagnostics(opened, finalProbe, onDiagnostics, true);
+    return pageState.candidateFirstPage!;
   }
-  if (finalPage?.total === 0 && parseFinishedRef.current) {
-    throw new Error(getCaptureEmptyParseError(parseErrorRef.current));
+  if (parseFinishedRef.current) {
+    const finishedError = getParseFinishedProbeError({
+      opened,
+      probe: finalProbe,
+      activeCaptureConfirmed,
+      parseError: parseErrorRef.current,
+    });
+    if (finishedError) throw new Error(finishedError);
   }
-  if (!activeCaptureConfirmed || !firstPageLoaded || !validatedFirstPage) {
-    throw new Error(getCapturePreloadTimeoutError());
+  if (!activeCaptureConfirmed || !pageState.firstPageLoaded || !pageState.validatedFirstPage) {
+    throw new Error(getCapturePreloadTimeoutErrorWithDiagnostics(lastProbe));
   }
 
-  return validatedFirstPage;
-}
-
-async function probeCapturePage({
-  opened,
-  filter,
-  limit,
-  captureSeq,
-  captureSeqRef,
-  captureTaskScopeRef,
-  listPacketsPage,
-  getCaptureStatus,
-}: {
-  readonly opened: OpenedCapture;
-  readonly filter: string;
-  readonly limit: number;
-  readonly captureSeq: number;
-  readonly captureSeqRef: Ref<number>;
-  readonly captureTaskScopeRef: Ref<CaptureTaskScope>;
-  readonly listPacketsPage: CapturePreloadProbeOptions["listPacketsPage"];
-  readonly getCaptureStatus: CapturePreloadProbeOptions["getCaptureStatus"];
-}): Promise<ProbeResult> {
-  const probeTask = captureTaskScopeRef.current.beginTask("preload-page");
-  try {
-    const [page, captureStatus] = await Promise.all([
-      listPacketsPage(0, limit, filter, probeTask.signal),
-      getCaptureStatus(probeTask.signal).catch(() => null),
-    ]);
-    if (!probeTask.isCurrent() || captureSeq !== captureSeqRef.current) {
-      return { stale: true, page: null, activeCaptureConfirmed: false };
-    }
-    return {
-      stale: false,
-      page,
-      activeCaptureConfirmed: isCommittedCaptureStatusForPath(captureStatus, opened.filePath),
-    };
-  } finally {
-    probeTask.finish();
-  }
-}
-
-function toFirstPage(page: PacketsPageResult): CapturePreloadFirstPage {
-  return {
-    items: page.items,
-    total: page.total,
-    hasMore: page.hasMore,
-  };
+  publishReadyDiagnostics(opened, finalProbe, onDiagnostics);
+  return pageState.validatedFirstPage;
 }

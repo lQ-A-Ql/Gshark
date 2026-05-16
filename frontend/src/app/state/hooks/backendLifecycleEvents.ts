@@ -71,7 +71,8 @@ export function createBackendLifecycleEventHandlers({
     },
     status: (message) => {
       const msg = message || "后端运行中";
-      if (shouldIgnoreCaptureStatusWithoutActiveCapture(msg, Boolean(activeCapturePathRef.current))) {
+      const hasCaptureContext = Boolean(activeCapturePathRef.current) || preloadingRef.current;
+      if (shouldIgnoreCaptureStatusWithoutActiveCapture(msg, hasCaptureContext)) {
         return;
       }
       if (isProgressStatusMessage(msg)) {
@@ -97,7 +98,8 @@ export function createBackendLifecycleEventHandlers({
     },
     error: (message) => {
       const next = message || "后端事件异常";
-      if (shouldIgnoreCaptureErrorWithoutActiveCapture(next, Boolean(activeCapturePathRef.current))) {
+      const hasCaptureContext = Boolean(activeCapturePathRef.current) || preloadingRef.current;
+      if (shouldIgnoreCaptureErrorWithoutActiveCapture(next, hasCaptureContext)) {
         return;
       }
       if (preloadingRef.current) {

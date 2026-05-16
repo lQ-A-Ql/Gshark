@@ -211,10 +211,11 @@ func (a *DesktopApp) startBackendIfPossible() error {
 		}
 		a.backendAuthToken = token
 	}
-	cmd.Env = append(os.Environ(), "GSHARK_BACKEND_TOKEN="+a.backendAuthToken)
+	buildID := backendCommandBuildID(cmd)
+	cmd.Env = append(os.Environ(), "GSHARK_BACKEND_TOKEN="+a.backendAuthToken, "GSHARK_BACKEND_BUILD_ID="+buildID)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	fmt.Fprintf(os.Stdout, "desktop startup: launching backend command %q in %q\n", strings.Join(cmd.Args, " "), cmd.Dir)
+	fmt.Fprintf(os.Stdout, "desktop startup: launching backend command %q in %q build_id=%q\n", strings.Join(cmd.Args, " "), cmd.Dir, buildID)
 
 	if startErr := cmd.Start(); startErr != nil {
 		return fmt.Errorf("start backend process: %w", startErr)
@@ -248,6 +249,27 @@ func buildBackendCommand() (*exec.Cmd, error) {
 	cmd.Dir = backendDir
 	fmt.Fprintf(os.Stdout, "desktop startup: bundled backend unavailable (%v); using go run backend from %q\n", bundledErr, backendDir)
 	return cmd, nil
+}
+
+func backendCommandBuildID(cmd *exec.Cmd) string {
+	if cmd == nil || len(cmd.Args) == 0 {
+		return "unknown"
+	}
+	if filepath.Base(cmd.Args[0]) == "go" || strings.EqualFold(filepath.Base(cmd.Args[0]), "go.exe") {
+		return "source-go-run"
+	}
+	binaryPath := cmd.Args[0]
+	if !filepath.IsAbs(binaryPath) {
+		if resolved, err := exec.LookPath(binaryPath); err == nil {
+			binaryPath = resolved
+		}
+	}
+	data, err := os.ReadFile(binaryPath)
+	if err != nil {
+		return "file-unavailable:" + filepath.Base(binaryPath)
+	}
+	digest := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(digest[:8])
 }
 
 func detectPackagedDesktopRuntime() (bool, string) {

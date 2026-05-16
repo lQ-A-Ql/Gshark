@@ -1,7 +1,8 @@
 import { useEffect, type MutableRefObject } from "react";
 import { backendClients } from "../../integrations/backendClients";
 import { wakeCaptureWaiters as wakeCaptureWaitersUtil } from "../captureSignal";
-import { getBackendUnavailableStatus, loadStartupToolRuntime } from "./backendLifecycleStartup";
+import { loadStartupToolRuntime } from "./backendLifecycleStartup";
+import { getBackendUnavailableStatus } from "./backendUnavailableStatus";
 import { clearWindowTimer } from "./backendLifecycleTimers";
 import { createBackendLifecycleEventHandlers, type BackendLifecycleEventOptions } from "./backendLifecycleEvents";
 
@@ -50,6 +51,9 @@ export function useBackendLifecycleStartupEffect({
       if (!available) {
         setBackendConnected(false);
         setBackendStatus(await getBackendUnavailableStatus());
+        startupToolRuntimeOptions.setToolRuntimeProbeState("idle");
+        startupToolRuntimeOptions.setToolRuntimeProbeTransport("unknown");
+        startupToolRuntimeOptions.setLastToolRuntimeProbeError("后端未连接，暂时无法探测运行时组件。");
         scheduleBackendRetry();
         return;
       }

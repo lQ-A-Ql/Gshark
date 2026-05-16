@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BinaryStream, HttpStream, Packet, StreamSwitchMetrics } from "../../core/types";
 import { createCaptureTaskScope } from "../../utils/captureTaskScope";
 import { createInitialCaptureFileMeta } from "../captureOpenState";
+import type { CapturePreloadDiagnostics } from "../capturePreloadDiagnostics";
 import { createIdleCaptureTransactionStatus } from "../captureTransactionStatus";
 import { EMPTY_SWITCH_METRICS } from "../streamState";
 import { createStreamSwitchSequences } from "../streamSwitchSequence";
@@ -39,6 +40,7 @@ describe("useCaptureStartWorkflow", () => {
       const [backendStatus, setBackendStatus] = useState("");
       const [captureTransaction, setCaptureTransaction] = useState(createIdleCaptureTransactionStatus(false));
       const [fileMeta, setFileMeta] = useState(createInitialCaptureFileMeta);
+      const [, setCapturePreloadDiagnostics] = useState<CapturePreloadDiagnostics | null>(null);
       const [, setStreamSwitchMetrics] = useState<StreamSwitchMetrics>(EMPTY_SWITCH_METRICS);
 
       const activeCapturePathRef = useRef("");
@@ -96,6 +98,7 @@ describe("useCaptureStartWorkflow", () => {
           setBackendStatus,
           setCaptureRevision: vi.fn(),
           setCaptureTransaction,
+          setCapturePreloadDiagnostics,
           setFileMeta,
           setHasMorePackets: vi.fn(),
           setHasPrevPackets: vi.fn(),

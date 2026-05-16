@@ -1,18 +1,18 @@
 import { ShieldAlert } from "lucide-react";
 
 import { yaraBinHint, yaraRulesHint } from "./RuntimeSettingsHints";
-import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
+import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
+import { Field } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
+import { RuntimeToolStatusLine } from "./RuntimeToolStatusLine";
 
-export function YaraSettingsSection({ backendConnected, form, snapshot, setForm }: RuntimeSettingsSectionProps) {
+export function YaraSettingsSection(props: RuntimeSettingsSectionProps) {
+  const { form, snapshot, setForm, unknownMessage, unknownStateText } = props;
   return (
-    <section className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)]">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-          <ShieldAlert className="h-4 w-4" />
-        </div>
+    <RuntimeSettingsSectionShell>
+      <RuntimeSettingsSectionTitle Icon={ShieldAlert} iconClassName="bg-amber-50 text-amber-600">
         YARA 狩猎
-      </div>
+      </RuntimeSettingsSectionTitle>
       <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
         <div>
           <div className="text-xs font-semibold text-slate-800">启用 YARA 狩猎</div>
@@ -56,13 +56,13 @@ export function YaraSettingsSection({ backendConnected, form, snapshot, setForm 
           />
         </label>
       </div>
-      <StatusLine
+      <RuntimeToolStatusLine
         label="YARA"
-        available={snapshot?.yara.available}
+        status={snapshot?.yara}
         enabled={snapshot?.yara.enabled ?? form.yaraEnabled}
         known={Boolean(snapshot)}
-        message={snapshot?.yara.message ?? (backendConnected ? "等待检测" : "后端未连接")}
-        path={snapshot?.yara.path}
+        unknownMessage={unknownMessage}
+        unknownStateText={unknownStateText}
       />
       {snapshot?.yara.rulePath ? (
         <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
@@ -76,6 +76,6 @@ export function YaraSettingsSection({ backendConnected, form, snapshot, setForm 
           <span className="break-all"> {snapshot.yara.lastScanMessage}</span>
         </div>
       ) : null}
-    </section>
+    </RuntimeSettingsSectionShell>
   );
 }

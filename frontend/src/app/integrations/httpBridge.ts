@@ -44,6 +44,14 @@ export async function requestJSON<T>(
     } catch {
       // ignore invalid json error payload
     }
+    if (res.status === 401) {
+      resetBackendAuthTokenCache();
+      throw new Error(
+        detail && detail !== "unauthorized"
+          ? detail
+          : "后端鉴权失败：token 不匹配或已过期，请重启 Wails dev 后重试。",
+      );
+    }
     throw new Error(detail || `backend request failed: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as T;
@@ -74,6 +82,14 @@ export async function requestBlob(
       }
     } catch {
       // ignore invalid json error payload
+    }
+    if (res.status === 401) {
+      resetBackendAuthTokenCache();
+      throw new Error(
+        detail && detail !== "unauthorized"
+          ? detail
+          : "后端鉴权失败：token 不匹配或已过期，请重启 Wails dev 后重试。",
+      );
     }
     throw new Error(detail || `backend request failed: ${res.status} ${res.statusText}`);
   }

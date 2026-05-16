@@ -1,10 +1,13 @@
 import type { CaptureTransactionStatus } from "../state/sentinelTypes";
 
-export function shouldShowWorkspaceWelcome(hasOpenedCapture: boolean, captureTransaction: CaptureTransactionStatus): boolean {
-  return !hasOpenedCapture && captureTransaction.phase !== "failed";
+export function shouldShowWorkspaceWelcome(hasOpenedCapture: boolean, captureTransaction: CaptureTransactionStatus) {
+  return !hasOpenedCapture && captureTransaction.phase === "idle";
 }
 
-export function shouldShowWorkspaceOpenFailure(hasOpenedCapture: boolean, captureTransaction: CaptureTransactionStatus): boolean {
+export function shouldShowWorkspaceOpenFailure(
+  hasOpenedCapture: boolean,
+  captureTransaction: CaptureTransactionStatus,
+) {
   return !hasOpenedCapture && captureTransaction.phase === "failed";
 }
 
@@ -30,11 +33,11 @@ export function getWorkspaceFilterErrorMessage(message: string, displayFilter: s
   if (!trimmedMessage || !displayFilter.trim()) return "";
   const normalized = trimmedMessage.toLowerCase();
   if (
-    normalized.includes("filter")
-    || normalized.includes("过滤")
-    || normalized.includes("tshark")
-    || normalized.includes("unexpected")
-    || normalized.includes("invalid")
+    normalized.includes("filter") ||
+    normalized.includes("过滤") ||
+    normalized.includes("tshark") ||
+    normalized.includes("unexpected") ||
+    normalized.includes("invalid")
   ) {
     return trimmedMessage;
   }

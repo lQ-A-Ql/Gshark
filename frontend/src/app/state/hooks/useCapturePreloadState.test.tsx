@@ -9,6 +9,7 @@ describe("useCapturePreloadState", () => {
     expect(result.current.isPreloadingCapture).toBe(false);
     expect(result.current.preloadProcessed).toBe(0);
     expect(result.current.preloadTotal).toBe(0);
+    expect(result.current.capturePreloadDiagnostics).toBeNull();
     expect(result.current.preloadProcessedRef.current).toBe(0);
     expect(result.current.preloadTotalRef.current).toBe(0);
   });

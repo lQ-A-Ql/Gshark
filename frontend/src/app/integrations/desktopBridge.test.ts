@@ -239,7 +239,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getCaptureStatus).toHaveBeenCalled();
   });
 
-  it("uses the HTTP fallback for abortable runtime calls", async () => {
+  it("keeps abortable runtime snapshot calls on Wails IPC when the binding exists", async () => {
     const controller = new AbortController();
     const fallbackBridge = createFallbackBridge();
     const desktopApp: DesktopTransportBinding = {
@@ -251,7 +251,41 @@ describe("createDesktopBridge", () => {
 
     await bridge.getToolRuntimeSnapshot(controller.signal);
 
-    expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(controller.signal);
-    expect(desktopApp.GetToolRuntimeSnapshot).not.toHaveBeenCalled();
+    expect(desktopApp.GetToolRuntimeSnapshot).toHaveBeenCalledTimes(1);
+    expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("keeps abortable runtime config updates on Wails IPC when the binding exists", async () => {
+    const controller = new AbortController();
+    const fallbackBridge = createFallbackBridge({
+      updateToolRuntimeConfig: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot()),
+    });
+    const desktopApp: DesktopTransportBinding = {
+      UpdateToolRuntimeConfig: vi.fn(async () => ({
+        config: { tshark_path: "desktop-tshark", yara_timeout_ms: 25000 },
+        tshark: { available: true, path: "desktop-tshark", message: "ok" },
+        ffmpeg: { available: true, path: "ffmpeg", message: "ok" },
+        speech: { available: false, message: "model missing" },
+        yara: { enabled: true, available: true, timeout_ms: 25000 },
+      })),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    await bridge.updateToolRuntimeConfig(
+      {
+        tsharkPath: "desktop-tshark",
+        ffmpegPath: "",
+        pythonPath: "",
+        voskModelPath: "",
+        yaraEnabled: true,
+        yaraBin: "",
+        yaraRules: "",
+        yaraTimeoutMs: 25000,
+      },
+      controller.signal,
+    );
+
+    expect(desktopApp.UpdateToolRuntimeConfig).toHaveBeenCalledTimes(1);
+    expect(fallbackBridge.updateToolRuntimeConfig).not.toHaveBeenCalled();
   });
 });

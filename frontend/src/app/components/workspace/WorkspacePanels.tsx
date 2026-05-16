@@ -9,42 +9,6 @@ import { WorkspacePacketErrorPanel } from "./WorkspacePacketErrorPanel";
 
 type StreamTarget = "http" | "tcp" | "udp";
 
-interface WorkspacePreloadProgressProps {
-  preloadProcessed: number;
-  preloadTotal: number;
-  totalPackets: number;
-  preloadPercent: number;
-  hasDeterministicPreloadProgress: boolean;
-}
-
-export function WorkspacePreloadProgress({
-  preloadProcessed,
-  preloadTotal,
-  totalPackets,
-  preloadPercent,
-  hasDeterministicPreloadProgress,
-}: WorkspacePreloadProgressProps) {
-  return (
-    <div className="border-b border-blue-100 bg-white/78 px-3 py-2 backdrop-blur-xl">
-      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>正在预加载全部流量</span>
-        <span>
-          {hasDeterministicPreloadProgress
-            ? `${preloadProcessed.toLocaleString()} / ${Math.max(preloadTotal, totalPackets).toLocaleString()} (${preloadPercent}%)`
-            : `已入库 ${Math.max(preloadProcessed, totalPackets).toLocaleString()} 包，正在继续解析...`}
-        </span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded bg-muted">
-        {hasDeterministicPreloadProgress ? (
-          <div className="h-full bg-blue-600 transition-all" style={{ width: `${preloadPercent}%` }} />
-        ) : (
-          <div className="h-full w-1/3 animate-pulse rounded bg-blue-600/80" />
-        )}
-      </div>
-    </div>
-  );
-}
-
 interface WorkspacePanelsProps {
   showFilterLoadingBlankState: boolean;
   filterLoadingTitle: string;

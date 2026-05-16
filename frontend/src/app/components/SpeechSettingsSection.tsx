@@ -2,6 +2,7 @@ import { Bot, FolderCog, MicVocal } from "lucide-react";
 
 import { RuntimeDependencyCard } from "./RuntimeDependencyCard";
 import { pythonPathHint, voskModelPathHint } from "./RuntimeSettingsHints";
+import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
 import type { SpeechSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 
@@ -11,15 +12,13 @@ export function SpeechSettingsSection({
   speechIssues,
   speechSummary,
   setForm,
+  unknownStateText,
 }: SpeechSettingsSectionProps) {
   return (
-    <section className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)]">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-          <Bot className="h-4 w-4" />
-        </div>
+    <RuntimeSettingsSectionShell>
+      <RuntimeSettingsSectionTitle Icon={Bot} iconClassName="bg-rose-50 text-rose-600">
         离线语音转写
-      </div>
+      </RuntimeSettingsSectionTitle>
       <div className="grid grid-cols-1 gap-3">
         <Field
           label="显式配置：Python 路径"
@@ -41,6 +40,7 @@ export function SpeechSettingsSection({
         available={snapshot?.speech.available}
         known={Boolean(snapshot)}
         message={speechSummary}
+        unknownStateText={unknownStateText}
         path={snapshot?.speech.pythonCommand || snapshot?.speech.modelPath}
         preferMessageWhenUnavailable
       />
@@ -72,6 +72,6 @@ export function SpeechSettingsSection({
           value={snapshot?.speech.modelPath || form.voskModelPath || "等待检测"}
         />
       </div>
-    </section>
+    </RuntimeSettingsSectionShell>
   );
 }

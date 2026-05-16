@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from "react";
 import { backendClients } from "../integrations/backendClients";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
@@ -32,9 +32,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     preloadTotal,
     preloadProcessedRef,
     preloadTotalRef,
+    capturePreloadDiagnostics,
     setIsPreloadingCapture,
     setPreloadProcessed,
     setPreloadTotal,
+    setCapturePreloadDiagnostics,
   } = useCapturePreloadState();
   const { captureTransaction, setCaptureTransaction, fileMeta, setFileMeta, captureRevision, setCaptureRevision } =
     useCaptureSessionState();
@@ -82,6 +84,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     isToolRuntimeLoading,
     refreshToolRuntimeSnapshot,
     saveToolRuntimeConfig,
+    toolRuntimeProbeState,
+    toolRuntimeProbeTransport,
+    lastToolRuntimeProbeError,
   } = useBackendLifecycle({
     activeCapturePathRef,
     captureWaitersRef,
@@ -304,6 +309,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setBackendStatus,
       setCaptureRevision,
       setCaptureTransaction,
+      setCapturePreloadDiagnostics,
       setFileMeta,
       setHasMorePackets,
       setHasPrevPackets,
@@ -355,6 +361,12 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 
   const openCapture = useOpenCaptureAction({ setDisplayFilter, startCapture });
 
+  const retryCapturePreloadConfirm = useCallback(async () => {
+    setBackendStatus("正在重新确认预加载状态");
+    wakeCaptureWaiters();
+    return true;
+  }, [setBackendStatus, wakeCaptureWaiters]);
+
   const stopCapture = useCaptureStopWorkflow({
     backendConnected,
     captureSeqRef,
@@ -382,6 +394,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
+      capturePreloadDiagnostics,
       filteredPackets,
       hasMorePackets,
       hasPrevPackets,
@@ -422,6 +435,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       recentCaptures,
       openCapture,
       stopCapture,
+      retryCapturePreloadConfirm,
       preparePacketStream,
       backendConnected,
       backendStatus,
@@ -429,6 +443,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       tsharkStatus,
       isTSharkChecking,
       toolRuntimeCheckDegraded,
+      toolRuntimeProbeState,
+      toolRuntimeProbeTransport,
+      lastToolRuntimeProbeError,
       setTSharkPath,
       toolRuntimeSnapshot,
       isToolRuntimeLoading,
@@ -444,6 +461,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isPreloadingCapture,
       preloadProcessed,
       preloadTotal,
+      capturePreloadDiagnostics,
       hasMorePackets,
       hasPrevPackets,
       isPageLoading,
@@ -482,6 +500,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       recentCaptures,
       openCapture,
       stopCapture,
+      retryCapturePreloadConfirm,
       preparePacketStream,
       backendConnected,
       backendStatus,
@@ -489,6 +508,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       tsharkStatus,
       isTSharkChecking,
       toolRuntimeCheckDegraded,
+      toolRuntimeProbeState,
+      toolRuntimeProbeTransport,
+      lastToolRuntimeProbeError,
       setTSharkPath,
       toolRuntimeSnapshot,
       isToolRuntimeLoading,

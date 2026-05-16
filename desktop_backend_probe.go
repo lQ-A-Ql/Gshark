@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	neturl "net/url"
+	"os"
 	"strings"
 )
 
@@ -41,5 +42,6 @@ func probeReusableBackendAt(ctx context.Context, addr, baseURL, token string) er
 	if !strings.EqualFold(identity.Service, "gshark-sentinel") {
 		return fmt.Errorf("runtime identity mismatch: unexpected service %q", identity.Service)
 	}
+	fmt.Fprintf(os.Stdout, "desktop startup: reusable backend identity service=%q build_id=%q exe=%q cwd=%q started_at=%q\n", identity.Service, identity.BuildID, identity.ExecutablePath, identity.WorkingDir, identity.StartedAt)
 	return nil
 }

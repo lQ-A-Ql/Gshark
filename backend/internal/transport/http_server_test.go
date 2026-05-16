@@ -162,6 +162,7 @@ func TestWithAuthAllowsTrustedDesktopOriginWithoutToken(t *testing.T) {
 }
 
 func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
+	t.Setenv("GSHARK_BACKEND_BUILD_ID", "test-build-id")
 	server := &Server{}
 	server.SetAuthToken("secret-token")
 
@@ -182,6 +183,18 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	}
 	if got := payload["auth_enabled"]; got != true {
 		t.Fatalf("unexpected auth_enabled value: %#v", got)
+	}
+	if got := payload["build_id"]; got != "test-build-id" {
+		t.Fatalf("unexpected build_id value: %#v", got)
+	}
+	if got := strings.TrimSpace(payload["executable_path"].(string)); got == "" {
+		t.Fatalf("expected executable_path to be populated")
+	}
+	if got := strings.TrimSpace(payload["working_dir"].(string)); got == "" {
+		t.Fatalf("expected working_dir to be populated")
+	}
+	if got := strings.TrimSpace(payload["started_at"].(string)); got == "" {
+		t.Fatalf("expected started_at to be populated")
 	}
 }
 
