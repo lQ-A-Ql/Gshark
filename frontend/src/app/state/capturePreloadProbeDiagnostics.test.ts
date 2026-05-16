@@ -93,4 +93,48 @@ describe("capturePreloadProbe diagnostics", () => {
 
     await expect(resolveCapturePreloadFirstPage(options)).rejects.toThrow("后端当前抓包与本次打开文件不一致");
   });
+
+  it("reports backend parsing when committed page and status are still empty but active load matches", async () => {
+    const onDiagnostics = vi.fn();
+    const options = createOptions({
+      parseFinishedRef: { current: false },
+      listPacketsPage: vi.fn(async () => createPage({ items: [], total: 0 })),
+      getCaptureStatus: vi.fn(async () =>
+        createStatus({
+          filePath: "",
+          hasCapture: false,
+          packetCount: 0,
+          load: {
+            runId: 3,
+            filePath: opened.filePath,
+            phase: "parsing",
+            parserProfile: "first_screen",
+            estimatedTotal: 100,
+            processed: 40,
+            accepted: 38,
+            stagedCount: 32,
+            lastError: "",
+            startedAt: "",
+            updatedAt: "",
+            completedAt: "",
+          },
+        }),
+      ),
+      onDiagnostics,
+      now: vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(200),
+    });
+
+    await expect(resolveCapturePreloadFirstPage(options)).rejects.toThrow(
+      "capture parsing timed out before preloading finished",
+    );
+    expect(onDiagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: "backend_parsing",
+        loadPhase: "parsing",
+        loadParserProfile: "first_screen",
+        loadProcessed: 40,
+        loadAccepted: 38,
+      }),
+    );
+  });
 });

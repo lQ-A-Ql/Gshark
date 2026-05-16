@@ -45,4 +45,21 @@ describe("RuntimeSettingsShell", () => {
 
     expect(screen.getByText(/最近一次探测失败（HTTP fallback）：后端鉴权失败/)).toBeInTheDocument();
   });
+
+  it("surfaces successful HTTP fallback diagnostics in the footer", () => {
+    render(
+      <RuntimeSettingsFooter
+        notice=""
+        backendConnected
+        probeState="ready"
+        probeTransport="http-fallback"
+        probeError=""
+        probeTransportError="runtime ipc unavailable"
+      />,
+    );
+
+    expect(
+      screen.getByText(/最近一次探测已通过 HTTP fallback 完成；备用链路原因：runtime ipc unavailable/),
+    ).toBeInTheDocument();
+  });
 });

@@ -20,6 +20,10 @@ type Status struct {
 	Capabilities
 }
 
+type StatusOptions struct {
+	ProbeCapabilities bool
+}
+
 var (
 	binaryMu         sync.RWMutex
 	configuredBinary string
@@ -66,6 +70,10 @@ func CurrentStatus() Status {
 }
 
 func CurrentStatusWithContext(ctx context.Context) Status {
+	return CurrentStatusWithOptions(ctx, StatusOptions{ProbeCapabilities: true})
+}
+
+func CurrentStatusWithOptions(ctx context.Context, opts StatusOptions) Status {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -80,7 +88,7 @@ func CurrentStatusWithContext(ctx context.Context) Status {
 				Message:         "ok",
 				CustomPath:      custom,
 				UsingCustomPath: true,
-				Capabilities:    CurrentCapabilities(ctx, resolved),
+				Capabilities:    capabilitiesForStatus(ctx, resolved, opts),
 			}
 		}
 
@@ -92,7 +100,7 @@ func CurrentStatusWithContext(ctx context.Context) Status {
 				Message:         fmt.Sprintf("custom tshark path is invalid; falling back to PATH (%s)", err),
 				CustomPath:      custom,
 				UsingCustomPath: false,
-				Capabilities:    CurrentCapabilities(ctx, fallback),
+				Capabilities:    capabilitiesForStatus(ctx, fallback, opts),
 			}
 		}
 
@@ -127,8 +135,18 @@ func CurrentStatusWithContext(ctx context.Context) Status {
 		Available:    true,
 		Path:         resolved,
 		Message:      "ok",
-		Capabilities: CurrentCapabilities(ctx, resolved),
+		Capabilities: capabilitiesForStatus(ctx, resolved, opts),
 	}
+}
+
+func capabilitiesForStatus(ctx context.Context, binary string, opts StatusOptions) Capabilities {
+	if !opts.ProbeCapabilities {
+		return Capabilities{
+			FieldProfile:      "pending",
+			CapabilityMessage: "完整 TShark 字段能力探测后台进行中",
+		}
+	}
+	return CurrentCapabilities(ctx, binary)
 }
 
 func resolvePathBinary(name string) (string, error) {

@@ -24,6 +24,7 @@ export function RuntimeSettingsSidebar() {
     dirty,
     form,
     notice,
+    probeTransportError,
     setForm,
     speechIssues,
     speechSummary,
@@ -45,7 +46,7 @@ export function RuntimeSettingsSidebar() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <RuntimeSettingsActions
           busy={busy}
-          loading={isToolRuntimeLoading}
+          loading={isToolRuntimeLoading || toolRuntimeProbeState === "probing_full"}
           backendConnected={backendConnected}
           dirty={dirty}
           onRefresh={() => void refresh()}
@@ -92,6 +93,8 @@ export function RuntimeSettingsSidebar() {
         probeState={toolRuntimeProbeState}
         probeTransport={toolRuntimeProbeTransport}
         probeError={lastToolRuntimeProbeError}
+        probeTransportError={probeTransportError}
+        snapshot={toolRuntimeSnapshot}
       />
     </div>
   );

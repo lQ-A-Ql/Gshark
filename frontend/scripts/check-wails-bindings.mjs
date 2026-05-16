@@ -12,13 +12,18 @@ const requiredMethods = [
   "OpenDBCDialog",
   "IsBackendReady",
   "GetToolRuntimeSnapshot",
+  "GetToolRuntimeSnapshotFast",
+  "GetToolRuntimeSnapshotFull",
   "UpdateToolRuntimeConfig",
+  "UpdateToolRuntimeConfigFast",
+  "UpdateToolRuntimeConfigFull",
   "SetTSharkPath",
   "StartCapture",
   "StopCapture",
   "PrepareCaptureReplacement",
   "CloseCapture",
   "GetCaptureStatus",
+  "ListPacketsPage",
   "GetTLSConfig",
   "UpdateTLSConfig",
   "CheckAppUpdate",
@@ -27,7 +32,7 @@ const requiredMethods = [
 
 const generatedDts = readFileSync(resolve(root, "wailsjs/go/main/DesktopApp.d.ts"), "utf8");
 const generatedJs = readFileSync(resolve(root, "wailsjs/go/main/DesktopApp.js"), "utf8");
-const bridgeTypes = readFileSync(resolve(root, "src/app/integrations/bridgeTypes.ts"), "utf8");
+const bridgeTypes = readFileSync(resolve(root, "src/app/integrations/desktopTransportBinding.ts"), "utf8");
 
 const failures = [];
 

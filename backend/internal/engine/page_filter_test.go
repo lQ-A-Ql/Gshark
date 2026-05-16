@@ -79,6 +79,57 @@ func TestPacketStorePageSummariesStripPayload(t *testing.T) {
 	}
 }
 
+func TestPacketStoreUpdatePacketEnrichment(t *testing.T) {
+	store, err := newPacketStore()
+	if err != nil {
+		t.Fatalf("newPacketStore() error = %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Append([]model.Packet{{ID: 1, Protocol: "UDP", Info: "summary"}}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	updated, err := store.UpdatePacketEnrichment(model.Packet{
+		ID:            1,
+		UDPPayloadHex: "de:ad:be:ef",
+		IPHeaderLen:   20,
+		L4HeaderLen:   8,
+		Color:         model.PacketColorFeatures{ChecksumBad: true},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePacketEnrichment() error = %v", err)
+	}
+	if !updated {
+		t.Fatal("expected existing packet to be updated")
+	}
+	packet, ok, err := store.PacketByID(1)
+	if err != nil {
+		t.Fatalf("PacketByID() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("expected packet to exist")
+	}
+	if packet.UDPPayloadHex != "de:ad:be:ef" || packet.IPHeaderLen != 20 || packet.L4HeaderLen != 8 || !packet.Color.ChecksumBad {
+		t.Fatalf("unexpected enriched packet: %+v", packet)
+	}
+}
+
+func TestPacketStoreUpdatePacketEnrichmentIgnoresMissingPacket(t *testing.T) {
+	store, err := newPacketStore()
+	if err != nil {
+		t.Fatalf("newPacketStore() error = %v", err)
+	}
+	defer store.Close()
+
+	updated, err := store.UpdatePacketEnrichment(model.Packet{ID: 404, Color: model.PacketColorFeatures{TCPRST: true}})
+	if err != nil {
+		t.Fatalf("UpdatePacketEnrichment() error = %v", err)
+	}
+	if updated {
+		t.Fatal("expected missing packet update to be ignored")
+	}
+}
+
 func TestPacketStoreTopUDPDestinationPorts(t *testing.T) {
 	store, err := newPacketStore()
 	if err != nil {
@@ -294,6 +345,75 @@ func TestClearCaptureCancelsActiveLoad(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("expected active load goroutine to exit after close")
+	}
+}
+
+func TestCaptureStatusReportsActiveFirstScreenLoad(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldFirstScreen := streamPacketsFirstFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFirstFn = oldFirstScreen
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 5, nil
+	}
+	started := make(chan struct{})
+	streamPacketsFirstFn = func(ctx context.Context, opts model.ParseOptions, _ func(model.Packet) error, onProgress func(int)) error {
+		if opts.ListProfile != "first_screen" {
+			t.Fatalf("expected first_screen profile, got %q", opts.ListProfile)
+		}
+		if onProgress != nil {
+			onProgress(2)
+		}
+		close(started)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+	capture := writeTempCaptureFile(t)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture, ListProfile: "first_screen"})
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("expected first-screen parser to start")
+	}
+
+	status := svc.CaptureStatus()
+	if status.HasCapture || status.PacketCount != 0 || status.FilePath != "" {
+		t.Fatalf("expected committed capture to remain empty while parsing, got %+v", status)
+	}
+	if status.Load == nil {
+		t.Fatal("expected active load status while parsing")
+	}
+	if status.Load.Phase != string(model.CaptureLoadParsing) {
+		t.Fatalf("expected parsing phase, got %+v", status.Load)
+	}
+	if status.Load.FilePath != capture || status.Load.ParserProfile != "first_screen" {
+		t.Fatalf("unexpected load identity: %+v", status.Load)
+	}
+	if status.Load.EstimatedTotal != 5 || status.Load.Processed != 2 {
+		t.Fatalf("unexpected load progress: %+v", status.Load)
+	}
+
+	if err := svc.ClearCapture(); err != nil {
+		t.Fatalf("ClearCapture() error = %v", err)
+	}
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected canceled load, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected first-screen load to exit after clear")
 	}
 }
 

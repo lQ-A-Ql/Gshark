@@ -1,6 +1,14 @@
 import { isOperationTimeoutError } from "../utils/asyncControl";
 
-export type ToolRuntimeProbeState = "idle" | "probing" | "ready" | "failed";
+export type ToolRuntimeProbeState =
+  | "idle"
+  | "probing"
+  | "probing_fast"
+  | "partial"
+  | "probing_full"
+  | "ready"
+  | "timeout_background"
+  | "failed";
 export type ToolRuntimeProbeTransport = "desktop-ipc" | "http-fallback" | "unknown";
 
 export function detectToolRuntimeProbeTransport(): ToolRuntimeProbeTransport {
@@ -8,7 +16,7 @@ export function detectToolRuntimeProbeTransport(): ToolRuntimeProbeTransport {
     return "unknown";
   }
   const desktopApp = (window as any)?.go?.main?.DesktopApp;
-  return desktopApp?.GetToolRuntimeSnapshot ? "desktop-ipc" : "http-fallback";
+  return desktopApp?.GetToolRuntimeSnapshotFast || desktopApp?.GetToolRuntimeSnapshot ? "desktop-ipc" : "http-fallback";
 }
 
 export function describeToolRuntimeProbeError(error: unknown): string {
@@ -24,9 +32,16 @@ export function describeToolRuntimeProbeError(error: unknown): string {
 export function toolRuntimeProbeStateText(state: ToolRuntimeProbeState): string {
   switch (state) {
     case "probing":
+    case "probing_fast":
       return "探测中";
+    case "partial":
+      return "快速状态已就绪";
+    case "probing_full":
+      return "完整探测中";
     case "ready":
       return "已就绪";
+    case "timeout_background":
+      return "后台探测中";
     case "failed":
       return "探测失败";
     default:

@@ -4,6 +4,7 @@ import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient"
 import { backendClients } from "../../integrations/backendClients";
 import { isOperationTimeoutError, withAbortableTimeout } from "../../utils/asyncControl";
 import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
+import { FULL_TOOL_RUNTIME_TIMEOUT_MS } from "../toolRuntimeProbeActions";
 import { toTSharkStatus } from "../tsharkStatusState";
 import {
   describeToolRuntimeProbeError,
@@ -41,7 +42,7 @@ export function applyStartupRuntimeSnapshot({
   if (isCancelled()) return;
   setToolRuntimeSnapshot(snapshot);
   setTsharkStatus(toTSharkStatus(snapshot.tshark));
-  setToolRuntimeProbeState("ready");
+  setToolRuntimeProbeState(snapshot.probeMode === "fast" ? "partial" : "ready");
   setLastToolRuntimeProbeError("");
   if (snapshot.tshark.available && snapshot.tshark.message && snapshot.tshark.message !== "ok") {
     setBackendStatus(snapshot.tshark.message);
@@ -109,16 +110,17 @@ export async function syncSavedToolRuntimeConfig({
 }: SyncSavedToolRuntimeConfigOptions) {
   if (isCancelled()) return;
   setIsToolRuntimeLoading(true);
-  setToolRuntimeProbeState("probing");
+  setToolRuntimeProbeState("probing_fast");
   setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
   setLastToolRuntimeProbeError("");
   try {
     const snapshot = await withAbortableTimeout(
-      (signal) => backendClients.runtime.updateToolRuntimeConfig(savedConfig, signal),
+      (signal) => backendClients.runtime.updateToolRuntimeConfig(savedConfig, signal, "fast"),
       STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
-      "startup tool runtime config sync timed out",
+      "startup fast tool runtime config sync timed out",
     );
     setToolRuntimeCheckDegraded(false);
+    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
     applyStartupRuntimeSnapshot({
       isCancelled,
       setBackendStatus,
@@ -129,6 +131,18 @@ export async function syncSavedToolRuntimeConfig({
       snapshot,
     });
     if (!isCancelled()) writeUserToolRuntimeConfig(snapshot.config, explicitFields);
+    if (!isCancelled()) {
+      void loadFullToolRuntimeInBackground({
+        isCancelled,
+        setBackendStatus,
+        setToolRuntimeSnapshot,
+        setTsharkStatus,
+        setToolRuntimeProbeState,
+        setToolRuntimeProbeTransport,
+        setLastToolRuntimeProbeError,
+        setToolRuntimeCheckDegraded,
+      });
+    }
   } catch (error) {
     markRuntimeProbeFailure({
       error,
@@ -144,6 +158,50 @@ export async function syncSavedToolRuntimeConfig({
     });
   } finally {
     if (!isCancelled()) setIsToolRuntimeLoading(false);
+  }
+}
+
+interface FullToolRuntimeBackgroundOptions extends Omit<ApplyStartupRuntimeSnapshotOptions, "snapshot"> {
+  readonly setToolRuntimeProbeTransport: Dispatch<SetStateAction<ToolRuntimeProbeTransport>>;
+  readonly setToolRuntimeCheckDegraded: Dispatch<SetStateAction<boolean>>;
+}
+
+export async function loadFullToolRuntimeInBackground({
+  isCancelled,
+  setBackendStatus,
+  setToolRuntimeSnapshot,
+  setTsharkStatus,
+  setToolRuntimeProbeState,
+  setToolRuntimeProbeTransport,
+  setLastToolRuntimeProbeError,
+  setToolRuntimeCheckDegraded,
+}: FullToolRuntimeBackgroundOptions) {
+  if (isCancelled()) return;
+  setToolRuntimeProbeState("probing_full");
+  setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
+  try {
+    const snapshot = await withAbortableTimeout(
+      (signal) => backendClients.runtime.getToolRuntimeSnapshot(signal, "full"),
+      FULL_TOOL_RUNTIME_TIMEOUT_MS,
+      "background full tool runtime check timed out",
+    );
+    setToolRuntimeCheckDegraded(false);
+    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+    applyStartupRuntimeSnapshot({
+      isCancelled,
+      setBackendStatus,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+      setToolRuntimeProbeState,
+      setLastToolRuntimeProbeError,
+      snapshot,
+    });
+  } catch (error) {
+    if (isCancelled()) return;
+    setToolRuntimeCheckDegraded(true);
+    setToolRuntimeProbeState("timeout_background");
+    setLastToolRuntimeProbeError(describeToolRuntimeProbeError(error));
+    setBackendStatus(`完整运行时组件探测仍在后台进行：${describeToolRuntimeProbeError(error)}`);
   }
 }
 

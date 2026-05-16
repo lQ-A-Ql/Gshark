@@ -22,12 +22,24 @@ export function GetCaptureStatus() {
   return window['go']['main']['DesktopApp']['GetCaptureStatus']();
 }
 
+export function ListPacketsPage(cursor, limit, filter) {
+  return window['go']['main']['DesktopApp']['ListPacketsPage'](cursor, limit, filter);
+}
+
 export function GetTLSConfig() {
   return window['go']['main']['DesktopApp']['GetTLSConfig']();
 }
 
 export function GetToolRuntimeSnapshot() {
   return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshot']();
+}
+
+export function GetToolRuntimeSnapshotFast() {
+  return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshotFast']();
+}
+
+export function GetToolRuntimeSnapshotFull() {
+  return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshotFull']();
 }
 
 export function InstallAppUpdate() {
@@ -68,4 +80,12 @@ export function UpdateTLSConfig(cfg) {
 
 export function UpdateToolRuntimeConfig(cfg) {
   return window['go']['main']['DesktopApp']['UpdateToolRuntimeConfig'](cfg);
+}
+
+export function UpdateToolRuntimeConfigFast(cfg) {
+  return window['go']['main']['DesktopApp']['UpdateToolRuntimeConfigFast'](cfg);
+}
+
+export function UpdateToolRuntimeConfigFull(cfg) {
+  return window['go']['main']['DesktopApp']['UpdateToolRuntimeConfigFull'](cfg);
 }

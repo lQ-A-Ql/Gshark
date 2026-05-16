@@ -1,10 +1,12 @@
 import { RefreshCw, Save, Sparkles } from "lucide-react";
 
+import type { ToolRuntimeSnapshot } from "../core/types";
 import {
   toolRuntimeProbeTransportText,
   type ToolRuntimeProbeState,
   type ToolRuntimeProbeTransport,
 } from "../state/toolRuntimeProbeState";
+import { buildRuntimeProbeDiagnostics } from "./runtimeProbeDiagnosticsText";
 
 export function RuntimeSettingsActions({
   busy,
@@ -49,19 +51,30 @@ export function RuntimeSettingsFooter({
   probeState,
   probeTransport,
   probeError,
+  probeTransportError,
+  snapshot,
 }: {
   notice: string;
   backendConnected: boolean;
   probeState: ToolRuntimeProbeState;
   probeTransport: ToolRuntimeProbeTransport;
   probeError: string;
+  probeTransportError?: string;
+  snapshot?: ToolRuntimeSnapshot | null;
 }) {
+  const diagnosticsText = buildRuntimeProbeDiagnostics(snapshot);
   const probeText =
     probeState === "failed"
       ? `最近一次探测失败（${toolRuntimeProbeTransportText(probeTransport)}）：${probeError || "未知错误"}`
-      : probeState === "probing"
-        ? `正在通过 ${toolRuntimeProbeTransportText(probeTransport)} 探测运行时组件。`
-        : "";
+      : probeState === "probing" || probeState === "probing_fast"
+        ? `正在通过 ${toolRuntimeProbeTransportText(probeTransport)} 快速探测运行时组件。`
+        : probeState === "probing_full"
+          ? `快速状态已可用，正在后台执行完整能力探测。${diagnosticsText ? ` ${diagnosticsText}` : ""}`
+          : probeState === "timeout_background"
+            ? `完整能力探测仍在后台进行：${probeError || "慢探测尚未返回"}`
+            : probeTransportError
+              ? `最近一次探测已通过 ${toolRuntimeProbeTransportText(probeTransport)} 完成；备用链路原因：${probeTransportError}`
+              : diagnosticsText;
   return (
     <div className="border-t border-slate-200 bg-white/90 px-5 py-4">
       <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-500">

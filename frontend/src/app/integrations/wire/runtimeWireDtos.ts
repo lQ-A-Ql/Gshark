@@ -65,4 +65,10 @@ export interface ToolRuntimeSnapshotWireDTO extends Record<string, unknown> {
   ffmpeg?: unknown;
   speech?: unknown;
   yara?: unknown;
+  probe_mode?: unknown;
+  probe_state?: unknown;
+  probe_timings?: unknown;
+  probe_errors?: unknown;
+  cached?: unknown;
+  updated_at?: unknown;
 }

@@ -36,6 +36,11 @@ export const sourceSizeBudgets = [
     reason: "bridge type composition should stay focused on client interfaces and compatibility transport binding",
   },
   {
+    path: "src/app/integrations/desktopTransportBinding.ts",
+    maxLines: 35,
+    reason: "desktop transport binding should stay as a Wails method surface contract",
+  },
+  {
     path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",
     maxLines: 110,
     reason: "C2 decrypt display mapper should stay focused on result-level record filtering and notes",
@@ -361,6 +366,16 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/runtimeMapper.ts",
     maxLines: 65,
     reason: "runtime mapper should keep tool runtime snapshot conversion local and re-export speech batch mapping",
+  },
+  {
+    path: "src/app/integrations/mappers/runtimeComponentMapper.ts",
+    maxLines: 65,
+    reason: "runtime component mapper should isolate FFmpeg, speech, YARA, and config field conversion",
+  },
+  {
+    path: "src/app/integrations/mappers/runtimeDiagnosticsMapper.ts",
+    maxLines: 30,
+    reason: "runtime diagnostics mapper should only normalize timing and error records",
   },
   {
     path: "src/app/integrations/mappers/tsharkStatusMapper.ts",

@@ -188,3 +188,56 @@ func TestLoadPCAPSkipsEstimateForLargeFastListCapture(t *testing.T) {
 		t.Fatalf("expected streamed packet to be persisted, got %+v", packets)
 	}
 }
+
+func TestLoadPCAPFirstScreenProfileUsesLightweightParser(t *testing.T) {
+	oldEstimate := estimatePacketsFn
+	oldFirst := streamPacketsFirstFn
+	oldFast := streamPacketsFastFn
+	t.Cleanup(func() {
+		estimatePacketsFn = oldEstimate
+		streamPacketsFirstFn = oldFirst
+		streamPacketsFastFn = oldFast
+	})
+
+	estimatePacketsFn = func(context.Context, model.ParseOptions) (int, error) {
+		return 1, nil
+	}
+	firstCalls := 0
+	streamPacketsFirstFn = func(_ context.Context, opts model.ParseOptions, onPacket func(model.Packet) error, onProgress func(int)) error {
+		firstCalls++
+		if opts.ListProfile != "first_screen" {
+			t.Fatalf("expected first_screen list profile, got %q", opts.ListProfile)
+		}
+		if onProgress != nil {
+			onProgress(1)
+		}
+		return onPacket(model.Packet{ID: 11, Protocol: "TCP", Info: "first screen packet"})
+	}
+	streamPacketsFastFn = func(context.Context, model.ParseOptions, func(model.Packet) error, func(int)) error {
+		t.Fatal("full fast parser should not block first-screen profile")
+		return nil
+	}
+
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
+		FilePath:    "first-screen.pcap",
+		FastList:    true,
+		ListProfile: "first_screen",
+		MaxPackets:  0,
+		EmitPackets: false,
+	}); err != nil {
+		t.Fatalf("LoadPCAP() error = %v", err)
+	}
+	if firstCalls != 1 {
+		t.Fatalf("expected first-screen parser call, got %d", firstCalls)
+	}
+	status := svc.CaptureStatus()
+	if !status.HasCapture || status.PacketCount != 1 || status.FilePath != "first-screen.pcap" {
+		t.Fatalf("expected committed first-screen capture, got %+v", status)
+	}
+	if status.Load == nil || status.Load.Phase != string(model.CaptureLoadReady) || status.Load.ParserProfile != "first_screen" {
+		t.Fatalf("expected ready first-screen load status, got %+v", status.Load)
+	}
+}

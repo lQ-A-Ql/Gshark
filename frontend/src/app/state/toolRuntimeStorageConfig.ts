@@ -114,6 +114,14 @@ export function explicitFieldsForUserConfig(): ToolRuntimeConfigExplicitFields {
   ) as ToolRuntimeConfigExplicitFields;
 }
 
+export function explicitFieldsFromPatch(patch: Partial<ToolRuntimeConfig>): ToolRuntimeConfigExplicitFields {
+  const fields: ToolRuntimeConfigExplicitFields = {};
+  for (const field of TOOL_RUNTIME_CONFIG_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(patch, field)) fields[field] = true;
+  }
+  return fields;
+}
+
 export function explicitFieldsFromLegacyConfig(config: ToolRuntimeConfig): ToolRuntimeConfigExplicitFields {
   const fields: ToolRuntimeConfigExplicitFields = {};
   if (config.tsharkPath) fields.tsharkPath = true;

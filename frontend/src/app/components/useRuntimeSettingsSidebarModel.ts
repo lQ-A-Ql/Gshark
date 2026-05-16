@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ToolRuntimeConfig } from "../core/types";
 import { useSentinel } from "../state/SentinelContext";
 import { toolRuntimeProbeStateText } from "../state/toolRuntimeProbeState";
+import { TOOL_RUNTIME_CONFIG_FIELDS } from "../state/toolRuntimeStorageConfig";
+import type { ToolRuntimeConfigExplicitFields } from "../state/toolRuntimeStorageConfig";
 import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
 import { normalizeConfig } from "./RuntimeSettingsSidebarParts";
 
@@ -20,6 +22,10 @@ export function useRuntimeSettingsSidebarModel() {
     const base = normalizeConfig(runtime.toolRuntimeSnapshot?.config);
     return JSON.stringify(base) !== JSON.stringify(form);
   }, [form, runtime.toolRuntimeSnapshot?.config]);
+  const dirtyFields = useMemo(
+    () => buildDirtyRuntimeFields(normalizeConfig(runtime.toolRuntimeSnapshot?.config), form),
+    [form, runtime.toolRuntimeSnapshot?.config],
+  );
 
   const speechIssues = useMemo(() => buildSpeechIssues(runtime.toolRuntimeSnapshot), [runtime.toolRuntimeSnapshot]);
   const unknownMessage = useMemo(() => {
@@ -27,7 +33,14 @@ export function useRuntimeSettingsSidebarModel() {
     if (runtime.toolRuntimeProbeState === "failed") {
       return runtime.lastToolRuntimeProbeError || "运行时组件探测失败，请重试。";
     }
-    return runtime.toolRuntimeProbeState === "probing" ? "正在探测运行时组件" : "等待首次探测";
+    if (runtime.toolRuntimeProbeState === "probing" || runtime.toolRuntimeProbeState === "probing_fast") {
+      return "正在快速探测运行时组件";
+    }
+    if (runtime.toolRuntimeProbeState === "probing_full") return "快速状态已可用，完整能力探测后台进行中";
+    if (runtime.toolRuntimeProbeState === "timeout_background") {
+      return runtime.lastToolRuntimeProbeError || "完整能力探测仍在后台进行";
+    }
+    return runtime.toolRuntimeProbeState === "partial" ? "快速状态已可用" : "等待首次探测";
   }, [runtime.backendConnected, runtime.lastToolRuntimeProbeError, runtime.toolRuntimeProbeState]);
 
   const speechSummary = useMemo(() => {
@@ -42,7 +55,7 @@ export function useRuntimeSettingsSidebarModel() {
     setBusy(true);
     setNotice("");
     try {
-      const snapshot = await runtime.saveToolRuntimeConfig(form);
+      const snapshot = await runtime.saveToolRuntimeConfig(form, dirtyFields);
       setForm(normalizeConfig(snapshot.config));
       setNotice("工具路径已保存并应用。");
     } catch (error) {
@@ -72,6 +85,7 @@ export function useRuntimeSettingsSidebarModel() {
     dirty,
     form,
     notice,
+    probeTransportError: runtime.toolRuntimeSnapshot?.transportError ?? "",
     setForm,
     speechIssues,
     speechSummary,
@@ -80,4 +94,20 @@ export function useRuntimeSettingsSidebarModel() {
     refresh,
     save,
   };
+}
+
+function buildDirtyRuntimeFields(base: ToolRuntimeConfig, form: ToolRuntimeConfig): ToolRuntimeConfigExplicitFields {
+  const fields: ToolRuntimeConfigExplicitFields = {};
+  for (const field of TOOL_RUNTIME_CONFIG_FIELDS) {
+    if (normalizeFieldValue(base[field]) !== normalizeFieldValue(form[field])) {
+      fields[field] = true;
+    }
+  }
+  return fields;
+}
+
+function normalizeFieldValue(value: ToolRuntimeConfig[keyof ToolRuntimeConfig]): string {
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(Number(value) || 0);
+  return String(value ?? "").trim();
 }

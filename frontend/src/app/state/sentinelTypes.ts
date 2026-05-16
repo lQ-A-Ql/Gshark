@@ -17,6 +17,7 @@ import type { CaptureFileMeta } from "./captureOpenState";
 import type { CapturePreloadDiagnostics } from "./capturePreloadDiagnostics";
 import type { StreamIds } from "./streamState";
 import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "./toolRuntimeProbeState";
+import type { ToolRuntimeConfigExplicitFields } from "./toolRuntimeStorageConfig";
 
 export interface PreparedPacketStream {
   packet: Packet | null;
@@ -105,5 +106,8 @@ export interface SentinelContextValue {
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;
   refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;
-  saveToolRuntimeConfig: (patch: Partial<ToolRuntimeConfig>) => Promise<ToolRuntimeSnapshot>;
+  saveToolRuntimeConfig: (
+    patch: Partial<ToolRuntimeConfig>,
+    explicitFields?: ToolRuntimeConfigExplicitFields,
+  ) => Promise<ToolRuntimeSnapshot>;
 }

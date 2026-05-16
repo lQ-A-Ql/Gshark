@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -33,12 +34,37 @@ const (
 )
 
 var (
-	resolveSpeechPythonCommandFn  = resolveSpeechPythonCommand
-	pythonCommandProbeFn          = pythonCommandCanStart
-	checkPythonVoskAvailabilityFn = checkPythonVoskAvailability
-	speechToTextStatusFn          = resolveSpeechToTextStatus
-	runSpeechToTextFn             = transcribeAudioFileWithPython
-	transcribeAudioArtifactFn     = transcribeAudioArtifact
+	resolveSpeechPythonCommandFn        = resolveSpeechPythonCommand
+	resolveSpeechPythonCommandContextFn = resolveSpeechPythonCommandWithContext
+	pythonCommandProbeFn                = pythonCommandCanStart
+	checkPythonVoskAvailabilityFn       = checkPythonVoskAvailability
+	speechToTextStatusFn                = resolveSpeechToTextStatus
+	runSpeechToTextFn                   = transcribeAudioFileWithPython
+	transcribeAudioArtifactFn           = transcribeAudioArtifact
+)
+
+type SpeechStatusOptions struct {
+	Fast            bool
+	FFmpegAvailable *bool
+}
+
+type speechPythonCacheEntry struct {
+	key       string
+	cmd       []string
+	err       string
+	expiresAt time.Time
+}
+
+type speechVoskCacheEntry struct {
+	err       string
+	expiresAt time.Time
+}
+
+var (
+	speechProbeCacheMu    sync.Mutex
+	speechPythonCache     speechPythonCacheEntry
+	speechVoskImportCache = map[string]speechVoskCacheEntry{}
+	speechProbeCacheTTL   = 2 * time.Minute
 )
 
 type transcriptionAudioProfile struct {
@@ -57,6 +83,20 @@ const speechEnhancementFilter = "highpass=f=120,lowpass=f=3800,acompressor=thres
 func (s *Service) SpeechToTextStatus() model.SpeechToTextStatus {
 	status := speechToTextStatusFn()
 	status.FFmpegAvailable = s.ffmpegStatus().Available
+	if !status.FFmpegAvailable && strings.TrimSpace(status.Message) == "" {
+		status.Message = "未检测到 ffmpeg，请先安装 ffmpeg 或在设置中配置其路径。"
+	}
+	status.Available = status.PythonAvailable && status.VoskAvailable && status.ModelAvailable && status.FFmpegAvailable
+	return status
+}
+
+func (s *Service) SpeechToTextStatusWithContext(ctx context.Context, opts SpeechStatusOptions) model.SpeechToTextStatus {
+	status := resolveSpeechToTextStatusWithContext(ctx, opts)
+	if opts.FFmpegAvailable != nil {
+		status.FFmpegAvailable = *opts.FFmpegAvailable
+	} else {
+		status.FFmpegAvailable = s.ffmpegStatus().Available
+	}
 	if !status.FFmpegAvailable && strings.TrimSpace(status.Message) == "" {
 		status.Message = "未检测到 ffmpeg，请先安装 ffmpeg 或在设置中配置其路径。"
 	}
@@ -412,18 +452,39 @@ func normalizeSpeechBatchError(err error) string {
 }
 
 func resolveSpeechToTextStatus() model.SpeechToTextStatus {
+	return resolveSpeechToTextStatusWithResolver(context.Background(), SpeechStatusOptions{}, func(context.Context, bool) ([]string, error) {
+		return resolveSpeechPythonCommandFn()
+	})
+}
+
+func resolveSpeechToTextStatusWithContext(ctx context.Context, opts SpeechStatusOptions) model.SpeechToTextStatus {
+	return resolveSpeechToTextStatusWithResolver(ctx, opts, resolveSpeechPythonCommandContextFn)
+}
+
+func resolveSpeechToTextStatusWithResolver(
+	ctx context.Context,
+	opts SpeechStatusOptions,
+	resolvePython func(context.Context, bool) ([]string, error),
+) model.SpeechToTextStatus {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	status := model.SpeechToTextStatus{
 		Engine:    speechEngineName,
 		Language:  speechLanguageCode,
 		ModelPath: defaultSpeechModelPath(),
 	}
 
-	pythonCmd, err := resolveSpeechPythonCommandFn()
+	pythonCmd, err := resolvePython(ctx, !opts.Fast)
 	if err == nil {
 		status.PythonAvailable = true
 		status.PythonCommand = strings.Join(pythonCmd, " ")
 	} else {
-		status.Message = "未找到 Python 解释器，请先安装 Python 3 或在设置中配置其路径。"
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			status.Message = "Python 解释器探测已取消或超时。"
+		} else {
+			status.Message = "未找到 Python 解释器，请先安装 Python 3 或在设置中配置其路径。"
+		}
 		return status
 	}
 
@@ -433,11 +494,20 @@ func resolveSpeechToTextStatus() model.SpeechToTextStatus {
 		status.Message = "未检测到 Vosk 中文模型，请在设置中配置模型目录或放置到默认模型目录。"
 	}
 
+	if opts.Fast {
+		if status.Message == "" {
+			status.Message = "快速探测已确认 Python；vosk 包完整探测后台进行中。"
+		}
+		return status
+	}
+
 	if status.PythonAvailable {
-		checkCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		if err := checkPythonVoskAvailabilityFn(checkCtx, pythonCmd); err == nil {
+		if err := checkPythonVoskAvailabilityCached(checkCtx, pythonCmd); err == nil {
 			status.VoskAvailable = true
+		} else if ctxErr := ctx.Err(); ctxErr != nil && status.Message == "" {
+			status.Message = fmt.Sprintf("vosk 包探测已取消或超时：%v", ctxErr)
 		} else if status.Message == "" {
 			status.Message = buildSpeechModuleHint(pythonCmd, err)
 		}
@@ -450,34 +520,58 @@ func resolveSpeechToTextStatus() model.SpeechToTextStatus {
 }
 
 func resolveSpeechPythonCommand() ([]string, error) {
+	return resolveSpeechPythonCommandWithContext(context.Background(), true)
+}
+
+func resolveSpeechPythonCommandWithContext(ctx context.Context, preferVosk bool) ([]string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cacheKey := speechPythonCacheKey(preferVosk)
+	if cmd, err, ok := getSpeechPythonCache(cacheKey); ok {
+		return cmd, err
+	}
+
 	pythonEnvConfigured := strings.TrimSpace(os.Getenv(pythonEnvVar)) != ""
 	var firstRunnable []string
 	for _, candidate := range speechPythonCandidates() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if !pythonCommandExists(candidate) {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		err := pythonCommandProbeFn(ctx, candidate)
+		probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := pythonCommandProbeFn(probeCtx, candidate)
 		cancel()
 		if err == nil {
 			if pythonEnvConfigured {
+				storeSpeechPythonCache(cacheKey, candidate, nil)
 				return candidate, nil
 			}
 			if firstRunnable == nil {
 				firstRunnable = append([]string(nil), candidate...)
 			}
-			checkCtx, checkCancel := context.WithTimeout(context.Background(), 3*time.Second)
-			hasVosk := checkPythonVoskAvailabilityFn(checkCtx, candidate) == nil
+			if !preferVosk {
+				storeSpeechPythonCache(cacheKey, candidate, nil)
+				return candidate, nil
+			}
+			checkCtx, checkCancel := context.WithTimeout(ctx, 3*time.Second)
+			hasVosk := checkPythonVoskAvailabilityCached(checkCtx, candidate) == nil
 			checkCancel()
 			if hasVosk {
+				storeSpeechPythonCache(cacheKey, candidate, nil)
 				return candidate, nil
 			}
 		}
 	}
 	if firstRunnable != nil {
+		storeSpeechPythonCache(cacheKey, firstRunnable, nil)
 		return firstRunnable, nil
 	}
-	return nil, errors.New("python executable not found")
+	err := errors.New("python executable not found")
+	storeSpeechPythonCache(cacheKey, nil, err)
+	return nil, err
 }
 
 func speechPythonCandidates() [][]string {
@@ -559,6 +653,77 @@ func checkPythonVoskAvailability(ctx context.Context, pythonCmd []string) error 
 		return errors.New(msg)
 	}
 	return nil
+}
+
+func checkPythonVoskAvailabilityCached(ctx context.Context, pythonCmd []string) error {
+	key := strings.Join(pythonCmd, "\x00")
+	now := time.Now()
+	speechProbeCacheMu.Lock()
+	if entry, ok := speechVoskImportCache[key]; ok && now.Before(entry.expiresAt) {
+		speechProbeCacheMu.Unlock()
+		if entry.err != "" {
+			return errors.New(entry.err)
+		}
+		return nil
+	}
+	speechProbeCacheMu.Unlock()
+
+	err := checkPythonVoskAvailabilityFn(ctx, pythonCmd)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+
+	entry := speechVoskCacheEntry{expiresAt: now.Add(speechProbeCacheTTL)}
+	if err != nil {
+		entry.err = err.Error()
+	}
+	speechProbeCacheMu.Lock()
+	speechVoskImportCache[key] = entry
+	speechProbeCacheMu.Unlock()
+	return err
+}
+
+func speechPythonCacheKey(preferVosk bool) string {
+	return strings.Join([]string{
+		strings.TrimSpace(os.Getenv(pythonEnvVar)),
+		strings.TrimSpace(os.Getenv("PATH")),
+		fmt.Sprintf("prefer_vosk=%t", preferVosk),
+		runtime.GOOS,
+	}, "\x00")
+}
+
+func getSpeechPythonCache(key string) ([]string, error, bool) {
+	now := time.Now()
+	speechProbeCacheMu.Lock()
+	defer speechProbeCacheMu.Unlock()
+	if speechPythonCache.key != key || now.After(speechPythonCache.expiresAt) {
+		return nil, nil, false
+	}
+	if speechPythonCache.err != "" {
+		return nil, errors.New(speechPythonCache.err), true
+	}
+	return append([]string(nil), speechPythonCache.cmd...), nil, true
+}
+
+func storeSpeechPythonCache(key string, cmd []string, err error) {
+	entry := speechPythonCacheEntry{
+		key:       key,
+		cmd:       append([]string(nil), cmd...),
+		expiresAt: time.Now().Add(speechProbeCacheTTL),
+	}
+	if err != nil {
+		entry.err = err.Error()
+	}
+	speechProbeCacheMu.Lock()
+	speechPythonCache = entry
+	speechProbeCacheMu.Unlock()
+}
+
+func clearSpeechRuntimeProbeCache() {
+	speechProbeCacheMu.Lock()
+	speechPythonCache = speechPythonCacheEntry{}
+	speechVoskImportCache = map[string]speechVoskCacheEntry{}
+	speechProbeCacheMu.Unlock()
 }
 
 func buildSpeechModuleHint(pythonCmd []string, importErr error) string {

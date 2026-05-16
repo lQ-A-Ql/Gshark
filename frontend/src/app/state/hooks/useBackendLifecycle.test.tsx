@@ -274,7 +274,8 @@ describe("useBackendLifecycle", () => {
       privateKeyPath: "C:/keys/server.pem",
       privateKeyIpPort: "10.0.0.1:443",
     });
-    expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledTimes(1);
+    expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "fast");
+    expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "full");
     expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
     expect(bridgeMocks.subscribeEvents).toHaveBeenCalledTimes(1);
 
@@ -344,9 +345,10 @@ describe("useBackendLifecycle", () => {
       expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
         expect.objectContaining({ tsharkPath: "C:/Saved/tshark.exe" }),
         expect.any(AbortSignal),
+        "fast",
       );
     });
-    expect(setTsharkStatus).toHaveBeenLastCalledWith(
+    expect(setTsharkStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         available: true,
         path: "C:/Saved/tshark.exe",
@@ -479,6 +481,7 @@ describe("useBackendLifecycle", () => {
           tsharkPath: "C:/Legacy/tshark.exe",
         },
         expect.any(AbortSignal),
+        "fast",
       );
     });
   });
@@ -524,6 +527,7 @@ describe("useBackendLifecycle", () => {
           yaraEnabled: false,
         }),
         expect.any(AbortSignal),
+        "fast",
       );
     });
   });
@@ -562,8 +566,46 @@ describe("useBackendLifecycle", () => {
           ffmpegPath: "",
         },
         expect.any(AbortSignal),
+        "fast",
       );
     });
+  });
+
+  it("manual runtime save only marks dirty fields as explicit overrides", async () => {
+    installRuntimeLocalStorage();
+    const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
+    bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
+    bridgeMocks.updateToolRuntimeConfig.mockResolvedValue({
+      ...envSnapshot,
+      config: {
+        ...envSnapshot.config,
+        ffmpegPath: "",
+      },
+    });
+    const { result, unmount } = await renderConnectedLifecycle();
+
+    await act(async () => {
+      await result.current.saveToolRuntimeConfig(
+        {
+          ...envSnapshot.config,
+          ffmpegPath: "",
+        },
+        { ffmpegPath: true },
+      );
+    });
+
+    expect(bridgeMocks.updateToolRuntimeConfig).toHaveBeenCalledWith(
+      {
+        ...envSnapshot.config,
+        ffmpegPath: "",
+      },
+      expect.any(AbortSignal),
+      "fast",
+    );
+    const stored = JSON.parse(window.localStorage.getItem("gshark.tool-runtime.v1") || "{}");
+    expect(stored.source).toBe("stored-runtime-config");
+    expect(stored.explicitFields).toEqual({ ffmpegPath: true });
+    unmount();
   });
 
   it("schedules packet pagination and debounced analysis refresh outside preload", async () => {

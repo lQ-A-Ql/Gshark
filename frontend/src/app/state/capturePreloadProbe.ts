@@ -1,54 +1,19 @@
-import type { CaptureTaskScope } from "../utils/captureTaskScope";
-import type { CaptureStatus, PacketsPageResult } from "../integrations/clients/captureClient";
 import { PAGE_SIZE, PRELOAD_POLL_INTERVAL_MS, PRELOAD_SIGNAL_WAIT_MS } from "./captureConstants";
-import type { CapturePreloadDiagnostics } from "./capturePreloadDiagnostics";
 import {
   applyProbePageState,
   canUseDegradedFirstPage,
+  getActiveLoadFailureError,
   getCapturePreloadTimeoutErrorWithDiagnostics,
   getParseFinishedProbeError,
-  getProbePhase,
   probeCapturePage,
-  publishDiagnostics,
+  publishProbeDiagnostics,
   publishReadyDiagnostics,
   type ProbeResult,
 } from "./capturePreloadProbeStep";
-import type { OpenedCapture } from "./captureOpenState";
+import type { CapturePreloadFirstPage, CapturePreloadProbeOptions } from "./capturePreloadProbeTypes";
 import { CAPTURE_PRELOAD_TIMEOUT_MS } from "./capturePreloadStatus";
 
-type Ref<T> = { current: T };
-type Setter<T> = (value: T | ((prev: T) => T)) => void;
-
-export type CapturePreloadFirstPage = Pick<PacketsPageResult, "items" | "total" | "hasMore">;
-
-interface CapturePreloadProbeOptions {
-  readonly opened: OpenedCapture;
-  readonly filter: string;
-  readonly captureSeq: number;
-  readonly captureSeqRef: Ref<number>;
-  readonly captureTaskScopeRef: Ref<CaptureTaskScope>;
-  readonly parseFinishedRef: Ref<boolean>;
-  readonly parseErrorRef: Ref<string>;
-  readonly preloadProcessedRef: Ref<number>;
-  readonly preloadTotalRef: Ref<number>;
-  readonly hadActiveCapture?: boolean;
-  readonly onDiagnostics?: (diagnostics: CapturePreloadDiagnostics) => void;
-  readonly listPacketsPage: (
-    cursor: number,
-    limit: number,
-    filter?: string,
-    signal?: AbortSignal,
-  ) => Promise<PacketsPageResult>;
-  readonly getCaptureStatus: (signal?: AbortSignal) => Promise<CaptureStatus>;
-  readonly waitForCaptureSignal: (delayMs: number) => Promise<void>;
-  readonly setTotalPackets: Setter<number>;
-  readonly setPreloadProcessed: Setter<number>;
-  readonly pageSize?: number;
-  readonly timeoutMs?: number;
-  readonly pollIntervalMs?: number;
-  readonly signalWaitMs?: number;
-  readonly now?: () => number;
-}
+export type { CapturePreloadFirstPage } from "./capturePreloadProbeTypes";
 
 export async function resolveCapturePreloadFirstPage({
   opened,
@@ -106,12 +71,15 @@ export async function resolveCapturePreloadFirstPage({
       setTotalPackets,
       setPreloadProcessed,
     });
-    publishDiagnostics({
+    publishProbeDiagnostics({
       opened,
       probe,
-      phase: getProbePhase(probe, activeCaptureConfirmed, Boolean(pageState.candidateFirstPage)),
+      activeCaptureConfirmed,
+      firstPageLoaded: Boolean(pageState.candidateFirstPage),
       onDiagnostics,
     });
+    const activeLoadError = getActiveLoadFailureError(probe.captureStatus, opened.filePath);
+    if (activeLoadError) throw new Error(activeLoadError);
 
     if (activeCaptureConfirmed && pageState.firstPageLoaded) break;
     if (parseFinishedRef.current) break;
@@ -144,12 +112,15 @@ export async function resolveCapturePreloadFirstPage({
     setTotalPackets,
     setPreloadProcessed,
   });
-  publishDiagnostics({
+  publishProbeDiagnostics({
     opened,
     probe: finalProbe,
-    phase: getProbePhase(finalProbe, activeCaptureConfirmed, Boolean(pageState.candidateFirstPage)),
+    activeCaptureConfirmed,
+    firstPageLoaded: Boolean(pageState.candidateFirstPage),
     onDiagnostics,
   });
+  const activeLoadError = getActiveLoadFailureError(finalProbe.captureStatus, opened.filePath);
+  if (activeLoadError) throw new Error(activeLoadError);
 
   if (
     canUseDegradedFirstPage({

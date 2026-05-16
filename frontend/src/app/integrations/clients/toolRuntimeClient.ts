@@ -1,5 +1,6 @@
 import type { SpeechToTextStatus, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import { asToolRuntimeSnapshot } from "../mappers/runtimeMapper";
+import { withToolRuntimeSnapshotMeta } from "../toolRuntimeSnapshotMeta";
 import { asTSharkStatus } from "../mappers/tsharkStatusMapper";
 import type {
   FFmpegStatusWireDTO,
@@ -35,8 +36,12 @@ export interface ToolRuntimeClient {
   checkTShark(): Promise<TSharkStatus>;
   checkFFmpeg(): Promise<FFmpegStatus>;
   checkSpeechToText(): Promise<SpeechToTextStatus>;
-  getToolRuntimeSnapshot(signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
-  updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
+  getToolRuntimeSnapshot(signal?: AbortSignal, mode?: "fast" | "full"): Promise<ToolRuntimeSnapshot>;
+  updateToolRuntimeConfig(
+    config: ToolRuntimeConfig,
+    signal?: AbortSignal,
+    mode?: "fast" | "full",
+  ): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
 }
 
@@ -72,16 +77,16 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
       };
     },
 
-    async getToolRuntimeSnapshot(signal?: AbortSignal) {
+    async getToolRuntimeSnapshot(signal?: AbortSignal, mode = "full") {
       const payload = await request<ToolRuntimeSnapshotWireDTO>(
-        "/api/tools/runtime-config",
+        toolRuntimeConfigPath(mode),
         signal ? { signal } : undefined,
       );
-      return asToolRuntimeSnapshot(payload);
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "http-fallback");
     },
 
-    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal) {
-      const payload = await request<ToolRuntimeSnapshotWireDTO>("/api/tools/runtime-config", {
+    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal, mode = "full") {
+      const payload = await request<ToolRuntimeSnapshotWireDTO>(toolRuntimeConfigPath(mode), {
         method: "POST",
         signal,
         body: JSON.stringify({
@@ -95,7 +100,7 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
           yara_timeout_ms: config.yaraTimeoutMs,
         }),
       });
-      return asToolRuntimeSnapshot(payload);
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "http-fallback");
     },
 
     async setTSharkPath(path: string) {
@@ -106,4 +111,8 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
       return asTSharkStatus(payload);
     },
   };
+}
+
+function toolRuntimeConfigPath(mode: "fast" | "full" | string): string {
+  return mode === "fast" ? "/api/tools/runtime-config?probe=fast" : "/api/tools/runtime-config";
 }

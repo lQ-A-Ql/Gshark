@@ -2,9 +2,16 @@ import { useCallback, useState } from "react";
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { backendClients } from "../../integrations/backendClients";
-import { buildOfflineToolRuntimeSnapshot } from "../toolRuntimeOfflineSnapshot";
-import { toTSharkStatus } from "../tsharkStatusState";
+import { applyOfflineToolRuntimeConfig } from "../toolRuntimeOfflineApply";
+import { probeToolRuntimeSnapshot, syncToolRuntimeConfig } from "../toolRuntimeProbeActions";
+import { startFullToolRuntimeProbe } from "../toolRuntimeBackgroundProbe";
+import { describeTSharkApplyStatus, describeTSharkReadyStatus, toTSharkStatus } from "../tsharkStatusState";
 import { readToolRuntimeConfig, writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
+import {
+  explicitFieldsFromPatch,
+  normalizeExplicitFields,
+  type ToolRuntimeConfigExplicitFields,
+} from "../toolRuntimeStorageConfig";
 import {
   buildNextToolRuntimeConfig,
   EMPTY_TSHARK_STATUS,
@@ -26,6 +33,17 @@ export function useToolRuntime() {
   const [toolRuntimeProbeState, setToolRuntimeProbeState] = useState<ToolRuntimeProbeState>("idle");
   const [toolRuntimeProbeTransport, setToolRuntimeProbeTransport] = useState<ToolRuntimeProbeTransport>("unknown");
   const [lastToolRuntimeProbeError, setLastToolRuntimeProbeError] = useState("");
+
+  const startBackgroundFullProbe = useCallback(() => {
+    startFullToolRuntimeProbe({
+      setToolRuntimeCheckDegraded,
+      setToolRuntimeProbeState,
+      setToolRuntimeProbeTransport,
+      setLastToolRuntimeProbeError,
+      setToolRuntimeSnapshot,
+      setTsharkStatus,
+    });
+  }, []);
 
   const setTSharkPath = useCallback(
     async (path: string, backendConnected: boolean, setBackendStatus: (status: string) => void) => {
@@ -52,11 +70,7 @@ export function useToolRuntime() {
       setToolRuntimeSnapshot((prev) => mergeTSharkStatusIntoSnapshot(prev, nextPath, status));
 
       if (status.available) {
-        if (status.message && status.message !== "ok") {
-          setBackendStatus(status.message);
-        } else {
-          setBackendStatus(status.usingCustomPath ? `tshark ready: ${status.path}` : "tshark ready");
-        }
+        setBackendStatus(describeTSharkReadyStatus(status));
         return;
       }
       setBackendStatus(status.message || "tshark is unavailable");
@@ -73,16 +87,18 @@ export function useToolRuntime() {
       return null;
     }
     setIsToolRuntimeLoading(true);
-    setToolRuntimeProbeState("probing");
+    setToolRuntimeProbeState("probing_fast");
     setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
     setLastToolRuntimeProbeError("");
     try {
-      const snapshot = await backendClients.runtime.getToolRuntimeSnapshot();
+      const snapshot = await probeToolRuntimeSnapshot("fast");
       setToolRuntimeCheckDegraded(false);
-      setToolRuntimeProbeState("ready");
+      setToolRuntimeProbeState("partial");
+      setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
       setLastToolRuntimeProbeError("");
       setToolRuntimeSnapshot(snapshot);
       setTsharkStatus(toTSharkStatus(snapshot.tshark));
+      startBackgroundFullProbe();
       return snapshot;
     } catch (error) {
       setToolRuntimeCheckDegraded(true);
@@ -99,44 +115,43 @@ export function useToolRuntime() {
       patch: Partial<ToolRuntimeConfig>,
       backendConnected: boolean,
       setBackendStatus: (status: string) => void,
+      explicitFields?: ToolRuntimeConfigExplicitFields,
     ) => {
       const base = toolRuntimeSnapshot?.config ?? readToolRuntimeConfig();
       const nextConfig = buildNextToolRuntimeConfig(base, patch);
+      const fields = normalizeExplicitFields(explicitFields ?? explicitFieldsFromPatch(patch));
 
-      writeUserToolRuntimeConfig(nextConfig);
+      writeUserToolRuntimeConfig(nextConfig, fields);
       if (!backendConnected) {
-        const offlineSnapshot = buildOfflineToolRuntimeSnapshot(nextConfig);
-        setToolRuntimeProbeState("ready");
-        setToolRuntimeProbeTransport("unknown");
-        setLastToolRuntimeProbeError("");
-        setToolRuntimeSnapshot(offlineSnapshot);
-        setTsharkStatus((prev) => ({
-          ...prev,
-          customPath: nextConfig.tsharkPath,
-          usingCustomPath: nextConfig.tsharkPath.length > 0,
-        }));
-        return offlineSnapshot;
+        return applyOfflineToolRuntimeConfig({
+          config: nextConfig,
+          setToolRuntimeProbeState,
+          setToolRuntimeProbeTransport,
+          setLastToolRuntimeProbeError,
+          setToolRuntimeSnapshot,
+          setTsharkStatus,
+        });
       }
 
       setIsToolRuntimeLoading(true);
-      setToolRuntimeProbeState("probing");
+      setToolRuntimeProbeState("probing_fast");
       setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
       setLastToolRuntimeProbeError("");
       try {
-        const snapshot = await backendClients.runtime.updateToolRuntimeConfig(nextConfig);
-        writeUserToolRuntimeConfig(snapshot.config);
+        const snapshot = await syncToolRuntimeConfig(nextConfig, "fast");
+        writeUserToolRuntimeConfig(snapshot.config, fields);
         setToolRuntimeCheckDegraded(false);
-        setToolRuntimeProbeState("ready");
+        setToolRuntimeProbeState("partial");
+        setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
         setLastToolRuntimeProbeError("");
         setToolRuntimeSnapshot(snapshot);
         setTsharkStatus(toTSharkStatus(snapshot.tshark));
-        if (snapshot.tshark.available) {
-          setBackendStatus(
-            snapshot.tshark.message && snapshot.tshark.message !== "ok" ? snapshot.tshark.message : "工具路径已更新",
-          );
-        } else {
-          setBackendStatus(snapshot.tshark.message || "tshark is unavailable");
-        }
+        startBackgroundFullProbe();
+        setBackendStatus(
+          snapshot.tshark.available
+            ? describeTSharkApplyStatus(snapshot.tshark)
+            : snapshot.tshark.message || "tshark is unavailable",
+        );
         return snapshot;
       } catch (error) {
         setToolRuntimeCheckDegraded(true);
@@ -147,7 +162,7 @@ export function useToolRuntime() {
         setIsToolRuntimeLoading(false);
       }
     },
-    [toolRuntimeSnapshot],
+    [startBackgroundFullProbe, toolRuntimeSnapshot],
   );
 
   return {

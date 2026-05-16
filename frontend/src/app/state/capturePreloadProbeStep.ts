@@ -1,6 +1,6 @@
 import type { CaptureTaskScope } from "../utils/captureTaskScope";
 import type { CaptureStatus, PacketsPageResult } from "../integrations/clients/captureClient";
-import { isCommittedCaptureStatusForPath } from "./captureCommitStatus";
+import { isCommittedCaptureStatusForPath, normalizeCapturePathForCompare } from "./captureCommitStatus";
 import {
   createCapturePreloadDiagnostics,
   describePreloadError,
@@ -21,6 +21,15 @@ export interface ProbeResult {
   readonly captureStatus: CaptureStatus | null;
   readonly statusError: string;
   readonly activeCaptureConfirmed: boolean;
+}
+
+export function isActiveLoadForOpenedCapture(status: CaptureStatus | null, openedPath: string): boolean {
+  const loadPath = status?.load?.filePath ?? "";
+  return (
+    normalizeCapturePathForCompare(openedPath) !== "" &&
+    normalizeCapturePathForCompare(openedPath) === normalizeCapturePathForCompare(loadPath) &&
+    Boolean(status?.load?.phase)
+  );
 }
 
 export interface ProbePageState {
@@ -140,11 +149,38 @@ export function publishDiagnostics({
       page: probe.page,
       status: probe.captureStatus,
       statusTransport: probe.captureStatus?.transport,
+      pageTransport: probe.page?.transport,
       lastStatusError: probe.statusError,
       lastPageError: probe.pageError,
       statusConfirmDegraded,
     }),
   );
+}
+
+export function publishProbeDiagnostics({
+  opened,
+  probe,
+  activeCaptureConfirmed,
+  firstPageLoaded,
+  onDiagnostics,
+}: {
+  readonly opened: OpenedCapture;
+  readonly probe: ProbeResult;
+  readonly activeCaptureConfirmed: boolean;
+  readonly firstPageLoaded: boolean;
+  readonly onDiagnostics?: (diagnostics: CapturePreloadDiagnostics) => void;
+}): void {
+  publishDiagnostics({
+    opened,
+    probe,
+    phase: getProbePhase(
+      probe,
+      activeCaptureConfirmed,
+      firstPageLoaded,
+      isActiveLoadForOpenedCapture(probe.captureStatus, opened.filePath),
+    ),
+    onDiagnostics,
+  });
 }
 
 export function publishReadyDiagnostics(
@@ -160,8 +196,22 @@ export function getProbePhase(
   probe: ProbeResult,
   activeCaptureConfirmed: boolean,
   firstPageLoaded: boolean,
+  activeLoadMatches = false,
 ): CapturePreloadConfirmPhase {
+  const loadPhase = probe.captureStatus?.load?.phase;
+  if (activeLoadMatches && (loadPhase === "failed" || loadPhase === "canceled")) return "backend_failed";
+  if (activeLoadMatches && loadPhase === "committing") return "backend_committing";
+  if (
+    activeLoadMatches &&
+    (loadPhase === "starting" || loadPhase === "counting" || loadPhase === "parsing") &&
+    (!probe.page || probe.page.total <= 0)
+  ) {
+    return "backend_parsing";
+  }
   if (probe.pageError) return "waiting_for_packets";
+  if (probe.captureStatus?.hasCapture && probe.captureStatus.packetCount > 0 && probe.page?.total === 0) {
+    return "committed_empty";
+  }
   if (!probe.page || probe.page.total <= 0 || !firstPageLoaded) return "waiting_for_packets";
   if (probe.statusError) return "status_failed";
   if (!probe.captureStatus?.hasCapture || probe.captureStatus.packetCount <= 0) return "waiting_for_status";
@@ -212,10 +262,27 @@ export function getParseFinishedProbeError({
   readonly parseError: string;
 }): string {
   if (probe.page?.total === 0) return getCaptureEmptyParseError(parseError);
+  if (probe.captureStatus?.load?.phase === "failed" || probe.captureStatus?.load?.phase === "canceled") {
+    return `后端解析失败: ${probe.captureStatus.load.lastError || probe.captureStatus.load.phase}`;
+  }
   if (probe.captureStatus && !activeCaptureConfirmed) return getPathMismatchError(opened, probe.captureStatus);
   if (probe.statusError) return `确认后端抓包状态失败: ${probe.statusError}`;
   if (probe.pageError) return `确认首屏数据页失败: ${probe.pageError}`;
   return "";
+}
+
+export function getActiveLoadFailureError(status: CaptureStatus | null, openedPath: string): string {
+  if (!isActiveLoadForOpenedCapture(status, openedPath)) return "";
+  const phase = status?.load?.phase;
+  if (phase !== "failed" && phase !== "canceled") return "";
+  return [
+    phase === "canceled" ? "后端解析已取消" : "后端解析失败",
+    `文件: ${status?.load?.filePath || openedPath}`,
+    `profile: ${status?.load?.parserProfile || "unknown"}`,
+    status?.load?.lastError ? `错误: ${status.load.lastError}` : "",
+  ]
+    .filter(Boolean)
+    .join("；");
 }
 
 export function getCapturePreloadTimeoutErrorWithDiagnostics(probe: ProbeResult | null): string {

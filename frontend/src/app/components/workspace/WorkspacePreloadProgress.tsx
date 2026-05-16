@@ -29,7 +29,13 @@ export function WorkspacePreloadProgress({
     : 0;
   const diagnosticMessage = describeCapturePreloadDiagnostics(diagnostics);
   const showDiagnostics =
-    elapsedMs >= 5000 || diagnostics?.phase === "status_failed" || diagnostics?.phase === "path_mismatch";
+    elapsedMs >= 5000 ||
+    diagnostics?.phase === "backend_parsing" ||
+    diagnostics?.phase === "backend_committing" ||
+    diagnostics?.phase === "backend_failed" ||
+    diagnostics?.phase === "committed_empty" ||
+    diagnostics?.phase === "status_failed" ||
+    diagnostics?.phase === "path_mismatch";
   const showDetailedDiagnostics = elapsedMs >= 20000;
   return (
     <div className="border-b border-blue-100 bg-white/78 px-3 py-2 backdrop-blur-xl">
@@ -91,21 +97,39 @@ function PreloadDiagnosticsPanel({
 function PreloadDiagnosticDetails({ diagnostics }: { diagnostics: CapturePreloadDiagnostics }) {
   return (
     <div className="mt-1 space-y-0.5 font-mono text-[10px] text-amber-950/80">
-      <div>phase={diagnostics.phase} transport={diagnostics.statusTransport}</div>
-      <div>page={diagnostics.pageItems}/{diagnostics.pageTotal} statusPackets={diagnostics.statusPacketCount}</div>
+      <div>
+        phase={diagnostics.phase} pageTransport={diagnostics.pageTransport} statusTransport=
+        {diagnostics.statusTransport}
+      </div>
+      <div>
+        page={diagnostics.pageItems}/{diagnostics.pageTotal} statusPackets={diagnostics.statusPacketCount}
+      </div>
+      {diagnostics.loadPhase && (
+        <div>
+          load={diagnostics.loadPhase} profile={diagnostics.loadParserProfile || "-"} processed=
+          {diagnostics.loadProcessed}/{diagnostics.loadEstimatedTotal || "-"} accepted={diagnostics.loadAccepted}{" "}
+          staged=
+          {diagnostics.loadStagedCount}
+        </div>
+      )}
+      {diagnostics.enrichmentPhase && (
+        <div>
+          enrichment={diagnostics.enrichmentPhase} processed={diagnostics.enrichmentProcessed} updated=
+          {diagnostics.enrichmentUpdated}
+        </div>
+      )}
       <div className="break-all">opened={diagnostics.openedPath || "-"}</div>
       <div className="break-all">status={diagnostics.statusPath || "-"}</div>
+      {diagnostics.loadPath && <div className="break-all">load={diagnostics.loadPath}</div>}
+      {diagnostics.loadLastError && <div className="break-all">loadError={diagnostics.loadLastError}</div>}
+      {diagnostics.enrichmentLastError && (
+        <div className="break-all">enrichmentError={diagnostics.enrichmentLastError}</div>
+      )}
     </div>
   );
 }
 
-function PreloadDiagnosticActions({
-  onRetryConfirm,
-  onStop,
-}: {
-  onRetryConfirm: () => void;
-  onStop: () => void;
-}) {
+function PreloadDiagnosticActions({ onRetryConfirm, onStop }: { onRetryConfirm: () => void; onStop: () => void }) {
   return (
     <div className="flex shrink-0 gap-1">
       <button

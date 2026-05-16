@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CapturePreloadDiagnostics } from "../state/capturePreloadDiagnostics";
+import { createCapturePreloadDiagnostics, type CapturePreloadDiagnostics } from "../state/capturePreloadDiagnostics";
 import Workspace from "./Workspace";
 
 const sentinelState = vi.hoisted(() => ({
@@ -96,23 +96,14 @@ describe("Workspace", () => {
 
   it("shows preload confirmation diagnostics and lets the user retry confirmation", () => {
     sentinelState.isPreloadingCapture = true;
-    sentinelState.capturePreloadDiagnostics = {
+    sentinelState.capturePreloadDiagnostics = createCapturePreloadDiagnostics({
       phase: "status_failed",
       openedPath: "C:/captures/sample.pcapng",
-      normalizedOpenedPath: "c:/captures/sample.pcapng",
-      statusPath: "",
-      normalizedStatusPath: "",
-      statusPathMatches: false,
-      statusHasCapture: false,
-      statusPacketCount: 0,
-      pageTotal: 12,
-      pageItems: 1,
+      page: { items: [{} as never], nextCursor: 1, total: 12, hasMore: true },
       statusTransport: "desktop-ipc",
       lastStatusError: "确认状态超时",
-      lastPageError: "",
-      statusConfirmDegraded: false,
-      updatedAt: "2026-05-16T00:00:00.000Z",
-    };
+      now: () => new Date("2026-05-16T00:00:00.000Z"),
+    });
     sentinelState.captureTransaction = {
       phase: "pending",
       reason: "",
@@ -131,5 +122,51 @@ describe("Workspace", () => {
     expect(screen.getByText("状态确认失败：确认状态超时")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /重新确认/ }));
     expect(sentinelState.retryCapturePreloadConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains empty page/status as an active backend parse when load status is present", () => {
+    sentinelState.isPreloadingCapture = true;
+    sentinelState.capturePreloadDiagnostics = createCapturePreloadDiagnostics({
+      phase: "backend_parsing",
+      openedPath: "C:/captures/sample.pcapng",
+      page: { items: [], nextCursor: 0, total: 0, hasMore: false, transport: "desktop-ipc" },
+      status: {
+        filePath: "",
+        hasCapture: false,
+        packetCount: 0,
+        transport: "desktop-ipc",
+        load: {
+          runId: 4,
+          filePath: "C:/captures/sample.pcapng",
+          phase: "parsing",
+          parserProfile: "first_screen",
+          estimatedTotal: 100,
+          processed: 40,
+          accepted: 38,
+          stagedCount: 32,
+          lastError: "",
+          startedAt: "",
+          updatedAt: "",
+          completedAt: "",
+        },
+      },
+      now: () => new Date("2026-05-16T00:00:00.000Z"),
+    });
+    sentinelState.captureTransaction = {
+      phase: "pending",
+      reason: "",
+      message: "",
+      pendingCaptureName: "sample.pcapng",
+      pendingCapturePath: "C:/captures/sample.pcapng",
+      hasActiveCapture: false,
+    };
+
+    render(
+      <MemoryRouter>
+        <Workspace />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/后端正在解析，尚未提交首屏数据/)).toBeInTheDocument();
   });
 });

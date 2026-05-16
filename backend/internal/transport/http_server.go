@@ -253,7 +253,7 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshotWithContext(r.Context()))
+		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshotWithOptions(r.Context(), toolRuntimeProbeOptionsFromRequest(r)))
 	case http.MethodPost:
 		var cfg model.ToolRuntimeConfig
 		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
@@ -261,10 +261,18 @@ func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		s.toolRuntime.SetToolRuntimeConfig(cfg)
-		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshotWithContext(r.Context()))
+		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshotWithOptions(r.Context(), toolRuntimeProbeOptionsFromRequest(r)))
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func toolRuntimeProbeOptionsFromRequest(r *http.Request) model.ToolRuntimeProbeOptions {
+	mode := strings.TrimSpace(r.URL.Query().Get("probe"))
+	if mode == "" {
+		mode = "full"
+	}
+	return model.ToolRuntimeProbeOptions{Mode: mode}
 }
 
 func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {

@@ -89,6 +89,7 @@ type ToolRuntimeService interface {
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot
 	ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot
+	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
 	SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig
 	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig

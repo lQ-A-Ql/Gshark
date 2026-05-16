@@ -5,6 +5,7 @@ import { detectToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
 import { readToolRuntimeConfigState, writeObservedToolRuntimeSnapshotConfig } from "../toolRuntimeStorage";
 import {
   applyStartupRuntimeSnapshot,
+  loadFullToolRuntimeInBackground,
   markRuntimeProbeFailure,
   startupToolRuntimeConfigForSync,
   syncSavedToolRuntimeConfig,
@@ -12,22 +13,23 @@ import {
 } from "./backendLifecycleToolRuntimeStartup";
 import type { StartupToolRuntimeOptions } from "./backendLifecycleStartupTypes";
 
-export async function loadStartupToolRuntime({
-  isCancelled,
-  setBackendStatus,
-  setIsTSharkChecking,
-  setIsToolRuntimeLoading,
-  setToolRuntimeCheckDegraded,
-  setToolRuntimeSnapshot,
-  setTsharkStatus,
-  setToolRuntimeProbeState,
-  setToolRuntimeProbeTransport,
-  setLastToolRuntimeProbeError,
-}: StartupToolRuntimeOptions) {
+export async function loadStartupToolRuntime(options: StartupToolRuntimeOptions) {
+  const {
+    isCancelled,
+    setBackendStatus,
+    setIsTSharkChecking,
+    setIsToolRuntimeLoading,
+    setToolRuntimeCheckDegraded,
+    setToolRuntimeSnapshot,
+    setTsharkStatus,
+    setToolRuntimeProbeState,
+    setToolRuntimeProbeTransport,
+    setLastToolRuntimeProbeError,
+  } = options;
   setIsTSharkChecking(true);
   setIsToolRuntimeLoading(true);
   setToolRuntimeCheckDegraded(false);
-  setToolRuntimeProbeState("probing");
+  setToolRuntimeProbeState("probing_fast");
   setToolRuntimeProbeTransport(detectToolRuntimeProbeTransport());
   setLastToolRuntimeProbeError("");
 
@@ -35,10 +37,11 @@ export async function loadStartupToolRuntime({
   try {
     const savedState = readToolRuntimeConfigState();
     const snapshot = await withAbortableTimeout(
-      (signal) => backendClients.runtime.getToolRuntimeSnapshot(signal),
+      (signal) => backendClients.runtime.getToolRuntimeSnapshot(signal, "fast"),
       STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
-      "startup tool runtime check timed out",
+      "startup fast tool runtime check timed out",
     );
+    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
     const syncConfig = startupToolRuntimeConfigForSync(savedState, snapshot.config);
     const shouldSyncSavedConfig = syncConfig !== null && !toolRuntimeConfigsEqual(syncConfig, snapshot.config);
     applyStartupRuntimeSnapshot({
@@ -50,22 +53,17 @@ export async function loadStartupToolRuntime({
       setToolRuntimeProbeState,
       setLastToolRuntimeProbeError,
     });
-    if (!isCancelled() && !shouldSyncSavedConfig) writeObservedToolRuntimeSnapshotConfig(snapshot.config);
+    if (!isCancelled() && !shouldSyncSavedConfig) {
+      writeObservedToolRuntimeSnapshotConfig(snapshot.config);
+      void loadFullToolRuntimeInBackground(options);
+    }
 
     if (!isCancelled() && shouldSyncSavedConfig) {
       isSyncingSavedConfig = true;
       void syncSavedToolRuntimeConfig({
+        ...options,
         explicitFields: savedState.explicitFields,
-        isCancelled,
         savedConfig: syncConfig,
-        setBackendStatus,
-        setIsToolRuntimeLoading,
-        setToolRuntimeCheckDegraded,
-        setToolRuntimeSnapshot,
-        setTsharkStatus,
-        setToolRuntimeProbeState,
-        setToolRuntimeProbeTransport,
-        setLastToolRuntimeProbeError,
       });
     }
   } catch (error) {

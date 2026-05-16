@@ -11,10 +11,8 @@ import {
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
-import {
-  type MediaAnalysisProgress,
-  type ThreatAnalysisProgress,
-} from "./useAnalysisProgress";
+import type { ToolRuntimeConfigExplicitFields } from "../toolRuntimeStorageConfig";
+import { type MediaAnalysisProgress, type ThreatAnalysisProgress } from "./useAnalysisProgress";
 import { useToolRuntime } from "./useToolRuntime";
 import { loadStartupTLSConfig } from "./backendLifecycleTLSStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";
@@ -54,7 +52,10 @@ export interface BackendLifecycleState {
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;
   refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;
-  saveToolRuntimeConfig: (patch: Partial<ToolRuntimeConfig>) => Promise<ToolRuntimeSnapshot>;
+  saveToolRuntimeConfig: (
+    patch: Partial<ToolRuntimeConfig>,
+    explicitFields?: ToolRuntimeConfigExplicitFields,
+  ) => Promise<ToolRuntimeSnapshot>;
 }
 
 export function useBackendLifecycle({

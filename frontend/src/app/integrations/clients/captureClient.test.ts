@@ -41,6 +41,43 @@ describe("captureClient transport mapping", () => {
     });
   });
 
+  it("maps active capture load status from the status payload", () => {
+    expect(
+      asCaptureStatus({
+        file_path: "",
+        has_capture: false,
+        packet_count: 0,
+        load: {
+          run_id: 12,
+          file_path: "C:/captures/loading.pcapng",
+          phase: "parsing",
+          parser_profile: "first_screen",
+          estimated_total: 13957,
+          processed: 4000,
+          accepted: 3999,
+          staged_count: 3072,
+          last_error: "",
+          enrichment: { phase: "pending", processed: 0, updated: 0 },
+        },
+      }),
+    ).toMatchObject({
+      filePath: "",
+      hasCapture: false,
+      packetCount: 0,
+      load: {
+        runId: 12,
+        filePath: "C:/captures/loading.pcapng",
+        phase: "parsing",
+        parserProfile: "first_screen",
+        estimatedTotal: 13957,
+        processed: 4000,
+        accepted: 3999,
+        stagedCount: 3072,
+        enrichment: { phase: "pending" },
+      },
+    });
+  });
+
   it("maps packet lists and paged packet payloads", async () => {
     const signal = new AbortController().signal;
     const requestMock = vi

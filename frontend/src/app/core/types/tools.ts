@@ -11,6 +11,15 @@ export interface ToolRuntimeConfig {
   yaraTimeoutMs: number;
 }
 
+export type ToolRuntimeProbeMode = "fast" | "full";
+export type ToolRuntimeProbeState =
+  | "fast_ready"
+  | "full_ready"
+  | "partial"
+  | "timeout"
+  | "failed"
+  | "background_probing";
+
 export interface YaraToolStatus {
   available: boolean;
   enabled: boolean;
@@ -50,4 +59,12 @@ export interface ToolRuntimeSnapshot {
   };
   speech: SpeechToTextStatus;
   yara: YaraToolStatus;
+  probeMode?: ToolRuntimeProbeMode | string;
+  probeState?: ToolRuntimeProbeState | string;
+  probeTimings?: Record<string, number>;
+  probeErrors?: Record<string, string>;
+  cached?: boolean;
+  updatedAt?: string;
+  transport?: "desktop-ipc" | "http-fallback" | "unknown";
+  transportError?: string;
 }

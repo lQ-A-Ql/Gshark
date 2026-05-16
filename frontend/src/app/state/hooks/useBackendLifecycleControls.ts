@@ -1,6 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import { backendClients } from "../../integrations/backendClients";
+import type { ToolRuntimeConfigExplicitFields } from "../toolRuntimeStorageConfig";
 
 interface UseBackendLifecycleControlsOptions {
   readonly backendConnected: boolean;
@@ -16,6 +17,7 @@ interface UseBackendLifecycleControlsOptions {
     patch: Partial<ToolRuntimeConfig>,
     backendConnected: boolean,
     setBackendStatus: (status: string) => void,
+    explicitFields?: ToolRuntimeConfigExplicitFields,
   ) => Promise<ToolRuntimeSnapshot>;
 }
 
@@ -41,8 +43,8 @@ export function useBackendLifecycleControls({
   }, [backendConnected, refreshToolRuntimeSnapshotImpl]);
 
   const saveToolRuntimeConfig = useCallback(
-    async (patch: Partial<ToolRuntimeConfig>) => {
-      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatusText);
+    async (patch: Partial<ToolRuntimeConfig>, explicitFields?: ToolRuntimeConfigExplicitFields) => {
+      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatusText, explicitFields);
     },
     [backendConnected, saveToolRuntimeConfigImpl, setBackendStatusText],
   );

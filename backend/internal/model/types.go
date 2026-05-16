@@ -105,6 +105,10 @@ type ToolRuntimeConfig struct {
 	YaraTimeoutMS int    `json:"yara_timeout_ms"`
 }
 
+type ToolRuntimeProbeOptions struct {
+	Mode string
+}
+
 type YaraToolStatus struct {
 	Available        bool   `json:"available"`
 	Enabled          bool   `json:"enabled"`
@@ -120,11 +124,17 @@ type YaraToolStatus struct {
 }
 
 type ToolRuntimeSnapshot struct {
-	Config ToolRuntimeConfig  `json:"config"`
-	TShark TSharkToolStatus   `json:"tshark"`
-	FFmpeg FFmpegToolStatus   `json:"ffmpeg"`
-	Speech SpeechToTextStatus `json:"speech"`
-	Yara   YaraToolStatus     `json:"yara"`
+	Config       ToolRuntimeConfig  `json:"config"`
+	TShark       TSharkToolStatus   `json:"tshark"`
+	FFmpeg       FFmpegToolStatus   `json:"ffmpeg"`
+	Speech       SpeechToTextStatus `json:"speech"`
+	Yara         YaraToolStatus     `json:"yara"`
+	ProbeMode    string             `json:"probe_mode,omitempty"`
+	ProbeState   string             `json:"probe_state,omitempty"`
+	ProbeTimings map[string]int64   `json:"probe_timings,omitempty"`
+	ProbeErrors  map[string]string  `json:"probe_errors,omitempty"`
+	Cached       bool               `json:"cached,omitempty"`
+	UpdatedAt    string             `json:"updated_at,omitempty"`
 }
 
 type TSharkToolStatus struct {
@@ -151,9 +161,47 @@ type FFmpegToolStatus struct {
 }
 
 type CaptureStatus struct {
-	FilePath    string `json:"file_path"`
-	HasCapture  bool   `json:"has_capture"`
-	PacketCount int    `json:"packet_count"`
+	FilePath    string             `json:"file_path"`
+	HasCapture  bool               `json:"has_capture"`
+	PacketCount int                `json:"packet_count"`
+	Load        *CaptureLoadStatus `json:"load,omitempty"`
+}
+
+type CaptureLoadPhase string
+
+const (
+	CaptureLoadIdle       CaptureLoadPhase = "idle"
+	CaptureLoadStarting   CaptureLoadPhase = "starting"
+	CaptureLoadCounting   CaptureLoadPhase = "counting"
+	CaptureLoadParsing    CaptureLoadPhase = "parsing"
+	CaptureLoadCommitting CaptureLoadPhase = "committing"
+	CaptureLoadReady      CaptureLoadPhase = "ready"
+	CaptureLoadFailed     CaptureLoadPhase = "failed"
+	CaptureLoadCanceled   CaptureLoadPhase = "canceled"
+)
+
+type CaptureEnrichmentStatus struct {
+	Phase     string `json:"phase"`
+	Processed int    `json:"processed"`
+	Updated   int    `json:"updated"`
+	LastError string `json:"last_error,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+type CaptureLoadStatus struct {
+	RunID          int64                    `json:"run_id"`
+	FilePath       string                   `json:"file_path"`
+	Phase          string                   `json:"phase"`
+	ParserProfile  string                   `json:"parser_profile"`
+	EstimatedTotal int                      `json:"estimated_total,omitempty"`
+	Processed      int                      `json:"processed"`
+	Accepted       int                      `json:"accepted"`
+	StagedCount    int                      `json:"staged_count"`
+	LastError      string                   `json:"last_error,omitempty"`
+	StartedAt      string                   `json:"started_at,omitempty"`
+	UpdatedAt      string                   `json:"updated_at,omitempty"`
+	CompletedAt    string                   `json:"completed_at,omitempty"`
+	Enrichment     *CaptureEnrichmentStatus `json:"enrichment,omitempty"`
 }
 
 type WinRMDecryptRequest struct {
@@ -588,12 +636,14 @@ type AuditEntry struct {
 }
 
 type ParseOptions struct {
-	FilePath      string    `json:"file_path"`
-	DisplayFilter string    `json:"display_filter"`
-	MaxPackets    int       `json:"max_packets"`
-	EmitPackets   bool      `json:"emit_packets,omitempty"`
-	FastList      bool      `json:"fast_list,omitempty"`
-	TLS           TLSConfig `json:"tls,omitempty"`
+	FilePath         string    `json:"file_path"`
+	DisplayFilter    string    `json:"display_filter"`
+	MaxPackets       int       `json:"max_packets"`
+	EmitPackets      bool      `json:"emit_packets,omitempty"`
+	FastList         bool      `json:"fast_list,omitempty"`
+	ListProfile      string    `json:"list_profile,omitempty"`
+	EnableEnrichment bool      `json:"enable_enrichment,omitempty"`
+	TLS              TLSConfig `json:"tls,omitempty"`
 }
 
 type StreamChunk struct {

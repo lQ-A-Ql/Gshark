@@ -1,14 +1,22 @@
 import type { DecryptionConfig, ToolRuntimeConfig } from "../core/types";
-import { asCaptureStatus, withCaptureStatusMeta } from "./clients/captureClient";
+import {
+  asCaptureStatus,
+  asPacketsPageResult,
+  withCaptureStatusMeta,
+  withPacketsPageMeta,
+} from "./clients/captureClient";
 import type { TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
+import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 
 interface DesktopBridgeContext {
   desktopApp: DesktopTransportBinding;
   fallbackBridge: BackendBridge;
 }
+
+const FAST_RUNTIME_IPC_TIMEOUT_MS = 2000;
 
 export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridgeContext): BackendBridge {
   return {
@@ -25,17 +33,37 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       }
       return String(await desktopApp.BackendStatus()).trim();
     },
-    async getToolRuntimeSnapshot(signal?: AbortSignal) {
-      if (!desktopApp.GetToolRuntimeSnapshot) {
-        return await fallbackBridge.getToolRuntimeSnapshot(signal);
+    async getToolRuntimeSnapshot(signal?: AbortSignal, mode = "full") {
+      const ipcSnapshot = runtimeSnapshotMethod(desktopApp, mode);
+      if (!ipcSnapshot) {
+        return await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
       }
-      return asToolRuntimeSnapshot(await desktopApp.GetToolRuntimeSnapshot());
+      try {
+        const payload =
+          mode === "fast" ? await withIpcTimeout(ipcSnapshot(), FAST_RUNTIME_IPC_TIMEOUT_MS) : await ipcSnapshot();
+        return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
+      } catch (error) {
+        const fallbackSnapshot = await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
+        const message = error instanceof Error ? error.message : "Wails IPC 运行时组件探测失败";
+        return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
+      }
     },
-    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal) {
-      if (!desktopApp.UpdateToolRuntimeConfig) {
-        return await fallbackBridge.updateToolRuntimeConfig(config, signal);
+    async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal, mode = "full") {
+      const ipcUpdate = runtimeConfigUpdateMethod(desktopApp, mode);
+      if (!ipcUpdate) {
+        return await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
       }
-      return asToolRuntimeSnapshot(await desktopApp.UpdateToolRuntimeConfig(toToolRuntimeRequest(config)));
+      try {
+        const payload =
+          mode === "fast"
+            ? await withIpcTimeout(ipcUpdate(toToolRuntimeRequest(config)), FAST_RUNTIME_IPC_TIMEOUT_MS)
+            : await ipcUpdate(toToolRuntimeRequest(config));
+        return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
+      } catch (error) {
+        const fallbackSnapshot = await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
+        const message = error instanceof Error ? error.message : "Wails IPC 运行时组件配置同步失败";
+        return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
+      }
     },
     async setTSharkPath(path: string): Promise<TSharkStatus> {
       if (!desktopApp.SetTSharkPath) {
@@ -86,6 +114,25 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         return withCaptureStatusMeta(fallbackStatus, "http-fallback", message);
       }
     },
+    async listPacketsPage(cursor: number, limit: number, filter = "", signal?: AbortSignal) {
+      if (!desktopApp.ListPacketsPage) {
+        return signal
+          ? await fallbackBridge.listPacketsPage(cursor, limit, filter, signal)
+          : await fallbackBridge.listPacketsPage(cursor, limit, filter);
+      }
+      try {
+        return withPacketsPageMeta(
+          asPacketsPageResult(await desktopApp.ListPacketsPage(cursor, limit, filter)),
+          "desktop-ipc",
+        );
+      } catch (error) {
+        const fallbackPage = signal
+          ? await fallbackBridge.listPacketsPage(cursor, limit, filter, signal)
+          : await fallbackBridge.listPacketsPage(cursor, limit, filter);
+        const message = error instanceof Error ? error.message : "Wails IPC 数据页确认失败";
+        return withPacketsPageMeta(fallbackPage, "http-fallback", message);
+      }
+    },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {
         return await fallbackBridge.getTLSConfig();
@@ -99,6 +146,36 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       await desktopApp.UpdateTLSConfig(toDecryptionConfigRequest(cfg));
     },
   };
+}
+
+function runtimeSnapshotMethod(
+  desktopApp: DesktopTransportBinding,
+  mode: string,
+): (() => Promise<unknown>) | undefined {
+  if (mode === "fast") {
+    return desktopApp.GetToolRuntimeSnapshotFast ?? desktopApp.GetToolRuntimeSnapshot;
+  }
+  return desktopApp.GetToolRuntimeSnapshotFull ?? desktopApp.GetToolRuntimeSnapshot;
+}
+
+function runtimeConfigUpdateMethod(
+  desktopApp: DesktopTransportBinding,
+  mode: string,
+): ((config: unknown) => Promise<unknown>) | undefined {
+  if (mode === "fast") {
+    return desktopApp.UpdateToolRuntimeConfigFast ?? desktopApp.UpdateToolRuntimeConfig;
+  }
+  return desktopApp.UpdateToolRuntimeConfigFull ?? desktopApp.UpdateToolRuntimeConfig;
+}
+
+function withIpcTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Wails IPC 快速探测超时（${timeoutMs}ms）`)), timeoutMs);
+  });
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timer !== undefined) window.clearTimeout(timer);
+  });
 }
 
 function toToolRuntimeRequest(config: ToolRuntimeConfig) {

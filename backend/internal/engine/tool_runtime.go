@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 	"github.com/gshark/sentinel/backend/internal/tshark"
@@ -13,6 +14,11 @@ const (
 	ffmpegEnvVar    = "GSHARK_FFMPEG"
 	pythonEnvVar    = "GSHARK_PYTHON"
 	voskModelEnvVar = "GSHARK_VOSK_MODEL"
+)
+
+const (
+	ToolRuntimeProbeModeFast = "fast"
+	ToolRuntimeProbeModeFull = "full"
 )
 
 // ToolRuntimeConfig returns a coherent snapshot of the tool runtime
@@ -79,6 +85,8 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
+	clearSpeechRuntimeProbeCache()
+	tshark.ClearCapabilityCache()
 
 	return s.toolRuntimeConfigLocked()
 }
@@ -92,13 +100,74 @@ func (s *Service) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
 }
 
 func (s *Service) ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot {
-	return model.ToolRuntimeSnapshot{
-		Config: s.ToolRuntimeConfig(),
-		TShark: toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx)),
-		FFmpeg: s.FFmpegStatus(),
-		Speech: s.SpeechToTextStatus(),
-		Yara:   s.YaraStatus(),
+	return s.ToolRuntimeSnapshotWithOptions(ctx, model.ToolRuntimeProbeOptions{Mode: ToolRuntimeProbeModeFull})
+}
+
+func (s *Service) ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot {
+	if ctx == nil {
+		ctx = context.Background()
 	}
+	mode := normalizeToolRuntimeProbeMode(opts.Mode)
+	if mode == ToolRuntimeProbeModeFull {
+		s.toolRuntimeFullProbeMu.Lock()
+		defer s.toolRuntimeFullProbeMu.Unlock()
+	}
+
+	probeTimings := map[string]int64{}
+	probeErrors := map[string]string{}
+	snapshot := model.ToolRuntimeSnapshot{
+		ProbeMode:    mode,
+		ProbeState:   "partial",
+		ProbeTimings: probeTimings,
+		ProbeErrors:  probeErrors,
+		UpdatedAt:    time.Now().Format(time.RFC3339Nano),
+	}
+
+	snapshot.Config = timedRuntimeProbe(probeTimings, "config", func() model.ToolRuntimeConfig {
+		return s.ToolRuntimeConfig()
+	})
+
+	probeCapabilities := mode == ToolRuntimeProbeModeFull
+	snapshot.TShark = timedRuntimeProbe(probeTimings, "tshark", func() model.TSharkToolStatus {
+		return toModelTSharkStatus(tshark.CurrentStatusWithOptions(ctx, tshark.StatusOptions{ProbeCapabilities: probeCapabilities}))
+	})
+	recordRuntimeStatusError(probeErrors, "tshark", snapshot.TShark.Available, snapshot.TShark.Message)
+
+	ffmpegInternal := timedRuntimeProbe(probeTimings, "ffmpeg", func() FFmpegStatus {
+		return s.ffmpegStatus()
+	})
+	snapshot.FFmpeg = toModelFFmpegStatus(ffmpegInternal)
+	recordRuntimeStatusError(probeErrors, "ffmpeg", snapshot.FFmpeg.Available, snapshot.FFmpeg.Message)
+
+	ffmpegAvailable := ffmpegInternal.Available
+	snapshot.Speech = timedRuntimeProbe(probeTimings, "speech", func() model.SpeechToTextStatus {
+		return s.SpeechToTextStatusWithContext(ctx, SpeechStatusOptions{
+			Fast:            mode == ToolRuntimeProbeModeFast,
+			FFmpegAvailable: &ffmpegAvailable,
+		})
+	})
+	recordRuntimeStatusError(probeErrors, "speech", snapshot.Speech.Available, snapshot.Speech.Message)
+
+	snapshot.Yara = timedRuntimeProbe(probeTimings, "yara", func() model.YaraToolStatus {
+		return s.YaraStatus()
+	})
+	recordRuntimeStatusError(probeErrors, "yara", snapshot.Yara.Available || !snapshot.Yara.Enabled, snapshot.Yara.Message)
+
+	if err := ctx.Err(); err != nil {
+		if err == context.DeadlineExceeded {
+			snapshot.ProbeState = "timeout"
+		} else {
+			snapshot.ProbeState = "failed"
+		}
+		probeErrors["snapshot"] = err.Error()
+		return snapshot
+	}
+	if mode == ToolRuntimeProbeModeFast {
+		snapshot.ProbeState = "fast_ready"
+	} else {
+		snapshot.ProbeState = "full_ready"
+	}
+	return snapshot
 }
 
 func toModelTSharkStatus(status tshark.Status) model.TSharkToolStatus {
@@ -147,6 +216,7 @@ func (s *Service) SetTSharkPathWithContext(ctx context.Context, path string) mod
 	s.toolRuntimeMu.Lock()
 	defer s.toolRuntimeMu.Unlock()
 	tshark.SetBinaryPath(strings.TrimSpace(path))
+	tshark.ClearCapabilityCache()
 	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
 }
 
@@ -219,4 +289,30 @@ func setEnvOrUnset(key, value string) {
 		return
 	}
 	_ = os.Setenv(key, value)
+}
+
+func normalizeToolRuntimeProbeMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case ToolRuntimeProbeModeFast:
+		return ToolRuntimeProbeModeFast
+	default:
+		return ToolRuntimeProbeModeFull
+	}
+}
+
+func timedRuntimeProbe[T any](timings map[string]int64, name string, fn func() T) T {
+	start := time.Now()
+	value := fn()
+	if timings != nil {
+		timings[name] = time.Since(start).Milliseconds()
+	}
+	return value
+}
+
+func recordRuntimeStatusError(errors map[string]string, component string, ok bool, message string) {
+	message = strings.TrimSpace(message)
+	if errors == nil || ok || message == "" || message == "ok" {
+		return
+	}
+	errors[component] = message
 }

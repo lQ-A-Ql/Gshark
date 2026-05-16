@@ -28,7 +28,14 @@ export function RuntimeSettingsHeader({
   onClose,
 }: RuntimeSettingsHeaderProps) {
   const known = Boolean(snapshot);
-  const unknownLabel = probeState === "failed" ? "失败" : probeState === "probing" ? "探测中" : "等待";
+  const unknownLabel =
+    probeState === "failed"
+      ? "失败"
+      : probeState === "probing" || probeState === "probing_fast" || probeState === "probing_full"
+        ? "探测中"
+        : probeState === "partial" || probeState === "timeout_background"
+          ? "部分就绪"
+          : "等待";
   return (
     <div className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.92),rgba(255,255,255,0.98))] px-5 py-5">
       <div className="flex items-start justify-between gap-3">

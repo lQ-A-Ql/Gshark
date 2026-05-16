@@ -133,7 +133,8 @@ export function StartupGate() {
               <div
                 className={`text-xs break-all ${toolRuntimeProbeState === "failed" ? "text-rose-600" : "text-slate-500"}`}
               >
-                {toolRuntimeProbeStateText(toolRuntimeProbeState)} · {toolRuntimeProbeTransportText(toolRuntimeProbeTransport)}
+                {toolRuntimeProbeStateText(toolRuntimeProbeState)} ·{" "}
+                {toolRuntimeProbeTransportText(toolRuntimeProbeTransport)}
                 {lastToolRuntimeProbeError ? `：${lastToolRuntimeProbeError}` : ""}
               </div>
             )}
@@ -158,10 +159,12 @@ export function StartupGate() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleProbeTools()}
-                  disabled={isToolRuntimeLoading}
+                  disabled={isToolRuntimeLoading || toolRuntimeProbeState === "probing_full"}
                   className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isToolRuntimeLoading ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${isToolRuntimeLoading || toolRuntimeProbeState === "probing_full" ? "animate-spin" : ""}`}
+                  />
                   重新探测工具
                 </button>
                 {probeNotice && <span className="text-xs text-slate-500">{probeNotice}</span>}

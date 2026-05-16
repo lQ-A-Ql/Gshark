@@ -247,6 +247,45 @@ func (s *packetStore) Append(packets []model.Packet) error {
 	return nil
 }
 
+func (s *packetStore) UpdatePacketEnrichment(packet model.Packet) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.db == nil {
+		return false, fmt.Errorf("packet store not initialized")
+	}
+	if _, ok := s.positions[packet.ID]; !ok {
+		return false, nil
+	}
+	colorJSON, err := marshalPacketColor(packet.Color)
+	if err != nil {
+		return false, fmt.Errorf("marshal packet color: %w", err)
+	}
+	result, err := s.db.Exec(`
+		UPDATE packets
+		SET
+			udp_payload_hex = CASE WHEN ? <> '' THEN ? ELSE udp_payload_hex END,
+			ip_header_len = CASE WHEN ? > 0 THEN ? ELSE ip_header_len END,
+			l4_header_len = CASE WHEN ? > 0 THEN ? ELSE l4_header_len END,
+			color_json = CASE WHEN ? <> '' THEN ? ELSE color_json END
+		WHERE packet_id = ?
+	`,
+		packet.UDPPayloadHex, packet.UDPPayloadHex,
+		packet.IPHeaderLen, packet.IPHeaderLen,
+		packet.L4HeaderLen, packet.L4HeaderLen,
+		colorJSON, colorJSON,
+		packet.ID,
+	)
+	if err != nil {
+		return false, fmt.Errorf("update packet enrichment: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return true, nil
+	}
+	return rows > 0, nil
+}
+
 func (s *packetStore) All(predicate packetPredicate) ([]model.Packet, error) {
 	items := make([]model.Packet, 0, s.Count())
 	err := s.Iterate(predicate, func(packet model.Packet) error {

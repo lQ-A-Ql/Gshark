@@ -22,12 +22,49 @@ export interface PacketsPageResult {
   total: number;
   hasMore: boolean;
   filtering?: boolean;
+  transport?: "desktop-ipc" | "http-fallback" | "unknown";
+  transportError?: string;
+}
+
+export type CaptureLoadPhase =
+  | "idle"
+  | "starting"
+  | "counting"
+  | "parsing"
+  | "committing"
+  | "ready"
+  | "failed"
+  | "canceled";
+
+export interface CaptureEnrichmentStatus {
+  phase: string;
+  processed: number;
+  updated: number;
+  lastError: string;
+  updatedAt: string;
+}
+
+export interface CaptureLoadStatus {
+  runId: number;
+  filePath: string;
+  phase: CaptureLoadPhase;
+  parserProfile: string;
+  estimatedTotal: number;
+  processed: number;
+  accepted: number;
+  stagedCount: number;
+  lastError: string;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string;
+  enrichment?: CaptureEnrichmentStatus;
 }
 
 export interface CaptureStatus {
   filePath: string;
   hasCapture: boolean;
   packetCount: number;
+  load?: CaptureLoadStatus;
   transport?: "desktop-ipc" | "http-fallback" | "unknown";
   transportError?: string;
 }
@@ -101,6 +138,8 @@ export function createCaptureClient(
           max_packets: 0,
           emit_packets: false,
           fast_list: true,
+          list_profile: "first_screen",
+          enable_enrichment: true,
         }),
       });
     },
@@ -136,14 +175,7 @@ export function createCaptureClient(
         query.set("filter", filter);
       }
       const payload = await request<PacketsPageWireDTO>(`/api/packets/page?${query.toString()}`, { signal });
-      const rows = asArray(payload.items);
-      return {
-        items: rows.map(asPacket),
-        nextCursor: Number(payload.next_cursor ?? rows.length),
-        total: Number(payload.total ?? rows.length),
-        hasMore: Boolean(payload.has_more),
-        filtering: Boolean(payload.filtering),
-      };
+      return withPacketsPageMeta(asPacketsPageResult(payload), "http-fallback");
     },
 
     async locatePacketPage(packetId: number, limit: number, filter = "", signal?: AbortSignal) {
@@ -172,12 +204,76 @@ export function createCaptureClient(
   };
 }
 
+export function asPacketsPageResult(input: unknown): PacketsPageResult {
+  const payload = (asPlainObject(input) ?? {}) as PacketsPageWireDTO;
+  const rows = asArray(payload.items);
+  return {
+    items: rows.map(asPacket),
+    nextCursor: Number(payload.next_cursor ?? rows.length),
+    total: Number(payload.total ?? rows.length),
+    hasMore: Boolean(payload.has_more),
+    filtering: Boolean(payload.filtering),
+  };
+}
+
 export function asCaptureStatus(input: unknown): CaptureStatus {
   const payload = (asPlainObject(input) ?? {}) as CaptureStatusWireDTO;
-  return {
+  const status: CaptureStatus = {
     filePath: String(payload?.file_path ?? payload?.filePath ?? ""),
     hasCapture: Boolean(payload?.has_capture ?? payload?.hasCapture),
     packetCount: Number(payload?.packet_count ?? payload?.packetCount ?? 0),
+  };
+  const load = asCaptureLoadStatus(payload.load);
+  if (load) status.load = load;
+  return status;
+}
+
+function asCaptureLoadStatus(input: unknown): CaptureLoadStatus | undefined {
+  const payload = asPlainObject(input);
+  if (!payload) return undefined;
+  return {
+    runId: Number(payload.run_id ?? payload.runId ?? 0),
+    filePath: String(payload.file_path ?? payload.filePath ?? ""),
+    phase: asCaptureLoadPhase(payload.phase),
+    parserProfile: String(payload.parser_profile ?? payload.parserProfile ?? ""),
+    estimatedTotal: Number(payload.estimated_total ?? payload.estimatedTotal ?? 0),
+    processed: Number(payload.processed ?? 0),
+    accepted: Number(payload.accepted ?? 0),
+    stagedCount: Number(payload.staged_count ?? payload.stagedCount ?? 0),
+    lastError: String(payload.last_error ?? payload.lastError ?? ""),
+    startedAt: String(payload.started_at ?? payload.startedAt ?? ""),
+    updatedAt: String(payload.updated_at ?? payload.updatedAt ?? ""),
+    completedAt: String(payload.completed_at ?? payload.completedAt ?? ""),
+    enrichment: asCaptureEnrichmentStatus(payload.enrichment),
+  };
+}
+
+function asCaptureLoadPhase(input: unknown): CaptureLoadPhase {
+  const value = String(input ?? "").trim();
+  if (
+    value === "idle" ||
+    value === "starting" ||
+    value === "counting" ||
+    value === "parsing" ||
+    value === "committing" ||
+    value === "ready" ||
+    value === "failed" ||
+    value === "canceled"
+  ) {
+    return value;
+  }
+  return "idle";
+}
+
+function asCaptureEnrichmentStatus(input: unknown): CaptureEnrichmentStatus | undefined {
+  const payload = asPlainObject(input);
+  if (!payload) return undefined;
+  return {
+    phase: String(payload.phase ?? ""),
+    processed: Number(payload.processed ?? 0),
+    updated: Number(payload.updated ?? 0),
+    lastError: String(payload.last_error ?? payload.lastError ?? ""),
+    updatedAt: String(payload.updated_at ?? payload.updatedAt ?? ""),
   };
 }
 
@@ -199,6 +295,26 @@ export function withCaptureStatusMeta(
     },
   });
   return status;
+}
+
+export function withPacketsPageMeta(
+  page: PacketsPageResult,
+  transport: NonNullable<PacketsPageResult["transport"]>,
+  transportError = "",
+): PacketsPageResult {
+  Object.defineProperties(page, {
+    transport: {
+      configurable: true,
+      enumerable: false,
+      value: transport,
+    },
+    transportError: {
+      configurable: true,
+      enumerable: false,
+      value: transportError,
+    },
+  });
+  return page;
 }
 
 async function selectLocalFile(): Promise<File> {

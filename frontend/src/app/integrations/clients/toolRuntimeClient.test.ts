@@ -72,7 +72,8 @@ describe("toolRuntimeClient", () => {
     }) as unknown as JsonRequest;
 
     const client = createToolRuntimeClient(request);
-    expect(await client.getToolRuntimeSnapshot()).toMatchObject({
+    const snapshot = await client.getToolRuntimeSnapshot();
+    expect(snapshot).toMatchObject({
       config: {
         tsharkPath: "tshark.exe",
         ffmpegPath: "env-ffmpeg.exe",
@@ -80,17 +81,41 @@ describe("toolRuntimeClient", () => {
         voskModelPath: "env-model",
       },
     });
-    expect(
-      await client.updateToolRuntimeConfig({
-        tsharkPath: "t.exe",
-        ffmpegPath: "f.exe",
-        pythonPath: "py.exe",
-        voskModelPath: "model",
-        yaraEnabled: true,
-        yaraBin: "yara.exe",
-        yaraRules: "rules",
-        yaraTimeoutMs: 12345,
-      }),
-    ).toMatchObject({ config: { tsharkPath: "t.exe" }, yara: { timeoutMs: 12345 } });
+    expect(snapshot.transport).toBe("http-fallback");
+    const updated = await client.updateToolRuntimeConfig({
+      tsharkPath: "t.exe",
+      ffmpegPath: "f.exe",
+      pythonPath: "py.exe",
+      voskModelPath: "model",
+      yaraEnabled: true,
+      yaraBin: "yara.exe",
+      yaraRules: "rules",
+      yaraTimeoutMs: 12345,
+    });
+    expect(updated).toMatchObject({ config: { tsharkPath: "t.exe" }, yara: { timeoutMs: 12345 } });
+    expect(updated.transport).toBe("http-fallback");
+  });
+
+  it("requests fast runtime snapshots with the probe query", async () => {
+    const request = vi.fn(async (path: string) => {
+      expect(path).toBe("/api/tools/runtime-config?probe=fast");
+      return {
+        config: {},
+        tshark: { available: true },
+        ffmpeg: { available: true },
+        speech: { available: false },
+        yara: { enabled: true },
+        probe_mode: "fast",
+        probe_state: "fast_ready",
+        probe_timings: { tshark: 1 },
+      };
+    }) as unknown as JsonRequest;
+
+    const client = createToolRuntimeClient(request);
+    const snapshot = await client.getToolRuntimeSnapshot(undefined, "fast");
+
+    expect(snapshot.probeMode).toBe("fast");
+    expect(snapshot.probeState).toBe("fast_ready");
+    expect(snapshot.probeTimings).toEqual({ tshark: 1 });
   });
 });

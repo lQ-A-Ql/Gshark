@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -35,11 +36,13 @@ type runtimeIdentity struct {
 }
 
 type captureStartRequest struct {
-	FilePath      string `json:"file_path"`
-	DisplayFilter string `json:"display_filter"`
-	MaxPackets    int    `json:"max_packets"`
-	EmitPackets   bool   `json:"emit_packets,omitempty"`
-	FastList      bool   `json:"fast_list,omitempty"`
+	FilePath         string `json:"file_path"`
+	DisplayFilter    string `json:"display_filter"`
+	MaxPackets       int    `json:"max_packets"`
+	EmitPackets      bool   `json:"emit_packets,omitempty"`
+	FastList         bool   `json:"fast_list,omitempty"`
+	ListProfile      string `json:"list_profile,omitempty"`
+	EnableEnrichment bool   `json:"enable_enrichment,omitempty"`
 }
 
 type desktopToolRuntimeConfig struct {
@@ -165,20 +168,52 @@ func (a *DesktopApp) IsBackendReady() bool {
 }
 
 func (a *DesktopApp) GetToolRuntimeSnapshot() (map[string]any, error) {
+	return a.getToolRuntimeSnapshot("full")
+}
+
+func (a *DesktopApp) GetToolRuntimeSnapshotFast() (map[string]any, error) {
+	return a.getToolRuntimeSnapshot("fast")
+}
+
+func (a *DesktopApp) GetToolRuntimeSnapshotFull() (map[string]any, error) {
+	return a.getToolRuntimeSnapshot("full")
+}
+
+func (a *DesktopApp) getToolRuntimeSnapshot(probeMode string) (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var snapshot map[string]any
-	if err := a.backendProxy().getJSON(ctx, "/api/tools/runtime-config", &snapshot); err != nil {
+	path := "/api/tools/runtime-config"
+	if strings.TrimSpace(probeMode) != "" {
+		path += "?probe=" + url.QueryEscape(strings.TrimSpace(probeMode))
+	}
+	if err := a.backendProxy().getJSON(ctx, path, &snapshot); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
 }
 
 func (a *DesktopApp) UpdateToolRuntimeConfig(cfg desktopToolRuntimeConfig) (map[string]any, error) {
+	return a.updateToolRuntimeConfig(cfg, "full")
+}
+
+func (a *DesktopApp) UpdateToolRuntimeConfigFast(cfg desktopToolRuntimeConfig) (map[string]any, error) {
+	return a.updateToolRuntimeConfig(cfg, "fast")
+}
+
+func (a *DesktopApp) UpdateToolRuntimeConfigFull(cfg desktopToolRuntimeConfig) (map[string]any, error) {
+	return a.updateToolRuntimeConfig(cfg, "full")
+}
+
+func (a *DesktopApp) updateToolRuntimeConfig(cfg desktopToolRuntimeConfig, probeMode string) (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var snapshot map[string]any
-	if err := a.backendProxy().postJSON(ctx, "/api/tools/runtime-config", cfg, &snapshot); err != nil {
+	path := "/api/tools/runtime-config"
+	if strings.TrimSpace(probeMode) != "" {
+		path += "?probe=" + url.QueryEscape(strings.TrimSpace(probeMode))
+	}
+	if err := a.backendProxy().postJSON(ctx, path, cfg, &snapshot); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
@@ -198,11 +233,13 @@ func (a *DesktopApp) StartCapture(filePath, filter string) error {
 	ctx, cancel := a.backendProxyContext(15 * time.Second)
 	defer cancel()
 	return a.backendProxy().postJSON(ctx, "/api/capture/start", captureStartRequest{
-		FilePath:      strings.TrimSpace(filePath),
-		DisplayFilter: filter,
-		MaxPackets:    0,
-		EmitPackets:   false,
-		FastList:      true,
+		FilePath:         strings.TrimSpace(filePath),
+		DisplayFilter:    filter,
+		MaxPackets:       0,
+		EmitPackets:      false,
+		FastList:         true,
+		ListProfile:      "first_screen",
+		EnableEnrichment: true,
 	}, nil)
 }
 
@@ -229,6 +266,24 @@ func (a *DesktopApp) GetCaptureStatus() (map[string]any, error) {
 	defer cancel()
 	var payload map[string]any
 	if err := a.backendProxy().getJSON(ctx, "/api/capture/status", &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) ListPacketsPage(cursor, limit int, filter string) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	query := fmt.Sprintf(
+		"/api/packets/page?cursor=%d&limit=%d",
+		cursor,
+		limit,
+	)
+	if strings.TrimSpace(filter) != "" {
+		query += "&filter=" + url.QueryEscape(filter)
+	}
+	var payload map[string]any
+	if err := a.backendProxy().getJSON(ctx, query, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil

@@ -30,6 +30,7 @@ type Service struct {
 	activeLoadMu            sync.Mutex
 	activeLoadID            int64
 	activeLoadCancel        context.CancelFunc
+	activeLoadStatus        *model.CaptureLoadStatus
 	captureTaskMu           sync.Mutex
 	captureTaskSeq          int64
 	captureTasks            map[int64]captureTaskCancel
@@ -72,6 +73,9 @@ type Service struct {
 	// the yaraConf slice below). It wraps the composite ToolRuntimeConfig
 	// read so callers always observe a consistent snapshot.
 	toolRuntimeMu sync.RWMutex
+	// toolRuntimeFullProbeMu prevents repeated full runtime probes from
+	// launching duplicate tshark/Python capability processes concurrently.
+	toolRuntimeFullProbeMu sync.Mutex
 
 	huntMu          sync.RWMutex
 	huntingPrefixes []string
@@ -128,6 +132,7 @@ var (
 	filterFrameIDsFn      = tshark.FilterFrameIDs
 	scanFrameIDsFn        = tshark.ScanFrameIDs
 	streamPacketsFn       = tshark.StreamPackets
+	streamPacketsFirstFn  = tshark.StreamPacketsFirstScreen
 	streamPacketsFastFn   = tshark.StreamPacketsFast
 	streamPacketsCompatFn = tshark.StreamPacketsCompat
 	httpStreamFromFileFn  = tshark.ReassembleHTTPStreamFromFileContext
@@ -186,10 +191,12 @@ func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOption
 		s.finishActiveCaptureLoad(currentRunID)
 		return errors.New("empty file path")
 	}
+	s.startCaptureLoadStatus(currentRunID, opts)
 	defer s.finishActiveCaptureLoad(currentRunID)
 
 	if err := s.lockLoad(runCtx); err != nil {
 		log.Printf("engine: capture parse canceled before acquiring load lock file=%q err=%v", opts.FilePath, err)
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, err.Error())
 		s.emitStatus("解析被取消")
 		return err
 	}
@@ -227,10 +234,11 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 
 	tsharkStatus := tshark.CurrentStatus()
 	log.Printf(
-		"engine: load capture file=%q filter=%q fast_list=%t tshark=%q custom=%t",
+		"engine: load capture file=%q filter=%q fast_list=%t list_profile=%q tshark=%q custom=%t",
 		opts.FilePath,
 		opts.DisplayFilter,
 		opts.FastList,
+		normalizeCaptureListProfile(opts),
 		tsharkStatus.Path,
 		tsharkStatus.UsingCustomPath,
 	)
@@ -241,9 +249,13 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		s.emitStatus("大流量包已跳过总包数预估，直接开始入库解析。")
 		log.Printf("engine: skipping packet estimate for %q due to large file fast_list path", opts.FilePath)
 	} else {
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCounting, "")
 		estimatedTotal, countErr := estimatePacketsFn(runCtx, opts)
 		if countErr == nil && estimatedTotal > 0 {
 			total = estimatedTotal
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.EstimatedTotal = total
+			})
 			s.emitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
 			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
 			log.Printf("engine: tshark estimated %d packets for %q", total, opts.FilePath)
@@ -251,13 +263,22 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			log.Printf("engine: tshark packet estimate failed for %q: %v", opts.FilePath, countErr)
 		}
 	}
+	s.setCaptureLoadPhase(currentRunID, model.CaptureLoadParsing, "")
 
 	processed := 0
 	accepted := 0
 	rawStreamIndex := make(map[string]*model.ReassembledStream)
+	profile := normalizeCaptureListProfile(opts)
 	streamFn := streamPacketsFn
-	if opts.FastList {
+	switch profile {
+	case "first_screen":
+		streamFn = streamPacketsFirstFn
+	case "full_fast":
 		streamFn = streamPacketsFastFn
+	case "compat":
+		streamFn = streamPacketsCompatFn
+	case "ek":
+		streamFn = streamPacketsFn
 	}
 
 	pending := make([]model.Packet, 0, 1024)
@@ -272,6 +293,11 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			}
 		}
 		pending = pending[:0]
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Processed = processed
+			status.Accepted = accepted
+			status.StagedCount = nextStore.Count()
+		})
 	}
 
 	err = streamFn(runCtx, opts, func(packet model.Packet) error {
@@ -290,24 +316,32 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		return nil
 	}, func(frameProcessed int) {
 		processed = frameProcessed
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Processed = frameProcessed
+			status.Accepted = accepted
+			status.StagedCount = nextStore.Count()
+		})
 		if total > 0 {
 			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 		}
 	})
 	flushPending()
 	log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", func() string {
-		if opts.FastList {
-			return "fast_list"
-		}
-		return "ek"
+		return profile
 	}(), processed, accepted, err)
-	if opts.FastList && !errors.Is(err, context.Canceled) {
+	if profile == "full_fast" && !errors.Is(err, context.Canceled) {
 		needsFallback := err != nil
 		if !needsFallback && total > 0 && accepted == 0 {
 			needsFallback = true
 		}
 		if needsFallback {
 			s.emitStatus("fast_list compatibility fallback: retrying parse with EK mode")
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.ParserProfile = "ek_fallback"
+				status.Processed = 0
+				status.Accepted = 0
+				status.StagedCount = 0
+			})
 			if resetErr := nextStore.Reset(); resetErr != nil {
 				return resetErr
 			}
@@ -332,6 +366,11 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 				return nil
 			}, func(frameProcessed int) {
 				processed = frameProcessed
+				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+					status.Processed = frameProcessed
+					status.Accepted = accepted
+					status.StagedCount = nextStore.Count()
+				})
 				if total > 0 {
 					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 				}
@@ -348,6 +387,12 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		if needsCompatFallback {
 			s.emitStatus("compatibility fallback: retrying parse with minimal field mode")
 			log.Printf("engine: switching parser to compat_fields fallback for %q", opts.FilePath)
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.ParserProfile = "compat_fields_fallback"
+				status.Processed = 0
+				status.Accepted = 0
+				status.StagedCount = 0
+			})
 			if resetErr := nextStore.Reset(); resetErr != nil {
 				return resetErr
 			}
@@ -371,6 +416,11 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 				return nil
 			}, func(frameProcessed int) {
 				processed = frameProcessed
+				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+					status.Processed = frameProcessed
+					status.Accepted = accepted
+					status.StagedCount = nextStore.Count()
+				})
 				if total > 0 {
 					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
 				}
@@ -395,7 +445,7 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	}
 	log.Printf("engine: packet store path=%q rows=%d", nextStore.Path(), nextStore.Count())
 	s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", nextStore.Count()))
-	if opts.FastList && dropped > 0 {
+	if profile == "full_fast" && dropped > 0 {
 		s.emitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
 	}
 
@@ -411,14 +461,18 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	case nil:
 		if accepted == 0 {
 			s.emitStatus("解析失败: 未读取到有效数据包")
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, "capture parse completed but produced no packets")
 			return errors.New("capture parse completed but produced no packets")
 		}
 		if atomic.LoadInt64(&s.runID) != currentRunID {
 			s.emitStatus("解析被取消")
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, context.Canceled.Error())
 			return context.Canceled
 		}
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCommitting, "")
 		if err := s.commitLoadedCapture(opts.FilePath, nextStore, rawStreamIndex); err != nil {
 			s.emitStatus("解析失败: " + err.Error())
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, err.Error())
 			return err
 		}
 		commitPending = true
@@ -432,10 +486,24 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		}
 		s.mu.Unlock()
 		s.emitStatus("解析完成")
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Phase = string(model.CaptureLoadReady)
+			status.Processed = processed
+			status.Accepted = accepted
+			if s.packetStore != nil {
+				status.StagedCount = s.packetStore.Count()
+			}
+			status.CompletedAt = nowCaptureLoadTimestamp()
+		})
+		if opts.EnableEnrichment && profile == "first_screen" {
+			s.startCaptureEnrichment(opts, currentRunID)
+		}
 	case context.Canceled:
 		s.emitStatus("解析被取消")
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, context.Canceled.Error())
 	default:
 		s.emitStatus("解析失败: " + err.Error())
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, err.Error())
 	}
 	return err
 }
@@ -499,6 +567,73 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 	}
 	s.streamOverrides = map[string]map[int]string{}
 	return nil
+}
+
+func (s *Service) startCaptureEnrichment(opts model.ParseOptions, runID int64) {
+	if strings.TrimSpace(opts.FilePath) == "" {
+		return
+	}
+	s.setCaptureEnrichmentStatus(runID, "pending", 0, 0, "")
+	enrichOpts := opts
+	enrichOpts.ListProfile = "full_fast"
+	enrichOpts.FastList = true
+	enrichOpts.EnableEnrichment = false
+	taskCtx, finish := s.TrackCaptureTask(context.Background(), "capture-enrichment")
+	go func() {
+		defer finish()
+		s.setCaptureEnrichmentStatus(runID, "running", 0, 0, "")
+		processed := 0
+		updated := 0
+		enrichedRawStreamIndex := make(map[string]*model.ReassembledStream)
+		err := streamPacketsFastFn(taskCtx, enrichOpts, func(packet model.Packet) error {
+			if atomic.LoadInt64(&s.runID) != runID {
+				return context.Canceled
+			}
+			appendPacketToRawStreamIndex(enrichedRawStreamIndex, packet)
+			changed, updateErr := s.packetStore.UpdatePacketEnrichment(packet)
+			if updateErr != nil {
+				return updateErr
+			}
+			if changed {
+				updated++
+			}
+			if updated == 1 || updated%2000 == 0 {
+				s.setCaptureEnrichmentStatus(runID, "running", processed, updated, "")
+			}
+			return nil
+		}, func(frameProcessed int) {
+			processed = frameProcessed
+			if frameProcessed == 1 || frameProcessed%2000 == 0 {
+				s.setCaptureEnrichmentStatus(runID, "running", processed, updated, "")
+			}
+		})
+		if errors.Is(err, context.Canceled) {
+			s.setCaptureEnrichmentStatus(runID, "canceled", processed, updated, context.Canceled.Error())
+			return
+		}
+		if err != nil {
+			log.Printf("engine: capture enrichment failed file=%q err=%v", opts.FilePath, err)
+			s.setCaptureEnrichmentStatus(runID, "failed", processed, updated, err.Error())
+			return
+		}
+		if atomic.LoadInt64(&s.runID) != runID {
+			s.setCaptureEnrichmentStatus(runID, "canceled", processed, updated, context.Canceled.Error())
+			return
+		}
+		s.mu.Lock()
+		if s.pcap == opts.FilePath {
+			s.rawStreamIndex = make(map[string]model.ReassembledStream, len(enrichedRawStreamIndex))
+			for key, stream := range enrichedRawStreamIndex {
+				if stream == nil {
+					continue
+				}
+				s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+			}
+		}
+		s.mu.Unlock()
+		s.setCaptureEnrichmentStatus(runID, "ready", processed, updated, "")
+		log.Printf("engine: capture enrichment completed file=%q processed=%d updated=%d", opts.FilePath, processed, updated)
+	}()
 }
 
 func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
@@ -596,6 +731,87 @@ func (s *Service) ActiveCaptureTaskCount() int {
 	return len(s.captureTasks)
 }
 
+func nowCaptureLoadTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func cloneCaptureLoadStatus(status *model.CaptureLoadStatus) *model.CaptureLoadStatus {
+	if status == nil {
+		return nil
+	}
+	clone := *status
+	if status.Enrichment != nil {
+		enrichment := *status.Enrichment
+		clone.Enrichment = &enrichment
+	}
+	return &clone
+}
+
+func normalizeCaptureListProfile(opts model.ParseOptions) string {
+	switch strings.ToLower(strings.TrimSpace(opts.ListProfile)) {
+	case "first_screen":
+		return "first_screen"
+	case "full_fast":
+		return "full_fast"
+	case "compat":
+		return "compat"
+	case "ek":
+		return "ek"
+	}
+	if opts.FastList {
+		return "full_fast"
+	}
+	return "ek"
+}
+
+func (s *Service) startCaptureLoadStatus(runID int64, opts model.ParseOptions) {
+	now := nowCaptureLoadTimestamp()
+	s.activeLoadMu.Lock()
+	s.activeLoadStatus = &model.CaptureLoadStatus{
+		RunID:         runID,
+		FilePath:      opts.FilePath,
+		Phase:         string(model.CaptureLoadStarting),
+		ParserProfile: normalizeCaptureListProfile(opts),
+		StartedAt:     now,
+		UpdatedAt:     now,
+	}
+	s.activeLoadMu.Unlock()
+}
+
+func (s *Service) updateCaptureLoadStatus(runID int64, fn func(*model.CaptureLoadStatus)) {
+	s.activeLoadMu.Lock()
+	defer s.activeLoadMu.Unlock()
+	if s.activeLoadStatus == nil || s.activeLoadStatus.RunID != runID {
+		return
+	}
+	fn(s.activeLoadStatus)
+	s.activeLoadStatus.UpdatedAt = nowCaptureLoadTimestamp()
+}
+
+func (s *Service) setCaptureLoadPhase(runID int64, phase model.CaptureLoadPhase, lastError string) {
+	s.updateCaptureLoadStatus(runID, func(status *model.CaptureLoadStatus) {
+		status.Phase = string(phase)
+		status.LastError = strings.TrimSpace(lastError)
+		switch phase {
+		case model.CaptureLoadReady, model.CaptureLoadFailed, model.CaptureLoadCanceled:
+			status.CompletedAt = nowCaptureLoadTimestamp()
+		}
+	})
+}
+
+func (s *Service) setCaptureEnrichmentStatus(runID int64, phase string, processed, updated int, lastError string) {
+	s.updateCaptureLoadStatus(runID, func(status *model.CaptureLoadStatus) {
+		if status.Enrichment == nil {
+			status.Enrichment = &model.CaptureEnrichmentStatus{}
+		}
+		status.Enrichment.Phase = strings.TrimSpace(phase)
+		status.Enrichment.Processed = processed
+		status.Enrichment.Updated = updated
+		status.Enrichment.LastError = strings.TrimSpace(lastError)
+		status.Enrichment.UpdatedAt = nowCaptureLoadTimestamp()
+	})
+}
+
 func (s *Service) BeginCaptureLoad(ctx context.Context) (int64, context.Context) {
 	currentRunID := atomic.AddInt64(&s.runID, 1)
 	s.CancelActiveCaptureLoad()
@@ -619,14 +835,30 @@ func (s *Service) finishActiveCaptureLoad(runID int64) {
 		s.activeLoadID = 0
 		s.activeLoadCancel = nil
 	}
+	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == runID {
+		switch s.activeLoadStatus.Phase {
+		case string(model.CaptureLoadReady), string(model.CaptureLoadFailed), string(model.CaptureLoadCanceled):
+		default:
+			s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+			s.activeLoadStatus.CompletedAt = nowCaptureLoadTimestamp()
+			s.activeLoadStatus.UpdatedAt = s.activeLoadStatus.CompletedAt
+		}
+	}
 	s.activeLoadMu.Unlock()
 }
 
 func (s *Service) CancelActiveCaptureLoad() bool {
 	s.activeLoadMu.Lock()
 	cancel := s.activeLoadCancel
+	canceledRunID := s.activeLoadID
 	s.activeLoadCancel = nil
 	s.activeLoadID = 0
+	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == canceledRunID && canceledRunID != 0 {
+		now := nowCaptureLoadTimestamp()
+		s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+		s.activeLoadStatus.CompletedAt = now
+		s.activeLoadStatus.UpdatedAt = now
+	}
 	s.activeLoadMu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -721,6 +953,9 @@ func (s *Service) ClearCapture() error {
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
+	s.activeLoadMu.Lock()
+	s.activeLoadStatus = nil
+	s.activeLoadMu.Unlock()
 	return nil
 }
 
@@ -754,10 +989,14 @@ func (s *Service) CaptureStatus() model.CaptureStatus {
 	if s.packetStore != nil {
 		packetCount = s.packetStore.Count()
 	}
+	s.activeLoadMu.Lock()
+	loadStatus := cloneCaptureLoadStatus(s.activeLoadStatus)
+	s.activeLoadMu.Unlock()
 	return model.CaptureStatus{
 		FilePath:    filePath,
 		HasCapture:  filePath != "" && packetCount > 0,
 		PacketCount: packetCount,
+		Load:        loadStatus,
 	}
 }
 

@@ -595,6 +595,10 @@ func (contractToolRuntimeService) ToolRuntimeSnapshotWithContext(context.Context
 	return contractToolRuntimeService{}.ToolRuntimeSnapshot()
 }
 
+func (contractToolRuntimeService) ToolRuntimeSnapshotWithOptions(context.Context, model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot {
+	return contractToolRuntimeService{}.ToolRuntimeSnapshot()
+}
+
 func (contractToolRuntimeService) SetToolRuntimeConfig(model.ToolRuntimeConfig) model.ToolRuntimeConfig {
 	return contractToolRuntimeService{}.ToolRuntimeSnapshot().Config
 }
@@ -614,6 +618,10 @@ func (s *recordingToolRuntimeService) ToolRuntimeSnapshot() model.ToolRuntimeSna
 }
 
 func (s *recordingToolRuntimeService) ToolRuntimeSnapshotWithContext(context.Context) model.ToolRuntimeSnapshot {
+	return s.ToolRuntimeSnapshot()
+}
+
+func (s *recordingToolRuntimeService) ToolRuntimeSnapshotWithOptions(context.Context, model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot {
 	return s.ToolRuntimeSnapshot()
 }
 

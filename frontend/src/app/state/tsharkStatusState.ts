@@ -17,3 +17,12 @@ export function toTSharkStatus(status: ToolRuntimeSnapshot["tshark"]): TSharkSta
     capabilityCheckDegraded: status.capabilityCheckDegraded,
   };
 }
+
+export function describeTSharkReadyStatus(status: TSharkStatus): string {
+  if (status.message && status.message !== "ok") return status.message;
+  return status.usingCustomPath ? `tshark ready: ${status.path}` : "tshark ready";
+}
+
+export function describeTSharkApplyStatus(status: ToolRuntimeSnapshot["tshark"]): string {
+  return status.message && status.message !== "ok" ? status.message : "工具路径已更新";
+}

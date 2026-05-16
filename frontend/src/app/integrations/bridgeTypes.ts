@@ -46,6 +46,7 @@ import type { HuntingRuntimeConfig } from "./clients/huntingClient";
 import type { CaptureStatus, OpenFileResult, PacketLocateResult, PacketsPageResult } from "./clients/captureClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 
+export type { DesktopTransportBinding } from "./desktopTransportBinding";
 export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
@@ -60,8 +61,12 @@ export interface RuntimeClient {
   checkTShark(): Promise<TSharkStatus>;
   checkFFmpeg(): Promise<FFmpegStatus>;
   checkSpeechToText(): Promise<SpeechToTextStatus>;
-  getToolRuntimeSnapshot(signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
-  updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal): Promise<ToolRuntimeSnapshot>;
+  getToolRuntimeSnapshot(signal?: AbortSignal, mode?: "fast" | "full"): Promise<ToolRuntimeSnapshot>;
+  updateToolRuntimeConfig(
+    config: ToolRuntimeConfig,
+    signal?: AbortSignal,
+    mode?: "fast" | "full",
+  ): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
   subscribeEvents(handlers: EventHandlers): () => void;
 }
@@ -98,11 +103,27 @@ export interface ObjectClient {
 export interface StreamClient {
   getHttpStream(streamId: number, signal?: AbortSignal): Promise<HttpStream>;
   getRawStream(protocol: "TCP" | "UDP", streamId: number, signal?: AbortSignal): Promise<BinaryStream>;
-  getRawStreamPage(protocol: "TCP" | "UDP", streamId: number, cursor: number, limit: number, signal?: AbortSignal): Promise<BinaryStream>;
-  decodeStreamPayload(decoder: string, payload: string, options?: Record<string, unknown>, signal?: AbortSignal): Promise<StreamDecodeResult>;
+  getRawStreamPage(
+    protocol: "TCP" | "UDP",
+    streamId: number,
+    cursor: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<BinaryStream>;
+  decodeStreamPayload(
+    decoder: string,
+    payload: string,
+    options?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<StreamDecodeResult>;
   inspectStreamPayload(payload: string, signal?: AbortSignal): Promise<StreamPayloadInspection>;
   listStreamPayloadSources(signal?: AbortSignal, limit?: number): Promise<StreamPayloadSource[]>;
-  updateStreamPayloads(protocol: "HTTP" | "TCP" | "UDP", streamId: number, patches: Array<{ index: number; body: string }>, signal?: AbortSignal): Promise<HttpStream | BinaryStream>;
+  updateStreamPayloads(
+    protocol: "HTTP" | "TCP" | "UDP",
+    streamId: number,
+    patches: Array<{ index: number; body: string }>,
+    signal?: AbortSignal,
+  ): Promise<HttpStream | BinaryStream>;
   listStreamIds(protocol: "HTTP" | "TCP" | "UDP", signal?: AbortSignal): Promise<number[]>;
 }
 
@@ -172,7 +193,8 @@ export interface MiscModuleClient {
 }
 
 export interface BackendBridge
-  extends RuntimeClient,
+  extends
+    RuntimeClient,
     CaptureClient,
     PacketClient,
     HuntingClient,
@@ -200,24 +222,4 @@ export interface BackendClients {
   plugin: PluginClient;
   securityMaterial: SecurityMaterialClient;
   miscModule: MiscModuleClient;
-}
-
-export interface DesktopTransportBinding {
-  BackendStatus?: () => Promise<string>;
-  GetBackendAuthToken?: () => Promise<string | null | undefined>;
-  CheckAppUpdate?: () => Promise<AppUpdateStatus | null | undefined>;
-  InstallAppUpdate?: () => Promise<void>;
-  OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
-  OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
-  IsBackendReady?: () => Promise<boolean>;
-  GetToolRuntimeSnapshot?: () => Promise<unknown>;
-  UpdateToolRuntimeConfig?: (config: unknown) => Promise<unknown>;
-  SetTSharkPath?: (path: string) => Promise<unknown>;
-  StartCapture?: (filePath: string, filter: string) => Promise<void>;
-  StopCapture?: () => Promise<void>;
-  PrepareCaptureReplacement?: () => Promise<void>;
-  CloseCapture?: () => Promise<void>;
-  GetCaptureStatus?: () => Promise<unknown>;
-  GetTLSConfig?: () => Promise<unknown>;
-  UpdateTLSConfig?: (cfg: unknown) => Promise<void>;
 }

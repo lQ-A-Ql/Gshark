@@ -204,6 +204,40 @@ func TestBuildFastListScanArgsUsesCapabilityAliases(t *testing.T) {
 	}
 }
 
+func TestFirstScreenListFieldsStayLightweight(t *testing.T) {
+	fields := map[string]struct{}{}
+	for _, field := range firstScreenListFields {
+		fields[field] = struct{}{}
+	}
+	for _, required := range []string{
+		"frame.number",
+		"frame.time_epoch",
+		"ip.src",
+		"ip.dst",
+		"_ws.col.Info",
+		"tcp.stream",
+		"udp.stream",
+	} {
+		if _, ok := fields[required]; !ok {
+			t.Fatalf("first-screen field set missing required field %q", required)
+		}
+	}
+	for _, heavy := range []string{
+		"tcp.analysis.flags",
+		"tcp.analysis.window_update",
+		"ip.checksum.status",
+		"smb",
+		"ospf",
+		"bgp",
+		"systemd_journal",
+		"sysdig",
+	} {
+		if _, ok := fields[heavy]; ok {
+			t.Fatalf("first-screen field set should not include heavy field %q", heavy)
+		}
+	}
+}
+
 func TestBuildPlannedFieldArgsForStreamFollowUsesAliases(t *testing.T) {
 	oldBinary := ConfiguredBinaryPath()
 	t.Cleanup(func() {
