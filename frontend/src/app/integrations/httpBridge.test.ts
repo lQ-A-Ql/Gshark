@@ -13,6 +13,7 @@ describe("httpBridge transport helpers", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     resetBackendAuthTokenCache();
   });
@@ -96,5 +97,105 @@ describe("httpBridge transport helpers", () => {
     fetchMock.mockRejectedValueOnce(abortError);
 
     await expect(requestJSON("/api/packets/page", undefined, () => undefined)).rejects.toBe(abortError);
+  });
+
+  it("does not cache an empty desktop token and recovers when the binding later returns one", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const binding: DesktopTransportBinding = {
+      GetBackendAuthToken: vi.fn()
+        .mockResolvedValueOnce("")
+        .mockResolvedValueOnce("late-token"),
+    };
+
+    await expect(requestJSON("/api/capture/status", undefined, () => binding)).rejects.toThrow("token 尚未就绪");
+    await expect(requestJSON("/api/capture/status", undefined, () => binding)).resolves.toMatchObject({ ok: true });
+
+    expect(binding.GetBackendAuthToken).toHaveBeenCalledTimes(2);
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer late-token");
+  });
+
+  it("does not cache rejected desktop token reads", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const binding: DesktopTransportBinding = {
+      GetBackendAuthToken: vi.fn()
+        .mockRejectedValueOnce(new Error("binding still starting"))
+        .mockResolvedValueOnce("ready-token"),
+    };
+
+    await expect(requestJSON("/api/runtime/identity", undefined, () => binding)).rejects.toThrow("binding still starting");
+    await expect(requestJSON("/api/runtime/identity", undefined, () => binding)).resolves.toMatchObject({ ok: true });
+
+    expect(binding.GetBackendAuthToken).toHaveBeenCalledTimes(2);
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer ready-token");
+  });
+
+  it("times out pending desktop token reads instead of leaving page requests loading forever", async () => {
+    vi.useFakeTimers();
+    const binding: DesktopTransportBinding = {
+      GetBackendAuthToken: vi.fn(async () => new Promise<string>(() => undefined)),
+    };
+
+    const request = requestJSON("/api/runtime/identity", undefined, () => binding);
+    const expectation = expect(request).rejects.toThrow("Wails token 初始化超时");
+    await vi.advanceTimersByTimeAsync(1500);
+
+    await expectation;
+    vi.useRealTimers();
+  });
+
+  it("clears token cache and retries once after a 401", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          statusText: "Unauthorized",
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    const binding: DesktopTransportBinding = {
+      GetBackendAuthToken: vi.fn()
+        .mockResolvedValueOnce("stale-token")
+        .mockResolvedValueOnce("fresh-token"),
+    };
+
+    await expect(requestJSON("/api/runtime/identity", undefined, () => binding)).resolves.toMatchObject({ status: "ok" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((fetchMock.mock.calls[0]?.[1]?.headers as Headers).get("Authorization")).toBe("Bearer stale-token");
+    expect((fetchMock.mock.calls[1]?.[1]?.headers as Headers).get("Authorization")).toBe("Bearer fresh-token");
+  });
+
+  it("times out pending backend HTTP requests with an actionable error", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockReturnValueOnce(new Promise<Response>(() => undefined));
+
+    const request = requestJSON("/health", undefined, () => undefined);
+    const expectation = expect(request).rejects.toThrow("后端请求超时");
+    await vi.advanceTimersByTimeAsync(15000);
+
+    await expectation;
+    vi.useRealTimers();
   });
 });

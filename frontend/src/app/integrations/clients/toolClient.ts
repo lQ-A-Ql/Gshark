@@ -48,7 +48,8 @@ import type {
 import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
-type BuildHeaders = (path: string, headersInit?: HeadersInit, body?: BodyInit | null) => Promise<Headers>;
+type BlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
+type TextRequest = (path: string, init?: RequestInit) => Promise<string>;
 
 export interface ToolClient {
   runWinRMDecrypt(req: WinRMDecryptRequest): Promise<WinRMDecryptResult>;
@@ -67,7 +68,7 @@ export interface ToolClient {
   getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal): Promise<ShiroRememberMeAnalysis>;
 }
 
-export function createToolClient(request: JsonRequest, apiBase: string, buildHeaders: BuildHeaders): ToolClient {
+export function createToolClient(request: JsonRequest, requestText: TextRequest, requestBlob: BlobRequest): ToolClient {
   return {
     async runWinRMDecrypt(req: WinRMDecryptRequest) {
       const payload = await request<WinRMDecryptResultWireDTO>("/api/tools/winrm-decrypt", {
@@ -87,24 +88,12 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
 
     async getWinRMDecryptResultText(resultId: string) {
       const path = `/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`;
-      const response = await fetch(`${apiBase}${path}`, {
-        headers: await buildHeaders(path),
-      });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "获取 WinRM 结果失败"));
-      }
-      return await response.text();
+      return await requestText(path);
     },
 
     async exportWinRMDecryptResult(resultId: string, filename: string) {
       const path = `/api/tools/winrm-decrypt/export?result_id=${encodeURIComponent(resultId)}`;
-      const response = await fetch(`${apiBase}${path}`, {
-        headers: await buildHeaders(path),
-      });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "导出 WinRM 结果失败"));
-      }
-      downloadBlob(filename, await response.blob());
+      downloadBlob(filename, await requestBlob(path));
     },
 
     async listMiscModules() {
@@ -189,13 +178,4 @@ export function createToolClient(request: JsonRequest, apiBase: string, buildHea
       return asShiroRememberMeAnalysis(payload);
     },
   };
-}
-
-async function readErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = await response.json();
-    return String(payload.error ?? fallback);
-  } catch {
-    return fallback;
-  }
 }

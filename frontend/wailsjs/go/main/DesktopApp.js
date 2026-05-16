@@ -22,8 +22,24 @@ export function GetCaptureStatus() {
   return window['go']['main']['DesktopApp']['GetCaptureStatus']();
 }
 
+export function InvokeBackendBlob(req) {
+  return window['go']['main']['DesktopApp']['InvokeBackendBlob'](req);
+}
+
+export function InvokeBackendJSON(req) {
+  return window['go']['main']['DesktopApp']['InvokeBackendJSON'](req);
+}
+
+export function InvokeBackendText(req) {
+  return window['go']['main']['DesktopApp']['InvokeBackendText'](req);
+}
+
 export function ListPacketsPage(cursor, limit, filter) {
   return window['go']['main']['DesktopApp']['ListPacketsPage'](cursor, limit, filter);
+}
+
+export function PingBackendDataPlane() {
+  return window['go']['main']['DesktopApp']['PingBackendDataPlane']();
 }
 
 export function GetTLSConfig() {

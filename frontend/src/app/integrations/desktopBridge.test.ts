@@ -86,7 +86,9 @@ describe("createDesktopBridge", () => {
         yara: { enabled: false, message: "", timeout_ms: 30000 },
       })),
     };
-    const fallbackBridge = createFallbackBridge();
+    const fallbackBridge = createFallbackBridge({
+      isAvailable: vi.fn(async () => true),
+    });
     const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
 
     await expect(bridge.isAvailable()).resolves.toBe(true);
@@ -111,6 +113,7 @@ describe("createDesktopBridge", () => {
     });
 
     expect(desktopApp.StartCapture).toHaveBeenCalledWith("C:/cases/sample.pcapng", "tcp");
+    expect(fallbackBridge.isAvailable).toHaveBeenCalledTimes(1);
     expect(desktopApp.UpdateTLSConfig).toHaveBeenCalledWith({
       ssl_key_log_file: "C:/keys/ssl.log",
       rsa_private_key: "",
@@ -122,7 +125,35 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getTLSConfig).not.toHaveBeenCalled();
   });
 
-  it("keeps packet, stream, analysis, and event data-plane calls on the HTTP fallback", async () => {
+  it("does not report desktop availability until the HTTP data-plane probe passes", async () => {
+    const fallbackBridge = createFallbackBridge({
+      isAvailable: vi.fn(async () => false),
+    });
+    const bridge = createDesktopBridge({
+      desktopApp: { IsBackendReady: vi.fn(async () => true) },
+      fallbackBridge,
+    });
+
+    await expect(bridge.isAvailable()).resolves.toBe(false);
+
+    expect(fallbackBridge.isAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips HTTP data-plane probes while the desktop backend is not ready", async () => {
+    const fallbackBridge = createFallbackBridge({
+      isAvailable: vi.fn(async () => true),
+    });
+    const desktopApp: DesktopTransportBinding = {
+      IsBackendReady: vi.fn(async () => false),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    await expect(bridge.isAvailable()).resolves.toBe(false);
+
+    expect(fallbackBridge.isAvailable).not.toHaveBeenCalled();
+  });
+
+  it("keeps packet, stream, analysis, and event data-plane calls on HTTP only when generic IPC is missing", async () => {
     const unsubscribe = vi.fn();
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
@@ -214,6 +245,82 @@ describe("createDesktopBridge", () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
+  it("routes long-tail page data through generic Wails IPC when the binding exists", async () => {
+    const fallbackBridge = createFallbackBridge({
+      getIndustrialAnalysis: vi.fn(),
+      getEvidenceWithFilter: vi.fn(),
+      listMiscModules: vi.fn(),
+    });
+    const invokeBackendJSON = vi.fn(async (request: unknown) => {
+      const path = String((request as { path?: unknown }).path ?? "");
+      switch (path) {
+        case "/api/analysis/industrial":
+          return {
+            total_industrial_packets: 0,
+            protocols: [],
+            conversations: [],
+            modbus: {
+              total_frames: 0,
+              requests: 0,
+              responses: 0,
+              exceptions: 0,
+              function_codes: [],
+              unit_ids: [],
+              reference_hits: [],
+              exception_codes: [],
+              transactions: [],
+            },
+            details: [],
+            notes: [],
+            report: { summary: [], evidence: [], details: [], recommendations: [] },
+          };
+        case "/api/evidence?modules=vehicle":
+          return { records: [] };
+        case "/api/tools/misc/modules":
+          return [];
+        default:
+          throw new Error(`unexpected IPC path: ${path}`);
+      }
+    });
+    const bridge = createDesktopBridge({
+      desktopApp: {
+        InvokeBackendJSON: invokeBackendJSON,
+        InvokeBackendBlob: vi.fn(),
+        InvokeBackendText: vi.fn(),
+      },
+      fallbackBridge,
+    });
+
+    await bridge.getIndustrialAnalysis();
+    await bridge.getEvidenceWithFilter(["vehicle"]);
+    await bridge.listMiscModules();
+
+    expect(invokeBackendJSON).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        path: "/api/analysis/industrial",
+        body_kind: "none",
+      }),
+    );
+    expect(invokeBackendJSON).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        path: "/api/evidence?modules=vehicle",
+        body_kind: "none",
+      }),
+    );
+    expect(invokeBackendJSON).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        path: "/api/tools/misc/modules",
+        body_kind: "none",
+      }),
+    );
+    expect(fallbackBridge.getIndustrialAnalysis).not.toHaveBeenCalled();
+    expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
+    expect(fallbackBridge.listMiscModules).not.toHaveBeenCalled();
+  });
+
   it("uses Wails IPC for packet pages and falls back to HTTP with transport metadata", async () => {
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
@@ -241,7 +348,7 @@ describe("createDesktopBridge", () => {
     expect(page.transport).toBe("desktop-ipc");
   });
 
-  it("falls back to HTTP when Wails packet page IPC fails", async () => {
+  it("surfaces Wails packet page IPC errors instead of silently falling back to browser HTTP", async () => {
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
         items: [],
@@ -259,11 +366,8 @@ describe("createDesktopBridge", () => {
       fallbackBridge,
     });
 
-    const page = await bridge.listPacketsPage(0, 50, "");
-
-    expect(page).toMatchObject({ nextCursor: 10, total: 10, hasMore: false });
-    expect(page.transport).toBe("http-fallback");
-    expect(page.transportError).toBe("ipc unavailable");
+    await expect(bridge.listPacketsPage(0, 50, "")).rejects.toThrow("ipc unavailable");
+    expect(fallbackBridge.listPacketsPage).not.toHaveBeenCalled();
   });
 
   it("falls back per method when a desktop control-plane binding is missing", async () => {

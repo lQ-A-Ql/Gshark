@@ -12,6 +12,12 @@ export interface DesktopAppBinding {
 
 type GetDesktopApp = () => DesktopAppBinding | undefined;
 
+let lastBackendReadinessError = "";
+
+export function getLastBackendReadinessError() {
+  return lastBackendReadinessError;
+}
+
 export interface DesktopClient {
   isAvailable(): Promise<boolean>;
   getDesktopBackendStatus(): Promise<string>;
@@ -70,8 +76,12 @@ export function createDesktopClient(request: JsonRequest, getDesktopApp: GetDesk
       }
       try {
         await request<{ status: string }>("/health");
+        await request<unknown>("/api/runtime/identity");
+        await request<unknown>("/api/capture/status");
+        lastBackendReadinessError = "";
         return true;
-      } catch {
+      } catch (error) {
+        lastBackendReadinessError = describeDataPlaneReadinessError(error);
         return false;
       }
     },
@@ -124,4 +134,11 @@ export function createDesktopClient(request: JsonRequest, getDesktopApp: GetDesk
       };
     },
   };
+}
+
+function describeDataPlaneReadinessError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return `后端端口在线，但 HTTP 数据面不可用：${error.message}`;
+  }
+  return "后端端口在线，但 HTTP 数据面不可用：无法完成鉴权或状态探针。";
 }

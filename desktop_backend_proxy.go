@@ -5,11 +5,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"time"
@@ -62,6 +66,44 @@ type desktopTLSConfig struct {
 	TargetIPPort  string `json:"target_ip_port"`
 }
 
+type desktopBackendRequest struct {
+	Method    string                 `json:"method"`
+	Path      string                 `json:"path"`
+	BodyKind  string                 `json:"body_kind"`
+	JSONBody  any                    `json:"json_body,omitempty"`
+	Multipart []desktopMultipartPart `json:"multipart,omitempty"`
+	TimeoutMS int                    `json:"timeout_ms,omitempty"`
+}
+
+type desktopMultipartPart struct {
+	Name        string `json:"name"`
+	Filename    string `json:"filename,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+	Value       string `json:"value,omitempty"`
+	DataBase64  string `json:"data_base64,omitempty"`
+}
+
+type desktopBackendBlob struct {
+	DataBase64  string `json:"data_base64"`
+	ContentType string `json:"content_type"`
+	Filename    string `json:"filename,omitempty"`
+	Size        int64  `json:"size"`
+}
+
+type desktopBackendProbe struct {
+	Ready           bool   `json:"ready"`
+	HealthOK        bool   `json:"health_ok"`
+	IdentityOK      bool   `json:"identity_ok"`
+	CaptureStatusOK bool   `json:"capture_status_ok"`
+	Message         string `json:"message,omitempty"`
+}
+
+type backendProxyRawResponse struct {
+	StatusCode int
+	Header     http.Header
+	Body       []byte
+}
+
 func newBackendProxyClient(token string) *backendProxyClient {
 	return newBackendProxyClientWithBaseURL(backendBaseURL, token)
 }
@@ -87,22 +129,43 @@ func (c *backendProxyClient) postJSON(ctx context.Context, path string, payload 
 
 func (c *backendProxyClient) doJSON(ctx context.Context, method, path string, payload any, dest any) error {
 	var body io.Reader
+	contentType := ""
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
 			return fmt.Errorf("encode request body: %w", err)
 		}
 		body = bytes.NewReader(encoded)
+		contentType = "application/json"
+	}
+
+	raw, err := c.doRaw(ctx, method, path, body, contentType)
+	if err != nil {
+		return err
+	}
+	if dest == nil || len(bytes.TrimSpace(raw.Body)) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(raw.Body, dest); err != nil {
+		return fmt.Errorf("decode backend response: %w", err)
+	}
+	return nil
+}
+
+func (c *backendProxyClient) doRaw(ctx context.Context, method, path string, body io.Reader, contentType string) (backendProxyRawResponse, error) {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = http.MethodGet
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("build backend request: %w", err)
+		return backendProxyRawResponse{}, fmt.Errorf("build backend request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
-	if payload != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(contentType) != "" {
+		req.Header.Set("Content-Type", strings.TrimSpace(contentType))
 	}
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
@@ -110,24 +173,18 @@ func (c *backendProxyClient) doJSON(ctx context.Context, method, path string, pa
 
 	res, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("connect backend %s %s: %w", method, path, err)
+		return backendProxyRawResponse{}, fmt.Errorf("connect backend %s %s: %w", method, path, err)
 	}
 	defer res.Body.Close()
 
 	raw, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("read backend response: %w", err)
+		return backendProxyRawResponse{}, fmt.Errorf("read backend response: %w", err)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return normalizeBackendProxyError(res.StatusCode, raw)
+		return backendProxyRawResponse{}, normalizeBackendProxyError(res.StatusCode, raw)
 	}
-	if dest == nil || len(bytes.TrimSpace(raw)) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(raw, dest); err != nil {
-		return fmt.Errorf("decode backend response: %w", err)
-	}
-	return nil
+	return backendProxyRawResponse{StatusCode: res.StatusCode, Header: res.Header.Clone(), Body: raw}, nil
 }
 
 func normalizeBackendProxyError(statusCode int, raw []byte) error {
@@ -149,8 +206,22 @@ func normalizeBackendProxyError(statusCode int, raw []byte) error {
 func (a *DesktopApp) backendProxy() *backendProxyClient {
 	a.mu.Lock()
 	token := a.backendAuthToken
+	baseURL := strings.TrimSpace(a.backendBaseURL)
 	a.mu.Unlock()
-	return newBackendProxyClient(token)
+	if baseURL == "" {
+		baseURL = backendBaseURL
+	}
+	return newBackendProxyClientWithBaseURL(baseURL, token)
+}
+
+func (a *DesktopApp) backendProxyBaseURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	baseURL := strings.TrimSpace(a.backendBaseURL)
+	if baseURL == "" {
+		return backendBaseURL
+	}
+	return strings.TrimRight(baseURL, "/")
 }
 
 func (a *DesktopApp) backendProxyContext(timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -165,6 +236,246 @@ func (a *DesktopApp) IsBackendReady() bool {
 	defer cancel()
 	var payload map[string]string
 	return a.backendProxy().getJSON(ctx, "/health", &payload) == nil
+}
+
+func (a *DesktopApp) PingBackendDataPlane() desktopBackendProbe {
+	ctx, cancel := a.backendProxyContext(8 * time.Second)
+	defer cancel()
+	proxy := a.backendProxy()
+	probe := desktopBackendProbe{}
+
+	var health map[string]any
+	if err := proxy.getJSON(ctx, "/health", &health); err != nil {
+		probe.Message = "health probe failed: " + err.Error()
+		return probe
+	}
+	probe.HealthOK = true
+
+	var identity map[string]any
+	if err := proxy.getJSON(ctx, "/api/runtime/identity", &identity); err != nil {
+		probe.Message = "runtime identity probe failed: " + err.Error()
+		return probe
+	}
+	probe.IdentityOK = true
+
+	var status map[string]any
+	if err := proxy.getJSON(ctx, "/api/capture/status", &status); err != nil {
+		probe.Message = "capture status probe failed: " + err.Error()
+		return probe
+	}
+	probe.CaptureStatusOK = true
+	probe.Ready = true
+	return probe
+}
+
+func (a *DesktopApp) InvokeBackendJSON(req desktopBackendRequest) (any, error) {
+	raw, err := a.invokeBackendRaw(req, "json")
+	if err != nil {
+		return nil, err
+	}
+	if len(bytes.TrimSpace(raw.Body)) == 0 {
+		return map[string]any{}, nil
+	}
+	var payload any
+	if err := json.Unmarshal(raw.Body, &payload); err != nil {
+		return nil, fmt.Errorf("decode backend JSON response for %s %s: %w", req.normalizedMethod(), req.Path, err)
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) InvokeBackendBlob(req desktopBackendRequest) (desktopBackendBlob, error) {
+	raw, err := a.invokeBackendRaw(req, "blob")
+	if err != nil {
+		return desktopBackendBlob{}, err
+	}
+	contentType := strings.TrimSpace(raw.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	return desktopBackendBlob{
+		DataBase64:  base64.StdEncoding.EncodeToString(raw.Body),
+		ContentType: contentType,
+		Filename:    filenameFromContentDisposition(raw.Header.Get("Content-Disposition")),
+		Size:        int64(len(raw.Body)),
+	}, nil
+}
+
+func (a *DesktopApp) InvokeBackendText(req desktopBackendRequest) (string, error) {
+	raw, err := a.invokeBackendRaw(req, "text")
+	if err != nil {
+		return "", err
+	}
+	return string(raw.Body), nil
+}
+
+func (a *DesktopApp) invokeBackendRaw(req desktopBackendRequest, responseKind string) (backendProxyRawResponse, error) {
+	method, path, err := validateDesktopBackendRequest(req)
+	if err != nil {
+		return backendProxyRawResponse{}, err
+	}
+	body, contentType, err := desktopBackendRequestBody(req)
+	if err != nil {
+		return backendProxyRawResponse{}, fmt.Errorf("prepare IPC backend request body for %s %s: %w", method, path, err)
+	}
+	timeout := desktopBackendRequestTimeout(req, method, path)
+	ctx, cancel := a.backendProxyContext(timeout)
+	defer cancel()
+	raw, err := a.backendProxy().doRaw(ctx, method, path, body, contentType)
+	if err != nil {
+		return backendProxyRawResponse{}, fmt.Errorf("desktop IPC backend %s request failed for %s %s: %w", responseKind, method, path, err)
+	}
+	return raw, nil
+}
+
+func (r desktopBackendRequest) normalizedMethod() string {
+	method := strings.ToUpper(strings.TrimSpace(r.Method))
+	if method == "" {
+		return http.MethodGet
+	}
+	return method
+}
+
+func validateDesktopBackendRequest(req desktopBackendRequest) (string, string, error) {
+	method := req.normalizedMethod()
+	switch method {
+	case http.MethodGet, http.MethodPost, http.MethodDelete:
+	default:
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: unsupported method %q", method)
+	}
+
+	rawPath := strings.TrimSpace(req.Path)
+	if rawPath == "" {
+		return "", "", errors.New("desktop IPC backend request rejected: empty path")
+	}
+	if strings.Contains(rawPath, "\\") {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: path contains backslash: %q", rawPath)
+	}
+	if strings.HasPrefix(strings.ToLower(rawPath), "http://") || strings.HasPrefix(strings.ToLower(rawPath), "https://") {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: absolute URL is not allowed: %q", rawPath)
+	}
+
+	parsed, err := url.ParseRequestURI(rawPath)
+	if err != nil {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: invalid path %q: %w", rawPath, err)
+	}
+	if parsed.Scheme != "" || parsed.Host != "" {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: absolute URL is not allowed: %q", rawPath)
+	}
+	if !strings.HasPrefix(parsed.Path, "/") {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: path must start with /: %q", rawPath)
+	}
+	unescapedPath, unescapeErr := url.PathUnescape(parsed.Path)
+	if unescapeErr != nil {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: invalid escaped path %q: %w", rawPath, unescapeErr)
+	}
+	if strings.Contains(unescapedPath, "\\") || strings.Contains(unescapedPath, "..") {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: unsafe path %q", rawPath)
+	}
+	if parsed.Path != "/health" && !strings.HasPrefix(parsed.Path, "/api/") {
+		return "", "", fmt.Errorf("desktop IPC backend request rejected: path outside backend allowlist: %q", rawPath)
+	}
+	return method, rawPath, nil
+}
+
+func desktopBackendRequestBody(req desktopBackendRequest) (io.Reader, string, error) {
+	bodyKind := strings.ToLower(strings.TrimSpace(req.BodyKind))
+	if bodyKind == "" {
+		if req.JSONBody != nil {
+			bodyKind = "json"
+		} else {
+			bodyKind = "none"
+		}
+	}
+
+	switch bodyKind {
+	case "none":
+		return nil, "", nil
+	case "json":
+		encoded, err := json.Marshal(req.JSONBody)
+		if err != nil {
+			return nil, "", fmt.Errorf("encode JSON body: %w", err)
+		}
+		return bytes.NewReader(encoded), "application/json", nil
+	case "multipart":
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		for _, part := range req.Multipart {
+			name := strings.TrimSpace(part.Name)
+			if name == "" {
+				_ = writer.Close()
+				return nil, "", errors.New("multipart part name is required")
+			}
+			if strings.TrimSpace(part.DataBase64) == "" {
+				if err := writer.WriteField(name, part.Value); err != nil {
+					_ = writer.Close()
+					return nil, "", fmt.Errorf("write multipart field %q: %w", name, err)
+				}
+				continue
+			}
+
+			data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(part.DataBase64))
+			if err != nil {
+				_ = writer.Close()
+				return nil, "", fmt.Errorf("decode multipart part %q: %w", name, err)
+			}
+			header := make(textproto.MIMEHeader)
+			dispositionParams := map[string]string{"name": name}
+			if filename := strings.TrimSpace(part.Filename); filename != "" {
+				dispositionParams["filename"] = filename
+			}
+			header.Set("Content-Disposition", mime.FormatMediaType("form-data", dispositionParams))
+			if contentType := strings.TrimSpace(part.ContentType); contentType != "" {
+				header.Set("Content-Type", contentType)
+			}
+			writerPart, err := writer.CreatePart(header)
+			if err != nil {
+				_ = writer.Close()
+				return nil, "", fmt.Errorf("create multipart part %q: %w", name, err)
+			}
+			if _, err := writerPart.Write(data); err != nil {
+				_ = writer.Close()
+				return nil, "", fmt.Errorf("write multipart part %q: %w", name, err)
+			}
+		}
+		if err := writer.Close(); err != nil {
+			return nil, "", fmt.Errorf("close multipart body: %w", err)
+		}
+		return bytes.NewReader(buf.Bytes()), writer.FormDataContentType(), nil
+	default:
+		return nil, "", fmt.Errorf("unsupported body kind %q", bodyKind)
+	}
+}
+
+func desktopBackendRequestTimeout(req desktopBackendRequest, method, path string) time.Duration {
+	if req.TimeoutMS > 0 {
+		return time.Duration(req.TimeoutMS) * time.Millisecond
+	}
+	normalizedPath := strings.ToLower(path)
+	if strings.Contains(normalizedPath, "/download") ||
+		strings.Contains(normalizedPath, "/export") ||
+		strings.Contains(normalizedPath, "/play") ||
+		strings.Contains(normalizedPath, "/transcribe") {
+		return 60 * time.Second
+	}
+	if method == http.MethodPost ||
+		strings.HasPrefix(normalizedPath, "/api/analysis/") ||
+		strings.HasPrefix(normalizedPath, "/api/c2-analysis") ||
+		strings.HasPrefix(normalizedPath, "/api/apt-analysis") ||
+		strings.HasPrefix(normalizedPath, "/api/evidence") ||
+		strings.HasPrefix(normalizedPath, "/api/stats/") ||
+		strings.HasPrefix(normalizedPath, "/api/objects") ||
+		strings.HasPrefix(normalizedPath, "/api/streams") {
+		return 30 * time.Second
+	}
+	return 15 * time.Second
+}
+
+func filenameFromContentDisposition(header string) string {
+	_, params, err := mime.ParseMediaType(strings.TrimSpace(header))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(params["filename"])
 }
 
 func (a *DesktopApp) GetToolRuntimeSnapshot() (map[string]any, error) {

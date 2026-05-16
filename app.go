@@ -24,8 +24,11 @@ type DesktopApp struct {
 	ctx              context.Context
 	backendCmd       *exec.Cmd
 	backendAuthToken string
+	backendBaseURL   string
 	backendStatus    string
 	mu               sync.Mutex
+	eventMu          sync.Mutex
+	eventCancel      context.CancelFunc
 	updateMu         sync.Mutex
 	updateInProgress bool
 }
@@ -38,7 +41,8 @@ type openCaptureDialogResult struct {
 
 func NewDesktopApp() *DesktopApp {
 	return &DesktopApp{
-		backendStatus: "not-started",
+		backendStatus:  "not-started",
+		backendBaseURL: backendBaseURL,
 	}
 }
 
@@ -53,6 +57,7 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 		}
 		return
 	}
+	a.startBackendEventBridge()
 	if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
 		writeReleaseSmokeResult("release smoke check: ok")
 		a.stopBackend()
@@ -62,6 +67,7 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 
 func (a *DesktopApp) Shutdown(_ context.Context) {
 	a.setBackendStatus("stopped")
+	a.stopBackendEventBridge()
 	a.stopBackend()
 }
 
@@ -467,6 +473,7 @@ func isLoopbackBackendListening(addr string) bool {
 }
 
 func (a *DesktopApp) stopBackend() {
+	a.stopBackendEventBridge()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.backendCmd == nil || a.backendCmd.Process == nil {

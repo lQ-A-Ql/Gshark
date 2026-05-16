@@ -11,7 +11,11 @@ vi.mock("../../utils/browserFile", () => ({
 import { createToolClient } from "./toolClient";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
-type BuildHeaders = (path: string, headersInit?: HeadersInit, body?: BodyInit | null) => Promise<Headers>;
+type TextRequest = (path: string, init?: RequestInit) => Promise<string>;
+type BlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
+
+const noopTextRequest = vi.fn(async () => "") as unknown as TextRequest;
+const noopBlobRequest = vi.fn(async () => new Blob()) as unknown as BlobRequest;
 
 describe("toolClient WinRM methods", () => {
   afterEach(() => {
@@ -40,9 +44,7 @@ describe("toolClient WinRM methods", () => {
         export_filename: "winrm.txt",
       };
     }) as unknown as JsonRequest;
-    const buildHeaders = vi.fn() as unknown as BuildHeaders;
-
-    const result = await createToolClient(request, "http://127.0.0.1", buildHeaders).runWinRMDecrypt({
+    const result = await createToolClient(request, noopTextRequest, noopBlobRequest).runWinRMDecrypt({
       port: 5985,
       authMode: "nt_hash",
       ntHash: "hash",
@@ -63,32 +65,24 @@ describe("toolClient WinRM methods", () => {
 
   it("fetches WinRM result text with auth headers", async () => {
     const request = vi.fn() as unknown as JsonRequest;
-    const buildHeaders = vi.fn(async (path: string) => {
+    const textRequest = vi.fn(async (path: string) => {
       expect(path).toBe("/api/tools/winrm-decrypt/export?result_id=res-1");
-      return new Headers({ Authorization: "Bearer token" });
-    }) as unknown as BuildHeaders;
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      expect(url).toBe("http://127.0.0.1/api/tools/winrm-decrypt/export?result_id=res-1");
-      expect((init?.headers as Headers).get("Authorization")).toBe("Bearer token");
-      return new Response("plain text", { status: 200 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
+      return "plain text";
+    }) as unknown as TextRequest;
 
     await expect(
-      createToolClient(request, "http://127.0.0.1", buildHeaders).getWinRMDecryptResultText("res-1"),
+      createToolClient(request, textRequest, noopBlobRequest).getWinRMDecryptResultText("res-1"),
     ).resolves.toBe("plain text");
   });
 
-  it("exports WinRM result blobs and surfaces JSON errors", async () => {
+  it("exports WinRM result blobs and surfaces text errors", async () => {
     const request = vi.fn() as unknown as JsonRequest;
-    const buildHeaders = vi.fn(async () => new Headers()) as unknown as BuildHeaders;
     const blob = new Blob(["zip"]);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(blob, { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "no result" }), { status: 404 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const client = createToolClient(request, "http://127.0.0.1", buildHeaders);
+    const blobRequest = vi.fn(async () => blob) as unknown as BlobRequest;
+    const textRequest = vi.fn(async () => {
+      throw new Error("no result");
+    }) as unknown as TextRequest;
+    const client = createToolClient(request, textRequest, blobRequest);
 
     await expect(client.exportWinRMDecryptResult("res-1", "winrm.txt")).resolves.toBeUndefined();
     expect(mocks.downloadBlob).toHaveBeenCalledWith("winrm.txt", expect.any(Blob));
@@ -112,7 +106,7 @@ describe("toolClient protocol analysis methods", () => {
           throw new Error(`unexpected path: ${path}`);
       }
     }) as unknown as JsonRequest;
-    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+    const client = createToolClient(request, noopTextRequest, noopBlobRequest);
 
     await expect(client.getHTTPLoginAnalysis(signal)).resolves.toMatchObject({
       totalAttempts: 2,
@@ -142,10 +136,7 @@ describe("toolClient protocol analysis methods", () => {
     }) as unknown as JsonRequest;
 
     await expect(
-      createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders).getShiroRememberMeAnalysis(
-        ["k1", "k2"],
-        signal,
-      ),
+      createToolClient(request, noopTextRequest, noopBlobRequest).getShiroRememberMeAnalysis(["k1", "k2"], signal),
     ).resolves.toMatchObject({
       candidateCount: 2,
       hitCount: 1,
@@ -166,7 +157,7 @@ describe("toolClient SMB3 and NTLM methods", () => {
           throw new Error(`unexpected path: ${path}`);
       }
     }) as unknown as JsonRequest;
-    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+    const client = createToolClient(request, noopTextRequest, noopBlobRequest);
 
     await expect(client.listSMB3SessionCandidates()).resolves.toMatchObject([
       { sessionId: "smb-1", username: "alice", ntProofStr: "proof", complete: true },
@@ -191,7 +182,7 @@ describe("toolClient SMB3 and NTLM methods", () => {
     }) as unknown as JsonRequest;
 
     await expect(
-      createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders).generateSMB3RandomSessionKey({
+      createToolClient(request, noopTextRequest, noopBlobRequest).generateSMB3RandomSessionKey({
         username: "alice",
         domain: "LAB",
         ntlmHash: "hash",
@@ -232,7 +223,7 @@ describe("toolClient MISC module methods", () => {
           throw new Error(`unexpected path: ${path}`);
       }
     }) as unknown as JsonRequest;
-    const client = createToolClient(request, "http://127.0.0.1", vi.fn() as unknown as BuildHeaders);
+    const client = createToolClient(request, noopTextRequest, noopBlobRequest);
 
     await expect(client.listMiscModules()).resolves.toMatchObject([
       { id: "decoder", title: "Decoder", apiPrefix: "/api/tools/misc/decoder", tags: ["misc"] },

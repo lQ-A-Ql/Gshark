@@ -18,7 +18,7 @@ GShark-Sentinel 是一款面向安全分析师、CTF 选手、应急响应人员
 - 后端：Go 1.22+（桌面壳）/ Go 1.25（后端模块）
 - 前端：React 18、TypeScript、Vite、Tailwind CSS、Radix UI
 - 解析核心：tshark
-- 本地通信：Wails 绑定 + 本地 HTTP / SSE
+- 本地通信：Wails IPC 桌面代理 + 本地 HTTP 后端；普通浏览器模式保留 HTTP / SSE fallback
 - 扩展运行时：JavaScript、Python
 
 ## 功能概览
@@ -174,7 +174,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 - `tshark capability degraded ... optional fields missing ... (tshark remains available)` 只表示可选字段降级，不表示 TShark 不可用。
 - 抓包首屏加载默认使用轻量 `first_screen` 字段集快速生成包列表；颜色特征、UDP payload、checksum 和专项协议辅助字段会通过后台 enrichment 补齐，不阻塞进入工作区。
 - 预加载诊断中的 `page=0/0 status=-` 表示前端读到的 committed capture 仍为空。若后端正在解析，`/api/capture/status` 会同时返回 `load.phase`、`parser_profile`、`processed`、`accepted`、`staged_count` 等 active load 信息，前端会显示“后端正在解析，尚未提交首屏数据”，而不是误报首屏数据失败。
-- Wails 桌面环境下抓包状态和首屏分页都优先走 Wails IPC；失败时会回退 HTTP，并在预加载诊断中分别显示 `pageTransport` 和 `statusTransport`。
+- Wails 桌面环境下页面数据面已迁移为全 IPC：React WebView 通过 `InvokeBackendJSON` / `InvokeBackendBlob` / `InvokeBackendText` / Wails runtime events 调用桌面壳，再由桌面壳带 token 代理到本地后端 HTTP。C2、工控、车机、USB、APT、证据、对象、流、媒体、插件、狩猎、MISC 上传和导出等长尾页面不再直接从 WebView `fetch` 后端 `/api/...`。
+- Wails 桌面环境中，generic IPC binding 存在时 IPC/backend proxy 失败会直接显示 IPC 端点和原因，不再静默回退浏览器 HTTP。只有旧 generated binding 缺少 generic IPC 方法时，才允许使用 HTTP fallback 维持兼容。普通浏览器开发模式继续使用 `httpBridge`、HTTP token、统一超时和错误分类。
+- Wails 桌面事件不再由 WebView 直连 `/api/events`；桌面壳内部读取后端 SSE 并转发 `gshark:backend:*` runtime events。DevTools Network 中页面数据 API 不应再出现对 `127.0.0.1:17891/api/...` 的直接请求，静态资源和 Vite 开发请求除外。
 
 ## 测试与验证
 

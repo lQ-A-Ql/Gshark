@@ -9,6 +9,10 @@ export interface DesktopTransportBinding {
   OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
   OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
   IsBackendReady?: () => Promise<boolean>;
+  PingBackendDataPlane?: () => Promise<unknown>;
+  InvokeBackendJSON?: (request: unknown) => Promise<unknown>;
+  InvokeBackendBlob?: (request: unknown) => Promise<unknown>;
+  InvokeBackendText?: (request: unknown) => Promise<string>;
   GetToolRuntimeSnapshot?: () => Promise<unknown>;
   GetToolRuntimeSnapshotFast?: () => Promise<unknown>;
   GetToolRuntimeSnapshotFull?: () => Promise<unknown>;
