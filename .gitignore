@@ -3,7 +3,6 @@
 .idea/
 .claude/
 .claude-design/
-.github/
 __pycache__/
 .DS_Store
 Thumbs.db
@@ -47,9 +46,6 @@ build/
 *.sqlite
 *.sqlite3
 backend/internal/transport/plugins/misc/
-
-# Local development reports
-/docs/audit*
 
 # Local component gallery / design scratchpad
 /component-gallery/

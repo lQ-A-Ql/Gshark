@@ -5,6 +5,7 @@ import type {
   IndustrialAnalysis,
   UnifiedEvidenceRecord,
   USBAnalysis,
+  USBHIDSourceMode,
   VehicleAnalysis,
 } from "../../core/types";
 import { asAPTAnalysis } from "../mappers/aptMapper";
@@ -22,7 +23,7 @@ export interface AnalysisClient {
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
-  getUSBAnalysis(signal?: AbortSignal): Promise<USBAnalysis>;
+  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number): Promise<USBAnalysis>;
   getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
   getEvidence(signal?: AbortSignal): Promise<UnifiedEvidenceRecord[]>;
@@ -46,8 +47,11 @@ export function createAnalysisClient(request: JsonRequest): AnalysisClient {
       return asVehicleAnalysis(payload);
     },
 
-    async getUSBAnalysis(signal?: AbortSignal) {
-      const payload = await request<unknown>("/api/analysis/usb", { signal });
+    async getUSBAnalysis(signal?: AbortSignal, hidSource: USBHIDSourceMode = "auto", hidEventLimit = 20000) {
+      const params = new URLSearchParams();
+      params.set("hid_source", hidSource);
+      params.set("hid_event_limit", String(hidEventLimit));
+      const payload = await request<unknown>(`/api/analysis/usb?${params.toString()}`, { signal });
       return asUSBAnalysis(payload);
     },
 

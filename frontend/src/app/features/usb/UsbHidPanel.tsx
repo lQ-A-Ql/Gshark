@@ -1,11 +1,24 @@
 import { AnalysisPanel as Panel, AnalysisStatCard as StatCard } from "../../components/analysis/AnalysisPrimitives";
-import type { USBAnalysis } from "../../core/types";
+import type { USBAnalysis, USBHIDSourceMode } from "../../core/types";
 import { DeviceChips, NotesList, SecondaryTabButton } from "./UsbAnalysisControls";
-import { KeyboardReplay, MouseBehaviorList, MouseHeatmap, MouseTrajectory } from "./UsbHidPanels";
-import { KeyboardEventTable, MouseEventTable } from "./UsbTables";
+import { KeyboardEditedText, KeyboardReplay } from "./UsbHidPanels";
+import { UsbMousePanel } from "./UsbMousePanel";
+import { KeyboardEventTable } from "./UsbTables";
 import { useUsbHidState } from "./useUsbHidState";
 
-export function UsbHidPanel({ analysis }: { analysis: USBAnalysis }) {
+export function UsbHidPanel({
+  analysis,
+  hidEventLimit,
+  hidSource,
+  onHidEventLimitChange,
+  onHidSourceChange,
+}: {
+  analysis: USBAnalysis;
+  hidEventLimit: number;
+  hidSource: USBHIDSourceMode;
+  onHidEventLimitChange: (limit: number) => void;
+  onHidSourceChange: (source: USBHIDSourceMode) => void;
+}) {
   const state = useUsbHidState(analysis);
 
   return (
@@ -22,7 +35,18 @@ export function UsbHidPanel({ analysis }: { analysis: USBAnalysis }) {
         </SecondaryTabButton>
       </div>
 
-      {state.activeSubTab === "keyboard" ? <UsbKeyboardPanel state={state} /> : <UsbMousePanel state={state} />}
+      {state.activeSubTab === "keyboard" ? (
+        <UsbKeyboardPanel state={state} />
+      ) : (
+        <UsbMousePanel
+          analysis={analysis}
+          hidEventLimit={hidEventLimit}
+          hidSource={hidSource}
+          onHidEventLimitChange={onHidEventLimitChange}
+          onHidSourceChange={onHidSourceChange}
+          state={state}
+        />
+      )}
     </div>
   );
 }
@@ -71,48 +95,13 @@ function UsbKeyboardPanel({ state }: { state: UsbHidState }) {
         </Panel>
       </div>
 
+      <KeyboardEditedText text={state.keyboardEditedText.text} deleted={state.keyboardEditedText.deleted} />
+
       <Panel title={`按键行为 (${state.filteredKeyboardEvents.length})`}>
-        <KeyboardEventTable rows={state.filteredKeyboardEvents} />
+        <KeyboardEventTable rows={state.filteredKeyboardEvents} resetKey={state.activeKeyboardDevice} />
       </Panel>
       <Panel title="HID 提示">
         <NotesList notes={state.notes} emptyLabel="暂无 HID 提示" />
-      </Panel>
-    </>
-  );
-}
-
-function UsbMousePanel({ state }: { state: UsbHidState }) {
-  return (
-    <>
-      <DeviceChips
-        devices={state.mouseDevices}
-        activeDevice={state.activeMouseDevice}
-        emptyLabel="未检测到鼠标设备"
-        onSelect={state.setActiveMouseDevice}
-      />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <StatCard title="事件数" value={state.filteredMouseEvents.length.toLocaleString()} />
-        <StatCard title="轨迹总路程" value={`${state.mouseStats.distance}`} />
-        <StatCard title="按钮动作数" value={`${state.mouseStats.buttonActions}`} />
-        <StatCard title="滚轮事件数" value={`${state.mouseStats.wheelCount}`} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="轨迹图">
-          <MouseTrajectory events={state.filteredMouseEvents} />
-        </Panel>
-        <Panel title="按键行为">
-          <MouseBehaviorList rows={state.filteredMouseEvents.slice(-18).reverse()} />
-        </Panel>
-      </div>
-
-      <Panel title="热区图">
-        <MouseHeatmap events={state.filteredMouseEvents} />
-      </Panel>
-
-      <Panel title={`行为明细表 (${state.filteredMouseEvents.length})`}>
-        <MouseEventTable rows={state.filteredMouseEvents} />
       </Panel>
     </>
   );

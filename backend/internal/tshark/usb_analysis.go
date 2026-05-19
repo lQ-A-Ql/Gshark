@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -34,6 +35,7 @@ const (
 	usbFieldControlResponse
 	usbFieldCapData
 	usbFieldHIDData
+	usbFieldBTATTValue
 	usbFieldKeyboardKey1
 	usbFieldKeyboardKey2
 	usbFieldKeyboardKey3
@@ -101,6 +103,7 @@ var usbAnalysisFields = []string{
 	"usb.control.Response",
 	"usb.capdata",
 	"usbhid.data",
+	"btatt.value",
 	"usbhid.boot_report.keyboard.keycode_1",
 	"usbhid.boot_report.keyboard.keycode_2",
 	"usbhid.boot_report.keyboard.keycode_3",
@@ -163,17 +166,28 @@ type usbHIDHint struct {
 
 type usbKeyboardSnapshot struct {
 	DeviceKey string
+	Source    string
+	Layout    string
 	Modifiers []string
 	Keys      []string
 }
 
 type usbMouseSnapshot struct {
 	DeviceKey       string
+	KeepState       bool
+	Source          string
+	Layout          string
 	Buttons         []string
 	XDelta          int
 	YDelta          int
 	WheelVertical   int
 	WheelHorizontal int
+}
+
+type usbHIDPayloadCandidate struct {
+	Source string
+	Mode   model.USBHIDSourceMode
+	Raw    string
 }
 
 type usbMassStorageCBW struct {
@@ -208,9 +222,97 @@ type usbMassStoragePacketInfo struct {
 	Summary        string
 }
 
-func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
-	analysis := model.USBAnalysis{}
+type usbAnalysisRawScan struct {
+	Rows            [][]string
+	MissingOptional []string
+}
 
+type USBAnalysisRawScan = usbAnalysisRawScan
+
+type usbAnalysisRawScanCacheEntry struct {
+	ready chan struct{}
+	scan  usbAnalysisRawScan
+	err   error
+}
+
+var (
+	usbAnalysisRawScanMu    sync.Mutex
+	usbAnalysisRawScanCache = map[string]*usbAnalysisRawScanCacheEntry{}
+	usbAnalysisScanRunner   = scanUSBAnalysisFromFile
+)
+
+func USBAnalysisScanRunnerForTesting() func(string) (USBAnalysisRawScan, error) {
+	return usbAnalysisScanRunner
+}
+
+func SetUSBAnalysisScanRunnerForTesting(runner func(string) (USBAnalysisRawScan, error)) {
+	if runner == nil {
+		usbAnalysisScanRunner = scanUSBAnalysisFromFile
+		return
+	}
+	usbAnalysisScanRunner = func(filePath string) (usbAnalysisRawScan, error) {
+		return runner(filePath)
+	}
+}
+
+func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
+	return BuildUSBAnalysisFromFileWithOptions(filePath, model.USBAnalysisOptions{})
+}
+
+func BuildUSBAnalysisFromFileWithOptions(filePath string, opts model.USBAnalysisOptions) (model.USBAnalysis, error) {
+	mode, ok := model.NormalizeUSBHIDSourceMode(string(opts.HIDSourceMode))
+	if !ok {
+		mode = model.USBHIDSourceAuto
+	}
+	hidEventLimit := model.NormalizeUSBHIDEventLimit(opts.HIDEventLimit)
+	rawScan, err := loadUSBAnalysisRawScan(filePath)
+	if err != nil {
+		return model.USBAnalysis{}, err
+	}
+	analysis := projectUSBAnalysisFromRawScan(rawScan, mode, hidEventLimit)
+	analysis.HIDSourceMode = string(mode)
+	analysis.HIDEventLimit = hidEventLimit
+	return analysis, nil
+}
+
+func loadUSBAnalysisRawScan(filePath string) (usbAnalysisRawScan, error) {
+	key := strings.TrimSpace(filePath)
+	if key == "" {
+		return usbAnalysisRawScan{}, fmt.Errorf("empty file path")
+	}
+
+	usbAnalysisRawScanMu.Lock()
+	if entry, ok := usbAnalysisRawScanCache[key]; ok {
+		usbAnalysisRawScanMu.Unlock()
+		<-entry.ready
+		return entry.scan, entry.err
+	}
+	entry := &usbAnalysisRawScanCacheEntry{ready: make(chan struct{})}
+	usbAnalysisRawScanCache[key] = entry
+	usbAnalysisRawScanMu.Unlock()
+
+	scan, err := usbAnalysisScanRunner(filePath)
+	entry.scan = scan
+	entry.err = err
+	close(entry.ready)
+	if err != nil {
+		usbAnalysisRawScanMu.Lock()
+		if usbAnalysisRawScanCache[key] == entry {
+			delete(usbAnalysisRawScanCache, key)
+		}
+		usbAnalysisRawScanMu.Unlock()
+	}
+	return scan, err
+}
+
+func ClearUSBAnalysisRawScanCache() {
+	usbAnalysisRawScanMu.Lock()
+	usbAnalysisRawScanCache = map[string]*usbAnalysisRawScanCacheEntry{}
+	usbAnalysisRawScanMu.Unlock()
+}
+
+func scanUSBAnalysisFromFile(filePath string) (usbAnalysisRawScan, error) {
+	raw := usbAnalysisRawScan{}
 	args := []string{
 		"-n",
 		"-r", filePath,
@@ -221,21 +323,50 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	}
 	plannedScan, err := BuildPlannedFieldArgs(args, usbAnalysisFields)
 	if err != nil {
-		return analysis, fmt.Errorf("plan tshark USB fields: %w", err)
+		return raw, fmt.Errorf("plan tshark USB fields: %w", err)
 	}
 
 	cmd, err := Command(plannedScan.Args...)
 	if err != nil {
-		return analysis, fmt.Errorf("resolve tshark: %w", err)
+		return raw, fmt.Errorf("resolve tshark: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return analysis, fmt.Errorf("create stdout pipe: %w", err)
+		return raw, fmt.Errorf("create stdout pipe: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return analysis, fmt.Errorf("start tshark: %w", err)
+		return raw, fmt.Errorf("start tshark: %w", err)
 	}
 
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := plannedScan.ProjectRow(strings.Split(line, "\t"))
+		if len(parts) < usbFieldCount {
+			continue
+		}
+		raw.Rows = append(raw.Rows, append([]string(nil), parts...))
+	}
+	if err := scanner.Err(); err != nil {
+		_ = cmd.Wait()
+		return raw, fmt.Errorf("scan tshark output: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return raw, fmt.Errorf("wait tshark: %w", err)
+	}
+	raw.MissingOptional = append([]string(nil), plannedScan.MissingOptional...)
+	return raw, nil
+}
+
+func projectUSBAnalysisFromRawScan(raw usbAnalysisRawScan, mode model.USBHIDSourceMode, hidEventLimit int) model.USBAnalysis {
+	analysis := model.USBAnalysis{
+		HIDSourceMode: string(mode),
+		HIDEventLimit: hidEventLimit,
+	}
 	protocolMap := make(map[string]int)
 	transferMap := make(map[string]int)
 	directionMap := make(map[string]int)
@@ -253,24 +384,13 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	keyboardStates := make(map[string]usbKeyboardState)
 	mouseStates := make(map[string]usbMouseState)
 	hidHints := make(map[string]usbHIDHint)
+	hidCandidateSet := make(map[string]struct{})
+	hidSelectedSourceMap := make(map[string]int)
 	pendingMassStorage := make(map[string]*model.USBMassStorageOperation)
 	residueOperations := 0
 	massStorageErrorStatuses := 0
 
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		parts := plannedScan.ProjectRow(strings.Split(line, "\t"))
-		if len(parts) < usbFieldCount {
-			continue
-		}
-
+	for _, parts := range raw.Rows {
 		protocol := normalizeUSBProtocolLabel(safeTrim(parts, usbFieldProtocol))
 		busID := safeTrim(parts, usbFieldBusID)
 		deviceAddress := safeTrim(parts, usbFieldDeviceAddress)
@@ -284,7 +404,13 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		setupValue := safeTrim(parts, usbFieldSetupValue)
 		setupIndex := safeTrim(parts, usbFieldSetupIndex)
 		setupLength := safeTrim(parts, usbFieldSetupLength)
-		payloadRaw := FirstNonEmpty(safeTrim(parts, usbFieldCapData), safeTrim(parts, usbFieldHIDData), safeTrim(parts, usbFieldControlResponse), safeTrim(parts, usbFieldFrameData))
+		payloadRaw := FirstNonEmpty(safeTrim(parts, usbFieldCapData), safeTrim(parts, usbFieldHIDData), safeTrim(parts, usbFieldBTATTValue), safeTrim(parts, usbFieldControlResponse), safeTrim(parts, usbFieldFrameData))
+		payloadCandidates := buildUSBHIDPayloadCandidates(parts, mode)
+		for _, candidate := range payloadCandidates {
+			if strings.TrimSpace(candidate.Raw) != "" {
+				hidCandidateSet[candidate.Source] = struct{}{}
+			}
+		}
 		info := safeTrim(parts, usbFieldInfo)
 
 		if !looksLikeUSBRecord(protocol, busID, deviceAddress, endpointRaw, transferType, urbType) {
@@ -292,7 +418,6 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		}
 
 		analysis.TotalUSBPackets++
-
 		if protocol != "" {
 			protocolMap[protocol]++
 		}
@@ -368,20 +493,18 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		}
 
 		deviceKey := firstNonEmptyTrim(record.Endpoint, deviceLabel)
-		keyboardSnapshot, keyboardDetected := detectUSBKeyboardSnapshot(record, parts, payloadRaw, hidHints[deviceKey])
-		mouseSnapshot, mouseDetected := detectUSBMouseSnapshot(record, parts, payloadRaw, hidHints[deviceKey])
+		keyboardSnapshot, keyboardDetected := detectUSBKeyboardSnapshot(record, parts, payloadCandidates, hidHints[deviceKey])
+		mouseSnapshot, mouseDetected := detectUSBMouseSnapshot(record, parts, payloadCandidates, hidHints[deviceKey])
 
 		if keyboardDetected {
 			analysis.HIDPackets++
+			if keyboardSnapshot.Source != "" {
+				hidSelectedSourceMap[keyboardSnapshot.Source]++
+			}
 			previous := keyboardStates[keyboardSnapshot.DeviceKey]
 			if keyboardEvent, ok := buildUSBKeyboardEvent(record, previous, keyboardSnapshot); ok {
 				analysis.KeyboardPackets++
-				if len(analysis.KeyboardEvents) < usbRecordLimit {
-					analysis.KeyboardEvents = append(analysis.KeyboardEvents, keyboardEvent)
-				}
-				if len(analysis.HID.KeyboardEvents) < usbRecordLimit {
-					analysis.HID.KeyboardEvents = append(analysis.HID.KeyboardEvents, keyboardEvent)
-				}
+				appendUSBKeyboardEvent(&analysis, keyboardEvent, hidEventLimit)
 			}
 			keyboardStates[keyboardSnapshot.DeviceKey] = usbKeyboardState{Modifiers: copyStrings(keyboardSnapshot.Modifiers), Keys: copyStrings(keyboardSnapshot.Keys)}
 			hint := hidHints[keyboardSnapshot.DeviceKey]
@@ -395,16 +518,14 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 
 		if mouseDetected {
 			analysis.HIDPackets++
+			if mouseSnapshot.Source != "" {
+				hidSelectedSourceMap[mouseSnapshot.Source]++
+			}
 			previous := mouseStates[mouseSnapshot.DeviceKey]
 			mouseEvent, nextState, ok := buildUSBMouseEvent(record, previous, mouseSnapshot)
 			if ok {
 				analysis.MousePackets++
-				if len(analysis.MouseEvents) < usbRecordLimit {
-					analysis.MouseEvents = append(analysis.MouseEvents, mouseEvent)
-				}
-				if len(analysis.HID.MouseEvents) < usbRecordLimit {
-					analysis.HID.MouseEvents = append(analysis.HID.MouseEvents, mouseEvent)
-				}
+				appendUSBMouseEvent(&analysis, mouseEvent, hidEventLimit)
 			}
 			mouseStates[mouseSnapshot.DeviceKey] = nextState
 			hint := hidHints[mouseSnapshot.DeviceKey]
@@ -428,14 +549,6 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		_ = cmd.Wait()
-		return analysis, fmt.Errorf("scan tshark output: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return analysis, fmt.Errorf("wait tshark: %w", err)
-	}
-
 	analysis.Protocols = topBuckets(protocolMap, 0)
 	analysis.TransferTypes = topBuckets(transferMap, 0)
 	analysis.Directions = topBuckets(directionMap, 0)
@@ -455,30 +568,35 @@ func BuildUSBAnalysisFromFile(filePath string) (model.USBAnalysis, error) {
 	analysis.Other.Endpoints = topBuckets(otherEndpointMap, 0)
 	analysis.Other.SetupRequests = topBuckets(otherSetupMap, 0)
 	analysis.Other.Notes = buildUSBOtherNotes(analysis.Other)
+	analysis.HIDSourceCandidates = orderedUSBHIDSourceCandidates(hidCandidateSet)
+	analysis.HIDSelectedSource = topUSBHIDSelectedSource(hidSelectedSourceMap)
+	analysis.HIDSourceNotes = buildUSBHIDSourceNotes(mode, analysis.HIDSourceCandidates, analysis.HIDSelectedSource)
 	analysis.Notes = buildUSBAnalysisNotes(analysis, statusMap)
-	analysis.Notes = appendTSharkFieldDegradationNote(analysis.Notes, "USB 分析字段扫描", plannedScan.MissingOptional)
-	return analysis, nil
+	analysis.Notes = appendTSharkFieldDegradationNote(analysis.Notes, "USB 分析字段扫描", raw.MissingOptional)
+	return analysis
 }
 
-func detectUSBKeyboardSnapshot(record model.USBPacketRecord, parts []string, payloadRaw string, hint usbHIDHint) (usbKeyboardSnapshot, bool) {
+func detectUSBKeyboardSnapshot(record model.USBPacketRecord, parts []string, candidates []usbHIDPayloadCandidate, hint usbHIDHint) (usbKeyboardSnapshot, bool) {
 	deviceKey := firstNonEmptyTrim(record.Endpoint, buildUSBDeviceLabel(record.BusID, record.DeviceAddress))
 	modifiers := buildKeyboardModifiers(parts)
 	keys := buildKeyboardKeys(parts)
 	if len(modifiers) > 0 || len(keys) > 0 {
-		return usbKeyboardSnapshot{DeviceKey: deviceKey, Modifiers: modifiers, Keys: keys}, true
+		return usbKeyboardSnapshot{DeviceKey: deviceKey, Source: "usbhid.fields", Layout: "tshark", Modifiers: modifiers, Keys: keys}, true
 	}
-	if record.TransferType != "Interrupt" {
+	if record.TransferType != "Interrupt" && !candidatesMayCarryHID(record, candidates) {
 		return usbKeyboardSnapshot{}, false
 	}
 
 	// Many USB CTF captures are plain usbmon/USBPcap frames. TShark keeps the
 	// boot report bytes in usb.capdata and never promotes them to usbhid.* fields.
 	// Keyboard boot reports are 8 bytes: modifier, reserved, then six keycodes.
-	payload := decodeLooseHexToBytes(payloadRaw)
-	if len(payload) >= 8 && len(payload) <= 16 {
-		modifiers, keys = parseKeyboardBootPayload(payload[:8])
-		if len(modifiers) > 0 || len(keys) > 0 || hint.Keyboard || isLikelyKeyboardBootReport(payload[:8]) {
-			return usbKeyboardSnapshot{DeviceKey: deviceKey, Modifiers: modifiers, Keys: keys}, true
+	for _, source := range candidates {
+		payload := decodeLooseHexToBytes(source.Raw)
+		for _, candidate := range keyboardBootPayloadCandidates(payload) {
+			modifiers, keys = parseKeyboardBootPayload(candidate)
+			if len(modifiers) > 0 || len(keys) > 0 || hint.Keyboard || isLikelyKeyboardBootReport(candidate) {
+				return usbKeyboardSnapshot{DeviceKey: deviceKey, Source: source.Source, Layout: "boot", Modifiers: modifiers, Keys: keys}, true
+			}
 		}
 	}
 	return usbKeyboardSnapshot{}, false
@@ -509,7 +627,7 @@ func buildUSBKeyboardEvent(record model.USBPacketRecord, previous usbKeyboardSta
 	}, true
 }
 
-func detectUSBMouseSnapshot(record model.USBPacketRecord, parts []string, payloadRaw string, hint usbHIDHint) (usbMouseSnapshot, bool) {
+func detectUSBMouseSnapshot(record model.USBPacketRecord, parts []string, candidates []usbHIDPayloadCandidate, hint usbHIDHint) (usbMouseSnapshot, bool) {
 	deviceKey := firstNonEmptyTrim(record.Endpoint, buildUSBDeviceLabel(record.BusID, record.DeviceAddress))
 	buttons := buildMouseButtons(parts)
 	xDelta := parseUSBSignedInt(safeTrim(parts, usbFieldMouseXDelta))
@@ -517,25 +635,25 @@ func detectUSBMouseSnapshot(record model.USBPacketRecord, parts []string, payloa
 	wheelVertical := parseUSBSignedInt(safeTrim(parts, usbFieldMouseWheelVertical))
 	wheelHorizontal := parseUSBSignedInt(safeTrim(parts, usbFieldMouseWheelHorizontal))
 	if len(buttons) > 0 || xDelta != 0 || yDelta != 0 || wheelVertical != 0 || wheelHorizontal != 0 {
-		return usbMouseSnapshot{DeviceKey: deviceKey, Buttons: buttons, XDelta: xDelta, YDelta: yDelta, WheelVertical: wheelVertical, WheelHorizontal: wheelHorizontal}, true
+		return usbMouseSnapshot{DeviceKey: deviceKey, Source: "usbhid.fields", Layout: "tshark", Buttons: buttons, XDelta: xDelta, YDelta: yDelta, WheelVertical: wheelVertical, WheelHorizontal: wheelHorizontal}, true
 	}
-	if record.TransferType != "Interrupt" || hint.Keyboard {
+	if hint.Keyboard || (record.TransferType != "Interrupt" && !candidatesMayCarryHID(record, candidates)) {
 		return usbMouseSnapshot{}, false
 	}
 
-	// Same raw usb.capdata fallback as keyboard: common boot mouse reports are
-	// button bitmask, X, Y, optional vertical wheel and optional horizontal wheel.
-	payload := decodeLooseHexToBytes(payloadRaw)
-	if len(payload) >= 3 && len(payload) <= 5 {
-		buttons, xDelta, yDelta, wheelVertical, wheelHorizontal = parseMouseBootPayload(payload)
-		if len(buttons) > 0 || xDelta != 0 || yDelta != 0 || wheelVertical != 0 || wheelHorizontal != 0 || hint.Mouse {
-			return usbMouseSnapshot{DeviceKey: deviceKey, Buttons: buttons, XDelta: xDelta, YDelta: yDelta, WheelVertical: wheelVertical, WheelHorizontal: wheelHorizontal}, true
-		}
+	if candidatesAreEmpty(candidates) && hint.Mouse && record.TransferType == "Interrupt" {
+		return usbMouseSnapshot{DeviceKey: deviceKey, KeepState: true}, true
+	}
+	if snapshot, ok := selectUSBMousePayloadCandidate(deviceKey, candidates, hint); ok {
+		return snapshot, true
 	}
 	return usbMouseSnapshot{}, false
 }
 
 func buildUSBMouseEvent(record model.USBPacketRecord, previous usbMouseState, current usbMouseSnapshot) (model.USBMouseEvent, usbMouseState, bool) {
+	if current.KeepState {
+		return model.USBMouseEvent{}, previous, false
+	}
 	nextState := usbMouseState{
 		Buttons: copyStrings(current.Buttons),
 		X:       previous.X + current.XDelta,
@@ -552,6 +670,8 @@ func buildUSBMouseEvent(record model.USBPacketRecord, previous usbMouseState, cu
 		Time:            record.Time,
 		Device:          buildUSBDeviceLabel(record.BusID, record.DeviceAddress),
 		Endpoint:        record.Endpoint,
+		Source:          current.Source,
+		Layout:          current.Layout,
 		Buttons:         copyStrings(current.Buttons),
 		PressedButtons:  pressedButtons,
 		ReleasedButtons: releasedButtons,
@@ -626,6 +746,216 @@ func parseKeyboardBootPayload(payload []byte) ([]string, []string) {
 	return modifiers, keys
 }
 
+func keyboardBootPayloadCandidates(payload []byte) [][]byte {
+	if len(payload) < 8 {
+		return nil
+	}
+	candidates := make([][]byte, 0, 3)
+	add := func(candidate []byte) {
+		if len(candidate) < 8 {
+			return
+		}
+		for _, existing := range candidates {
+			if string(existing) == string(candidate[:8]) {
+				return
+			}
+		}
+		candidates = append(candidates, candidate[:8])
+	}
+	add(payload)
+	if len(payload) >= 9 {
+		add(payload[1:])
+	}
+	if len(payload) > 8 {
+		add(payload[len(payload)-8:])
+	}
+	return candidates
+}
+
+func buildUSBHIDPayloadCandidates(parts []string, mode model.USBHIDSourceMode) []usbHIDPayloadCandidate {
+	all := []usbHIDPayloadCandidate{
+		{Source: "usbhid.data", Mode: model.USBHIDSourceUSBHID, Raw: safeTrim(parts, usbFieldHIDData)},
+		{Source: "usb.capdata", Mode: model.USBHIDSourceCapData, Raw: safeTrim(parts, usbFieldCapData)},
+		{Source: "btatt.value", Mode: model.USBHIDSourceBTATT, Raw: safeTrim(parts, usbFieldBTATTValue)},
+		{Source: "usb.control.Response", Mode: model.USBHIDSourceRaw, Raw: safeTrim(parts, usbFieldControlResponse)},
+		{Source: "usb.frame.data", Mode: model.USBHIDSourceRaw, Raw: safeTrim(parts, usbFieldFrameData)},
+	}
+	if mode == "" || mode == model.USBHIDSourceAuto {
+		return all
+	}
+	filtered := make([]usbHIDPayloadCandidate, 0, len(all))
+	for _, candidate := range all {
+		if candidate.Mode == mode {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
+}
+
+func orderedUSBHIDSourceCandidates(sourceSet map[string]struct{}) []string {
+	ordered := make([]string, 0, len(sourceSet))
+	for _, source := range []string{"usbhid.data", "usb.capdata", "btatt.value", "usb.control.Response", "usb.frame.data"} {
+		if _, ok := sourceSet[source]; ok {
+			ordered = append(ordered, source)
+		}
+	}
+	return ordered
+}
+
+func topUSBHIDSelectedSource(sourceCounts map[string]int) string {
+	bestSource := ""
+	bestCount := 0
+	for _, source := range []string{"usbhid.fields", "usbhid.data", "usb.capdata", "btatt.value", "usb.control.Response", "usb.frame.data"} {
+		if count := sourceCounts[source]; count > bestCount {
+			bestSource = source
+			bestCount = count
+		}
+	}
+	return bestSource
+}
+
+func buildUSBHIDSourceNotes(mode model.USBHIDSourceMode, candidates []string, selected string) []string {
+	notes := []string{fmt.Sprintf("HID 数据源模式：%s。", mode)}
+	if selected != "" {
+		notes = append(notes, fmt.Sprintf("当前主要采用 %s 解析 HID 事件。", selected))
+	}
+	if len(candidates) > 0 {
+		notes = append(notes, "本次抓包可见候选字段："+strings.Join(candidates, "、")+"。")
+	}
+	if mode != model.USBHIDSourceAuto {
+		notes = append(notes, "手动模式仅使用所选候选源，适合复核 CTF/蓝牙/原始帧样本。")
+	}
+	return notes
+}
+
+func candidatesMayCarryHID(record model.USBPacketRecord, candidates []usbHIDPayloadCandidate) bool {
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate.Raw) == "" {
+			continue
+		}
+		if candidate.Mode == model.USBHIDSourceBTATT || looksLikeBluetoothHIDRecord(record, candidate.Raw) {
+			return true
+		}
+		return record.TransferType == "Interrupt"
+	}
+	return false
+}
+
+func candidatesAreEmpty(candidates []usbHIDPayloadCandidate) bool {
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate.Raw) != "" {
+			return false
+		}
+	}
+	return true
+}
+
+func selectUSBMousePayloadCandidate(deviceKey string, candidates []usbHIDPayloadCandidate, hint usbHIDHint) (usbMouseSnapshot, bool) {
+	var best usbMouseCandidateScore
+	for priority, candidate := range candidates {
+		payload := decodeLooseHexToBytes(candidate.Raw)
+		if len(payload) == 0 {
+			continue
+		}
+		for _, parsed := range parseUSBMousePayloadLayouts(payload, hint.Mouse) {
+			score := scoreUSBMousePayloadCandidate(parsed, hint)
+			if score <= 0 {
+				continue
+			}
+			current := usbMouseCandidateScore{
+				snapshot: usbMouseSnapshot{
+					DeviceKey:       deviceKey,
+					Source:          candidate.Source,
+					Layout:          parsed.layout,
+					Buttons:         parsed.buttons,
+					XDelta:          parsed.xDelta,
+					YDelta:          parsed.yDelta,
+					WheelVertical:   parsed.wheelVertical,
+					WheelHorizontal: parsed.wheelHorizontal,
+				},
+				score:    score,
+				priority: priority,
+			}
+			if !best.valid || current.score > best.score || (current.score == best.score && current.priority < best.priority) {
+				best = current
+				best.valid = true
+			}
+		}
+	}
+	if !best.valid {
+		return usbMouseSnapshot{}, false
+	}
+	return best.snapshot, true
+}
+
+type usbMouseCandidateScore struct {
+	snapshot usbMouseSnapshot
+	score    int
+	priority int
+	valid    bool
+}
+
+type usbMouseParsedPayload struct {
+	layout          string
+	buttons         []string
+	xDelta          int
+	yDelta          int
+	wheelVertical   int
+	wheelHorizontal int
+}
+
+func parseUSBMousePayloadLayouts(payload []byte, allowIdle bool) []usbMouseParsedPayload {
+	parsed := make([]usbMouseParsedPayload, 0, 4)
+	add := func(layout string, buttons []string, xDelta, yDelta, wheelVertical, wheelHorizontal int) {
+		if !allowIdle && len(buttons) == 0 && xDelta == 0 && yDelta == 0 && wheelVertical == 0 && wheelHorizontal == 0 {
+			return
+		}
+		parsed = append(parsed, usbMouseParsedPayload{
+			layout:          layout,
+			buttons:         buttons,
+			xDelta:          xDelta,
+			yDelta:          yDelta,
+			wheelVertical:   wheelVertical,
+			wheelHorizontal: wheelHorizontal,
+		})
+	}
+
+	if len(payload) >= 3 && len(payload) <= 5 && (looksLikeMouseBootPayload(payload) || allowIdle && payload[0]&0xF8 == 0) {
+		buttons, xDelta, yDelta, wheelVertical, wheelHorizontal := parseMouseBootPayload(payload)
+		add(fmt.Sprintf("boot-%d", len(payload)), buttons, xDelta, yDelta, wheelVertical, wheelHorizontal)
+	}
+	if len(payload) >= 4 && len(payload) <= 6 && (looksLikeMouseReportIDPayload(payload) || allowIdle && payload[0] > 0 && payload[0] <= 0x10 && payload[1]&0xF8 == 0) {
+		buttons, xDelta, yDelta, wheelVertical, wheelHorizontal := parseMouseBootPayload(payload[1:])
+		add(fmt.Sprintf("report-id-%d", len(payload)), buttons, xDelta, yDelta, wheelVertical, wheelHorizontal)
+	}
+	if len(payload) == 6 && looksLikeOffsetMousePayload(payload, 1, 2, 3) {
+		buttons, xDelta, yDelta, wheelVertical, wheelHorizontal := parseMouseOffsetPayload(payload, 1, 2, 3)
+		add("github-6", buttons, xDelta, yDelta, wheelVertical, wheelHorizontal)
+	}
+	if len(payload) == 8 && looksLikeOffsetMousePayload(payload, 1, 2, 4) {
+		buttons, xDelta, yDelta, wheelVertical, wheelHorizontal := parseMouseOffsetPayload(payload, 1, 2, 4)
+		add("github-8", buttons, xDelta, yDelta, wheelVertical, wheelHorizontal)
+	}
+	return parsed
+}
+
+func scoreUSBMousePayloadCandidate(parsed usbMouseParsedPayload, hint usbHIDHint) int {
+	score := 0
+	if len(parsed.buttons) > 0 {
+		score += 6
+	}
+	if parsed.xDelta != 0 || parsed.yDelta != 0 {
+		score += 5
+	}
+	if parsed.wheelVertical != 0 || parsed.wheelHorizontal != 0 {
+		score += 3
+	}
+	if hint.Mouse {
+		score += 1
+	}
+	return score
+}
+
 func keyboardModifiersFromMask(mask byte) []string {
 	labels := []string{"Left Ctrl", "Left Shift", "Left Alt", "Left GUI", "Right Ctrl", "Right Shift", "Right Alt", "Right GUI"}
 	modifiers := make([]string, 0, len(labels))
@@ -677,6 +1007,49 @@ func parseMouseBootPayload(payload []byte) ([]string, int, int, int, int) {
 		wheelHorizontal = int(int8(payload[4]))
 	}
 	return buttons, int(int8(payload[1])), int(int8(payload[2])), wheelVertical, wheelHorizontal
+}
+
+func looksLikeMouseBootPayload(payload []byte) bool {
+	if len(payload) < 3 || len(payload) > 5 {
+		return false
+	}
+	if payload[0]&0xF8 != 0 {
+		return false
+	}
+	return payload[0] != 0 || payload[1] != 0 || payload[2] != 0 || (len(payload) >= 4 && payload[3] != 0) || (len(payload) >= 5 && payload[4] != 0)
+}
+
+func parseMouseOffsetPayload(payload []byte, buttonIndex, xIndex, yIndex int) ([]string, int, int, int, int) {
+	if len(payload) <= buttonIndex || len(payload) <= xIndex || len(payload) <= yIndex {
+		return nil, 0, 0, 0, 0
+	}
+	buttons, _, _, _, _ := parseMouseBootPayload([]byte{payload[buttonIndex], 0, 0})
+	return buttons, int(int8(payload[xIndex])), int(int8(payload[yIndex])), 0, 0
+}
+
+func looksLikeOffsetMousePayload(payload []byte, buttonIndex, xIndex, yIndex int) bool {
+	if len(payload) <= buttonIndex || len(payload) <= xIndex || len(payload) <= yIndex {
+		return false
+	}
+	if payload[buttonIndex]&0xF8 != 0 {
+		return false
+	}
+	return payload[xIndex] != 0 || payload[yIndex] != 0 || payload[buttonIndex] != 0
+}
+
+func looksLikeMouseReportIDPayload(payload []byte) bool {
+	if len(payload) < 4 || payload[0] == 0 || payload[0] > 0x10 {
+		return false
+	}
+	return payload[1]&0xF8 == 0
+}
+
+func looksLikeBluetoothHIDRecord(record model.USBPacketRecord, payloadRaw string) bool {
+	if strings.TrimSpace(payloadRaw) == "" {
+		return false
+	}
+	value := strings.ToLower(record.Protocol + " " + record.Summary)
+	return strings.Contains(value, "btatt") || strings.Contains(value, "bluetooth") || strings.Contains(value, "hid")
 }
 
 func buildKeyboardSummary(currentModifiers, currentKeys, pressedModifiers, releasedModifiers, pressedKeys, releasedKeys []string, text string) string {
@@ -977,7 +1350,8 @@ func parseUSBSignedInt(raw string) int {
 }
 
 func looksLikeUSBRecord(protocol, busID, deviceAddress, endpointRaw, transferType, urbType string) bool {
-	if strings.Contains(strings.ToLower(protocol), "usb") {
+	protocolLower := strings.ToLower(protocol)
+	if strings.Contains(protocolLower, "usb") || strings.Contains(protocolLower, "btatt") || strings.Contains(protocolLower, "bluetooth") {
 		return true
 	}
 	return busID != "" || deviceAddress != "" || endpointRaw != "" || transferType != "" || urbType != ""
@@ -990,6 +1364,10 @@ func normalizeUSBProtocolLabel(raw string) string {
 	}
 	upper := strings.ToUpper(value)
 	switch {
+	case strings.Contains(strings.ToLower(value), "btatt"):
+		return "BTATT"
+	case strings.Contains(strings.ToLower(value), "bluetooth"):
+		return "BLUETOOTH"
 	case strings.Contains(strings.ToLower(value), "hci_usb"):
 		return "HCI_USB"
 	case strings.Contains(strings.ToLower(value), "mausb"):
@@ -1634,6 +2012,12 @@ func buildUSBHIDNotes(analysis model.USBAnalysis) []string {
 	if analysis.MousePackets > 0 {
 		notes = append(notes, fmt.Sprintf("识别到 %d 条鼠标行为事件。", analysis.MousePackets))
 	}
+	if analysis.HIDEventsTruncated {
+		notes = append(notes, fmt.Sprintf("HID 行为事件列表已按上限截断为键盘 %d/%d、鼠标 %d/%d 条。",
+			len(analysis.KeyboardEvents), analysis.HIDKeyboardEventsTotal,
+			len(analysis.MouseEvents), analysis.HIDMouseEventsTotal,
+		))
+	}
 	if len(analysis.HID.Devices) > 0 {
 		notes = append(notes, fmt.Sprintf("最活跃 HID 设备为 %s。", analysis.HID.Devices[0].Label))
 	}
@@ -1641,6 +2025,40 @@ func buildUSBHIDNotes(analysis model.USBAnalysis) []string {
 		return []string{"当前抓包未识别到可展示的 HID 行为事件。"}
 	}
 	return notes
+}
+
+func appendUSBKeyboardEvent(analysis *model.USBAnalysis, event model.USBKeyboardEvent, limit int) {
+	if analysis == nil {
+		return
+	}
+	limit = model.NormalizeUSBHIDEventLimit(limit)
+	analysis.HIDKeyboardEventsTotal++
+	if len(analysis.KeyboardEvents) < limit {
+		analysis.KeyboardEvents = append(analysis.KeyboardEvents, event)
+	}
+	if len(analysis.HID.KeyboardEvents) < limit {
+		analysis.HID.KeyboardEvents = append(analysis.HID.KeyboardEvents, event)
+	}
+	if analysis.HIDKeyboardEventsTotal > limit {
+		analysis.HIDEventsTruncated = true
+	}
+}
+
+func appendUSBMouseEvent(analysis *model.USBAnalysis, event model.USBMouseEvent, limit int) {
+	if analysis == nil {
+		return
+	}
+	limit = model.NormalizeUSBHIDEventLimit(limit)
+	analysis.HIDMouseEventsTotal++
+	if len(analysis.MouseEvents) < limit {
+		analysis.MouseEvents = append(analysis.MouseEvents, event)
+	}
+	if len(analysis.HID.MouseEvents) < limit {
+		analysis.HID.MouseEvents = append(analysis.HID.MouseEvents, event)
+	}
+	if analysis.HIDMouseEventsTotal > limit {
+		analysis.HIDEventsTruncated = true
+	}
 }
 
 func buildUSBMassStorageNotes(analysis model.USBMassStorageAnalysis, residueCount, errorStatuses int) []string {

@@ -56,7 +56,7 @@ describe("analysisClient", () => {
 
   it("maps USB and C2 report payloads from transport responses", async () => {
     const request = vi.fn(async (path: string) => {
-      if (path === "/api/analysis/usb") {
+      if (path === "/api/analysis/usb?hid_source=usbhid&hid_event_limit=40000") {
         return {
           total_usb_packets: 4,
           hid_packets: 1,
@@ -71,6 +71,14 @@ describe("analysisClient", () => {
           keyboard_events: [],
           mouse_events: [],
           other_records: [],
+          hid_source_mode: "auto",
+          hid_source_candidates: ["usbhid.data"],
+          hid_selected_source: "usbhid.data",
+          hid_source_notes: ["source note"],
+          hid_event_limit: 40000,
+          hid_events_truncated: true,
+          hid_mouse_events_total: 41000,
+          hid_keyboard_events_total: 200,
           hid: { keyboard_events: [], mouse_events: [], devices: [], notes: [] },
           mass_storage: {
             total_packets: 0,
@@ -140,12 +148,26 @@ describe("analysisClient", () => {
     }) as unknown as JsonRequest;
 
     const client = createAnalysisClient(request);
-    const usb = await client.getUSBAnalysis();
+    const usb = await client.getUSBAnalysis(undefined, "usbhid", 40000);
     const c2 = await client.getC2SampleAnalysis();
 
     expect(usb.report?.evidence[0]).toMatchObject({ title: "USB 存储写入", severity: "high", packetId: 21 });
+    expect(usb.hidSelectedSource).toBe("usbhid.data");
+    expect(usb.hidEventLimit).toBe(40000);
+    expect(usb.hidEventsTruncated).toBe(true);
+    expect(usb.hidMouseEventsTotal).toBe(41000);
+    expect(usb.hidKeyboardEventsTotal).toBe(200);
     expect(c2.cs.report?.summary[0]).toMatchObject({ title: "CS 候选概览" });
     expect(c2.cs.report?.evidence[0]).toMatchObject({ title: "candidate", packetId: 9, streamId: 4 });
+  });
+
+  it("uses default HID source and event limit for USB analysis", async () => {
+    const request = vi.fn(async (path: string) => {
+      expect(path).toBe("/api/analysis/usb?hid_source=auto&hid_event_limit=20000");
+      return {};
+    }) as unknown as JsonRequest;
+
+    await createAnalysisClient(request).getUSBAnalysis();
   });
 
   it("encodes evidence module filters on the request path and preserves evidence records", async () => {

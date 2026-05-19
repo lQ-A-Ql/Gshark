@@ -16,6 +16,10 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+const maxCaptureUploadMemory = 64 << 20
+
+var maxCaptureUploadBytes int64 = 2 << 30
+
 type openCaptureResult struct {
 	FilePath string `json:"filePath"`
 	FileSize int64  `json:"fileSize"`
@@ -115,10 +119,16 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(4 << 30); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxCaptureUploadBytes)
+	if err := r.ParseMultipartForm(maxCaptureUploadMemory); err != nil {
+		if isRequestBodyTooLarge(err) {
+			writeError(w, http.StatusRequestEntityTooLarge, "capture upload exceeds 2GB limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid multipart payload")
 		return
 	}
+	defer r.MultipartForm.RemoveAll()
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -145,9 +155,13 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer target.Close()
 
-	written, err := io.Copy(target, file)
+	written, err := copyCaptureUpload(target, file, maxCaptureUploadBytes)
 	if err != nil {
 		_ = os.Remove(targetPath)
+		if errors.Is(err, errCaptureUploadTooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, "capture upload exceeds 2GB limit")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to save upload")
 		return
 	}
@@ -159,4 +173,21 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 		FileSize: written,
 		FileName: name,
 	})
+}
+
+var errCaptureUploadTooLarge = errors.New("capture upload exceeds size limit")
+
+func copyCaptureUpload(dst io.Writer, src io.Reader, limit int64) (int64, error) {
+	written, err := io.Copy(dst, io.LimitReader(src, limit+1))
+	if err != nil {
+		return written, err
+	}
+	if written > limit {
+		return written, errCaptureUploadTooLarge
+	}
+	return written, nil
+}
+
+func isRequestBodyTooLarge(err error) bool {
+	return strings.Contains(err.Error(), "http: request body too large")
 }

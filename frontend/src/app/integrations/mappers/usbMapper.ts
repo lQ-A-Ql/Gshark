@@ -1,4 +1,4 @@
-import type { USBAnalysis } from "../../core/types";
+import { normalizeUSBHIDSourceMode, type USBAnalysis } from "../../core/types";
 import type { USBAnalysisWireDTO } from "../wire/usbWireDtos";
 import { asInvestigationReport } from "./investigationReportMapper";
 import { asArray, asBucket, asPlainObject, asStringList } from "./mapperPrimitives";
@@ -9,6 +9,7 @@ import { asUSBPacketRecord } from "./usbRecordMapper";
 
 export function asUSBAnalysis(input: unknown): USBAnalysis {
   const payload = asPlainObject(input) as USBAnalysisWireDTO | undefined;
+  const hidSourceMode = String(payload?.hid_source_mode ?? "auto");
   return {
     totalUSBPackets: Number(payload?.total_usb_packets ?? 0),
     keyboardPackets: Number(payload?.keyboard_packets ?? 0),
@@ -26,6 +27,14 @@ export function asUSBAnalysis(input: unknown): USBAnalysis {
     keyboardEvents: asArray(payload?.keyboard_events).map(asUSBKeyboardEvent),
     mouseEvents: asArray(payload?.mouse_events).map(asUSBMouseEvent),
     otherRecords: asArray(payload?.other_records).map(asUSBPacketRecord),
+    hidSourceMode: normalizeUSBHIDSourceMode(hidSourceMode),
+    hidSourceCandidates: asStringList(payload?.hid_source_candidates),
+    hidSelectedSource: String(payload?.hid_selected_source ?? "") || undefined,
+    hidSourceNotes: asStringList(payload?.hid_source_notes),
+    hidEventLimit: Number(payload?.hid_event_limit ?? 0),
+    hidEventsTruncated: Boolean(payload?.hid_events_truncated),
+    hidMouseEventsTotal: Number(payload?.hid_mouse_events_total ?? 0),
+    hidKeyboardEventsTotal: Number(payload?.hid_keyboard_events_total ?? 0),
     hid: asUSBHidAnalysis(payload?.hid),
     massStorage: asUSBMassStorageAnalysis(payload?.mass_storage),
     other: asUSBOtherAnalysis(payload?.other),

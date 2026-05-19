@@ -1,6 +1,13 @@
 import type { InvestigationReport } from "./report";
 import type { TrafficBucket } from "./traffic";
 
+export const USB_HID_SOURCE_MODES = ["auto", "usbhid", "capdata", "btatt", "raw"] as const;
+export type USBHIDSourceMode = (typeof USB_HID_SOURCE_MODES)[number];
+
+export function normalizeUSBHIDSourceMode(value: string): USBHIDSourceMode {
+  return USB_HID_SOURCE_MODES.includes(value as USBHIDSourceMode) ? (value as USBHIDSourceMode) : "auto";
+}
+
 export interface USBPacketRecord {
   packetId: number;
   time: string;
@@ -38,6 +45,8 @@ export interface USBMouseEvent {
   time: string;
   device: string;
   endpoint: string;
+  source?: string;
+  layout?: string;
   buttons: string[];
   pressedButtons: string[];
   releasedButtons: string[];
@@ -121,6 +130,14 @@ export interface USBAnalysis {
   keyboardEvents: USBKeyboardEvent[];
   mouseEvents: USBMouseEvent[];
   otherRecords: USBPacketRecord[];
+  hidSourceMode?: USBHIDSourceMode;
+  hidSourceCandidates: string[];
+  hidSelectedSource?: string;
+  hidSourceNotes: string[];
+  hidEventLimit: number;
+  hidEventsTruncated: boolean;
+  hidMouseEventsTotal: number;
+  hidKeyboardEventsTotal: number;
   hid: USBHIDAnalysis;
   massStorage: USBMassStorageAnalysis;
   other: USBOtherAnalysis;

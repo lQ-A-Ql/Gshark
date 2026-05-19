@@ -115,6 +115,14 @@ const EMPTY_USB: USBAnalysis = {
   keyboardEvents: [],
   mouseEvents: [],
   otherRecords: [],
+  hidSourceMode: "auto",
+  hidSourceCandidates: [],
+  hidSelectedSource: undefined,
+  hidSourceNotes: [],
+  hidEventLimit: 0,
+  hidEventsTruncated: false,
+  hidMouseEventsTotal: 0,
+  hidKeyboardEventsTotal: 0,
   hid: {
     keyboardEvents: [],
     mouseEvents: [],
@@ -233,7 +241,9 @@ describe("buildCaptureOverview", () => {
 
     expect(overview.recommendations.map((item) => item.key)).toContain("industrial");
     expect(overview.recommendations.map((item) => item.key)).toContain("vehicle");
-    expect(overview.quickFilters.map((item) => item.filter)).toContain("modbus or s7comm or dnp3 or cip or bacnet or iec104 or opcua or pn_rt");
+    expect(overview.quickFilters.map((item) => item.filter)).toContain(
+      "modbus or s7comm or dnp3 or cip or bacnet or iec104 or opcua or pn_rt",
+    );
     expect(overview.quickFilters.map((item) => item.filter)).toContain("can or j1939 or doip or uds");
   });
 });

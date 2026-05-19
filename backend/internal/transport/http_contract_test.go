@@ -319,17 +319,20 @@ func TestUSBAnalysisContract(t *testing.T) {
 	server := &Server{analysis: contractAnalysisService{}}
 	rec := httptest.NewRecorder()
 
-	server.handleUSBAnalysis(rec, httptest.NewRequest(http.MethodGet, "/api/analysis/usb", nil))
+	server.handleUSBAnalysis(rec, httptest.NewRequest(http.MethodGet, "/api/analysis/usb?hid_source=usbhid&hid_event_limit=42", nil))
 
 	requireStatus(t, rec, http.StatusOK)
 	payload := decodeJSONMap(t, rec)
-	requireJSONKeys(t, payload, "total_usb_packets", "keyboard_packets", "mouse_packets", "other_usb_packets", "hid_packets", "mass_storage_packets", "protocols", "records", "hid", "mass_storage", "other", "notes", "report")
+	requireJSONKeys(t, payload, "total_usb_packets", "keyboard_packets", "mouse_packets", "other_usb_packets", "hid_packets", "mass_storage_packets", "protocols", "records", "hid_source_mode", "hid_event_limit", "hid_events_truncated", "hid_mouse_events_total", "hid_keyboard_events_total", "hid", "mass_storage", "other", "notes", "report")
 	requireJSONNumber(t, payload, "total_usb_packets")
 	requireJSONNumber(t, payload, "keyboard_packets")
 	requireJSONNumber(t, payload, "mouse_packets")
 	requireJSONNumber(t, payload, "other_usb_packets")
 	requireJSONNumber(t, payload, "hid_packets")
 	requireJSONNumber(t, payload, "mass_storage_packets")
+	requireJSONNumber(t, payload, "hid_event_limit")
+	requireJSONNumber(t, payload, "hid_mouse_events_total")
+	requireJSONNumber(t, payload, "hid_keyboard_events_total")
 	requireJSONArray(t, payload, "protocols")
 	requireJSONArray(t, payload, "records")
 	requireJSONObject(t, payload, "hid")
@@ -496,12 +499,21 @@ func (contractAnalysisService) USBAnalysis() (model.USBAnalysis, error) {
 }
 
 func (contractAnalysisService) USBAnalysisWithContext(context.Context) (model.USBAnalysis, error) {
+	return contractAnalysisService{}.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{})
+}
+
+func (contractAnalysisService) USBAnalysisWithOptions(context.Context, model.USBAnalysisOptions) (model.USBAnalysis, error) {
 	return model.USBAnalysis{
-		TotalUSBPackets: 1,
-		Protocols:       []model.TrafficBucket{{Label: "usb", Count: 1}},
-		Records:         []model.USBPacketRecord{},
-		Notes:           []string{"contract"},
-		Report:          contractReport(),
+		TotalUSBPackets:        1,
+		Protocols:              []model.TrafficBucket{{Label: "usb", Count: 1}},
+		Records:                []model.USBPacketRecord{},
+		HIDSourceMode:          "usbhid",
+		HIDEventLimit:          model.MinUSBHIDEventLimit,
+		HIDEventsTruncated:     true,
+		HIDMouseEventsTotal:    501,
+		HIDKeyboardEventsTotal: 502,
+		Notes:                  []string{"contract"},
+		Report:                 contractReport(),
 	}, nil
 }
 

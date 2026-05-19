@@ -359,12 +359,35 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUSBAnalysis(w http.ResponseWriter, r *http.Request) {
-	analysis, err := s.analysis.USBAnalysisWithContext(r.Context())
+	hidSource := strings.TrimSpace(r.URL.Query().Get("hid_source"))
+	mode, ok := model.NormalizeUSBHIDSourceMode(hidSource)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid hid_source; expected auto, usbhid, capdata, btatt, or raw")
+		return
+	}
+	hidEventLimit, ok := parseUSBHIDEventLimit(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid hid_event_limit; expected integer")
+		return
+	}
+	analysis, err := s.analysis.USBAnalysisWithOptions(r.Context(), model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, analysis)
+}
+
+func parseUSBHIDEventLimit(r *http.Request) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get("hid_event_limit"))
+	if raw == "" {
+		return model.DefaultUSBHIDEventLimit, true
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, false
+	}
+	return model.NormalizeUSBHIDEventLimit(limit), true
 }
 
 func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
@@ -1001,7 +1024,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		token := s.authToken
 		s.mu.Unlock()
 
-		if token == "" || r.URL.Path == "/health" || isTrustedDesktopOrigin(r.Header.Get("Origin")) {
+		if token == "" || r.URL.Path == "/health" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -1095,14 +1118,6 @@ func isAllowedOrigin(origin string) bool {
 	default:
 		return false
 	}
-}
-
-func isTrustedDesktopOrigin(origin string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(origin))
-	if err != nil {
-		return false
-	}
-	return strings.EqualFold(parsed.Hostname(), "wails.localhost")
 }
 
 func classifyAuditAction(path, method string) string {

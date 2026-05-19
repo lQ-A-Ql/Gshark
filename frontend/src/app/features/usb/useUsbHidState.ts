@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { USBAnalysis } from "../../core/types";
 import { keyboardReplayToken } from "./usbHidRules";
+import { buildKeyboardEditedText } from "./usbKeyboardEditRules";
 
 export type HidSubTab = "keyboard" | "mouse";
 
@@ -125,6 +126,8 @@ export function useUsbHidState(analysis: USBAnalysis) {
     return text || "(未解析到可打印字符，仍可查看下方按键行为表)";
   }, [filteredKeyboardEvents]);
 
+  const keyboardEditedText = useMemo(() => buildKeyboardEditedText(filteredKeyboardEvents), [filteredKeyboardEvents]);
+
   const keyboardReplayText = useMemo(() => {
     if (filteredKeyboardEvents.length === 0) {
       return "(未解析到键盘行为)";
@@ -148,6 +151,7 @@ export function useUsbHidState(analysis: USBAnalysis) {
     isKeyboardPlaying,
     keyboardCursor,
     keyboardDevices,
+    keyboardEditedText,
     keyboardReplayText,
     keyboardStats,
     keyboardTextPreview,

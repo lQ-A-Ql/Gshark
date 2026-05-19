@@ -1,15 +1,21 @@
 import type { USBMouseEvent } from "../../core/types";
 import { UsbHidEmptyState } from "./UsbHidEmptyState";
-import { normalizeMousePoints } from "./usbHidRules";
+import { type MouseCoordinateMode, normalizeMousePointsForMode } from "./usbMouseGeometry";
 
-export function MouseHeatmap({ events }: { events: USBMouseEvent[] }) {
+export function MouseHeatmap({
+  events,
+  coordinateMode = "screen",
+}: {
+  events: USBMouseEvent[];
+  coordinateMode?: MouseCoordinateMode;
+}) {
   if (events.length === 0) {
     return <UsbHidEmptyState>暂无鼠标热区数据</UsbHidEmptyState>;
   }
 
   const width = 680;
   const height = 320;
-  const points = normalizeMousePoints(events, width, height);
+  const points = normalizeMousePointsForMode(events, width, height, coordinateMode);
   const bucketSize = 18;
   const density = new Map<string, { x: number; y: number; count: number; clicks: number }>();
 
@@ -68,6 +74,7 @@ export function MouseHeatmap({ events }: { events: USBMouseEvent[] }) {
         <span className="inline-flex items-center gap-1">
           <span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> 点击热点
         </span>
+        <span>{coordinateMode === "recovered" ? "Y 轴已取反" : "屏幕坐标"}</span>
       </div>
     </div>
   );

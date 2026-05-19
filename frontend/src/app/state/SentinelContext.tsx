@@ -70,6 +70,10 @@ export function SentinelProvider({ children }: PropsWithChildren) {
   const { recentCaptures, rememberRecentCapture } = useRecentCapturesState();
 
   const { captureWaitersRef, wakeCaptureWaiters, waitForCaptureSignal } = useCaptureSignalWaiters();
+  const setSelectedPacketIdFromRef = useCallback(
+    (value: Parameters<typeof setSelectedPacketIdRef.current>[0]) => setSelectedPacketIdRef.current(value),
+    [setSelectedPacketIdRef],
+  );
   const {
     backendConnected,
     backendStatus,
@@ -96,7 +100,7 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     scheduleLoadMoreRef,
     refreshAnalysisResultRef,
     updateProgressFromStatusRef,
-    setSelectedPacketId: (value) => setSelectedPacketIdRef.current(value),
+    setSelectedPacketId: setSelectedPacketIdFromRef,
     setMediaAnalysisProgress,
     setThreatAnalysisProgress,
     setIsThreatAnalysisLoading,

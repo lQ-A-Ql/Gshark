@@ -45,6 +45,7 @@ type Service struct {
 	vehicleAnalysis         *model.VehicleAnalysis
 	mediaAnalysis           *model.MediaAnalysis
 	usbAnalysis             *model.USBAnalysis
+	usbAnalysisBySource     map[string]*model.USBAnalysis
 	c2Analysis              *model.C2SampleAnalysis
 	aptAnalysis             *model.APTAnalysis
 	vehicleDBCDefs          []*tshark.DBCDatabase
@@ -540,6 +541,7 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 	if err := s.packetStore.ReplaceWith(nextStore); err != nil {
 		return err
 	}
+	tshark.ClearUSBAnalysisRawScanCache()
 	s.cancelDisplayFilterCacheLocked()
 	s.pcap = filePath
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
@@ -549,6 +551,7 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 	s.vehicleAnalysis = nil
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
 	s.c2Analysis = nil
 	s.aptAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
@@ -896,7 +899,9 @@ func (s *Service) PrepareCaptureReplacement() {
 
 	s.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
+	s.clearUSBAnalysisCacheLocked()
 	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
 }
 
 func (s *Service) ClearCapture() error {
@@ -911,6 +916,7 @@ func (s *Service) ClearCapture() error {
 	s.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
 	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
 
 	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -947,6 +953,7 @@ func (s *Service) ClearCapture() error {
 	s.resetCaptureAnalysisStateLocked()
 	s.cancelSpeechBatchLocked()
 	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
@@ -968,6 +975,7 @@ func (s *Service) resetCaptureAnalysisStateLocked() {
 	s.vehicleAnalysis = nil
 	s.mediaAnalysis = nil
 	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
 	s.c2Analysis = nil
 	s.aptAnalysis = nil
 	s.mediaArtifacts = map[string]string{}
@@ -978,6 +986,11 @@ func (s *Service) resetCaptureAnalysisStateLocked() {
 	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = map[string]model.ReassembledStream{}
 	s.streamOverrides = map[string]map[int]string{}
+}
+
+func (s *Service) clearUSBAnalysisCacheLocked() {
+	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
 }
 
 func (s *Service) CaptureStatus() model.CaptureStatus {
@@ -2247,15 +2260,32 @@ func (s *Service) USBAnalysis() (model.USBAnalysis, error) {
 }
 
 func (s *Service) USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis, error) {
+	return s.USBAnalysisWithOptions(ctx, model.USBAnalysisOptions{})
+}
+
+func (s *Service) USBAnalysisWithOptions(ctx context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
 		return model.USBAnalysis{}, err
 	}
+	mode, ok := model.NormalizeUSBHIDSourceMode(string(opts.HIDSourceMode))
+	if !ok {
+		mode = model.USBHIDSourceAuto
+	}
+	hidEventLimit := model.NormalizeUSBHIDEventLimit(opts.HIDEventLimit)
+	cacheKey := usbAnalysisCacheKey(mode, hidEventLimit)
+	defaultCacheKey := usbAnalysisCacheKey(model.USBHIDSourceAuto, model.DefaultUSBHIDEventLimit)
 	s.mu.RLock()
 	pcap := s.pcap
-	cached := s.usbAnalysis
+	var cached *model.USBAnalysis
+	if cacheKey == defaultCacheKey {
+		cached = s.usbAnalysis
+	}
+	if cached == nil && s.usbAnalysisBySource != nil {
+		cached = s.usbAnalysisBySource[cacheKey]
+	}
 	s.mu.RUnlock()
 
 	if cached != nil {
@@ -2267,26 +2297,39 @@ func (s *Service) USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis
 	if err := ctx.Err(); err != nil {
 		return model.USBAnalysis{}, err
 	}
-	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
-		log.Printf("engine: specialized field cache warm failed for usb analysis: %v", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return model.USBAnalysis{}, err
-	}
 
-	analysis, err := tshark.BuildUSBAnalysisFromFile(pcap)
+	analysis, err := tshark.BuildUSBAnalysisFromFileWithOptions(pcap, model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
 	if err != nil {
 		return model.USBAnalysis{}, err
 	}
 	analysis.Report = buildUSBInvestigationReport(analysis)
 
 	s.mu.Lock()
-	if s.usbAnalysis == nil {
+	if s.pcap != pcap {
+		s.mu.Unlock()
+		return model.USBAnalysis{}, context.Canceled
+	}
+	if s.usbAnalysisBySource == nil {
+		s.usbAnalysisBySource = make(map[string]*model.USBAnalysis)
+	}
+	if s.usbAnalysisBySource[cacheKey] == nil {
+		s.usbAnalysisBySource[cacheKey] = &analysis
+	}
+	if cacheKey == defaultCacheKey && s.usbAnalysis == nil {
 		s.usbAnalysis = &analysis
 	}
-	out := *s.usbAnalysis
+	out := analysis
+	if cacheKey == defaultCacheKey && s.usbAnalysis != nil {
+		out = *s.usbAnalysis
+	} else if s.usbAnalysisBySource[cacheKey] != nil {
+		out = *s.usbAnalysisBySource[cacheKey]
+	}
 	s.mu.Unlock()
 	return out, nil
+}
+
+func usbAnalysisCacheKey(mode model.USBHIDSourceMode, hidEventLimit int) string {
+	return fmt.Sprintf("source=%s;hid_event_limit=%d", mode, model.NormalizeUSBHIDEventLimit(hidEventLimit))
 }
 
 func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error) {

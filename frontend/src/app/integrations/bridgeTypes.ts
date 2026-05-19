@@ -32,6 +32,7 @@ import type {
   ThreatHit,
   NTLMSessionMaterial,
   USBAnalysis,
+  USBHIDSourceMode,
   VehicleAnalysis,
   WinRMDecryptRequest,
   WinRMDecryptResult,
@@ -131,7 +132,7 @@ export interface AnalysisClient {
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
-  getUSBAnalysis(signal?: AbortSignal): Promise<USBAnalysis>;
+  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number): Promise<USBAnalysis>;
   getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
   decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal): Promise<C2DecryptResult>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;

@@ -259,6 +259,20 @@ func TestImportZipBytesRejectsOversizedFile(t *testing.T) {
 	}
 }
 
+func TestImportZipBytesRejectsOversizedManifest(t *testing.T) {
+	manager := NewManager()
+	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("large-manifest")
+	files["large-manifest/manifest.json"] = strings.Repeat("x", maxModuleZipFileBytes+1)
+
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "manifest.json exceeds size limit") {
+		t.Fatalf("expected oversized manifest error, got %v", err)
+	}
+}
+
 func TestImportZipBytesRejectsOversizedTotalUncompressedSize(t *testing.T) {
 	manager := NewManager()
 	if err := manager.LoadFromDir(filepath.Join(t.TempDir(), "misc")); err != nil {

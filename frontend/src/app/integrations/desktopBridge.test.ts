@@ -403,6 +403,20 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getCaptureStatus).not.toHaveBeenCalled();
   });
 
+  it("preserves string IPC errors in wrapped desktop data-plane failures", async () => {
+    const fallbackBridge = createFallbackBridge();
+    const bridge = createDesktopBridge({
+      desktopApp: {
+        InvokeBackendJSON: vi.fn(async () => {
+          throw "backend token expired";
+        }),
+      },
+      fallbackBridge,
+    });
+
+    await expect(bridge.getIndustrialAnalysis()).rejects.toThrow("backend token expired");
+  });
+
   it("lets packet page callers abort typed IPC without browser HTTP fallback", async () => {
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
@@ -508,6 +522,42 @@ describe("createDesktopBridge", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("falls back through generic desktop IPC when typed fast runtime snapshot fails", async () => {
+    const fallbackBridge = createFallbackBridge({
+      getToolRuntimeSnapshot: vi.fn(),
+    });
+    const invokeBackendJSON = vi.fn(async (request: unknown) => {
+      expect(request).toMatchObject({
+        method: "GET",
+        path: "/api/tools/runtime-config?probe=fast",
+        body_kind: "none",
+      });
+      return {
+        config: { tshark_path: "ipc-data-plane-tshark", yara_timeout_ms: 25000 },
+        tshark: { available: true, path: "ipc-data-plane-tshark", message: "ok" },
+        ffmpeg: { available: false, path: "", message: "" },
+        speech: { available: false, message: "" },
+        yara: { enabled: false, message: "", timeout_ms: 25000 },
+      };
+    });
+    const desktopApp: DesktopTransportBinding = {
+      InvokeBackendJSON: invokeBackendJSON,
+      GetToolRuntimeSnapshotFast: vi.fn(async () => {
+        throw "typed runtime bridge missing";
+      }),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    const snapshot = await bridge.getToolRuntimeSnapshot(undefined, "fast");
+
+    expect(desktopApp.GetToolRuntimeSnapshotFast).toHaveBeenCalledTimes(1);
+    expect(invokeBackendJSON).toHaveBeenCalledTimes(1);
+    expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
+    expect(snapshot.config.tsharkPath).toBe("ipc-data-plane-tshark");
+    expect(snapshot.transport).toBe("http-fallback");
+    expect(snapshot.transportError).toContain("typed runtime bridge missing");
   });
 
   it("keeps abortable runtime config updates on Wails IPC when the binding exists", async () => {

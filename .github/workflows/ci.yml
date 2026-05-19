@@ -20,10 +20,6 @@ jobs:
         with:
           go-version-file: backend/go.mod
 
-      - name: Root desktop dev-tag tests
-        working-directory: .
-        run: go test -tags dev ./...
-
       - name: Go fmt check
         run: |
           test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
@@ -76,3 +72,58 @@ jobs:
 
       - name: Frontend checks
         run: pnpm run ci
+
+  desktop:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable Corepack
+        working-directory: frontend
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.31.0 --activate
+
+      - name: Resolve pnpm store
+        id: pnpm-store
+        working-directory: frontend
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $env:GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Wails desktop assets
+        working-directory: frontend
+        run: pnpm run build:wails
+
+      - name: Check desktop assets
+        run: .\scripts\check-desktop-assets.ps1
+
+      - name: Root desktop dev-tag tests
+        run: go test -tags dev ./...
+
+      - name: Root desktop production-tag tests
+        run: go test -tags production ./...

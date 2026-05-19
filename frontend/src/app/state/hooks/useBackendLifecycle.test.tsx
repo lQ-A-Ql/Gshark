@@ -300,6 +300,29 @@ describe("useBackendLifecycle", () => {
     result.unmount();
   });
 
+  it("does not restart startup probes after a runtime probe failure rerender", async () => {
+    bridgeMocks.getToolRuntimeSnapshot.mockRejectedValue(new Error("runtime ipc unavailable"));
+    const result = renderHook(() => useBackendLifecycleHarness());
+
+    await waitFor(() => {
+      expect(result.result.current.toolRuntimeProbeState).toBe("failed");
+    });
+    const availabilityCalls = bridgeMocks.isAvailable.mock.calls.length;
+    const snapshotCalls = bridgeMocks.getToolRuntimeSnapshot.mock.calls.length;
+    const subscribeCalls = bridgeMocks.subscribeEvents.mock.calls.length;
+
+    await act(async () => {
+      result.rerender();
+      await Promise.resolve();
+    });
+
+    expect(bridgeMocks.isAvailable).toHaveBeenCalledTimes(availabilityCalls);
+    expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledTimes(snapshotCalls);
+    expect(bridgeMocks.subscribeEvents).toHaveBeenCalledTimes(subscribeCalls);
+
+    result.unmount();
+  });
+
   it("syncs saved runtime config after the initial startup snapshot when it differs", async () => {
     const storedConfig = JSON.stringify({
       tsharkPath: "C:/Saved/tshark.exe",

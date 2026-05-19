@@ -27,6 +27,7 @@ type StatusOptions struct {
 var (
 	binaryMu         sync.RWMutex
 	configuredBinary string
+	commandContextFn = exec.CommandContext
 )
 
 func SetBinaryPath(path string) {
@@ -50,7 +51,7 @@ func CommandContext(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	return exec.CommandContext(ctx, binary, args...), nil
+	return commandContextFn(ctx, binary, args...), nil
 }
 
 func ResolveBinary() (string, error) {

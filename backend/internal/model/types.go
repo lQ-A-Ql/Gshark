@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 type Packet struct {
 	ID              int64               `json:"id"`
 	Timestamp       string              `json:"timestamp"`
@@ -1477,6 +1479,8 @@ type USBMouseEvent struct {
 	Time            string   `json:"time"`
 	Device          string   `json:"device"`
 	Endpoint        string   `json:"endpoint"`
+	Source          string   `json:"source,omitempty"`
+	Layout          string   `json:"layout,omitempty"`
 	Buttons         []string `json:"buttons,omitempty"`
 	PressedButtons  []string `json:"pressed_buttons,omitempty"`
 	ReleasedButtons []string `json:"released_buttons,omitempty"`
@@ -1487,6 +1491,74 @@ type USBMouseEvent struct {
 	PositionX       int      `json:"position_x"`
 	PositionY       int      `json:"position_y"`
 	Summary         string   `json:"summary"`
+}
+
+type USBHIDSourceMode string
+
+const (
+	USBHIDSourceAuto    USBHIDSourceMode = "auto"
+	USBHIDSourceUSBHID  USBHIDSourceMode = "usbhid"
+	USBHIDSourceCapData USBHIDSourceMode = "capdata"
+	USBHIDSourceBTATT   USBHIDSourceMode = "btatt"
+	USBHIDSourceRaw     USBHIDSourceMode = "raw"
+
+	DefaultUSBHIDEventLimit = 20000
+	MinUSBHIDEventLimit     = 500
+	MaxUSBHIDEventLimit     = 100000
+)
+
+type USBAnalysisOptions struct {
+	HIDSourceMode USBHIDSourceMode `json:"hid_source_mode,omitempty"`
+	HIDEventLimit int              `json:"hid_event_limit,omitempty"`
+}
+
+type USBRawAnalysis struct {
+	Records                []USBPacketRecord      `json:"records"`
+	KeyboardEvents         []USBKeyboardEvent     `json:"keyboard_events"`
+	MouseEvents            []USBMouseEvent        `json:"mouse_events"`
+	OtherRecords           []USBPacketRecord      `json:"other_records"`
+	HIDSourceMode          string                 `json:"hid_source_mode,omitempty"`
+	HIDSourceCandidates    []string               `json:"hid_source_candidates,omitempty"`
+	HIDSelectedSource      string                 `json:"hid_selected_source,omitempty"`
+	HIDSourceNotes         []string               `json:"hid_source_notes,omitempty"`
+	HIDEventLimit          int                    `json:"hid_event_limit"`
+	HIDEventsTruncated     bool                   `json:"hid_events_truncated"`
+	HIDMouseEventsTotal    int                    `json:"hid_mouse_events_total"`
+	HIDKeyboardEventsTotal int                    `json:"hid_keyboard_events_total"`
+	HID                    USBHIDAnalysis         `json:"hid"`
+	MassStorage            USBMassStorageAnalysis `json:"mass_storage"`
+	Other                  USBOtherAnalysis       `json:"other"`
+	Notes                  []string               `json:"notes"`
+}
+
+func NormalizeUSBHIDSourceMode(value string) (USBHIDSourceMode, bool) {
+	switch USBHIDSourceMode(strings.ToLower(strings.TrimSpace(value))) {
+	case "", USBHIDSourceAuto:
+		return USBHIDSourceAuto, true
+	case USBHIDSourceUSBHID:
+		return USBHIDSourceUSBHID, true
+	case USBHIDSourceCapData:
+		return USBHIDSourceCapData, true
+	case USBHIDSourceBTATT:
+		return USBHIDSourceBTATT, true
+	case USBHIDSourceRaw:
+		return USBHIDSourceRaw, true
+	default:
+		return USBHIDSourceAuto, false
+	}
+}
+
+func NormalizeUSBHIDEventLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultUSBHIDEventLimit
+	}
+	if limit < MinUSBHIDEventLimit {
+		return MinUSBHIDEventLimit
+	}
+	if limit > MaxUSBHIDEventLimit {
+		return MaxUSBHIDEventLimit
+	}
+	return limit
 }
 
 type USBMassStorageOperation struct {
@@ -1539,27 +1611,35 @@ type USBOtherAnalysis struct {
 }
 
 type USBAnalysis struct {
-	TotalUSBPackets    int                    `json:"total_usb_packets"`
-	KeyboardPackets    int                    `json:"keyboard_packets"`
-	MousePackets       int                    `json:"mouse_packets"`
-	OtherUSBPackets    int                    `json:"other_usb_packets"`
-	HIDPackets         int                    `json:"hid_packets"`
-	MassStoragePackets int                    `json:"mass_storage_packets"`
-	Protocols          []TrafficBucket        `json:"protocols"`
-	TransferTypes      []TrafficBucket        `json:"transfer_types"`
-	Directions         []TrafficBucket        `json:"directions"`
-	Devices            []TrafficBucket        `json:"devices"`
-	Endpoints          []TrafficBucket        `json:"endpoints"`
-	SetupRequests      []TrafficBucket        `json:"setup_requests"`
-	Records            []USBPacketRecord      `json:"records"`
-	KeyboardEvents     []USBKeyboardEvent     `json:"keyboard_events"`
-	MouseEvents        []USBMouseEvent        `json:"mouse_events"`
-	OtherRecords       []USBPacketRecord      `json:"other_records"`
-	HID                USBHIDAnalysis         `json:"hid"`
-	MassStorage        USBMassStorageAnalysis `json:"mass_storage"`
-	Other              USBOtherAnalysis       `json:"other"`
-	Notes              []string               `json:"notes"`
-	Report             InvestigationReport    `json:"report,omitempty"`
+	TotalUSBPackets        int                    `json:"total_usb_packets"`
+	KeyboardPackets        int                    `json:"keyboard_packets"`
+	MousePackets           int                    `json:"mouse_packets"`
+	OtherUSBPackets        int                    `json:"other_usb_packets"`
+	HIDPackets             int                    `json:"hid_packets"`
+	MassStoragePackets     int                    `json:"mass_storage_packets"`
+	Protocols              []TrafficBucket        `json:"protocols"`
+	TransferTypes          []TrafficBucket        `json:"transfer_types"`
+	Directions             []TrafficBucket        `json:"directions"`
+	Devices                []TrafficBucket        `json:"devices"`
+	Endpoints              []TrafficBucket        `json:"endpoints"`
+	SetupRequests          []TrafficBucket        `json:"setup_requests"`
+	Records                []USBPacketRecord      `json:"records"`
+	KeyboardEvents         []USBKeyboardEvent     `json:"keyboard_events"`
+	MouseEvents            []USBMouseEvent        `json:"mouse_events"`
+	OtherRecords           []USBPacketRecord      `json:"other_records"`
+	HIDSourceMode          string                 `json:"hid_source_mode,omitempty"`
+	HIDSourceCandidates    []string               `json:"hid_source_candidates,omitempty"`
+	HIDSelectedSource      string                 `json:"hid_selected_source,omitempty"`
+	HIDSourceNotes         []string               `json:"hid_source_notes,omitempty"`
+	HIDEventLimit          int                    `json:"hid_event_limit"`
+	HIDEventsTruncated     bool                   `json:"hid_events_truncated"`
+	HIDMouseEventsTotal    int                    `json:"hid_mouse_events_total"`
+	HIDKeyboardEventsTotal int                    `json:"hid_keyboard_events_total"`
+	HID                    USBHIDAnalysis         `json:"hid"`
+	MassStorage            USBMassStorageAnalysis `json:"mass_storage"`
+	Other                  USBOtherAnalysis       `json:"other"`
+	Notes                  []string               `json:"notes"`
+	Report                 InvestigationReport    `json:"report,omitempty"`
 }
 
 type EvidenceRecord struct {

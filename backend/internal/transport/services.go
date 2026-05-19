@@ -56,6 +56,7 @@ type AnalysisService interface {
 	RemoveVehicleDBC(path string) []model.DBCProfile
 	USBAnalysis() (model.USBAnalysis, error)
 	USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis, error)
+	USBAnalysisWithOptions(ctx context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error)
 	C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error)
 	C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error)
 	APTAnalysis(ctx context.Context) (model.APTAnalysis, error)

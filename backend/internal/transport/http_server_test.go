@@ -19,6 +19,16 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+type usbQueryAnalysisService struct {
+	contractAnalysisService
+	last model.USBAnalysisOptions
+}
+
+func (s *usbQueryAnalysisService) USBAnalysisWithOptions(_ context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error) {
+	s.last = opts
+	return model.USBAnalysis{TotalUSBPackets: 1, HIDEventLimit: opts.HIDEventLimit}, nil
+}
+
 func newTestServerWithTempMiscPackages(t *testing.T) *Server {
 	t.Helper()
 
@@ -144,7 +154,7 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 	}
 }
 
-func TestWithAuthAllowsTrustedDesktopOriginWithoutToken(t *testing.T) {
+func TestWithAuthRequiresTokenForTrustedDesktopOrigin(t *testing.T) {
 	server := &Server{}
 	server.SetAuthToken("secret-token")
 	handler := server.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -156,8 +166,18 @@ func TestWithAuthAllowsTrustedDesktopOriginWithoutToken(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected trusted desktop origin without token to fail, got %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/tools/tshark", nil)
+	req.Header.Set("Origin", "http://wails.localhost")
+	req.Header.Set("Authorization", "Bearer secret-token")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected trusted desktop origin request to succeed, got %d", rec.Code)
+		t.Fatalf("expected trusted desktop origin with token to succeed, got %d", rec.Code)
 	}
 }
 
@@ -313,6 +333,35 @@ func TestHandlerRegistersPacketStreamRoutes(t *testing.T) {
 				t.Fatalf("%s status = %d, want %d body=%s", tt.path, rec.Code, http.StatusOK, rec.Body.String())
 			}
 		})
+	}
+}
+
+func TestHandleUSBAnalysisParsesHIDEventLimit(t *testing.T) {
+	analysis := &usbQueryAnalysisService{}
+	server := &Server{analysis: analysis}
+	rec := httptest.NewRecorder()
+
+	server.handleUSBAnalysis(rec, httptest.NewRequest(http.MethodGet, "/api/analysis/usb?hid_source=capdata&hid_event_limit=42", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected USB analysis request to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if analysis.last.HIDSourceMode != model.USBHIDSourceCapData {
+		t.Fatalf("unexpected HID source mode: %q", analysis.last.HIDSourceMode)
+	}
+	if analysis.last.HIDEventLimit != model.MinUSBHIDEventLimit {
+		t.Fatalf("expected small HID event limit to clamp to %d, got %d", model.MinUSBHIDEventLimit, analysis.last.HIDEventLimit)
+	}
+}
+
+func TestHandleUSBAnalysisRejectsInvalidHIDEventLimit(t *testing.T) {
+	server := &Server{analysis: &usbQueryAnalysisService{}}
+	rec := httptest.NewRecorder()
+
+	server.handleUSBAnalysis(rec, httptest.NewRequest(http.MethodGet, "/api/analysis/usb?hid_event_limit=abc", nil))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid HID event limit to fail, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

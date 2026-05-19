@@ -26,6 +26,8 @@ export function asUSBMouseEvent(input: unknown): USBMouseEvent {
     time: String(item.time ?? ""),
     device: String(item.device ?? ""),
     endpoint: String(item.endpoint ?? ""),
+    source: String(item.source ?? "") || undefined,
+    layout: String(item.layout ?? "") || undefined,
     buttons: asStringList(item.buttons),
     pressedButtons: asStringList(item.pressed_buttons),
     releasedButtons: asStringList(item.released_buttons),

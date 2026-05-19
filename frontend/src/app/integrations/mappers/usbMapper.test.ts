@@ -10,6 +10,10 @@ describe("usbMapper", () => {
       other_usb_packets: 3,
       hid_packets: 3,
       mass_storage_packets: 4,
+      hid_event_limit: 20000,
+      hid_events_truncated: true,
+      hid_mouse_events_total: 18000,
+      hid_keyboard_events_total: 2500,
       protocols: [{ label: "USB", count: 9 }],
       transfer_types: [{ label: "BULK", count: 4 }],
       directions: [{ label: "IN", count: 5 }],
@@ -125,6 +129,12 @@ describe("usbMapper", () => {
     });
 
     expect(result.totalUSBPackets).toBe(9);
+    expect(result).toMatchObject({
+      hidEventLimit: 20000,
+      hidEventsTruncated: true,
+      hidMouseEventsTotal: 18000,
+      hidKeyboardEventsTotal: 2500,
+    });
     expect(result.records[0]).toMatchObject({ packetId: 1, payloadPreview: "00 04" });
     expect(result.keyboardEvents[0]).toMatchObject({ packetId: 2, keys: ["A", "1"], text: "A" });
     expect(result.mouseEvents[0]).toMatchObject({ packetId: 3, xDelta: 4, positionY: 20 });
@@ -152,6 +162,8 @@ describe("usbMapper", () => {
     expect(result.massStorage.writeOperations).toEqual([]);
     expect(result.other.records).toEqual([]);
     expect(result.report?.summary).toEqual([]);
+    expect(result.hidEventLimit).toBe(0);
+    expect(result.hidEventsTruncated).toBe(false);
   });
 
   it("defaults malformed wire payloads and ignores non-array sections", () => {

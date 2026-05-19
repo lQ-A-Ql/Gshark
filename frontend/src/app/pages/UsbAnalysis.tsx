@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
-import type { USBAnalysis as USBAnalysisData, USBMassStorageOperation } from "../core/types";
+import type { USBAnalysis as USBAnalysisData, USBHIDSourceMode, USBMassStorageOperation } from "../core/types";
 import { Banner } from "../features/usb/UsbAnalysisControls";
 import { UsbHidPanel } from "../features/usb/UsbHidPanel";
 import { UsbMassStoragePanel, type MassStorageSubTab } from "../features/usb/UsbMassStoragePanel";
@@ -14,12 +14,16 @@ import { useSentinel } from "../state/SentinelContext";
 
 export default function UsbAnalysis() {
   const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const [hidSource, setHidSource] = useState<USBHIDSourceMode>("auto");
+  const [hidEventLimit, setHidEventLimit] = useState(20000);
   const { analysis, loading, error, refreshAnalysis } = useUsbAnalysis({
     backendConnected,
     isPreloadingCapture,
     filePath: fileMeta.path,
     totalPackets,
     captureRevision,
+    hidSource,
+    hidEventLimit,
   });
 
   const [activePrimaryTab, setActivePrimaryTab] = useState<UsbPrimaryTab>("hid");
@@ -37,10 +41,7 @@ export default function UsbAnalysis() {
   const readOperations = analysis.massStorage.readOperations;
   const writeOperations = analysis.massStorage.writeOperations;
   const massStorageNotes = analysis.massStorage.notes.length > 0 ? analysis.massStorage.notes : analysis.notes;
-  const allMassStorageOperations = useMemo(
-    () => [...readOperations, ...writeOperations],
-    [readOperations, writeOperations],
-  );
+  const allMassStorageOperations = useMemo(() => [...readOperations, ...writeOperations], [readOperations, writeOperations]);
 
   useEffect(() => {
     setActivePrimaryTab((prev) => (domainHasData(analysis, prev) ? prev : pickDefaultPrimaryTab(analysis)));
@@ -114,7 +115,15 @@ export default function UsbAnalysis() {
         title="USB 调查报告"
       />
 
-      {activePrimaryTab === "hid" && <UsbHidPanel analysis={analysis} />}
+      {activePrimaryTab === "hid" && (
+        <UsbHidPanel
+          analysis={analysis}
+          hidEventLimit={hidEventLimit}
+          hidSource={hidSource}
+          onHidEventLimitChange={setHidEventLimit}
+          onHidSourceChange={setHidSource}
+        />
+      )}
 
       {activePrimaryTab === "mass-storage" && (
         <UsbMassStoragePanel

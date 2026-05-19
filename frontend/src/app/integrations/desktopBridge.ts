@@ -69,12 +69,12 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         });
         return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
       } catch (error) {
-        if (!ipcTransport) {
-          const fallbackSnapshot = await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
-          const message = error instanceof Error ? error.message : "Wails IPC 运行时组件探测失败";
-          return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
-        }
-        throw error;
+        const fallbackSnapshot = await dataBridge.getToolRuntimeSnapshot(signal, mode);
+        return withToolRuntimeSnapshotMeta(
+          fallbackSnapshot,
+          "http-fallback",
+          desktopIpcErrorMessage(error, "Wails IPC 运行时组件探测失败"),
+        );
       }
     },
     async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal, mode = "full") {
@@ -211,6 +211,16 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       });
     },
   };
+}
+
+function desktopIpcErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error.trim();
+  }
+  return fallback;
 }
 
 function runtimeSnapshotMethod(

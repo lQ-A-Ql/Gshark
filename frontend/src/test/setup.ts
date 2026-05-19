@@ -26,6 +26,19 @@ const localStorageMock = {
   clear: () => {},
 };
 
+const canvasContextMock: Partial<CanvasRenderingContext2D> = {
+  arc: () => {},
+  beginPath: () => {},
+  clearRect: () => {},
+  fill: () => {},
+  lineTo: () => {},
+  moveTo: () => {},
+  restore: () => {},
+  save: () => {},
+  setTransform: () => {},
+  stroke: () => {},
+};
+
 afterEach(() => {
   cleanup();
 });
@@ -47,6 +60,11 @@ Object.defineProperty(window, "localStorage", {
 Object.defineProperty(window, "PointerEvent", {
   writable: true,
   value: PointerEventMock,
+});
+
+Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+  writable: true,
+  value: () => canvasContextMock,
 });
 
 if (!HTMLElement.prototype.hasPointerCapture) {

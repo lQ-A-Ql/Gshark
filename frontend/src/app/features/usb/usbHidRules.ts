@@ -1,13 +1,10 @@
 import type { USBKeyboardEvent, USBMouseEvent } from "../../core/types";
 
+export type MouseTrackKind = "left" | "right" | "none" | "other";
+
 export function keyboardReplayToken(event: USBKeyboardEvent) {
-  if (event.text) {
-    return event.text;
-  }
-  if (event.pressedKeys.length > 0 || event.releasedKeys.length > 0) {
-    return `[${event.summary}] `;
-  }
-  return "";
+  if (event.text) return event.text;
+  return event.pressedKeys.length > 0 || event.releasedKeys.length > 0 ? `[${event.summary}] ` : "";
 }
 
 export function mouseActionBadge(row: USBMouseEvent) {
@@ -18,19 +15,11 @@ export function mouseActionBadge(row: USBMouseEvent) {
   return "event";
 }
 
-export function normalizeMousePoints(events: USBMouseEvent[], width: number, height: number) {
-  const points = events.map((event) => ({ x: event.positionX, y: event.positionY }));
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const spanX = Math.max(1, maxX - minX);
-  const spanY = Math.max(1, maxY - minY);
-
-  return points.map((point) => ({
-    x: ((point.x - minX) / spanX) * (width - 40) + 20,
-    y: height - (((point.y - minY) / spanY) * (height - 40) + 20),
-  }));
+export function mouseButtonTrackKind(row: USBMouseEvent): MouseTrackKind {
+  const left = row.buttons.includes("Left");
+  const right = row.buttons.includes("Right");
+  if (left && !right && row.buttons.length === 1) return "left";
+  if (right && !left && row.buttons.length === 1) return "right";
+  if (row.buttons.length === 0) return "none";
+  return "other";
 }

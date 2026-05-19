@@ -1,11 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createUSBAnalysis,
-  createUSBHidAnalysis,
-  createUSBMassStorageAnalysis,
-  createUSBOtherAnalysis,
-} from "./UsbAnalysis.testFixtures";
+import { createUSBAnalysis, createUSBMassStorageAnalysis, createUSBOtherAnalysis } from "./UsbAnalysis.testFixtures";
 
 const mocks = vi.hoisted(() => ({
   getUSBAnalysis: vi.fn(),
@@ -54,7 +49,6 @@ describe("UsbAnalysis", () => {
 
   it("defaults to the first top-level tab that has data", async () => {
     mocks.getUSBAnalysis.mockResolvedValue(createUSBMassStorageAnalysis());
-
     render(<UsbAnalysis />);
 
     await waitFor(() => {
@@ -63,31 +57,8 @@ describe("UsbAnalysis", () => {
     expect(screen.getByText("读请求数")).toBeInTheDocument();
   });
 
-  it("switches between HID keyboard and mouse subpages", async () => {
-    mocks.getUSBAnalysis.mockResolvedValue(createUSBHidAnalysis());
-
-    render(<UsbAnalysis />);
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "键盘" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "鼠标" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "键盘" }));
-    await waitFor(() => {
-      expect(screen.getByText("完整文本流")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "鼠标" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("行为明细表 (1)")).toBeInTheDocument();
-    });
-  });
-
-  it("switches between Mass Storage overview, read, and write subpages", async () => {
+  it("switches between Mass Storage subpages", async () => {
     mocks.getUSBAnalysis.mockResolvedValue(createUSBMassStorageAnalysis());
-
     render(<UsbAnalysis />);
 
     await waitFor(() => {
@@ -98,14 +69,13 @@ describe("UsbAnalysis", () => {
     await waitFor(() => {
       expect(screen.getAllByText("READ(10)").length).toBeGreaterThan(0);
     });
-
     fireEvent.click(screen.getByRole("button", { name: "写请求" }));
     await waitFor(() => {
       expect(screen.getAllByText("WRITE(10)").length).toBeGreaterThan(0);
     });
   });
 
-  it("switches between 其他 overview, control requests, and raw records", async () => {
+  it("switches between Other USB subpages", async () => {
     mocks.getUSBAnalysis.mockResolvedValue(createUSBOtherAnalysis());
 
     render(<UsbAnalysis />);

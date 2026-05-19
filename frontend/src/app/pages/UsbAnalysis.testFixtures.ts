@@ -1,4 +1,5 @@
 import type { USBAnalysis } from "../core/types";
+import { keyboardEventsFixture, mouseEventsFixture } from "./UsbAnalysis.hidFixtures";
 
 export function createUSBAnalysis(overrides: Partial<USBAnalysis> = {}): USBAnalysis {
   return {
@@ -18,6 +19,14 @@ export function createUSBAnalysis(overrides: Partial<USBAnalysis> = {}): USBAnal
     keyboardEvents: [],
     mouseEvents: [],
     otherRecords: [],
+    hidSourceMode: "auto",
+    hidSourceCandidates: [],
+    hidSelectedSource: undefined,
+    hidSourceNotes: [],
+    hidEventLimit: 0,
+    hidEventsTruncated: false,
+    hidMouseEventsTotal: 0,
+    hidKeyboardEventsTotal: 0,
     hid: {
       keyboardEvents: [],
       mouseEvents: [],
@@ -107,53 +116,26 @@ export function createUSBMassStorageAnalysis(): USBAnalysis {
   });
 }
 
-export function createUSBHidAnalysis(): USBAnalysis {
+export function createUSBHidAnalysis(overrides: Partial<USBAnalysis> = {}): USBAnalysis {
   return createUSBAnalysis({
-    totalUSBPackets: 2,
-    hidPackets: 2,
-    keyboardPackets: 1,
-    mousePackets: 1,
+    totalUSBPackets: 10,
+    hidPackets: 10,
+    keyboardPackets: 6,
+    mousePackets: 4,
+    hidSourceMode: "auto",
+    hidSourceCandidates: ["usbhid.data", "usb.capdata"],
+    hidSelectedSource: "usbhid.data",
+    hidSourceNotes: ["HID 数据源模式：auto。"],
     hid: {
-      keyboardEvents: [
-        {
-          packetId: 1,
-          time: "1.000000",
-          device: "Keyboard A",
-          endpoint: "EP 0x81 (IN)",
-          modifiers: ["Left Shift"],
-          keys: ["A"],
-          pressedModifiers: ["Left Shift"],
-          releasedModifiers: [],
-          pressedKeys: ["A"],
-          releasedKeys: [],
-          text: "A",
-          summary: "press Left Shift + A",
-        },
-      ],
-      mouseEvents: [
-        {
-          packetId: 2,
-          time: "1.100000",
-          device: "Mouse A",
-          endpoint: "EP 0x82 (IN)",
-          buttons: ["Left"],
-          pressedButtons: ["Left"],
-          releasedButtons: [],
-          xDelta: 8,
-          yDelta: 2,
-          wheelVertical: 0,
-          wheelHorizontal: 0,
-          positionX: 8,
-          positionY: 2,
-          summary: "press Left / move=(+8,+2)",
-        },
-      ],
+      keyboardEvents: keyboardEventsFixture,
+      mouseEvents: mouseEventsFixture,
       devices: [
-        { label: "Keyboard A", count: 1 },
-        { label: "Mouse A", count: 1 },
+        { label: "Keyboard A", count: 6 },
+        { label: "Mouse A", count: 4 },
       ],
       notes: ["hid note"],
     },
+    ...overrides,
   });
 }
 

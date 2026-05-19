@@ -1,4 +1,23 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { normalizeReleaseMarkdownHref } from "./updateReleaseLinks";
+
+function ReleaseMarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
+  const safeHref = normalizeReleaseMarkdownHref(href);
+  if (!safeHref) {
+    return <span className="font-medium text-slate-500">{children}</span>;
+  }
+
+  return (
+    <a
+      href={safeHref}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-blue-600 underline decoration-blue-200 underline-offset-4 hover:text-blue-700"
+    >
+      {children}
+    </a>
+  );
+}
 
 export const releaseMarkdownComponents = {
   h1: ({ children }: { children?: ReactNode }) => (
@@ -26,16 +45,7 @@ export const releaseMarkdownComponents = {
     </blockquote>
   ),
   hr: () => <hr className="my-6 border-slate-200" />,
-  a: ({ href, children }: { href?: string; children?: ReactNode }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="font-medium text-blue-600 underline decoration-blue-200 underline-offset-4 hover:text-blue-700"
-    >
-      {children}
-    </a>
-  ),
+  a: ReleaseMarkdownLink,
   code: ({ children, ...props }: HTMLAttributes<HTMLElement>) => {
     const isInline = !String(children).includes("\n");
     return isInline ? (

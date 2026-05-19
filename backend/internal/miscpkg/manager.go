@@ -401,9 +401,12 @@ func readPackageManifest(reader *zip.Reader) (model.MiscModulePackageManifest, e
 			}
 			defer rc.Close()
 
-			raw, err := io.ReadAll(rc)
+			raw, err := io.ReadAll(io.LimitReader(rc, int64(maxModuleZipFileBytes)+1))
 			if err != nil {
 				return model.MiscModulePackageManifest{}, fmt.Errorf("read module manifest: %w", err)
+			}
+			if len(raw) > maxModuleZipFileBytes {
+				return model.MiscModulePackageManifest{}, fmt.Errorf("module manifest.json exceeds size limit %d bytes", maxModuleZipFileBytes)
 			}
 			var manifest model.MiscModulePackageManifest
 			if err := json.Unmarshal(raw, &manifest); err != nil {

@@ -2,10 +2,15 @@ package tshark
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -25,6 +30,121 @@ func TestUSBAnalysisFieldsMatchParserWidth(t *testing.T) {
 	}
 	if usbAnalysisFields[usbFieldSCSIStatus] != "scsi.status" {
 		t.Fatalf("unexpected final field: %q", usbAnalysisFields[usbFieldSCSIStatus])
+	}
+	if usbAnalysisFields[usbFieldBTATTValue] != "btatt.value" {
+		t.Fatalf("unexpected Bluetooth HID field: %q", usbAnalysisFields[usbFieldBTATTValue])
+	}
+}
+
+func TestUSBAnalysisRawScanCacheDeduplicatesInFlightRequests(t *testing.T) {
+	oldRunner := usbAnalysisScanRunner
+	t.Cleanup(func() {
+		usbAnalysisScanRunner = oldRunner
+		ClearUSBAnalysisRawScanCache()
+	})
+	ClearUSBAnalysisRawScanCache()
+
+	var calls int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	usbAnalysisScanRunner = func(filePath string) (usbAnalysisRawScan, error) {
+		atomic.AddInt32(&calls, 1)
+		close(started)
+		<-release
+		return usbAnalysisRawScan{Rows: [][]string{make([]string, usbFieldCount)}}, nil
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	results := make(chan error, 2)
+	go func() {
+		defer wg.Done()
+		_, err := loadUSBAnalysisRawScan("sample.pcapng")
+		results <- err
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := loadUSBAnalysisRawScan("sample.pcapng")
+		results <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("expected first raw scan to start")
+	}
+	close(release)
+	wg.Wait()
+	close(results)
+	for err := range results {
+		if err != nil {
+			t.Fatalf("unexpected raw scan error: %v", err)
+		}
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one scan invocation, got %d", got)
+	}
+}
+
+func TestClearUSBAnalysisRawScanCacheInvalidatesEntries(t *testing.T) {
+	oldRunner := usbAnalysisScanRunner
+	t.Cleanup(func() {
+		usbAnalysisScanRunner = oldRunner
+		ClearUSBAnalysisRawScanCache()
+	})
+	ClearUSBAnalysisRawScanCache()
+
+	var calls int32
+	usbAnalysisScanRunner = func(filePath string) (usbAnalysisRawScan, error) {
+		atomic.AddInt32(&calls, 1)
+		return usbAnalysisRawScan{Rows: [][]string{make([]string, usbFieldCount)}}, nil
+	}
+
+	if _, err := loadUSBAnalysisRawScan("sample.pcapng"); err != nil {
+		t.Fatalf("first load error = %v", err)
+	}
+	ClearUSBAnalysisRawScanCache()
+	if _, err := loadUSBAnalysisRawScan("sample.pcapng"); err != nil {
+		t.Fatalf("second load error = %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("expected cache invalidation to force a second scan, got %d", got)
+	}
+}
+
+func TestUSBAnalysisRawScanCacheDoesNotPersistFailures(t *testing.T) {
+	oldRunner := usbAnalysisScanRunner
+	t.Cleanup(func() {
+		usbAnalysisScanRunner = oldRunner
+		ClearUSBAnalysisRawScanCache()
+	})
+	ClearUSBAnalysisRawScanCache()
+
+	var calls int32
+	usbAnalysisScanRunner = func(filePath string) (usbAnalysisRawScan, error) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			return usbAnalysisRawScan{}, errors.New("temporary scan failure")
+		}
+		return usbAnalysisRawScan{Rows: [][]string{make([]string, usbFieldCount)}}, nil
+	}
+
+	if _, err := loadUSBAnalysisRawScan("sample.pcapng"); err == nil {
+		t.Fatal("expected first load to fail")
+	}
+	if _, err := loadUSBAnalysisRawScan("sample.pcapng"); err != nil {
+		t.Fatalf("expected second load to retry and succeed, got %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("expected failed load to be evicted and retried, got %d calls", got)
+	}
+}
+
+func TestUSBHIDBluetoothRecordsAreAccepted(t *testing.T) {
+	if !looksLikeUSBRecord("BTATT", "", "", "", "", "") {
+		t.Fatalf("expected BTATT records to enter USB HID analysis")
+	}
+	if got := normalizeUSBProtocolLabel("btatt"); got != "BTATT" {
+		t.Fatalf("unexpected Bluetooth protocol label: %q", got)
 	}
 }
 
@@ -150,6 +270,79 @@ func TestBuildUSBMouseEventReleaseWithoutMovement(t *testing.T) {
 	}
 }
 
+func TestDetectUSBMouseSnapshotKeepsEmptyInterruptFramesWithHint(t *testing.T) {
+	record := model.USBPacketRecord{
+		PacketID:      4,
+		TransferType:  "Interrupt",
+		BusID:         "1",
+		DeviceAddress: "3",
+		Endpoint:      "Bus 1 / Device 3 / EP 0x81 (IN)",
+	}
+
+	snapshot, ok := detectUSBMouseSnapshot(record, make([]string, usbFieldCount), nil, usbHIDHint{Mouse: true})
+	if !ok {
+		t.Fatalf("expected empty completion frame to stay classified as mouse HID after a mouse hint")
+	}
+	if !snapshot.KeepState || len(snapshot.Buttons) != 0 || snapshot.XDelta != 0 || snapshot.YDelta != 0 || snapshot.WheelVertical != 0 || snapshot.WheelHorizontal != 0 {
+		t.Fatalf("expected empty mouse snapshot, got %+v", snapshot)
+	}
+
+	_, nextState, eventOK := buildUSBMouseEvent(record, usbMouseState{Buttons: []string{"Left"}, X: 10, Y: 5}, snapshot)
+	if eventOK {
+		t.Fatalf("expected empty completion frame not to produce a mouse event")
+	}
+	if nextState.X != 10 || nextState.Y != 5 || len(nextState.Buttons) != 1 || nextState.Buttons[0] != "Left" {
+		t.Fatalf("unexpected next mouse state: %+v", nextState)
+	}
+}
+
+func TestDetectUSBMouseSnapshotFromReportIDPayload(t *testing.T) {
+	record := model.USBPacketRecord{
+		PacketID:      5,
+		TransferType:  "Interrupt",
+		BusID:         "1",
+		DeviceAddress: "3",
+		Endpoint:      "Bus 1 / Device 3 / EP 0x81 (IN)",
+	}
+
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldHIDData] = "09:01:FE:00"
+	snapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{Mouse: true})
+	if !ok {
+		t.Fatalf("expected report-id mouse payload to be detected")
+	}
+	if len(snapshot.Buttons) != 1 || snapshot.Buttons[0] != "Left" || snapshot.XDelta != -2 || snapshot.YDelta != 0 {
+		t.Fatalf("unexpected report-id mouse snapshot: %+v", snapshot)
+	}
+	if snapshot.Source != "usbhid.data" || snapshot.Layout != "report-id-4" {
+		t.Fatalf("unexpected report-id source/layout: %+v", snapshot)
+	}
+}
+
+func TestDetectUSBMouseSnapshotKeepsZeroReleasePayloadWithHint(t *testing.T) {
+	record := model.USBPacketRecord{
+		PacketID:      6,
+		TransferType:  "Interrupt",
+		BusID:         "1",
+		DeviceAddress: "3",
+		Endpoint:      "Bus 1 / Device 3 / EP 0x81 (IN)",
+	}
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldHIDData] = "00:00:00:00"
+
+	snapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{Mouse: true})
+	if !ok {
+		t.Fatalf("expected zero mouse release payload to stay classified as mouse")
+	}
+	event, nextState, eventOK := buildUSBMouseEvent(record, usbMouseState{Buttons: []string{"Left"}, X: 4, Y: 5}, snapshot)
+	if !eventOK {
+		t.Fatalf("expected zero release payload to produce release event")
+	}
+	if len(event.ReleasedButtons) != 1 || event.ReleasedButtons[0] != "Left" || nextState.X != 4 || nextState.Y != 5 {
+		t.Fatalf("unexpected zero release event=%+v state=%+v", event, nextState)
+	}
+}
+
 func TestBuildUSBMassStoragePacketInfoReadAndWriteClassification(t *testing.T) {
 	readParts := make([]string, usbFieldCount)
 	readParts[usbFieldMassStorageCBWTag] = "0x00000001"
@@ -263,6 +456,32 @@ func TestAppendUSBOtherRecordAddsControlRequests(t *testing.T) {
 	}
 }
 
+func TestUSBHIDEventLimitTracksTotalsAndTruncation(t *testing.T) {
+	analysis := model.USBAnalysis{}
+	limit := model.MinUSBHIDEventLimit
+	for i := 0; i < limit+1; i++ {
+		appendUSBKeyboardEvent(&analysis, model.USBKeyboardEvent{PacketID: int64(i + 1)}, limit)
+		appendUSBMouseEvent(&analysis, model.USBMouseEvent{PacketID: int64(i + 1)}, limit)
+	}
+
+	if analysis.HIDKeyboardEventsTotal != limit+1 || analysis.HIDMouseEventsTotal != limit+1 {
+		t.Fatalf("unexpected HID totals: keyboard=%d mouse=%d", analysis.HIDKeyboardEventsTotal, analysis.HIDMouseEventsTotal)
+	}
+	if len(analysis.KeyboardEvents) != limit || len(analysis.HID.KeyboardEvents) != limit {
+		t.Fatalf("keyboard event slices should be truncated to %d, got top=%d nested=%d", limit, len(analysis.KeyboardEvents), len(analysis.HID.KeyboardEvents))
+	}
+	if len(analysis.MouseEvents) != limit || len(analysis.HID.MouseEvents) != limit {
+		t.Fatalf("mouse event slices should be truncated to %d, got top=%d nested=%d", limit, len(analysis.MouseEvents), len(analysis.HID.MouseEvents))
+	}
+	if !analysis.HIDEventsTruncated {
+		t.Fatal("expected HID events truncated metadata")
+	}
+	notes := buildUSBHIDNotes(analysis)
+	if !strings.Contains(strings.Join(notes, " "), "已按上限截断") {
+		t.Fatalf("expected HID notes to mention truncation, got %#v", notes)
+	}
+}
+
 func buildCBWHex(tag uint32, transferLength uint32, flags byte, lun byte, cdb []byte) string {
 	payload := make([]byte, 31)
 	binary.LittleEndian.PutUint32(payload[0:4], 0x43425355)
@@ -286,7 +505,9 @@ func TestDetectUSBKeyboardSnapshotFromRawBootPayload(t *testing.T) {
 		TransferType: "Interrupt",
 	}
 
-	snapshot, ok := detectUSBKeyboardSnapshot(record, make([]string, usbFieldCount), "0200040000000000", usbHIDHint{})
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldCapData] = "0200040000000000"
+	snapshot, ok := detectUSBKeyboardSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{})
 	if !ok {
 		t.Fatalf("expected raw 8-byte boot report to be detected as keyboard")
 	}
@@ -304,11 +525,138 @@ func TestDetectUSBKeyboardSnapshotRawReleaseWithHint(t *testing.T) {
 		TransferType: "Interrupt",
 	}
 
-	snapshot, ok := detectUSBKeyboardSnapshot(record, make([]string, usbFieldCount), "0000000000000000", usbHIDHint{Keyboard: true})
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldCapData] = "0000000000000000"
+	snapshot, ok := detectUSBKeyboardSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{Keyboard: true})
 	if !ok {
 		t.Fatalf("expected all-zero boot report to keep keyboard endpoint state")
 	}
 	if len(snapshot.Modifiers) != 0 || len(snapshot.Keys) != 0 {
 		t.Fatalf("release snapshot should be empty, got modifiers=%#v keys=%#v", snapshot.Modifiers, snapshot.Keys)
+	}
+}
+
+func TestDetectUSBKeyboardSnapshotFromBluetoothPrefixedPayload(t *testing.T) {
+	record := model.USBPacketRecord{
+		Protocol: "BTATT",
+		Summary:  "Bluetooth HID Report",
+	}
+
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldBTATTValue] = "a10200040000000000"
+	snapshot, ok := detectUSBKeyboardSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{})
+	if !ok {
+		t.Fatalf("expected prefixed Bluetooth keyboard payload to be detected")
+	}
+	if len(snapshot.Keys) != 1 || snapshot.Keys[0] != "A" {
+		t.Fatalf("unexpected Bluetooth keys: %#v", snapshot.Keys)
+	}
+}
+
+func TestDetectUSBMouseSnapshotFromEightByteOffsetPayload(t *testing.T) {
+	record := model.USBPacketRecord{
+		PacketID:      6,
+		TransferType:  "Interrupt",
+		BusID:         "1",
+		DeviceAddress: "3",
+		Endpoint:      "Bus 1 / Device 3 / EP 0x81 (IN)",
+	}
+
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldHIDData] = "00:01:FE:00:02:00:00:00"
+	snapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{})
+	if !ok {
+		t.Fatalf("expected 8-byte offset mouse payload to be detected")
+	}
+	if len(snapshot.Buttons) != 1 || snapshot.Buttons[0] != "Left" || snapshot.XDelta != -2 || snapshot.YDelta != 2 {
+		t.Fatalf("unexpected offset mouse snapshot: %+v", snapshot)
+	}
+	if snapshot.Source != "usbhid.data" || snapshot.Layout != "github-8" {
+		t.Fatalf("unexpected offset source/layout: %+v", snapshot)
+	}
+}
+
+func TestDetectUSBMouseSnapshotSourceModeUsesSelectedCandidate(t *testing.T) {
+	record := model.USBPacketRecord{
+		PacketID:      7,
+		TransferType:  "Interrupt",
+		BusID:         "1",
+		DeviceAddress: "3",
+		Endpoint:      "Bus 1 / Device 3 / EP 0x81 (IN)",
+	}
+	parts := make([]string, usbFieldCount)
+	parts[usbFieldHIDData] = "01:05:00:00"
+	parts[usbFieldCapData] = "02:00:07:00"
+
+	autoSnapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceAuto), usbHIDHint{})
+	if !ok {
+		t.Fatalf("expected auto mouse candidate")
+	}
+	if autoSnapshot.Source != "usbhid.data" || autoSnapshot.Buttons[0] != "Left" || autoSnapshot.XDelta != 5 {
+		t.Fatalf("auto should prefer usbhid.data on comparable candidates, got %+v", autoSnapshot)
+	}
+
+	capSnapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceCapData), usbHIDHint{})
+	if !ok {
+		t.Fatalf("expected capdata mouse candidate")
+	}
+	if capSnapshot.Source != "usb.capdata" || capSnapshot.Buttons[0] != "Right" || capSnapshot.YDelta != 7 {
+		t.Fatalf("forced capdata should use usb.capdata, got %+v", capSnapshot)
+	}
+}
+
+func TestDetectUSBMouseSnapshotLayouts(t *testing.T) {
+	record := model.USBPacketRecord{TransferType: "Interrupt", Endpoint: "EP 0x81 (IN)"}
+	tests := []struct {
+		name   string
+		raw    string
+		layout string
+		x      int
+		y      int
+		button string
+	}{
+		{name: "github4", raw: "01:02:FE:00", layout: "boot-4", x: 2, y: -2, button: "Left"},
+		{name: "github6", raw: "00:02:04:FC:00:00", layout: "github-6", x: 4, y: -4, button: "Right"},
+		{name: "github8", raw: "00:01:FE:00:02:00:00:00", layout: "github-8", x: -2, y: 2, button: "Left"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parts := make([]string, usbFieldCount)
+			parts[usbFieldHIDData] = tt.raw
+			snapshot, ok := detectUSBMouseSnapshot(record, parts, buildUSBHIDPayloadCandidates(parts, model.USBHIDSourceUSBHID), usbHIDHint{})
+			if !ok {
+				t.Fatalf("expected mouse snapshot")
+			}
+			if snapshot.Layout != tt.layout || snapshot.XDelta != tt.x || snapshot.YDelta != tt.y || len(snapshot.Buttons) != 1 || snapshot.Buttons[0] != tt.button {
+				t.Fatalf("unexpected snapshot: %+v", snapshot)
+			}
+		})
+	}
+}
+
+func TestUSBHIDSourceModeRejectsUnknownValue(t *testing.T) {
+	if _, ok := model.NormalizeUSBHIDSourceMode("unknown"); ok {
+		t.Fatalf("expected unknown hid source to be rejected")
+	}
+	if mode, ok := model.NormalizeUSBHIDSourceMode("USBHID"); !ok || mode != model.USBHIDSourceUSBHID {
+		t.Fatalf("expected case-insensitive usbhid mode, got %q ok=%v", mode, ok)
+	}
+}
+
+func TestUSBMouseTrafficSampleRegression(t *testing.T) {
+	sample := os.Getenv("GSHARK_USB_MOUSE_SAMPLE")
+	if strings.TrimSpace(sample) == "" {
+		t.Skip("set GSHARK_USB_MOUSE_SAMPLE to run local mouse traffic regression")
+	}
+
+	analysis, err := BuildUSBAnalysisFromFile(sample)
+	if err != nil {
+		t.Fatalf("BuildUSBAnalysisFromFile() error = %v", err)
+	}
+	if analysis.MousePackets == 0 {
+		t.Fatalf("expected mouse events in sample, got none")
+	}
+	if analysis.OtherUSBPackets >= analysis.HIDPackets/10 {
+		t.Fatalf("expected mouse HID completion frames to stay out of Other USB, got hid=%d other=%d mouse=%d", analysis.HIDPackets, analysis.OtherUSBPackets, analysis.MousePackets)
 	}
 }

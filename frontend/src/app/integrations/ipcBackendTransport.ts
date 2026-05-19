@@ -290,7 +290,7 @@ export async function withDesktopIpcControls<T>(
         elapsedMs(startedAt),
       );
     }
-    const message = error instanceof Error && error.message.trim() ? error.message : "Wails IPC 数据面请求失败";
+    const message = desktopIpcFailureMessage(error);
     throw new DesktopIpcRequestError(
       "backend_proxy_failed",
       `Wails IPC 数据面不可用：${endpoint}。${message}`,
@@ -303,6 +303,23 @@ export async function withDesktopIpcControls<T>(
     }
     abortCleanup?.();
   }
+}
+
+function desktopIpcFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error.trim();
+  }
+  if (error && typeof error === "object") {
+    const candidate = error as { message?: unknown; error?: unknown };
+    const message = String(candidate.message ?? candidate.error ?? "").trim();
+    if (message) {
+      return message;
+    }
+  }
+  return "Wails IPC 数据面请求失败";
 }
 
 function requestTimeoutMs(path: string, method: DesktopBackendMethod): number {
