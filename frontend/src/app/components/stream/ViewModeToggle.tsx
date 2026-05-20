@@ -30,7 +30,7 @@ export function ViewModeToggle<T extends string>({
             className={cn(
               "rounded-sm px-2.5 py-0.5 text-[11px] transition-colors",
               value === option.value
-                ? "gshark-control-primary font-semibold text-white"
+                ? "gshark-control-primary font-semibold"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

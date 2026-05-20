@@ -37,9 +37,9 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
 
   return (
     <div className="gshark-page-bg flex h-full min-h-0 flex-col overflow-auto p-3 text-foreground sm:p-4">
-      <section className="gshark-tile gshark-tile-strong flex min-h-0 flex-1 overflow-hidden">
+      <section className="gshark-aurora-surface flex min-h-0 flex-1 overflow-hidden">
         <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
-          <div className="relative border-b border-slate-200/80 p-8 lg:min-h-0 lg:border-b-0 lg:border-r lg:overflow-hidden">
+          <div className="relative p-8 lg:min-h-0 lg:overflow-hidden">
             <div className="gshark-diffuse-chip mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
               GSHARK QUICK START
@@ -111,7 +111,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
           </div>
 
           <div className="flex min-h-0 flex-col p-8">
-            <div className="gshark-form-surface p-5">
+            <div className="gshark-aurora-surface p-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ENGINE STATUS</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
                 <span
@@ -138,7 +138,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               )}
             </div>
 
-            <div className="gshark-form-surface mt-5 flex min-h-0 flex-1 flex-col p-5">
+            <div className="gshark-aurora-surface mt-5 flex min-h-0 flex-1 flex-col p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RECENT FILES</div>
@@ -184,7 +184,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
 
 function GuideCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="gshark-form-surface px-4 py-4">
+    <div className="gshark-inset-halo px-4 py-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         {icon}
         {title}

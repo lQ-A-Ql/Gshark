@@ -31,11 +31,7 @@ export function HttpStreamPayloadGrid({
   onSelectChunk,
 }: HttpStreamPayloadGridProps) {
   if (displayCount === 0) {
-    return (
-      <div className="rounded-md border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
-        当前流没有可展示内容。
-      </div>
-    );
+    return <div className="gshark-soft-fill px-4 py-3 text-xs text-muted-foreground">当前流没有可展示内容。</div>;
   }
 
   return (
@@ -55,7 +51,7 @@ export function HttpStreamPayloadGrid({
         ))}
         {renderLimit < displayCount && (
           <button
-            className="self-start rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="gshark-control self-start px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground"
             onClick={onLoadMore}
           >
             加载更多 ({renderLimit}/{displayCount})
@@ -136,10 +132,10 @@ function HttpDirectionBadge({ direction }: { direction: HTTPChunk["direction"] }
   return (
     <span
       className={cn(
-        "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+        "gshark-diffuse-chip px-2.5 py-1 text-[11px] font-semibold",
         direction === "client"
-          ? "border-rose-200 bg-rose-50 text-rose-700"
-          : "border-emerald-200 bg-emerald-50 text-emerald-700",
+          ? "border-rose-200/30 bg-rose-50/20 text-rose-700"
+          : "border-emerald-200/30 bg-emerald-50/20 text-emerald-700",
       )}
     >
       {direction === "client" ? "请求" : "响应"}

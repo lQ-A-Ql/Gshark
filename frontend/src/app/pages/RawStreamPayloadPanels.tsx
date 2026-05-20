@@ -63,7 +63,7 @@ export function RawStreamPayloadGrid({
           viewportRef.current = node;
         }
       }}
-      className="min-h-0 overflow-auto rounded-[24px] border border-white/80 bg-white/88 p-4 font-mono text-sm leading-relaxed shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl"
+      className="gshark-aurora-surface min-h-0 overflow-auto p-4 font-mono text-sm leading-relaxed text-slate-800"
       onScroll={(event) => {
         if (!onScrollNearBottom) return;
         const nearBottom =
@@ -72,12 +72,10 @@ export function RawStreamPayloadGrid({
       }}
     >
       {loadError && (
-        <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-          {loadError}
-        </div>
+        <div className="gshark-soft-fill gshark-risk-accent mb-3 px-3 py-2 text-xs text-amber-700">{loadError}</div>
       )}
       {loadMeta?.loading && loadedChunkCount === 0 && (
-        <div className="mb-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-700">
+        <div className="gshark-soft-fill gshark-evidence-accent mb-3 px-3 py-2 text-xs text-blue-700">
           正在解析 {protocol.toLowerCase()}.stream eq {streamId}，当前只先加载这一条流。
         </div>
       )}

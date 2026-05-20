@@ -32,7 +32,7 @@ export function MainHeader({
   | "onOpenTLSDialog"
 >) {
   return (
-    <header className="relative z-50 flex shrink-0 flex-col border-b border-white/18 bg-white/42 shadow-[0_0_34px_rgba(255,255,255,0.12)] backdrop-blur-xl">
+    <header className="gshark-chrome-bar relative z-50 flex shrink-0 flex-col">
       <div className="flex h-12 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <img src={logoImg} alt="Logo" className="gshark-brand-mark h-10 w-auto object-contain" />
@@ -104,16 +104,16 @@ export function MainHeader({
 
         <div className="flex items-center gap-2 text-xs font-medium">
           <HeaderSettingsButton />
-          <span className="gshark-control flex items-center gap-1 px-2.5 py-1.5 text-rose-600">
+          <span className="gshark-chrome-action flex items-center gap-1 px-2.5 py-1.5 text-rose-600">
             <ShieldAlert className="h-3.5 w-3.5" /> OWASP
           </span>
-          <span className="gshark-control flex items-center gap-1 px-2.5 py-1.5 text-emerald-600">
+          <span className="gshark-chrome-action flex items-center gap-1 px-2.5 py-1.5 text-emerald-600">
             <Activity className="h-3.5 w-3.5" /> CTF
           </span>
           <button
             type="button"
             onClick={onOpenTLSDialog}
-            className="gshark-control flex items-center gap-1 px-2.5 py-1.5 text-amber-600 transition hover:text-amber-700"
+            className="gshark-chrome-action flex items-center gap-1 px-2.5 py-1.5 text-amber-600 transition hover:text-amber-700"
             title="打开 TLS 解密配置"
           >
             <KeyRound className="h-3.5 w-3.5" /> 解密
@@ -130,7 +130,7 @@ function HeaderSettingsButton() {
     <button
       type="button"
       onClick={toggleSidebar}
-      className="gshark-control-ghost mr-1 inline-flex h-8 w-8 items-center justify-center text-slate-600 transition hover:text-slate-900"
+      className="gshark-chrome-action mr-1 inline-flex h-8 w-8 items-center justify-center text-slate-600 transition hover:text-slate-900"
       title="打开设置侧栏"
     >
       <Settings2 className="h-4 w-4" />
@@ -141,10 +141,10 @@ function HeaderSettingsButton() {
 function MenuGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="group relative">
-      <button className="gshark-control-ghost cursor-default px-3 py-1.5 transition-colors hover:text-cyan-700">
+      <button className="gshark-chrome-action cursor-default px-3 py-1.5 transition-colors hover:text-cyan-700">
         {label}
       </button>
-      <div className="gshark-form-surface invisible absolute left-0 top-full z-50 mt-1 max-h-[calc(100vh-5rem)] min-w-[190px] overflow-auto py-1.5 opacity-0 shadow-[0_24px_64px_rgba(15,23,42,0.08),0_0_44px_rgba(255,255,255,0.22)] backdrop-blur-xl transition-all group-hover:visible group-hover:opacity-100">
+      <div className="gshark-chrome-menu invisible absolute left-0 top-full z-50 mt-1 max-h-[calc(100vh-5rem)] min-w-[190px] overflow-auto py-1.5 opacity-0 transition-all group-hover:visible group-hover:opacity-100">
         {children}
       </div>
     </div>
@@ -165,8 +165,8 @@ function MenuItem({
   return (
     <div
       className={cn(
-        "flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition-colors",
-        danger ? "hover:bg-rose-50/24 hover:text-rose-700" : "hover:bg-cyan-50/24 hover:text-cyan-700",
+        "gshark-chrome-menu-item flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium transition-colors",
+        danger ? "gshark-chrome-menu-item-danger" : "text-slate-700",
       )}
       onClick={onClick}
     >
@@ -177,5 +177,5 @@ function MenuItem({
 }
 
 function MenuDivider() {
-  return <div className="my-1 h-px bg-white/18" />;
+  return <div className="gshark-chrome-menu-divider my-1 h-px" />;
 }

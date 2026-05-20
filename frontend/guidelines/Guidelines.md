@@ -1,61 +1,53 @@
-**Add your own guidelines here**
-<!--
+# GShark Sentinel Frontend Visual System
 
-System Guidelines
+GShark Sentinel is a dense security traffic investigation workbench. The UI should feel like a light forensic operations console: precise, calm, data-heavy, and purpose-built for repeated packet, stream, payload, and evidence review.
 
-Use this file to provide the AI with rules and guidelines you want it to follow.
-This template outlines a few examples of things you can add. You can add your own sections and format it to suit your needs
+## Direction
 
-TIP: More context isn't always better. It can confuse the LLM. Try and add the most important rules you need
+- Use the existing light forensic glass cockpit language.
+- Prefer continuous rectangular information regions over floating rounded cards.
+- Keep surfaces quiet and low-boundary; reserve strong contrast for payloads, code, warnings, selected rows, and destructive actions.
+- Use route accent colors to orient the analyst, not to decorate every element.
+- Keep controls compact and scannable. This is an analyst tool, not a marketing page.
 
-# General guidelines
+## Surface Roles
 
-Any general rules you want the AI to follow.
-For example:
+- Page shell: `gshark-page-bg`, `gshark-glass-shell`, and `gshark-theme-main` belong to the app layout.
+- Page content: use `PageShell` with tiled layout for normal analysis pages.
+- Region/container: use `gshark-tile`, `gshark-tile-grid`, `gshark-tile-header`, `gshark-tile-toolbar`, or `gshark-tile-table`.
+- Soft inner emphasis: use `gshark-soft-fill`.
+- Chips and small labels: use `gshark-diffuse-chip` or `AnalysisBadge`.
+- Buttons and icon controls: use shared `Button` or `gshark-control`, `gshark-control-primary`, `gshark-control-ghost`.
+- Inputs/selects/forms: use shared `Input`, `Select`, `gshark-field`, or `gshark-form-surface`.
+- Status: use `StatusHint`, `gshark-status-dot`, `gshark-risk-accent`, and `gshark-evidence-accent`.
+- Stream pages: keep their dedicated workbench structure; only sync controls with `gshark-stream-control-cluster`, `gshark-stream-segment`, and `gshark-stream-value`.
 
-* Only use absolute positioning when necessary. Opt for responsive and well structured layouts that use flexbox and grid by default
-* Refactor code as you go to keep code clean
-* Keep file sizes small and put helper functions and components in their own files.
+## Avoid
 
---------------
+- Do not add new page-level radial or linear decorative backgrounds inside pages.
+- Do not introduce floating SaaS card stacks, card-in-card sections, or oversized hero marketing layouts.
+- Avoid raw `bg-white`, `bg-slate-50`, `border-slate-200`, `shadow-sm`, `rounded-xl`, and `rounded-2xl` in normal page content.
+- Avoid one-off class strings for status blocks, code previews, and chips when a shared primitive already fits.
+- Do not use decorative blobs, orbs, bokeh, or purely ornamental illustration.
 
-# Design system guidelines
-Rules for how the AI should make generations look like your company's design system
+## Allowed Exceptions
 
-Additionally, if you select a design system to use in the prompt box, you can reference
-your design system's components, tokens, variables and components.
-For example:
+- Dialogs, tooltips, select menus, and floating popovers may keep stronger panel identity.
+- Code, terminal, hex, raw payload, JSON, and media preview blocks may keep stronger contrast for readability.
+- Round marks are allowed for status dots, graph points, avatar-like indicators, and small badges where the shape carries meaning.
+- Stream payload workbenches may keep specialized layouts and backgrounds when they improve payload inspection.
 
-* Use a base font-size of 14px
-* Date formats should always be in the format “Jun 10”
-* The bottom toolbar should only ever have a maximum of 4 items
-* Never use the floating action button with the bottom toolbar
-* Chips should always come in sets of 3 or more
-* Don't use a dropdown if there are 2 or fewer options
+## Validation
 
-You can also create sub sections and add more specific details
-For example:
+For visual implementation rounds, run the relevant Vitest files plus:
 
+```powershell
+cd C:\Users\QAQ\Desktop\gshark\frontend
+pnpm run typecheck
+pnpm run lint
+pnpm run format:check
+pnpm run size:check
+pnpm run boundary:check
+```
 
-## Button
-The Button component is a fundamental interactive element in our design system, designed to trigger actions or navigate
-users through the application. It provides visual feedback and clear affordances to enhance user experience.
-
-### Usage
-Buttons should be used for important actions that users need to take, such as form submissions, confirming choices,
-or initiating processes. They communicate interactivity and should have clear, action-oriented labels.
-
-### Variants
-* Primary Button
-  * Purpose : Used for the main action in a section or page
-  * Visual Style : Bold, filled with the primary brand color
-  * Usage : One primary button per section to guide users toward the most important action
-* Secondary Button
-  * Purpose : Used for alternative or supporting actions
-  * Visual Style : Outlined with the primary color, transparent background
-  * Usage : Can appear alongside a primary button for less important actions
-* Tertiary Button
-  * Purpose : Used for the least important actions
-  * Visual Style : Text-only with no border, using primary color
-  * Usage : For actions that should be available but not emphasized
--->
+Before handoff, prefer full frontend CI and browser screenshots across the main routes. Check for horizontal overflow, unreadable glass text, clipped controls, and accidental stream-page structure migration.

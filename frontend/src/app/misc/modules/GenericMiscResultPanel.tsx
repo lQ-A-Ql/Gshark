@@ -1,6 +1,7 @@
 import { Badge } from "../../components/ui/badge";
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
 import type { MiscModuleTableResult } from "../../core/types";
+import { ContrastPreview } from "../ui";
 
 type GenericMiscResultPanelProps = {
   moduleId: string;
@@ -25,10 +26,7 @@ export function GenericMiscResultPanel({
     <div className="gshark-soft-fill space-y-3 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-800">{resultTitle}</div>
-        <Badge
-          variant="outline"
-          className="gshark-diffuse-chip border-emerald-200/24 bg-emerald-50/16 text-[11px] text-emerald-700"
-        >
+        <Badge variant="outline" className="gshark-diffuse-chip text-[11px] text-emerald-700">
           Result
         </Badge>
       </div>
@@ -38,8 +36,8 @@ export function GenericMiscResultPanel({
           rowKey={(_, index) => `${moduleId}-row-${index}`}
           maxHeightClassName="max-h-72"
           tableClassName="min-w-full text-slate-700"
-          wrapperClassName="gshark-tile-table border-slate-200/18"
-          headerClassName="gshark-tile-header bg-white/12 text-slate-800"
+          wrapperClassName="gshark-tile-table"
+          headerClassName="gshark-tile-header text-slate-800"
           emptyText="暂无表格结果"
           rowClassName="last:border-b-0 hover:bg-cyan-50/20"
           columns={resultTable.columns.map((column) => ({
@@ -56,11 +54,7 @@ export function GenericMiscResultPanel({
           {resultText}
         </pre>
       ) : null}
-      {resultJSON ? (
-        <pre className="max-h-72 overflow-auto border border-slate-900/35 bg-slate-950/88 p-3.5 text-xs leading-relaxed text-cyan-50 shadow-[inset_0_1px_24px_rgba(34,211,238,0.08)]">
-          {resultJSON}
-        </pre>
-      ) : null}
+      {resultJSON ? <ContrastPreview className="max-h-72">{resultJSON}</ContrastPreview> : null}
     </div>
   );
 }

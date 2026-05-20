@@ -110,7 +110,7 @@ export function UpdateReleaseNotesPanel({ notes }: { notes: string }) {
       className="gshark-tile"
       actions={<span className="text-xs font-normal text-slate-500">GitHub 最新 Release 正文</span>}
     >
-      <div className="gshark-tile max-h-[420px] overflow-auto border-slate-200 bg-slate-50/80 p-3.5">
+      <div className="gshark-soft-fill max-h-[420px] overflow-auto p-3.5">
         <LazyMarkdown components={releaseMarkdownComponents}>{notes}</LazyMarkdown>
       </div>
     </AnalysisPanel>
@@ -209,7 +209,7 @@ function UpdateStateNotice({ status }: { status: AppUpdateStatus }) {
 
 function StatusTile({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <div className="gshark-tile bg-slate-50/75 p-3.5">
+    <div className="gshark-soft-fill p-3.5">
       <div className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">{title}</div>
       <div className="mt-3 break-all text-lg font-semibold text-slate-900">{value}</div>
       <div className="mt-2 text-xs leading-5 text-slate-500">{hint}</div>
@@ -219,7 +219,7 @@ function StatusTile({ title, value, hint }: { title: string; value: string; hint
 
 function StepCard({ index, title, description }: { index: string; title: string; description: string }) {
   return (
-    <div className="gshark-tile border-slate-200 bg-slate-50/75 p-3.5">
+    <div className="gshark-soft-fill p-3.5">
       <div className="flex items-center gap-3">
         <div className="bg-blue-600 px-2.5 py-1 text-xs font-semibold tracking-[0.18em] text-white">{index}</div>
         <div className="text-sm font-semibold text-slate-900">{title}</div>
@@ -231,7 +231,7 @@ function StepCard({ index, title, description }: { index: string; title: string;
 
 function DiagnosticRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="gshark-tile border-slate-200 bg-slate-50/75 px-3.5 py-3">
+    <div className="gshark-soft-fill px-3.5 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
       <div className="mt-2 break-all font-mono text-[13px] leading-6 text-slate-800">{value}</div>
     </div>

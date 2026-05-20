@@ -1,10 +1,19 @@
 import { ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { AnalysisBadge } from "../../components/analysis/AnalysisPrimitives";
 import { SurfacePanel } from "../../components/DesignSystem";
 import { cn } from "../../components/ui/utils";
 import type { APTActorStatusTone, APTDisplayProfile } from "./actorRegistry";
 
-export function ActorTab({ profile, active, onClick }: { profile: APTDisplayProfile; active: boolean; onClick: () => void }) {
+export function ActorTab({
+  profile,
+  active,
+  onClick,
+}: {
+  profile: APTDisplayProfile;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -13,7 +22,7 @@ export function ActorTab({ profile, active, onClick }: { profile: APTDisplayProf
         "gshark-tile px-4 py-3 text-left transition-all",
         active
           ? "border-indigo-200 bg-indigo-50/30 text-indigo-900"
-          : "border-slate-200 bg-transparent text-slate-700 hover:border-indigo-100 hover:bg-indigo-50/20",
+          : "border-transparent bg-transparent text-slate-700 hover:border-indigo-100/35 hover:bg-indigo-50/20",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -21,15 +30,12 @@ export function ActorTab({ profile, active, onClick }: { profile: APTDisplayProf
           <div className="truncate font-semibold">{profile.name}</div>
           <div className="mt-1 truncate text-xs text-slate-500">{profile.aliases?.join(" / ") || "actor profile"}</div>
         </div>
-        <span className={cn(
-          "shrink-0 rounded-full border px-2 py-0.5 text-[11px]",
-          aptStatusToneClass(profile.registry.statusTone),
-        )}>
+        <AnalysisBadge tone={profile.registry.statusTone} className="shrink-0">
           {profile.registry.statusLabel}
-        </span>
+        </AnalysisBadge>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-        <span className="rounded-sm border border-slate-200/70 bg-transparent px-2 py-0.5 font-mono">
+        <span className="gshark-diffuse-chip px-2 py-0.5 font-mono">
           {profile.frameworkOnly ? "不评分" : profile.evidenceCount}
         </span>
         {profile.frameworkOnly ? <span>需要人工补样本验证</span> : <span>证据计入当前评分</span>}
@@ -73,13 +79,23 @@ export function ActorEvidenceNeeds({ profile }: { profile: APTDisplayProfile }) 
 
 export function StatusBadge({ label, tone }: { label: string; tone: APTActorStatusTone }) {
   return (
-    <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", aptStatusToneClass(tone))}>
+    <AnalysisBadge tone={tone} className="px-2.5 py-1">
       {label}
-    </span>
+    </AnalysisBadge>
   );
 }
 
-export function AptPanel({ title, children, icon, className }: { title: string; children: ReactNode; icon?: ReactNode; className?: string }) {
+export function AptPanel({
+  title,
+  children,
+  icon,
+  className,
+}: {
+  title: string;
+  children: ReactNode;
+  icon?: ReactNode;
+  className?: string;
+}) {
   return (
     <SurfacePanel
       title={title}
@@ -101,21 +117,22 @@ function RegistryTagBlock({ title, values }: { title: string; values: string[] }
 }
 
 function ListCallout({ title, values, tone }: { title: string; values: string[]; tone: "amber" | "rose" }) {
-  const toneClass = tone === "amber"
-    ? "border-amber-100 bg-amber-50/50 text-amber-800"
-    : "border-rose-100 bg-rose-50/50 text-rose-800";
+  const toneClass =
+    tone === "amber" ? "border-amber-100 bg-amber-50/50 text-amber-800" : "border-rose-100 bg-rose-50/50 text-rose-800";
   return (
     <div className={cn("gshark-tile px-4 py-3", toneClass)}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">{title}</div>
       <div className="mt-2 space-y-1">
         {values.length === 0 ? (
           <div className="text-[11px] opacity-70">暂无条目</div>
-        ) : values.map((value) => (
-          <div key={value} className="flex items-start gap-2 text-[11px] leading-5">
-            <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />
-            <span>{value}</span>
-          </div>
-        ))}
+        ) : (
+          values.map((value) => (
+            <div key={value} className="flex items-start gap-2 text-[11px] leading-5">
+              <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />
+              <span>{value}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -126,22 +143,10 @@ function TagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span
-          key={value}
-          className="rounded-sm border border-slate-200/70 bg-transparent px-2 py-0.5 text-[10px] font-semibold text-slate-500"
-        >
+        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
           {value}
         </span>
       ))}
     </div>
   );
-}
-
-function aptStatusToneClass(tone: APTActorStatusTone) {
-  return {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    slate: "border-slate-200 bg-slate-50 text-slate-600",
-    rose: "border-rose-200 bg-rose-50 text-rose-700",
-  }[tone];
 }

@@ -23,7 +23,7 @@ export const PAGE_THEMES = {
     bottom: "241 245 249",
     accent: "59 130 246",
     accent2: "14 165 233",
-    active: "bg-blue-50 text-blue-600 shadow-[0_12px_30px_-20px_rgba(37,99,235,0.55)]",
+    active: "text-blue-600",
     bar: "bg-blue-600",
   },
   indigo: {
@@ -32,7 +32,7 @@ export const PAGE_THEMES = {
     bottom: "245 243 255",
     accent: "99 102 241",
     accent2: "59 130 246",
-    active: "bg-indigo-50 text-indigo-600 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.55)]",
+    active: "text-indigo-600",
     bar: "bg-indigo-600",
   },
   amber: {
@@ -41,7 +41,7 @@ export const PAGE_THEMES = {
     bottom: "248 250 252",
     accent: "245 158 11",
     accent2: "251 191 36",
-    active: "bg-amber-50 text-amber-600 shadow-[0_12px_30px_-20px_rgba(217,119,6,0.55)]",
+    active: "text-amber-600",
     bar: "bg-amber-500",
   },
   emerald: {
@@ -50,7 +50,7 @@ export const PAGE_THEMES = {
     bottom: "240 253 244",
     accent: "16 185 129",
     accent2: "20 184 166",
-    active: "bg-emerald-50 text-emerald-600 shadow-[0_12px_30px_-20px_rgba(5,150,105,0.55)]",
+    active: "text-emerald-600",
     bar: "bg-emerald-500",
   },
   rose: {
@@ -59,7 +59,7 @@ export const PAGE_THEMES = {
     bottom: "248 250 252",
     accent: "244 63 94",
     accent2: "251 113 133",
-    active: "bg-rose-50 text-rose-600 shadow-[0_12px_30px_-20px_rgba(225,29,72,0.55)]",
+    active: "text-rose-600",
     bar: "bg-rose-500",
   },
   cyan: {
@@ -68,7 +68,7 @@ export const PAGE_THEMES = {
     bottom: "240 249 255",
     accent: "6 182 212",
     accent2: "14 165 233",
-    active: "bg-cyan-50 text-cyan-600 shadow-[0_12px_30px_-20px_rgba(8,145,178,0.55)]",
+    active: "text-cyan-600",
     bar: "bg-cyan-500",
   },
 } as const;
@@ -102,7 +102,6 @@ export const NAV_ITEMS: MainNavItem[] = [
 
 export function themeForPath(pathname: string): PageTheme {
   const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme;
-  const fallbackTheme: PageThemeName =
-    pathname === "/" || (!pathname.includes("udp") && !pathname.includes("http")) ? "blue" : "cyan";
+  const fallbackTheme: PageThemeName = pathname.includes("stream") ? "cyan" : "blue";
   return PAGE_THEMES[navTheme ?? fallbackTheme];
 }

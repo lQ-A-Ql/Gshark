@@ -1,6 +1,7 @@
 import type React from "react";
 import { Download, ShieldAlert } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { cn } from "../components/ui/utils";
 import type { MiscExportFormat } from "./exportResult";
 
 export function Field({
@@ -29,6 +30,105 @@ export function ErrorBlock({ message }: { message: string }) {
       <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
       <div className="break-all font-medium leading-relaxed">{message}</div>
     </div>
+  );
+}
+
+type SurfaceTone = "slate" | "sky" | "cyan" | "emerald" | "amber" | "rose" | "violet" | "indigo";
+
+const surfaceNoteToneClasses: Record<SurfaceTone, string> = {
+  slate: "text-slate-600",
+  sky: "gshark-evidence-accent text-sky-900",
+  cyan: "gshark-evidence-accent text-cyan-900",
+  emerald: "gshark-evidence-accent text-emerald-900",
+  amber: "gshark-risk-accent text-amber-800",
+  rose: "gshark-risk-accent text-rose-700",
+  violet: "gshark-evidence-accent text-violet-900",
+  indigo: "gshark-evidence-accent text-indigo-900",
+};
+
+export function EmptyState({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("gshark-soft-fill border-dashed px-3 py-8 text-center text-[13px] text-slate-500", className)}>
+      {children}
+    </div>
+  );
+}
+
+export function SurfaceNote({
+  children,
+  className,
+  tone = "slate",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  tone?: SurfaceTone;
+}) {
+  return (
+    <div className={cn("gshark-soft-fill px-3 py-2 text-[12px] leading-5", surfaceNoteToneClasses[tone], className)}>
+      {children}
+    </div>
+  );
+}
+
+export function SurfaceInfoBlock({
+  title,
+  values,
+  empty,
+  className,
+  tone = "slate",
+}: {
+  title: string;
+  values?: string[];
+  empty: string;
+  className?: string;
+  tone?: Exclude<SurfaceTone, "cyan">;
+}) {
+  const toneClass =
+    tone === "rose"
+      ? "gshark-soft-fill gshark-risk-accent"
+      : tone === "amber"
+        ? "gshark-soft-fill gshark-risk-accent"
+        : tone === "sky"
+          ? "gshark-soft-fill gshark-evidence-accent"
+          : tone === "emerald"
+            ? "gshark-soft-fill gshark-evidence-accent"
+            : tone === "violet"
+              ? "gshark-soft-fill gshark-evidence-accent"
+              : tone === "indigo"
+                ? "gshark-soft-fill gshark-evidence-accent"
+                : "gshark-soft-fill";
+
+  return (
+    <div className={cn(toneClass, "p-3", className)}>
+      <div className="mb-2 text-[12px] font-semibold text-slate-700">{title}</div>
+      {values && values.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {values.map((value) => (
+            <span
+              key={`${title}-${value}`}
+              className="gshark-diffuse-chip px-2 py-1 font-mono text-[11px] text-slate-700"
+            >
+              {value}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[12px] text-slate-500">{empty}</div>
+      )}
+    </div>
+  );
+}
+
+export function ContrastPreview({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <pre
+      className={cn(
+        "overflow-auto border border-slate-900/35 bg-slate-950/88 p-3.5 font-mono text-xs leading-relaxed text-cyan-50 selection:bg-cyan-100 selection:text-slate-950",
+        className,
+      )}
+    >
+      {children}
+    </pre>
   );
 }
 

@@ -3,10 +3,7 @@ export function TagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span
-          key={value}
-          className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-        >
+        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[11px] font-medium text-slate-600">
           {value}
         </span>
       ))}
@@ -20,7 +17,7 @@ export function CaveatLine({ values }: { values: string[] }) {
       {values.slice(0, 2).map((value) => (
         <div
           key={value}
-          className="rounded-sm border border-amber-100 bg-amber-50/50 px-2 py-1 text-[10px] leading-4 text-amber-700"
+          className="gshark-diffuse-chip border-amber-100/30 bg-amber-50/16 px-2 py-1 text-[10px] leading-4 text-amber-700"
         >
           {value}
         </div>

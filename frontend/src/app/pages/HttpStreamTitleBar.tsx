@@ -108,7 +108,7 @@ export function HttpStreamToolbar({
   onSearchChange,
 }: HttpStreamToolbarProps) {
   return (
-    <div className="gshark-tile-toolbar gshark-workbench-panel flex shrink-0 items-center justify-between gap-3 border-x-0 border-t-0 px-4 py-2">
+    <div className="gshark-tile-toolbar gshark-workbench-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-4 py-2">
       <StreamSearchBar
         value={search}
         onChange={onSearchChange}
@@ -121,7 +121,7 @@ export function HttpStreamToolbar({
       <WorkbenchChip>{formatLoadMeta(loadMeta)}</WorkbenchChip>
       <button
         onClick={onExportAll}
-        className="gshark-control flex items-center gap-1 px-3 py-1.5 text-xs text-foreground transition-all hover:text-accent-foreground"
+        className="gshark-control gshark-evidence-accent flex items-center gap-1 px-3 py-1.5 text-xs text-foreground transition-all hover:text-accent-foreground"
       >
         <Download className="h-3.5 w-3.5" /> 导出流文本
       </button>

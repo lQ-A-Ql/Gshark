@@ -30,10 +30,10 @@ export function StreamChunkCard({
   return (
     <div
       className={cn(
-        "flex min-w-0 cursor-pointer flex-col rounded-2xl border px-3 py-2 shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        "flex min-w-0 cursor-pointer flex-col rounded-sm border px-3 py-2 shadow-[0_14px_34px_rgba(148,163,184,0.1)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(14,165,233,0.1)]",
         minHeight,
         tone,
-        selected && "ring-2 ring-violet-200 shadow-[0_18px_38px_rgba(99,102,241,0.14)]",
+        selected && "ring-1 ring-sky-200/70 shadow-[0_18px_38px_rgba(14,165,233,0.12)]",
         className,
       )}
       onClick={onSelect}
@@ -49,7 +49,7 @@ export function StreamChunkCard({
         <div className="mt-2 flex justify-end text-[11px] opacity-80">
           <button
             type="button"
-            className="rounded border border-current/20 px-2 py-1 hover:opacity-100"
+            className="gshark-control px-2 py-1 hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onOpen();

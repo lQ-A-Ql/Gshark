@@ -61,7 +61,7 @@ export function EvidenceActions({
         onClick={() => void locatePacket()}
         disabled={actionDisabled}
         title="跳转到主工作区并定位该证据包"
-        className="gshark-diffuse-chip h-8 gap-1.5 border-slate-200/20 bg-slate-50/12 px-3 text-xs text-slate-700 hover:border-amber-200/30 hover:bg-amber-50/18 hover:text-amber-700"
+        className="h-8 gap-1.5 px-3 text-xs text-slate-700 hover:text-amber-700"
       >
         <Crosshair className="h-3.5 w-3.5" />
         {pending === "packet" ? "定位中..." : "定位到包"}
@@ -73,7 +73,7 @@ export function EvidenceActions({
         onClick={() => void openStream()}
         disabled={actionDisabled}
         title="打开该证据包所在的 HTTP/TCP/UDP 流"
-        className="gshark-diffuse-chip h-8 gap-1.5 border-blue-200/24 bg-blue-50/16 px-3 text-xs text-blue-700 hover:bg-blue-50/24"
+        className="h-8 gap-1.5 px-3 text-xs text-blue-700 hover:text-blue-800"
       >
         <Network className="h-3.5 w-3.5" />
         {pending === "stream" ? "打开中..." : "打开关联流"}

@@ -37,12 +37,10 @@ export function C2FamilyTabButton({
         "gshark-tile flex items-center gap-3 px-3.5 py-3 text-left transition-all",
         active
           ? "border-rose-200 bg-rose-50/90 text-rose-700"
-          : "border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50/70",
+          : "border-transparent bg-transparent text-slate-500 hover:border-rose-200/30 hover:bg-rose-50/20 hover:text-rose-700",
       )}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-current/20 bg-slate-50/70">
-        {icon}
-      </span>
+      <span className="gshark-diffuse-chip flex h-9 w-9 shrink-0 items-center justify-center text-current">{icon}</span>
       <span>
         <span className="block text-sm font-semibold">{title}</span>
         <span className="mt-1 block text-xs leading-5 opacity-75">{description}</span>
@@ -109,7 +107,7 @@ export function C2NotesPanel({ notes, emptyText }: { notes: string[]; emptyText:
       {notes.map((note, index) => (
         <div
           key={`${note}-${index}`}
-          className="gshark-tile flex items-start gap-2 border-slate-100 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600"
+          className="gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5 text-slate-600"
         >
           <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
           <span>{note}</span>

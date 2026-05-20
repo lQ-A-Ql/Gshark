@@ -14,9 +14,9 @@ import {
   preferredProtocolForCandidate,
 } from "./C2CandidateTableRules";
 
-const C2_CANDIDATE_TABLE_WRAPPER_CLASS = "border-slate-200";
-const C2_CANDIDATE_TABLE_HEADER_CLASS = "gshark-tile-header bg-slate-50/80 text-slate-700";
-const C2_CANDIDATE_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-slate-50/45";
+const C2_CANDIDATE_TABLE_WRAPPER_CLASS = "";
+const C2_CANDIDATE_TABLE_HEADER_CLASS = "gshark-tile-header text-slate-700";
+const C2_CANDIDATE_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-[var(--gshark-table-selected-bg)]";
 const C2_CANDIDATE_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord[] }) {
@@ -54,7 +54,7 @@ export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord
       rowClassName={(item, index) =>
         cn(
           C2_CANDIDATE_TABLE_ROW_CLASS,
-          expandedRows.has(candidateRowKey(item, index)) ? "bg-rose-50/25" : "hover:bg-slate-50/70",
+          expandedRows.has(candidateRowKey(item, index)) ? "bg-rose-50/25" : "hover:bg-[var(--gshark-table-hover-bg)]",
         )
       }
       expandedRowClassName="border-rose-100/80 bg-rose-50/20"
@@ -109,10 +109,8 @@ export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord
                     aria-label={`${expanded ? "收起" : "展开"} C2 候选详情 #${item.packetId || index + 1}`}
                     onClick={() => toggleExpanded(rowKey)}
                     className={cn(
-                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-all duration-200",
-                      expanded
-                        ? "border-rose-200 bg-rose-50 text-rose-700"
-                        : "border-slate-200 bg-slate-50/70 text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700",
+                      "gshark-control inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-semibold transition-all duration-200",
+                      expanded ? "gshark-risk-accent text-rose-700" : "text-slate-600 hover:text-rose-700",
                     )}
                   >
                     {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}

@@ -70,7 +70,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
       {hasSchemaForm ? (
         <>
           {!embedded && module.formSchema?.description ? (
-            <div className="gshark-soft-fill border-cyan-200/22 bg-cyan-50/16 px-4 py-3 text-[13px] leading-relaxed text-cyan-900">
+            <div className="gshark-soft-fill gshark-evidence-accent px-4 py-3 text-[13px] leading-relaxed text-cyan-900">
               {module.formSchema.description}
             </div>
           ) : null}
@@ -85,7 +85,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
             }}
           />
 
-          <div className="gshark-tile-toolbar flex flex-col gap-3 border-cyan-200/20 bg-cyan-50/12 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="gshark-tile-toolbar flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1 text-xs text-slate-500">
               <div className="font-semibold uppercase tracking-[0.2em] text-cyan-700/80">Invoke endpoint</div>
               <div className="gshark-diffuse-chip break-all px-2.5 py-1.5 font-mono text-[11px] text-slate-700">

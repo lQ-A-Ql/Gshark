@@ -9,13 +9,13 @@ interface HTTPLoginAttemptTableProps {
 
 export function HTTPLoginAttemptTable({ attempts }: HTTPLoginAttemptTableProps) {
   return (
-    <div className="gshark-tile overflow-hidden border-slate-200">
-      <div className="gshark-tile-header flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+    <div className="gshark-tile overflow-hidden">
+      <div className="gshark-tile-header flex items-center justify-between gap-3 px-4 py-3">
         <div>
           <div className="text-sm font-semibold text-slate-800">认证尝试明细</div>
           <div className="mt-0.5 text-[11px] text-slate-500">按包号串联请求、响应、凭据线索与判定原因。</div>
         </div>
-        <span className="shrink-0 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-semibold text-cyan-700">
+        <span className="gshark-diffuse-chip shrink-0 px-2.5 py-1 text-[11px] font-semibold text-cyan-700">
           {attempts.length} 条
         </span>
       </div>
@@ -24,11 +24,11 @@ export function HTTPLoginAttemptTable({ attempts }: HTTPLoginAttemptTableProps) 
         rowKey={(item) => `${item.packetId}-${item.responsePacketId || 0}`}
         maxHeightClassName="max-h-[460px]"
         tableClassName="min-w-[1040px] border-separate border-spacing-0"
-        wrapperClassName="gshark-tile-table rounded-none border-0"
-        headerClassName="gshark-tile-header z-10 bg-slate-50/80 text-[11px] uppercase tracking-[0.12em]"
+        wrapperClassName="gshark-tile-table"
+        headerClassName="gshark-tile-header z-10 text-[11px] uppercase tracking-[0.12em]"
         headerCellClassName="py-3 font-semibold"
         emptyText="暂无认证尝试"
-        rowClassName="odd:bg-transparent even:bg-slate-50/45 hover:bg-cyan-50/45"
+        rowClassName="odd:bg-transparent even:bg-slate-50/35 hover:bg-cyan-50/20"
         cellClassName="py-3"
         columns={[
           {
@@ -123,8 +123,8 @@ export function HTTPLoginAttemptTable({ attempts }: HTTPLoginAttemptTableProps) 
 function PreviewLine({ label, value, tone }: { label: string; value: string; tone: "sky" | "slate" }) {
   return (
     <div
-      className={`flex min-w-0 items-start gap-2 rounded-lg border px-2.5 py-2 ${
-        tone === "sky" ? "border-sky-100 bg-sky-50/70 text-sky-900" : "border-slate-100 bg-slate-50 text-slate-700"
+      className={`gshark-soft-fill flex min-w-0 items-start gap-2 px-2.5 py-2 ${
+        tone === "sky" ? "gshark-evidence-accent text-sky-900" : "text-slate-700"
       }`}
     >
       <span
@@ -140,14 +140,14 @@ function PreviewLine({ label, value, tone }: { label: string; value: string; ton
 }
 
 function attemptBadge(result?: string, bruteforce?: boolean) {
-  if (bruteforce) return "rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700";
+  if (bruteforce) return "gshark-diffuse-chip px-2 py-0.5 text-rose-700";
   switch (result) {
     case "success":
-      return "rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700";
+      return "gshark-diffuse-chip px-2 py-0.5 text-emerald-700";
     case "failure":
-      return "rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700";
+      return "gshark-diffuse-chip px-2 py-0.5 text-amber-700";
     default:
-      return "rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700";
+      return "gshark-diffuse-chip px-2 py-0.5 text-slate-700";
   }
 }
 

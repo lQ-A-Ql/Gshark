@@ -99,7 +99,7 @@ function CategoryCard({
           {icon}
           {title}
         </div>
-        <AnalysisBadge tone={accent} className="border-slate-200/70 bg-slate-50/80 px-2 text-xs text-slate-600">
+        <AnalysisBadge tone={accent} className="px-2 text-xs">
           {count}
         </AnalysisBadge>
       </div>

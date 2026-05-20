@@ -7,9 +7,9 @@ import { cn } from "../../components/ui/utils";
 import type { C2DecryptResult } from "../../core/types";
 import { C2NotesPanel } from "./C2DisplayComponents";
 
-const C2_DECRYPT_TABLE_WRAPPER_CLASS = "overflow-auto border-slate-200";
-const C2_DECRYPT_TABLE_HEADER_CLASS = "gshark-tile-header bg-slate-50/80 text-slate-700";
-const C2_DECRYPT_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-slate-50/45";
+const C2_DECRYPT_TABLE_WRAPPER_CLASS = "overflow-auto";
+const C2_DECRYPT_TABLE_HEADER_CLASS = "gshark-tile-header text-slate-700";
+const C2_DECRYPT_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-[var(--gshark-table-selected-bg)]";
 const C2_DECRYPT_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | null }) {
@@ -58,10 +58,10 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
           </div>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={exportJson} className="h-8 bg-slate-50 text-xs">
+          <Button type="button" variant="outline" onClick={exportJson} className="gshark-control h-8 text-xs">
             导出 JSON
           </Button>
-          <Button type="button" variant="outline" onClick={exportCsv} className="h-8 bg-slate-50 text-xs">
+          <Button type="button" variant="outline" onClick={exportCsv} className="gshark-control h-8 text-xs">
             导出 CSV
           </Button>
         </div>
@@ -81,7 +81,7 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
           </p>
         </div>
       ) : null}
-      <div className="gshark-tile-toolbar flex flex-col gap-2 border-slate-100 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="gshark-tile-toolbar flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="min-w-0 flex-1">
           <span className="sr-only">搜索解密结果</span>
           <input
@@ -141,7 +141,7 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
                 </div>
               ) : (
                 <div className="min-w-0 space-y-1">
-                  <pre className="gshark-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-100 bg-slate-50 p-2 font-mono text-[11px] leading-5 text-slate-700">
+                  <pre className="gshark-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-5 text-slate-100">
                     {item.plaintextPreview || "--"}
                   </pre>
                   <DecryptTagLine
@@ -195,10 +195,7 @@ function DecryptTagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span
-          key={value}
-          className="border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
-        >
+        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
           {value}
         </span>
       ))}

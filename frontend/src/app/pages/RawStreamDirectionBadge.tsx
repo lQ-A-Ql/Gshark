@@ -6,7 +6,7 @@ export function RawDirectionBadge({ chunk, tone }: { chunk: VisibleRawChunk; ton
   return (
     <span
       className={cn(
-        "rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
+        "gshark-diffuse-chip px-2.5 py-1 text-[11px] font-semibold",
         chunk.direction === "client" ? tone.clientBadge : tone.serverBadge,
       )}
     >

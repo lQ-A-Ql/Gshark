@@ -14,7 +14,7 @@ export function ThreatHuntingHitsTable({
 }) {
   return (
     <>
-      <div className="gshark-tile-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+      <div className="gshark-tile-header flex shrink-0 items-center justify-between px-4 py-3">
         <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
           <CheckCircle2 className="h-4 w-4 text-emerald-600" /> 命中结果 (共 {hits.length} 条)
         </span>
@@ -26,32 +26,32 @@ export function ThreatHuntingHitsTable({
             key: "packet",
             header: "No.",
             widthClassName: "w-16",
-            headerClassName: "border-r border-slate-200",
-            cellClassName: "border-r border-slate-200/80 text-slate-500",
+            headerClassName: "border-r border-[var(--gshark-tile-divider)]",
+            cellClassName: "border-r border-[var(--gshark-tile-divider)] text-slate-500",
             render: (hit) => hit.packetId,
           },
           {
             key: "category",
             header: "分类",
             widthClassName: "w-28",
-            headerClassName: "border-r border-slate-200",
-            cellClassName: "border-r border-slate-200/80",
+            headerClassName: "border-r border-[var(--gshark-tile-divider)]",
+            cellClassName: "border-r border-[var(--gshark-tile-divider)]",
             render: (hit) => hit.category,
           },
           {
             key: "rule",
             header: "规则",
             widthClassName: "w-40",
-            headerClassName: "border-r border-slate-200",
-            cellClassName: "border-r border-slate-200/80 font-medium text-rose-600",
+            headerClassName: "border-r border-[var(--gshark-tile-divider)]",
+            cellClassName: "border-r border-[var(--gshark-tile-divider)] font-medium text-rose-600",
             render: (hit) => hit.rule,
           },
           {
             key: "level",
             header: "等级",
             widthClassName: "w-24",
-            headerClassName: "border-r border-slate-200",
-            cellClassName: "border-r border-slate-200/80",
+            headerClassName: "border-r border-[var(--gshark-tile-divider)]",
+            cellClassName: "border-r border-[var(--gshark-tile-divider)]",
             render: (hit) => <AnalysisBadge tone={toneForThreatLevel(hit.level)}>{hit.level}</AnalysisBadge>,
           },
           {
@@ -73,7 +73,7 @@ export function ThreatHuntingHitsTable({
         maxHeightClassName="max-h-none"
         wrapperClassName="gshark-tile-table min-h-0 flex-1 rounded-none border-0 bg-transparent"
         tableClassName="cursor-default whitespace-nowrap"
-        headerClassName="gshark-tile-header z-10 bg-slate-50/80"
+        headerClassName="gshark-tile-header z-10"
       />
     </>
   );
@@ -91,8 +91,8 @@ export function ThreatHuntingHitDetailPanel({
   onOpenRelatedStream: (packetId: number) => void | Promise<void>;
 }) {
   return (
-    <div className="flex h-56 min-h-0 shrink-0 flex-col border-t border-slate-200 bg-slate-50/55">
-      <div className="gshark-tile-header flex items-center gap-2 border-b border-slate-200 bg-slate-50/80 px-4 py-2 text-xs font-semibold text-slate-900">
+    <div className="gshark-soft-fill flex h-56 min-h-0 shrink-0 flex-col border-t border-[var(--gshark-tile-divider)]">
+      <div className="gshark-tile-header flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-900">
         <Crosshair className="h-4 w-4 text-blue-600" /> 详细特征提取
       </div>
       <ScrollArea className="min-h-0 flex-1">
@@ -101,14 +101,14 @@ export function ThreatHuntingHitDetailPanel({
             <button
               onClick={() => void onJumpToPacket(selected.packetId)}
               disabled={actionBusy.length > 0}
-              className="border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="gshark-control px-3 py-1.5 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {actionBusy === `packet:${selected.packetId}` ? "定位中" : `定位到包 #${selected.packetId}`}
             </button>
             <button
               onClick={() => void onOpenRelatedStream(selected.packetId)}
               disabled={actionBusy.length > 0}
-              className="border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="gshark-control gshark-evidence-accent px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {actionBusy === `stream:${selected.packetId}` ? "打开中" : "打开关联流"}
             </button>

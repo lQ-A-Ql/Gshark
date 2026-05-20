@@ -4,6 +4,7 @@ import { router } from "./routes";
 import { SentinelProvider, useSentinel } from "./state/SentinelContext";
 import { useEffect, useState } from "react";
 import { toolRuntimeProbeStateText, toolRuntimeProbeTransportText } from "./state/toolRuntimeProbeState";
+import { cn } from "./components/ui/utils";
 
 export function StartupGate() {
   const {
@@ -85,53 +86,71 @@ export function StartupGate() {
 
   if (!enterMain) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-100 text-slate-900">
-        <div className="w-[560px] rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
-          <div className="mb-3 text-xs tracking-[0.24em] text-blue-600">GSHARK SENTINEL</div>
-          <h1 className="text-3xl font-semibold text-slate-900">启动中</h1>
-          <p className="mt-2 text-sm text-slate-600">正在拉起后端服务并初始化前端界面。</p>
+      <div className="gshark-page-bg gshark-glass-shell flex h-screen w-screen items-center justify-center overflow-hidden px-6 text-slate-900">
+        <div className="gshark-tile gshark-workbench-panel gshark-forensic-scan w-full max-w-[600px] overflow-hidden">
+          <div className="gshark-tile-header px-5 py-4">
+            <div className="text-[11px] font-semibold tracking-[0.24em] text-blue-600">GSHARK SENTINEL</div>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">启动中</h1>
+            <p className="mt-1 text-sm leading-6 text-slate-600">正在拉起后端服务并初始化前端界面。</p>
+          </div>
 
-          <div className="mt-6 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center gap-3 text-sm">
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${backendConnected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+          <div className="space-y-3 px-5 py-4">
+            <div className="gshark-soft-fill space-y-3 px-3.5 py-3">
+              <StartupStatusLine
+                tone={backendConnected ? "emerald" : "amber"}
+                pulse={!backendConnected}
+                label="后端服务"
+                value={backendConnected ? "已连接" : "启动中"}
               />
-              <span>后端服务：{backendConnected ? "已连接" : "启动中"}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${!backendConnected || isTSharkChecking ? "bg-slate-400 animate-pulse" : tsharkStatus.available ? (tsharkDegraded ? "bg-amber-500" : "bg-emerald-500") : "bg-rose-500"}`}
+              <StartupStatusLine
+                tone={
+                  !backendConnected || isTSharkChecking
+                    ? "slate"
+                    : tsharkStatus.available
+                      ? tsharkDegraded
+                        ? "amber"
+                        : "emerald"
+                      : "rose"
+                }
+                pulse={!backendConnected || isTSharkChecking}
+                label="tshark"
+                value={
+                  !backendConnected || isTSharkChecking
+                    ? "检测中"
+                    : tsharkStatus.available
+                      ? tsharkDegraded
+                        ? "可用，部分分析降级"
+                        : "可用"
+                      : toolRuntimeProbeState === "failed"
+                        ? "探测失败"
+                        : toolRuntimeCheckDegraded
+                          ? "稍后重试"
+                          : "不可用"
+                }
               />
-              <span>
-                tshark：
-                {!backendConnected || isTSharkChecking
-                  ? "检测中"
-                  : tsharkStatus.available
-                    ? tsharkDegraded
-                      ? "可用，部分分析降级"
-                      : "可用"
-                    : toolRuntimeProbeState === "failed"
-                      ? "探测失败"
-                      : toolRuntimeCheckDegraded
-                        ? "稍后重试"
-                        : "不可用"}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                FFmpeg：
-                {toolRuntimeSnapshot
-                  ? toolRuntimeSnapshot.ffmpeg.available
-                    ? "可用"
-                    : "未就绪"
-                  : toolRuntimeProbeStateText(toolRuntimeProbeState)}
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <ToolRuntimeTile
+                  label="FFmpeg"
+                  value={
+                    toolRuntimeSnapshot
+                      ? toolRuntimeSnapshot.ffmpeg.available
+                        ? "可用"
+                        : "未就绪"
+                      : toolRuntimeProbeStateText(toolRuntimeProbeState)
+                  }
+                />
+                <ToolRuntimeTile label="Speech" value={speechStatusText} />
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">Speech：{speechStatusText}</div>
             </div>
-            <div className="text-xs text-slate-500 break-all">{backendStatus || "等待状态..."}</div>
+            <div className="gshark-diffuse-chip px-3 py-2 text-xs break-all text-slate-500">
+              {backendStatus || "等待状态..."}
+            </div>
             {!toolRuntimeSnapshot && backendConnected && (
               <div
-                className={`text-xs break-all ${toolRuntimeProbeState === "failed" ? "text-rose-600" : "text-slate-500"}`}
+                className={cn(
+                  "gshark-soft-fill px-3 py-2 text-xs break-all",
+                  toolRuntimeProbeState === "failed" ? "text-rose-600" : "text-slate-500",
+                )}
               >
                 {toolRuntimeProbeStateText(toolRuntimeProbeState)} ·{" "}
                 {toolRuntimeProbeTransportText(toolRuntimeProbeTransport)}
@@ -140,7 +159,10 @@ export function StartupGate() {
             )}
             {backendConnected && !isTSharkChecking && (
               <div
-                className={`text-xs break-all ${tsharkStatus.available ? (tsharkDegraded ? "text-amber-700" : "text-emerald-600") : "text-rose-600"}`}
+                className={cn(
+                  "gshark-soft-fill px-3 py-2 text-xs break-all",
+                  tsharkStatus.available ? (tsharkDegraded ? "text-amber-700" : "text-emerald-600") : "text-rose-600",
+                )}
               >
                 {tsharkStatus.available
                   ? `${tsharkDegraded ? "部分分析降级" : "已检测到"}: ${tsharkStatus.path || "tshark"}`
@@ -151,7 +173,7 @@ export function StartupGate() {
               </div>
             )}
             {tsharkDegraded && (tsharkStatus.missingOptionalFields?.length ?? 0) > 0 && (
-              <div className="text-xs text-amber-700 break-all">
+              <div className="gshark-soft-fill px-3 py-2 text-xs break-all text-amber-700">
                 缺少可选字段：{tsharkStatus.missingOptionalFields?.join(", ")}
               </div>
             )}
@@ -160,7 +182,7 @@ export function StartupGate() {
                 <button
                   onClick={() => void handleProbeTools()}
                   disabled={isToolRuntimeLoading || toolRuntimeProbeState === "probing_full"}
-                  className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="gshark-control inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${isToolRuntimeLoading || toolRuntimeProbeState === "probing_full" ? "animate-spin" : ""}`}
@@ -173,7 +195,7 @@ export function StartupGate() {
           </div>
 
           {backendConnected && !isTSharkChecking && !tsharkStatus.available && !toolRuntimeCheckDegraded && (
-            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="gshark-soft-fill gshark-risk-accent mx-5 mb-4 px-4 py-3">
               <div className="text-sm font-medium text-amber-800">未检测到 TShark，可在设置中配置</div>
               <p className="mt-1 text-xs text-amber-700">
                 可以直接填写 tshark.exe 的绝对路径，或者填写 Wireshark 安装目录。
@@ -183,12 +205,12 @@ export function StartupGate() {
                   value={pathInput}
                   onChange={(event) => setPathInput(event.target.value)}
                   placeholder="C:\\Program Files\\Wireshark\\tshark.exe"
-                  className="flex-1 rounded-md border border-amber-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-500"
+                  className="gshark-field flex-1 px-3 py-2 text-xs text-slate-900 outline-none"
                 />
                 <button
                   onClick={() => void handleSavePath()}
                   disabled={savingPath}
-                  className="rounded-md border border-blue-200 bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="gshark-control-primary px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingPath ? "保存中" : "保存路径"}
                 </button>
@@ -200,7 +222,7 @@ export function StartupGate() {
                     void handleSavePath("");
                   }}
                   disabled={savingPath}
-                  className="mt-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="gshark-control mt-2 px-3 py-1.5 text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   清除自定义路径
                 </button>
@@ -209,9 +231,9 @@ export function StartupGate() {
             </div>
           )}
 
-          <div className="mt-5 h-1.5 w-full overflow-hidden rounded bg-slate-200">
+          <div className="mx-5 mb-5 h-1.5 overflow-hidden bg-slate-200/45">
             <div
-              className={`h-full rounded bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected ? "w-full" : "w-2/3 animate-pulse"}`}
+              className={`h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected ? "w-full" : "w-2/3 animate-pulse"}`}
             />
           </div>
         </div>
@@ -255,3 +277,39 @@ export default function App() {
     </SentinelProvider>
   );
 }
+
+function StartupStatusLine({
+  label,
+  value,
+  tone,
+  pulse = false,
+}: {
+  label: string;
+  value: string;
+  tone: "slate" | "emerald" | "amber" | "rose";
+  pulse?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className={cn("gshark-status-dot", statusToneClassName[tone], pulse && "animate-pulse")} />
+      <span>
+        {label}：{value}
+      </span>
+    </div>
+  );
+}
+
+function ToolRuntimeTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="gshark-diffuse-chip px-3 py-2">
+      {label}：{value}
+    </div>
+  );
+}
+
+const statusToneClassName = {
+  slate: "text-slate-400",
+  emerald: "text-emerald-500",
+  amber: "text-amber-500",
+  rose: "text-rose-500",
+};

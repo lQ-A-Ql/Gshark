@@ -19,20 +19,18 @@ export function EvidenceTimeline({ evidence }: { evidence: APTEvidenceRecord[] }
             按当前 actor 与证据来源 tab 排序展示前 50 条；无时间证据置于末尾。
           </div>
         </div>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] text-slate-500">
+        <span className="gshark-diffuse-chip px-2 py-0.5 font-mono text-[10px] text-slate-500">
           {sorted.length}/{evidence.length}
         </span>
       </div>
       {sorted.length === 0 ? (
-        <div className="px-3 py-4 text-center text-xs text-slate-500">
-          暂无可用于时间线的证据。
-        </div>
+        <div className="px-3 py-4 text-center text-xs text-slate-500">暂无可用于时间线的证据。</div>
       ) : (
         <div className="space-y-2">
           {sorted.map((item, index) => (
             <div
               key={`${item.packetId}-${item.sourceModule}-${index}`}
-              className="gshark-tile grid gap-3 border-slate-100 bg-slate-50/60 px-3 py-2 text-xs md:grid-cols-[8rem_minmax(0,1fr)]"
+              className="gshark-soft-fill grid gap-3 px-3 py-2 text-xs md:grid-cols-[8rem_minmax(0,1fr)]"
             >
               <div className="font-mono text-[11px] text-slate-500">{item.time || "no-time"}</div>
               <div>
@@ -60,10 +58,7 @@ function TagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span
-          key={value}
-          className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-        >
+        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[11px] font-medium text-slate-600">
           {value}
         </span>
       ))}

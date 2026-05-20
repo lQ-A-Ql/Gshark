@@ -26,24 +26,24 @@ export function PacketVirtualTableHeader({
   onStartResize,
 }: PacketVirtualTableHeaderProps) {
   return (
-    <div className="sticky top-0 z-10 bg-accent text-muted-foreground shadow-[0_1px_0_0_var(--color-border)]">
-      <div className="flex items-center justify-end border-b border-border px-2 py-1">
+    <div className="gshark-packet-header sticky top-0 z-10 text-muted-foreground">
+      <div className="gshark-packet-header-toolbar flex items-center justify-end px-2 py-1">
         <button
-          className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
+          className="gshark-control gshark-packet-action inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium transition"
           onClick={onToggleColumnPanel}
         >
           <Settings2 className="h-3.5 w-3.5" /> 列设置
         </button>
       </div>
       {showColumnPanel && (
-        <div className="grid grid-cols-2 gap-2 border-b border-border bg-card p-2 text-[11px]">
+        <div className="gshark-packet-column-panel grid grid-cols-2 gap-2 p-2 text-[11px]">
           {columns.map((col) => (
-            <label key={col.id} className="flex items-center gap-2 rounded border border-border px-2 py-1">
+            <label key={col.id} className="gshark-packet-column-row flex items-center gap-2 px-2 py-1">
               <input
                 type="checkbox"
                 checked={col.visible}
                 onChange={() => onToggleColumnVisible(col.id)}
-                className="accent-blue-600"
+                className="gshark-checkbox"
               />
               <input
                 value={col.label}
@@ -53,7 +53,7 @@ export function PacketVirtualTableHeader({
             </label>
           ))}
           <button
-            className="col-span-2 rounded border border-border bg-accent px-2 py-1 text-muted-foreground hover:bg-accent/80"
+            className="gshark-control gshark-packet-action col-span-2 px-2 py-1 text-muted-foreground transition"
             onClick={onResetColumns}
           >
             恢复默认列配置
@@ -62,10 +62,10 @@ export function PacketVirtualTableHeader({
       )}
       <div className="grid text-xs font-medium" style={{ gridTemplateColumns }}>
         {visibleColumns.map((col) => (
-          <div key={col.id} className="relative border-r border-border px-3 py-2 last:border-r-0">
+          <div key={col.id} className="gshark-packet-header-cell relative px-3 py-2">
             {col.label}
             <div
-              className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize"
+              className="gshark-packet-resize-handle absolute right-0 top-0 h-full w-1.5 cursor-col-resize"
               onMouseDown={(event) => onStartResize(col.id, event)}
             />
           </div>

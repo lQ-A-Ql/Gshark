@@ -17,15 +17,21 @@ export function getPacketColorStyle(packet: Packet): PacketColorStyle | null {
   const matched = RULES.find((rule) => rule.match(packet, text));
   if (!matched) return null;
 
-  const strong = rgb16ToRgba(matched.bg, 0.85);
-  const mid = rgb16ToRgba(matched.bg, 0.45);
-  const clear = rgb16ToRgba(matched.bg, 0.05);
+  const edge = rgb16ToRgba(matched.bg, 0.46);
+  const soft = rgb16ToRgba(matched.bg, 0.2);
+  const mist = rgb16ToRgba(matched.bg, 0.09);
+  const clear = rgb16ToRgba(matched.bg, 0.035);
   const fontColor = "rgb(0, 0, 0)";
 
   return {
     ruleName: matched.name,
     backgroundColor: rgb16ToCss(matched.bg),
-    backgroundGradient: `linear-gradient(90deg, ${strong} 0%, ${mid} 42%, ${clear} 100%)`,
+    backgroundGradient: [
+      `linear-gradient(90deg, ${edge} 0 0.35rem, transparent 0.35rem 100%)`,
+      `radial-gradient(circle at 12% 50%, ${soft} 0%, ${clear} 44%, transparent 72%)`,
+      `linear-gradient(90deg, ${soft} 0%, ${mist} 34%, ${clear} 78%, transparent 100%)`,
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04))",
+    ].join(", "),
     color: fontColor,
   };
 }

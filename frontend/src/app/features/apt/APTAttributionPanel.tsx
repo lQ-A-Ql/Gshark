@@ -66,7 +66,7 @@ export function AttributionExplainer({
           <div className="mt-1 text-lg font-semibold text-amber-900">{weak.length}</div>
           <div className="mt-1 text-[11px] text-amber-700">中弱权重或弱观察因子</div>
         </div>
-        <div className="gshark-tile border-slate-100 bg-slate-50/50 px-4 py-3">
+        <div className="gshark-soft-fill px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Missing Evidence</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{missing.length}</div>
           <div className="mt-1 text-[11px] text-slate-700">基于真实证据动态判断</div>
@@ -113,7 +113,7 @@ export function AttributionExplainer({
         )}
 
       {missing.length > 0 && (
-        <div className="gshark-tile border-slate-100 bg-slate-50/50 px-4 py-3">
+        <div className="gshark-soft-fill px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
             Missing Evidence Details
           </div>

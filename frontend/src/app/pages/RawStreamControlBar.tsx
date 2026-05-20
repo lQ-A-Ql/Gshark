@@ -108,7 +108,7 @@ export function RawStreamControlBar({
       <div className="ml-auto">
         <button
           onClick={onExportAll}
-          className="gshark-control flex items-center gap-1 px-3 py-1.5 text-xs text-foreground transition-all hover:text-accent-foreground"
+          className="gshark-control gshark-evidence-accent flex items-center gap-1 px-3 py-1.5 text-xs text-foreground transition-all hover:text-accent-foreground"
         >
           <Download className="h-3.5 w-3.5" /> 导出为文件
         </button>

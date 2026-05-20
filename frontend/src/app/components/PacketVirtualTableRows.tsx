@@ -48,18 +48,18 @@ export function PacketVirtualTableRows({
             onDoubleClick={() => packet.proto === "HTTP" && onDoubleClickHttp()}
             onContextMenu={(event) => onOpenContextMenu(event, packet)}
             className={cn(
-              "grid border-b border-border/60 text-xs transition-colors",
-              selected
-                ? "bg-blue-600 text-white"
-                : packetColor
-                  ? ""
-                  : failureLevel === "critical"
-                    ? "bg-rose-50 text-rose-900 hover:bg-rose-100"
-                    : failureLevel === "major"
-                      ? "bg-orange-50 text-orange-900 hover:bg-orange-100"
-                      : failureLevel === "warn"
-                        ? "bg-amber-50 text-amber-900 hover:bg-amber-100"
-                        : "hover:bg-accent text-foreground",
+              "gshark-packet-row grid text-xs transition-[box-shadow,background-color,background-image,color]",
+              packetColor
+                ? "gshark-packet-row-colored"
+                : failureLevel === "critical"
+                  ? "gshark-packet-row-failure-critical"
+                  : failureLevel === "major"
+                    ? "gshark-packet-row-failure-major"
+                    : failureLevel === "warn"
+                      ? "gshark-packet-row-failure-warn"
+                      : "text-foreground",
+              !selected && !packetColor && !failureLevel && "gshark-packet-row-neutral",
+              selected && "gshark-packet-row-selected",
             )}
             style={{
               position: "absolute",
@@ -68,20 +68,18 @@ export function PacketVirtualTableRows({
               right: 0,
               height: rowHeight,
               gridTemplateColumns,
-              ...(selected
-                ? null
-                : packetColor
-                  ? {
-                      backgroundImage: packetColor.backgroundGradient,
-                      backgroundColor: "transparent",
-                      color: packetColor.color,
-                    }
-                  : null),
+              ...(packetColor
+                ? {
+                    backgroundImage: packetColor.backgroundGradient,
+                    backgroundColor: "transparent",
+                    color: packetColor.color,
+                  }
+                : null),
             }}
             title={selected ? undefined : packetColor?.ruleName}
           >
             {visibleColumns.map((col) => (
-              <div key={col.id} className="border-r border-border/60 last:border-r-0">
+              <div key={col.id} className="gshark-packet-cell">
                 {renderPacketCell(packet, col.id)}
               </div>
             ))}

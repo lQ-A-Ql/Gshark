@@ -37,8 +37,8 @@ export function StreamSearchBar({
   const navigationDisabled = disabled || (hasResultSummary && resultCount <= 0);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="gshark-field flex w-72 items-center overflow-hidden px-2 transition-colors">
+    <div className={cn("gshark-stream-control-cluster flex min-w-0 flex-wrap items-center gap-2 px-2 py-1", className)}>
+      <div className="gshark-field flex w-72 max-w-full items-center overflow-hidden px-2 transition-colors">
         <Search className="ml-2 h-4 w-4 text-muted-foreground" />
         <input
           value={value}
@@ -64,7 +64,9 @@ export function StreamSearchBar({
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-      <span className="px-2 text-xs font-medium text-muted-foreground">{resultSummary}</span>
+      <span className="gshark-stream-segment px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        {resultSummary}
+      </span>
     </div>
   );
 }
