@@ -24,11 +24,11 @@ export function RuntimeSettingsActions({
   onSave: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-slate-200 bg-white/90 px-5 py-3">
+    <div className="gshark-tile-toolbar flex items-center gap-2 border-x-0 border-t-0 px-5 py-3">
       <button
         onClick={onRefresh}
         disabled={busy || loading || !backendConnected}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-control inline-flex h-10 items-center gap-2 px-3.5 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${busy || loading ? "animate-spin" : ""}`} />
         重新探测工具
@@ -36,7 +36,7 @@ export function RuntimeSettingsActions({
       <button
         onClick={onSave}
         disabled={busy || loading || !dirty}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-200 bg-blue-600 px-3.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-control-primary inline-flex h-10 items-center gap-2 px-3.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Save className="h-3.5 w-3.5" />
         保存并应用
@@ -76,8 +76,8 @@ export function RuntimeSettingsFooter({
               ? `最近一次探测已通过 ${toolRuntimeProbeTransportText(probeTransport)} 完成；备用链路原因：${probeTransportError}`
               : diagnosticsText;
   return (
-    <div className="border-t border-slate-200 bg-white/90 px-5 py-4">
-      <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-500">
+    <div className="gshark-tile-toolbar border-x-0 border-b-0 px-5 py-4">
+      <div className="gshark-soft-fill flex items-start gap-2 px-3 py-3 text-[11px] leading-5 text-slate-500">
         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
         <div>
           {notice ||

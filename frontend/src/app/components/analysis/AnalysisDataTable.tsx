@@ -55,7 +55,10 @@ export function AnalysisDataTable<T = ReactNode[]>({
     <div className={cn("gshark-tile-table", maxHeightClassName, wrapperClassName)}>
       <table className={cn("w-full table-fixed border-collapse text-left text-xs", tableClassName)}>
         <thead
-          className={cn("sticky top-0 bg-[var(--gshark-table-header-bg)] text-[11px] text-slate-500", headerClassName)}
+          className={cn(
+            "sticky top-0 bg-[var(--gshark-table-header-bg)] text-[11px] uppercase tracking-[0.08em] text-slate-500 backdrop-blur-md",
+            headerClassName,
+          )}
         >
           <tr>
             {effectiveHeaders.map((header, index) => (
@@ -101,7 +104,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                   <Fragment key={resolvedRowKey}>
                     <tr
                       className={cn(
-                        "border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-slate-500/5",
+                        "border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-[var(--gshark-table-hover-bg)]",
                         onRowClick && "cursor-pointer",
                         resolvedRowClassName,
                       )}
@@ -131,7 +134,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                       <tr
                         key={`${resolvedRowKey}-expanded`}
                         className={cn(
-                          "border-b border-[var(--gshark-tile-divider)] bg-slate-500/5",
+                          "border-b border-[var(--gshark-tile-divider)] bg-[var(--gshark-table-selected-bg)]",
                           resolvedExpandedRowClassName,
                         )}
                       >
@@ -157,7 +160,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
             (rows ?? []).map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-slate-500/5"
+                className="border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-[var(--gshark-table-hover-bg)]"
               >
                 {row.map((value, cellIndex) => (
                   <td key={`${rowIndex}-${cellIndex}`} className={cn("break-words px-2.5 py-1.5", cellClassName)}>

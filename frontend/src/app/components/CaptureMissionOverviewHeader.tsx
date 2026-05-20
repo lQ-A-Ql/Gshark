@@ -60,14 +60,14 @@ export function CaptureMissionOverviewHeader({
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">{overview.headline}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{overview.summary}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="rounded-sm border border-slate-200 bg-slate-50/70 px-3 py-1">{fileName}</span>
+            <span className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1">{fileName}</span>
             {overview.topProtocols.map((item) => (
-              <span key={item.label} className="rounded-sm border border-blue-100 bg-blue-50/80 px-3 py-1 text-blue-700">
+              <span key={item.label} className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1 text-blue-700">
                 {item.label} {item.count}
               </span>
             ))}
             {overviewLoading && (
-              <span className="rounded-sm border border-amber-200 bg-amber-50/80 px-3 py-1 text-amber-700">
+              <span className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1 text-amber-700">
                 正在汇总专项分析
               </span>
             )}
@@ -77,14 +77,14 @@ export function CaptureMissionOverviewHeader({
         <div className="gshark-tile-toolbar flex flex-wrap items-center gap-2 border-0 bg-transparent p-0">
           <button
             onClick={onOpenHunting}
-            className="inline-flex items-center gap-2 rounded-sm border border-rose-200 bg-rose-50/80 px-4 py-2 text-sm font-medium text-rose-700 transition-all hover:bg-rose-100"
+            className="gshark-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-700 transition-all"
           >
             <ShieldAlert className="h-4 w-4" />
             威胁狩猎
           </button>
           <button
             onClick={onOpenTrafficGraph}
-            className="inline-flex items-center gap-2 rounded-sm border border-slate-200 bg-white/65 px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:bg-slate-100"
+            className="gshark-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 transition-all"
           >
             <Network className="h-4 w-4" />
             流量图

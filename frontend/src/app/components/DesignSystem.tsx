@@ -23,6 +23,17 @@ const surfaceClasses: Record<SurfaceVariant, string> = {
   subtle: "gshark-tile",
 };
 
+const statusDotClasses: Record<Tone, string> = {
+  slate: "text-slate-400",
+  blue: "text-blue-500",
+  cyan: "text-cyan-500",
+  emerald: "text-emerald-500",
+  amber: "text-amber-500",
+  rose: "text-rose-500",
+  indigo: "text-indigo-500",
+  violet: "text-violet-500",
+};
+
 export function SurfacePanel({
   title,
   description,
@@ -53,7 +64,9 @@ export function SurfacePanel({
             <div className="min-w-0">
               {title || icon ? (
                 <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900">
-                  {icon ? <span className="shrink-0">{icon}</span> : null}
+                  {icon ? (
+                    <span className="gshark-diffuse-chip gshark-evidence-accent shrink-0 p-1.5">{icon}</span>
+                  ) : null}
                   <span className="truncate">{title}</span>
                 </div>
               ) : null}
@@ -84,8 +97,13 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <div className={cn("gshark-tile gshark-diffuse-edge flex items-center gap-3 px-3 py-2.5", className)}>
-      {icon ? <span className="shrink-0">{icon}</span> : null}
+    <div
+      className={cn(
+        "gshark-tile gshark-diffuse-edge gshark-evidence-accent flex items-center gap-3 px-3 py-2.5",
+        className,
+      )}
+    >
+      {icon ? <span className="gshark-diffuse-chip gshark-evidence-accent shrink-0 p-1.5">{icon}</span> : null}
       <div className="min-w-0">
         <div className="text-[11px] leading-5 text-slate-500">{label}</div>
         <div className={cn("truncate text-sm font-semibold", toneClasses[tone].text)}>{value}</div>
@@ -105,18 +123,21 @@ export function StatusHint({
   className?: string;
 }) {
   return (
-    <div className={cn("gshark-soft-fill px-3 py-2 text-xs leading-5", toneClasses[tone].hint, className)}>
+    <div
+      className={cn(
+        "gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5",
+        toneClasses[tone].hint,
+        className,
+      )}
+    >
+      <span className={cn("gshark-status-dot mt-1 shrink-0", statusDotClasses[tone])} />
       {children}
     </div>
   );
 }
 
 export function EmptyState({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("px-4 py-5 text-center text-xs leading-6 text-slate-500", className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn("px-4 py-5 text-center text-xs leading-6 text-slate-500", className)}>{children}</div>;
 }
 
 export function CollapsibleContent({
@@ -160,18 +181,33 @@ export function WorkbenchTitleBar({
   className?: string;
 }) {
   return (
-    <div className={cn("gshark-tile-toolbar flex shrink-0 flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-3.5 py-2 text-foreground", className)}>
+    <div
+      className={cn(
+        "gshark-tile-toolbar gshark-workbench-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-3.5 py-2 text-foreground",
+        className,
+      )}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {onBack ? (
-          <button onClick={onBack} className="gshark-diffuse-chip p-1.5 text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground" title="返回">
+          <button
+            onClick={onBack}
+            className="gshark-control-ghost p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            title="返回"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
         ) : null}
         {onBack ? <div className="h-5 w-px bg-[var(--gshark-tile-divider)]" /> : null}
-        {icon ? <div className="gshark-diffuse-chip flex h-8 w-8 shrink-0 items-center justify-center text-slate-600">{icon}</div> : null}
+        {icon ? (
+          <div className="gshark-diffuse-chip gshark-evidence-accent flex h-8 w-8 shrink-0 items-center justify-center text-slate-600">
+            {icon}
+          </div>
+        ) : null}
         <div className="min-w-0">
           <h1 className="truncate text-sm font-semibold text-foreground">{title}</h1>
-          {subtitle ? <div className="mt-0.5 min-w-0 text-[11px] leading-4 text-muted-foreground">{subtitle}</div> : null}
+          {subtitle ? (
+            <div className="mt-0.5 min-w-0 text-[11px] leading-4 text-muted-foreground">{subtitle}</div>
+          ) : null}
         </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
@@ -184,7 +220,12 @@ export function WorkbenchTitleBar({
 
 export function WorkbenchChip({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cn("gshark-diffuse-chip inline-flex min-h-7 items-center px-2 py-1 text-[11px] leading-4 text-muted-foreground", className)}>
+    <span
+      className={cn(
+        "gshark-stream-control-cluster inline-flex min-h-7 items-center px-2.5 py-1 text-[11px] leading-4 text-muted-foreground",
+        className,
+      )}
+    >
       {children}
     </span>
   );

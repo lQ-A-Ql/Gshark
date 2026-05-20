@@ -45,7 +45,7 @@ export function GenericMiscModuleChrome({
   }
 
   return (
-    <section className="gshark-tile gshark-diffuse-edge group relative min-w-0 overflow-visible border-cyan-100/24 transition-colors duration-300 hover:border-cyan-200/36">
+    <section className="gshark-tile gshark-diffuse-edge gshark-workbench-panel group relative min-w-0 overflow-visible transition-colors duration-300">
       <GenericMiscCardHeader
         module={module}
         canDelete={canDelete}

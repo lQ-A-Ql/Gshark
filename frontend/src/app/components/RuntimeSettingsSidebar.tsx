@@ -33,7 +33,7 @@ export function RuntimeSettingsSidebar() {
   } = useRuntimeSettingsSidebarModel();
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_28px_80px_-28px_rgba(15,23,42,0.45)] backdrop-blur">
+    <div className="gshark-tile gshark-tile-strong flex h-full flex-col overflow-hidden">
       <RuntimeSettingsHeader
         form={form}
         snapshot={toolRuntimeSnapshot}
@@ -53,7 +53,7 @@ export function RuntimeSettingsSidebar() {
           onSave={() => void save()}
         />
 
-        <div className="flex-1 space-y-4 overflow-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.5),rgba(255,255,255,0.95))] px-5 py-5">
+        <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.18),rgba(255,255,255,0.34))] px-5 py-5">
           <CaptureSettingsSection
             form={form}
             snapshot={toolRuntimeSnapshot}

@@ -18,14 +18,14 @@ export function AnalysisStatCard({
   return (
     <div
       className={cn(
-        "gshark-tile gshark-tile-strong p-3 transition-colors duration-200 hover:border-slate-300/24",
+        "gshark-tile gshark-tile-strong gshark-evidence-accent p-3 transition-colors duration-200 hover:border-slate-300/24",
         toneTileBorder[tone],
         className,
       )}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         <span>{title}</span>
-        {icon ? <span className="gshark-diffuse-chip p-1.5">{icon}</span> : null}
+        {icon ? <span className="gshark-diffuse-chip gshark-evidence-accent p-1.5">{icon}</span> : null}
       </div>
       <div className="text-[22px] font-semibold tracking-tight text-slate-950">{value}</div>
     </div>
@@ -48,7 +48,7 @@ export function AnalysisPanel({
   return (
     <div
       className={cn(
-        "gshark-tile overflow-hidden p-3.5 transition-colors duration-200 hover:border-slate-300/24",
+        "gshark-tile gshark-workbench-panel overflow-hidden p-3.5 transition-colors duration-200 hover:border-slate-300/24",
         toneTileBorder[tone],
         className,
       )}
@@ -74,7 +74,7 @@ export function AnalysisMiniStat({
   className?: string;
 }) {
   return (
-    <div className={cn("gshark-soft-fill px-3 py-2", className)}>
+    <div className={cn("gshark-soft-fill gshark-evidence-accent px-3 py-2", className)}>
       <div className="text-[11px] font-medium text-slate-400">{title}</div>
       <div className={cn("text-sm font-semibold", toneMiniText[tone])}>{value}</div>
     </div>
@@ -93,7 +93,7 @@ export function AnalysisBadge({
   return (
     <span
       className={cn(
-        "gshark-diffuse-chip inline-flex items-center px-2 py-0.5 text-[11px] font-semibold",
+        "gshark-diffuse-chip inline-flex items-center px-2 py-0.5 text-[11px] font-semibold tracking-[0.01em]",
         toneBadge[tone],
         className,
       )}
@@ -104,16 +104,7 @@ export function AnalysisBadge({
 }
 
 export function AnalysisEmptyState({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "px-3 py-6 text-center text-xs leading-6 text-slate-500",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn("px-3 py-6 text-center text-xs leading-6 text-slate-500", className)}>{children}</div>;
 }
 
 export function AnalysisCallout({
@@ -130,7 +121,7 @@ export function AnalysisCallout({
   return (
     <div
       className={cn(
-        "gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs",
+        "gshark-soft-fill gshark-evidence-accent flex items-start gap-2 px-3 py-2 text-xs",
         toneCallout[tone],
         className,
       )}

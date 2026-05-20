@@ -92,14 +92,16 @@ export function AnalysisHero({
   const isTile = variant === "tile";
 
   return (
-    <section className={cn("overflow-hidden", isTile ? "gshark-tile gshark-tile-strong" : "gshark-tile")}>
+    <section
+      className={cn("gshark-forensic-scan overflow-hidden", isTile ? "gshark-tile gshark-tile-strong" : "gshark-tile")}
+    >
       <div className={cn("pointer-events-none h-px w-full bg-gradient-to-r", themeConfig.accent)} />
       <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <div
               className={cn(
-                "gshark-soft-fill flex h-10 w-10 shrink-0 items-center justify-center border",
+                "gshark-soft-fill gshark-evidence-accent flex h-10 w-10 shrink-0 items-center justify-center border",
                 isTile ? "rounded-sm" : "rounded-none",
                 themeConfig.iconWrap,
                 themeConfig.iconText,
@@ -110,7 +112,7 @@ export function AnalysisHero({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-2">
-                <h1 className="truncate text-[18px] font-bold tracking-tight text-slate-900 sm:text-[20px]">{title}</h1>
+                <h1 className="truncate text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">{title}</h1>
                 <span className="truncate text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">
                   {subtitle}
                 </span>

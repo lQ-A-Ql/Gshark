@@ -31,28 +31,26 @@ export function StreamNavigator({
 }) {
   const title = `${protocolLabel} 流总数: ${streamTotal}`;
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs",
-        className,
-      )}
-    >
-      <span className="text-muted-foreground">流切换</span>
+    <div className={cn("gshark-stream-control-cluster flex flex-wrap items-center gap-2 px-2 py-1 text-xs", className)}>
+      <span className="px-1 text-[11px] font-medium text-muted-foreground">流切换</span>
       <button
         type="button"
-        className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
+        className="gshark-control-ghost min-h-6 min-w-6 px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
         onClick={onPrev}
         disabled={disabled || !hasPrev}
         title={title}
       >
         ‹
       </button>
-      <span className="min-w-[11rem] px-1 text-center font-mono text-foreground" title={title}>
+      <span
+        className="gshark-stream-segment min-w-[11rem] px-2 py-0.5 text-center font-mono text-[11px] text-foreground"
+        title={title}
+      >
         第 {ordinalLabel} 条 / stream eq {streamId}
       </span>
       <button
         type="button"
-        className="rounded border border-border bg-accent p-1 text-muted-foreground hover:bg-accent/80 hover:text-foreground disabled:opacity-40"
+        className="gshark-control-ghost min-h-6 min-w-6 px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
         onClick={onNext}
         disabled={disabled || !hasNext}
         title={title}
@@ -67,7 +65,7 @@ export function StreamNavigator({
             onSubmitStream();
           }
         }}
-        className="w-16 rounded border border-border bg-card px-1 py-0.5 text-center font-mono outline-none"
+        className="gshark-stream-value w-16 px-1 py-0.5 text-center font-mono text-[11px] outline-none"
         placeholder="stream"
         title={title}
         disabled={disabled}

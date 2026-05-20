@@ -38,7 +38,7 @@ export function StreamSearchBar({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex w-72 items-center overflow-hidden rounded-md border border-border bg-background shadow-sm transition-colors focus-within:border-blue-500">
+      <div className="gshark-field flex w-72 items-center overflow-hidden px-2 transition-colors">
         <Search className="ml-2 h-4 w-4 text-muted-foreground" />
         <input
           value={value}
@@ -50,7 +50,7 @@ export function StreamSearchBar({
       </div>
       <button
         type="button"
-        className="rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+        className="gshark-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
         onClick={onPrev}
         disabled={navigationDisabled}
       >
@@ -58,7 +58,7 @@ export function StreamSearchBar({
       </button>
       <button
         type="button"
-        className="rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+        className="gshark-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
         onClick={onNext}
         disabled={navigationDisabled}
       >

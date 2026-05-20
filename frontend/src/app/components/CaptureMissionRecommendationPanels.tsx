@@ -14,7 +14,7 @@ export function CaptureRecommendationsPanel({
   onApplyFilter,
 }: CaptureRecommendationsPanelProps) {
   return (
-    <div className="gshark-tile border-slate-200 bg-slate-50/80 p-3.5">
+    <div className="gshark-tile gshark-workbench-panel p-3.5">
       <div className="mb-3 text-sm font-semibold text-slate-900">推荐入口</div>
       <div className="grid gap-3 md:grid-cols-2">
         {recommendations.map((item) => (
@@ -58,13 +58,13 @@ function RecommendationCard({
   onFilter?: () => void;
 }) {
   return (
-    <div className="gshark-tile border-slate-200 px-3.5 py-3">
+    <div className="gshark-tile gshark-evidence-accent px-3.5 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
           {icon}
           {title}
         </div>
-        <div className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+        <div className="gshark-diffuse-chip gshark-evidence-accent px-2 py-0.5 text-[11px] font-medium text-blue-700">
           匹配度 {score}
         </div>
       </div>
@@ -72,16 +72,13 @@ function RecommendationCard({
       <div className="mt-3 flex items-center gap-2">
         <button
           onClick={onOpen}
-          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          className="gshark-control-primary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
         >
           进入模块
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
         {onFilter && (
-          <button
-            onClick={onFilter}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-          >
+          <button onClick={onFilter} className="gshark-control px-3 py-1.5 text-xs font-medium text-slate-700">
             先应用过滤器
           </button>
         )}

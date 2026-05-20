@@ -16,21 +16,21 @@ export function ViewModeToggle<T extends string>({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground",
+        "gshark-stream-control-cluster flex flex-wrap items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground",
         className,
       )}
     >
-      <span>{label}:</span>
-      <div className="flex rounded-md border border-border bg-accent p-0.5">
+      <span className="px-1 text-[11px]">{label}:</span>
+      <div className="gshark-stream-segment flex p-0.5">
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded-sm px-2 py-0.5 text-xs transition-colors",
+              "rounded-sm px-2.5 py-0.5 text-[11px] transition-colors",
               value === option.value
-                ? "bg-background text-foreground shadow-sm"
+                ? "gshark-control-primary font-semibold text-white"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

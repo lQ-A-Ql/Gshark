@@ -15,12 +15,12 @@ export function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeC
 
 export function statusTone(available?: boolean, enabled = true) {
   if (!enabled) {
-    return "border-slate-200 bg-slate-50 text-slate-500";
+    return "gshark-evidence-accent text-slate-500";
   }
   if (available === undefined) {
-    return "border-slate-200 bg-slate-50 text-slate-500";
+    return "gshark-evidence-accent text-slate-500";
   }
-  return available ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700";
+  return available ? "gshark-evidence-accent text-emerald-700" : "gshark-risk-accent text-rose-700";
 }
 
 export function Field({
@@ -43,7 +43,7 @@ export function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition focus:border-blue-400"
+        className="gshark-field h-9 px-3 text-xs text-slate-900 outline-none transition"
       />
       {hint ? <span className="text-[11px] leading-5 text-slate-500">{hint}</span> : null}
     </label>
@@ -92,7 +92,7 @@ export function StatusLine({
           : "未就绪";
   return (
     <div
-      className={`rounded-xl border px-3 py-2 ${degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known)}`}
+      className={`gshark-soft-fill px-3 py-2 ${degraded ? "gshark-evidence-accent text-amber-700" : statusTone(ready, enabled && known)}`}
     >
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold">{label}</span>
@@ -119,10 +119,10 @@ export function MiniStatus({
   unknownLabel?: string;
 }) {
   const ready = Boolean(available);
-  const tone = degraded ? "border-amber-200 bg-amber-50 text-amber-700" : statusTone(ready, enabled && known);
+  const tone = degraded ? "gshark-evidence-accent text-amber-700" : statusTone(ready, enabled && known);
   const text = !known ? unknownLabel : !enabled ? "已关闭" : degraded ? "降级" : ready ? "就绪" : "缺失";
   return (
-    <div className={`rounded-2xl border px-3 py-2 ${tone}`}>
+    <div className={`gshark-soft-fill px-3 py-2 ${tone}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</div>
       <div className="mt-1 text-sm font-semibold">{text}</div>
     </div>

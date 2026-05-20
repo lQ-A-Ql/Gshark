@@ -16,7 +16,7 @@ export function CaptureSuspiciousHitsPanel({
   onOpenStream,
 }: CaptureSuspiciousHitsPanelProps) {
   return (
-    <div className="gshark-tile border-slate-200 bg-slate-50/80 p-3.5">
+    <div className="gshark-tile gshark-workbench-panel p-3.5">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-900">优先处理的命中</div>
         <button onClick={onOpenAll} className="text-xs font-medium text-blue-700 hover:text-blue-800">
@@ -24,23 +24,23 @@ export function CaptureSuspiciousHitsPanel({
         </button>
       </div>
       {hits.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-xs leading-5 text-slate-500">
+        <div className="px-3 py-5 text-center text-xs leading-5 text-slate-500">
           当前默认规则还没有给出明显命中，可以先从推荐过滤器和协议分布切入，再按需要重跑狩猎。
         </div>
       ) : (
         <div className="space-y-2.5">
           {hits.map((hit) => (
-            <div key={hit.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <div key={hit.id} className="gshark-soft-fill px-3 py-2.5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                    <span className="gshark-diffuse-chip gshark-evidence-accent px-2 py-0.5 text-[11px] text-slate-600">
                       #{hit.packetId}
                     </span>
-                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+                    <span className="gshark-diffuse-chip gshark-risk-accent px-2 py-0.5 text-[11px] font-medium text-rose-700">
                       {hit.rule}
                     </span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                    <span className="gshark-diffuse-chip gshark-evidence-accent px-2 py-0.5 text-[11px] text-slate-600">
                       {hit.level}
                     </span>
                   </div>
@@ -53,14 +53,14 @@ export function CaptureSuspiciousHitsPanel({
                   <button
                     onClick={() => void onJumpToPacket(hit.packetId)}
                     disabled={pendingAction.length > 0}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="gshark-control px-3 py-1.5 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {pendingAction === `packet:${hit.packetId}` ? "定位中" : "定位到包"}
                   </button>
                   <button
                     onClick={() => void onOpenStream(hit.packetId)}
                     disabled={pendingAction.length > 0}
-                    className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="gshark-control-primary px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {pendingAction === `stream:${hit.packetId}` ? "打开中" : "打开关联流"}
                   </button>

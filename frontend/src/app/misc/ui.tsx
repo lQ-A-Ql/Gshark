@@ -25,7 +25,7 @@ export function Field({
 
 export function ErrorBlock({ message }: { message: string }) {
   return (
-    <div className="gshark-soft-fill mt-2 flex items-start gap-2 border-rose-500/20 bg-rose-50/20 px-4 py-3 text-[13px] text-rose-700">
+    <div className="gshark-soft-fill gshark-risk-accent mt-2 flex items-start gap-2 px-4 py-3 text-[13px] text-rose-700">
       <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
       <div className="break-all font-medium leading-relaxed">{message}</div>
     </div>
@@ -98,10 +98,10 @@ export function MetaChip({
   color?: "slate" | "rose" | "sky" | "emerald";
 }) {
   const colorStyles = {
-    slate: "border-slate-200/28 bg-slate-50/20 text-slate-700",
-    rose: "border-rose-200/28 bg-rose-50/20 font-semibold text-rose-700",
-    sky: "border-sky-200/28 bg-sky-50/20 font-semibold text-sky-700",
-    emerald: "border-emerald-200/28 bg-emerald-50/20 font-semibold text-emerald-700",
+    slate: "gshark-evidence-accent text-slate-700",
+    rose: "gshark-risk-accent font-semibold text-rose-700",
+    sky: "gshark-evidence-accent font-semibold text-sky-700",
+    emerald: "gshark-evidence-accent font-semibold text-emerald-700",
   };
   return (
     <span className={`gshark-diffuse-chip inline-flex items-center px-2 py-1 text-xs ${colorStyles[color]}`}>

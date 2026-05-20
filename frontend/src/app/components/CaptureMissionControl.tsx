@@ -125,8 +125,8 @@ export function CaptureMissionControl() {
 
   return (
     <section className="px-4 py-4">
-      <div className="gshark-tile overflow-hidden border-slate-200">
-        <div className="gshark-tile-header border-b border-slate-200 px-4 py-4 sm:px-5">
+      <div className="gshark-tile gshark-workbench-panel overflow-hidden">
+        <div className="gshark-tile-header px-4 py-4 sm:px-5">
           <CaptureMissionOverviewHeader
             extractedObjectCount={extractedObjects.length}
             fileName={fileMeta.name}

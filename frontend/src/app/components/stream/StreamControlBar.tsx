@@ -6,7 +6,7 @@ export function StreamControlBar({ children, className }: { children: ReactNode;
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-wrap items-center gap-3 border-t border-border bg-white px-4 py-3 shadow-sm",
+        "gshark-tile-toolbar gshark-workbench-panel flex shrink-0 flex-wrap items-center gap-3 border-x-0 border-b-0 px-4 py-3",
         className,
       )}
     >

@@ -66,10 +66,10 @@ export function RawStreamControlBar({
 
   return (
     <StreamControlBar>
-      <div className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+      <WorkbenchChip>
         切流 last {protocolMetrics.lastMs}ms / p50 {protocolMetrics.p50Ms}ms / p95 {protocolMetrics.p95Ms}ms / fast-path{" "}
         {protocolMetrics.cacheHitRate}%
-      </div>
+      </WorkbenchChip>
       <ViewModeToggle<RawViewMode>
         value={viewMode}
         onChange={onViewModeChange}
@@ -108,7 +108,7 @@ export function RawStreamControlBar({
       <div className="ml-auto">
         <button
           onClick={onExportAll}
-          className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground shadow-sm transition-all hover:bg-accent"
+          className="gshark-control flex items-center gap-1 px-3 py-1.5 text-xs text-foreground transition-all hover:text-accent-foreground"
         >
           <Download className="h-3.5 w-3.5" /> 导出为文件
         </button>

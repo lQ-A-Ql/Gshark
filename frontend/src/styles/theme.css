@@ -58,6 +58,14 @@
   --gshark-field-bg: rgba(255, 255, 255, 0.16);
   --gshark-form-surface-bg: rgba(248, 250, 252, 0.1);
   --gshark-table-header-bg: rgba(248, 250, 252, 0.54);
+  --gshark-forensic-risk: rgba(244, 63, 94, 0.78);
+  --gshark-forensic-evidence: rgba(14, 165, 233, 0.78);
+  --gshark-forensic-success: rgba(16, 185, 129, 0.76);
+  --gshark-forensic-warning: rgba(245, 158, 11, 0.78);
+  --gshark-scanline: rgba(14, 165, 233, 0.16);
+  --gshark-status-glow: rgba(14, 165, 233, 0.18);
+  --gshark-table-hover-bg: rgba(14, 165, 233, 0.045);
+  --gshark-table-selected-bg: rgba(14, 165, 233, 0.075);
 }
 
 @theme inline {
@@ -208,9 +216,10 @@
       radial-gradient(circle at 80% 12%, rgba(255, 255, 255, 0.38), transparent 24rem),
       radial-gradient(circle at 56% 82%, rgba(255, 255, 255, 0.26), transparent 32rem),
       linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 34%, rgba(255, 255, 255, 0.2)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.56), var(--gshark-glass-shell-bg)), var(--gshark-curtain-bg);
-    backdrop-filter: blur(30px) saturate(1.22) contrast(1.02);
-    -webkit-backdrop-filter: blur(30px) saturate(1.22) contrast(1.02);
+      linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.12) 44%, transparent 62%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.58), var(--gshark-glass-shell-bg)), var(--gshark-curtain-bg);
+    backdrop-filter: blur(32px) saturate(1.24) contrast(1.03);
+    -webkit-backdrop-filter: blur(32px) saturate(1.24) contrast(1.03);
   }
 
   .gshark-glass-shell > * {
@@ -274,8 +283,8 @@
     border-radius: 0.125rem;
     background:
       radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.42), transparent 20rem),
-      radial-gradient(circle at 84% 92%, rgba(186, 230, 253, 0.12), transparent 18rem),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(236, 254, 255, 0.09)), rgba(248, 250, 252, 0.12);
+      radial-gradient(circle at 84% 92%, rgba(186, 230, 253, 0.14), transparent 18rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(236, 254, 255, 0.1)), rgba(248, 250, 252, 0.13);
     box-shadow: var(--gshark-soft-edge-shadow);
     backdrop-filter: blur(14px) saturate(1.1);
     -webkit-backdrop-filter: blur(14px) saturate(1.1);
@@ -295,6 +304,56 @@
     background:
       radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.34), transparent 8rem), rgba(248, 250, 252, 0.18);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  .gshark-forensic-scan {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gshark-forensic-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, var(--gshark-scanline), transparent),
+      radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.1), transparent 18rem);
+    opacity: 0.42;
+    mix-blend-mode: multiply;
+    transform: translateX(-38%);
+    animation: gshark-forensic-scan 4.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+
+  .gshark-status-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: currentColor;
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 14%, transparent),
+      0 0 20px color-mix(in srgb, currentColor 30%, transparent);
+  }
+
+  .gshark-risk-accent {
+    border-color: color-mix(in srgb, var(--gshark-forensic-risk) 24%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 32px rgba(244, 63, 94, 0.08);
+  }
+
+  .gshark-evidence-accent {
+    border-color: color-mix(in srgb, var(--gshark-forensic-evidence) 24%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 32px rgba(14, 165, 233, 0.08);
+  }
+
+  .gshark-workbench-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(248, 250, 252, 0.08)),
+      radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.08), transparent 22rem), transparent;
   }
 
   .gshark-control {
@@ -333,7 +392,7 @@
     color: rgba(255, 255, 255, 0.96);
     background:
       radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.28), transparent 9rem),
-      linear-gradient(135deg, rgba(37, 99, 235, 0.74), rgba(8, 145, 178, 0.58)), var(--gshark-control-primary-bg);
+      linear-gradient(135deg, rgba(37, 99, 235, 0.76), rgba(8, 145, 178, 0.6)), var(--gshark-control-primary-bg);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.2),
       0 0 28px rgba(59, 130, 246, 0.12);
@@ -359,6 +418,37 @@
     background:
       radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.3), transparent 8rem), rgba(248, 250, 252, 0.12);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .gshark-stream-control-cluster {
+    border: 1px solid rgba(14, 165, 233, 0.055);
+    border-radius: 0.125rem;
+    background:
+      linear-gradient(90deg, rgba(14, 165, 233, 0.06), transparent 36%),
+      radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.38), transparent 10rem), rgba(248, 250, 252, 0.105);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 26px rgba(14, 165, 233, 0.055);
+    backdrop-filter: blur(14px) saturate(1.12);
+    -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  }
+
+  .gshark-stream-segment {
+    border: 1px solid rgba(100, 116, 139, 0.035);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.34), transparent 8rem), rgba(255, 255, 255, 0.095);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .gshark-stream-value {
+    border: 1px solid rgba(14, 165, 233, 0.07);
+    border-radius: 0.125rem;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(224, 242, 254, 0.08)), rgba(255, 255, 255, 0.11);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 18px rgba(14, 165, 233, 0.045);
   }
 
   .gshark-field {
@@ -413,7 +503,9 @@
     gap: 0;
     overflow: hidden;
     border: 1px solid var(--gshark-tile-border);
-    background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.18), transparent 28rem), transparent;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.18), transparent 28rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent), transparent;
     box-shadow: var(--gshark-soft-edge-shadow);
   }
 
@@ -427,7 +519,9 @@
     min-width: 0;
     border: 1px solid var(--gshark-tile-border);
     border-radius: 0;
-    background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.14), transparent 18rem), var(--gshark-tile-bg);
+    background:
+      radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.16), transparent 18rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent), var(--gshark-tile-bg);
     box-shadow: var(--gshark-soft-edge-shadow);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -441,7 +535,8 @@
     min-width: 0;
     border-bottom: 1px solid var(--gshark-tile-divider);
     background:
-      radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.22), transparent 16rem), rgba(248, 250, 252, 0.08);
+      linear-gradient(90deg, rgba(14, 165, 233, 0.055), transparent 36%),
+      radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.24), transparent 16rem), rgba(248, 250, 252, 0.09);
   }
 
   .gshark-tile-toolbar {
@@ -527,6 +622,14 @@
     border-color: var(--gshark-tile-divider);
   }
 
+  .gshark-tile-page :where(thead, .gshark-tile-header) {
+    letter-spacing: 0.01em;
+  }
+
+  .gshark-tile-page :where(tbody tr:hover) {
+    background-color: var(--gshark-table-hover-bg);
+  }
+
   .gshark-tile-page :where(input:not([type="checkbox"]):not([type="radio"]), textarea, [data-slot="select-trigger"]) {
     border-color: var(--gshark-control-border);
     background-color: transparent;
@@ -583,6 +686,24 @@
   }
 }
 
+@keyframes gshark-forensic-scan {
+  0%,
+  24% {
+    opacity: 0;
+    transform: translateX(-54%);
+  }
+
+  44% {
+    opacity: 0.42;
+  }
+
+  76%,
+  100% {
+    opacity: 0;
+    transform: translateX(54%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gshark-page-bg {
     transition: none;
@@ -598,6 +719,10 @@
     animation: none;
     transform: none;
     filter: none;
+  }
+
+  .gshark-forensic-scan::after {
+    animation: none;
   }
 }
 

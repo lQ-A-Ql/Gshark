@@ -16,7 +16,7 @@ export function RuntimeDependencyCard({
   Icon: LucideIcon;
 }) {
   return (
-    <div className={`rounded-xl border px-3 py-2 ${statusTone(available, known)}`}>
+    <div className={`gshark-soft-fill px-3 py-2 ${statusTone(available, known)}`}>
       <div className="flex items-center gap-1 text-xs font-semibold">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
