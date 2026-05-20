@@ -15,17 +15,15 @@ export function EvidenceSeveritySummary({
   onSeverityFilterChange,
 }: EvidenceSeveritySummaryProps) {
   return (
-    <div className="mb-4 flex flex-wrap gap-2">
+    <div className="mb-3 flex flex-wrap gap-2">
       {EVIDENCE_SEVERITIES.map((severity) => (
         <button
           key={severity}
           type="button"
           onClick={() => onSeverityFilterChange(severityFilter === severity ? "all" : severity)}
           className={cn(
-            "rounded-full border px-3 py-1 text-[11px] font-medium transition-all",
-            severityFilter === severity
-              ? severityActiveStyle(severity)
-              : "border-slate-200 bg-white/80 text-slate-600 hover:border-indigo-200",
+            "gshark-control px-3 py-1 text-[11px] font-medium transition-all",
+            severityFilter === severity ? severityActiveStyle(severity) : "text-slate-600 hover:text-indigo-700",
           )}
         >
           {severityLabel(severity)} · {counts[severity] ?? 0}
@@ -57,8 +55,8 @@ export function EvidenceToolbar({
   onToggleModule,
 }: EvidenceToolbarProps) {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500">
+    <div className="gshark-tile-toolbar flex flex-wrap items-center gap-2.5 px-3 py-2.5">
+      <div className="gshark-field flex items-center gap-2 px-2 py-1">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
           value={query}
@@ -103,10 +101,8 @@ function EvidenceModuleButton({ active, label, module, onToggle }: EvidenceModul
       type="button"
       onClick={() => onToggle(module)}
       className={cn(
-        "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
-        active
-          ? "border-indigo-200 bg-indigo-100 text-indigo-700 shadow-sm"
-          : "border-slate-200 bg-white/80 text-slate-500 hover:border-indigo-200 hover:text-indigo-700",
+        "gshark-control px-2.5 py-1 text-[11px] font-medium transition-all",
+        active ? "border-indigo-200 bg-indigo-100 text-indigo-700" : "text-slate-500 hover:text-indigo-700",
       )}
     >
       {label}
@@ -124,7 +120,7 @@ function ExportButton({ label, onClick }: ExportButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+      className="gshark-control flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors"
     >
       <Download className="h-3 w-3" /> {label}
     </button>

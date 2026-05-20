@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../ui/utils";
-import {
-  toneBadge,
-  toneCallout,
-  toneMiniText,
-  tonePanelShadow,
-  toneShadow,
-  type AnalysisTone,
-} from "./analysisTone";
+import { toneBadge, toneCallout, toneMiniText, toneTileBorder, type AnalysisTone } from "./analysisTone";
 
 export function AnalysisStatCard({
   title,
@@ -25,16 +18,16 @@ export function AnalysisStatCard({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-white/80 bg-white/88 p-4 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5",
-        toneShadow[tone],
+        "gshark-tile gshark-tile-strong p-3 transition-colors duration-200 hover:border-slate-300/24",
+        toneTileBorder[tone],
         className,
       )}
     >
-      <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
         <span>{title}</span>
-        {icon ? <span className="rounded-2xl border border-slate-100 bg-slate-50 p-2 shadow-sm">{icon}</span> : null}
+        {icon ? <span className="gshark-diffuse-chip p-1.5">{icon}</span> : null}
       </div>
-      <div className="text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
+      <div className="text-[22px] font-semibold tracking-tight text-slate-950">{value}</div>
     </div>
   );
 }
@@ -55,12 +48,12 @@ export function AnalysisPanel({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[24px] border border-white/80 bg-white/88 p-5 shadow-[0_22px_55px_rgba(148,163,184,0.16)] backdrop-blur-xl transition-all duration-300",
-        tonePanelShadow[tone],
+        "gshark-tile overflow-hidden p-3.5 transition-colors duration-200 hover:border-slate-300/24",
+        toneTileBorder[tone],
         className,
       )}
     >
-      <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="gshark-tile-header -mx-3.5 -mt-3.5 mb-3 flex items-center justify-between gap-3 px-3.5 py-2.5">
         <div className="text-sm font-semibold tracking-tight text-slate-900">{title}</div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
@@ -81,7 +74,7 @@ export function AnalysisMiniStat({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-slate-100 bg-slate-50/75 px-3 py-2 shadow-sm", className)}>
+    <div className={cn("gshark-soft-fill px-3 py-2", className)}>
       <div className="text-[11px] font-medium text-slate-400">{title}</div>
       <div className={cn("text-sm font-semibold", toneMiniText[tone])}>{value}</div>
     </div>
@@ -100,7 +93,7 @@ export function AnalysisBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+        "gshark-diffuse-chip inline-flex items-center px-2 py-0.5 text-[11px] font-semibold",
         toneBadge[tone],
         className,
       )}
@@ -114,7 +107,7 @@ export function AnalysisEmptyState({ children, className }: { children: ReactNod
   return (
     <div
       className={cn(
-        "rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-8 text-center text-xs leading-6 text-slate-500",
+        "px-3 py-6 text-center text-xs leading-6 text-slate-500",
         className,
       )}
     >
@@ -137,7 +130,7 @@ export function AnalysisCallout({
   return (
     <div
       className={cn(
-        "flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs shadow-sm",
+        "gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs",
         toneCallout[tone],
         className,
       )}

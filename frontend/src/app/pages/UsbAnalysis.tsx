@@ -88,7 +88,7 @@ export default function UsbAnalysis() {
   );
 
   return (
-    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.26),transparent_36%),linear-gradient(180deg,#f0fdff_0%,#f6faff_44%,#f8fafc_100%)]">
+    <PageShell>
       <AnalysisHero
         icon={<Usb className="h-5 w-5" />}
         title="USB 行为分析"
@@ -109,7 +109,7 @@ export default function UsbAnalysis() {
         onPrimaryTabChange={setActivePrimaryTab}
       />
       <InvestigationReportPanel
-        className="mt-4"
+        className="mt-0"
         preferredProtocol="TCP"
         report={analysis.report}
         title="USB 调查报告"

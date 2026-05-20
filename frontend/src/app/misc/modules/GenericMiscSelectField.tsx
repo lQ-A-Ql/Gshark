@@ -2,7 +2,7 @@ import { SelectField, type SelectOption } from "../../components/ui/select";
 import type { MiscModuleFormField } from "../../core/types";
 
 export const miscFieldSurfaceClass =
-  "border-slate-200/80 bg-gradient-to-br from-white to-slate-50/80 text-slate-900 shadow-[0_1px_0_rgba(15,23,42,0.03),0_10px_24px_rgba(15,23,42,0.04)] transition-all placeholder:text-slate-400 hover:border-cyan-200 hover:bg-white focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100/70 disabled:cursor-not-allowed disabled:opacity-60";
+  "gshark-field text-slate-900 transition-all placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface GenericMiscSelectFieldProps {
   field: MiscModuleFormField;
@@ -31,8 +31,8 @@ export function GenericMiscSelectField({ field, value, onChange, disabled }: Gen
       tone="cyan"
       fieldClassName="gap-2"
       labelClassName="sr-only"
-      triggerClassName={`h-11 rounded-xl px-3.5 text-sm ${miscFieldSurfaceClass}`}
-      contentClassName="border-cyan-100 shadow-[0_22px_55px_rgba(8,145,178,0.18)] ring-cyan-50"
+      triggerClassName={`h-11 px-3.5 text-sm ${miscFieldSurfaceClass}`}
+      contentClassName="border-cyan-200/14 shadow-[0_18px_48px_rgba(8,145,178,0.06),0_0_34px_rgba(255,255,255,0.22)] ring-cyan-50/30"
     />
   );
 }

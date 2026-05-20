@@ -15,8 +15,8 @@ export function ProtocolTreePanel({
   registerNodeRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
   return (
-    <Panel defaultSize={50} minSize={20} className="flex flex-col border-r border-border bg-card">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-accent/40 px-3 py-1.5 text-xs font-semibold text-foreground">
+    <Panel defaultSize={50} minSize={20} className="gshark-tile flex flex-col border-r border-border">
+      <div className="gshark-tile-header flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs font-semibold text-foreground">
         <Network className="h-4 w-4 text-emerald-600" /> 协议解析树
       </div>
       <div className="flex-1 overflow-auto p-2 font-mono text-xs">
@@ -76,7 +76,7 @@ function TreeNode({
         <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
           <span className="break-all leading-5">{node.label}</span>
           {node.byteRange && (
-            <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] ${selected ? "border-blue-200 bg-white/80 text-blue-700" : "border-border/70 bg-background/80 text-muted-foreground"}`}>
+            <span className={`shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] ${selected ? "border-blue-200 bg-blue-50/35 text-blue-700" : "border-border/70 bg-transparent text-muted-foreground"}`}>
               {node.byteRange[0]}-{node.byteRange[1]}
             </span>
           )}

@@ -15,7 +15,7 @@ export function VehicleDetailPanels({ analysis }: VehicleDetailPanelsProps) {
 
   return (
     <>
-      <Panel title={`CAN 明细预览 (${analysis.can.frames.length} / ${analysis.can.totalFrames})`} className="mt-4">
+      <Panel title={`CAN 明细预览 (${analysis.can.frames.length} / ${analysis.can.totalFrames})`} className="mt-0">
         <DataTable
           headers={["包号", "时间", "Bus", "ID", "长度", "标志", "摘要"]}
           rows={analysis.can.frames.map((item) => [
@@ -32,7 +32,7 @@ export function VehicleDetailPanels({ analysis }: VehicleDetailPanelsProps) {
         />
       </Panel>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="CAN Payload 协议分布">
           <BucketChart
             data={analysis.can.payloadProtocols}
@@ -60,7 +60,7 @@ export function VehicleDetailPanels({ analysis }: VehicleDetailPanelsProps) {
         </Panel>
       </div>
 
-      <Panel title={`CAN ID 数据区域 (${canIdDataGroups.length})`} className="mt-4">
+      <Panel title={`CAN ID 数据区域 (${canIdDataGroups.length})`} className="mt-0">
         <CanIdDataBoard groups={canIdDataGroups} />
       </Panel>
 
@@ -73,7 +73,7 @@ export function VehicleDetailPanels({ analysis }: VehicleDetailPanelsProps) {
 function VehicleDbcDetailPanels({ analysis }: VehicleDetailPanelsProps) {
   return (
     <>
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="DBC 报文分布">
           <BucketChart
             data={analysis.can.decodedMessageDist}
@@ -90,7 +90,7 @@ function VehicleDbcDetailPanels({ analysis }: VehicleDetailPanelsProps) {
         </Panel>
       </div>
 
-      <Panel title={`DBC 解码明细预览 (${analysis.can.decodedMessages.length})`} className="mt-4">
+      <Panel title={`DBC 解码明细预览 (${analysis.can.decodedMessages.length})`} className="mt-0">
         <DataTable
           headers={["包号", "时间", "Bus", "ID", "数据库", "报文", "发送方", "信号", "摘要"]}
           rows={analysis.can.decodedMessages.map((item) => [
@@ -109,7 +109,7 @@ function VehicleDbcDetailPanels({ analysis }: VehicleDetailPanelsProps) {
         />
       </Panel>
 
-      <Panel title={`DBC 信号时间线 (${analysis.can.signalTimelines.length})`} className="mt-4">
+      <Panel title={`DBC 信号时间线 (${analysis.can.signalTimelines.length})`} className="mt-0">
         <DataTable
           headers={["信号", "样本数", "最新值", "最小值", "最大值", "单位", "最近报文"]}
           rows={analysis.can.signalTimelines.map((timeline) => {
@@ -135,7 +135,7 @@ function VehicleDbcDetailPanels({ analysis }: VehicleDetailPanelsProps) {
 
 function VehicleDiagnosticDetailPanels({ analysis }: VehicleDetailPanelsProps) {
   return (
-    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
       <Panel title={`DoIP 明细预览 (${analysis.doip.messages.length} / ${analysis.doip.totalMessages})`}>
         <DataTable
           headers={["包号", "时间", "源", "目标", "类型", "VIN", "状态", "摘要"]}

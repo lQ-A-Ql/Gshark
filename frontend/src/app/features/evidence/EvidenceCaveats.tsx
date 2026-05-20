@@ -10,7 +10,7 @@ export function EvidenceCaveats({ records }: EvidenceCaveatsProps) {
   if (caveats.length === 0) return null;
 
   return (
-    <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-[11px] text-amber-700">
+    <div className="gshark-tile mt-0 border-amber-100 bg-amber-50/35 px-3 py-2.5 text-[11px] text-amber-700">
       <div className="mb-1 font-semibold">证据使用提示</div>
       <ul className="list-inside list-disc space-y-0.5">
         {caveats.map((caveat) => (

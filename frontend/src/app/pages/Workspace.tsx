@@ -139,14 +139,14 @@ export default function Workspace() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(147,197,253,0.22),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f8fafc_100%)] text-sm text-foreground">
+    <div className="gshark-tile-page flex h-full flex-col overflow-hidden text-sm text-foreground">
       <WorkbenchTitleBar
         title="流量工作区"
         subtitle={
           fileMeta.path ? `${fileMeta.name} · ${totalPackets.toLocaleString()} packets` : "打开 PCAP/PCAPNG 后开始分析"
         }
         icon={<Network className="h-4 w-4 text-blue-600" />}
-        className="border-blue-100 bg-white/90 shadow-[0_18px_48px_rgba(148,163,184,0.16)] backdrop-blur-xl"
+        className="gshark-tile-header border-blue-100"
         actions={
           <WorkspaceTitleActions
             capturePath={capturePath}

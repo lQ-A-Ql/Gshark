@@ -39,7 +39,7 @@ export function ShiroRememberMeControls({
 }: ShiroRememberMeControlsProps) {
   return (
     <>
-      <div className="flex flex-wrap gap-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4 text-[11px] shadow-sm">
+      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-amber-100 bg-amber-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={hasCapture ? captureName : "未加载"} color={hasCapture ? "sky" : "slate"} />
         <MetaChip label="候选" value={candidateCount} color="slate" />
         <MetaChip label="密钥命中" value={hitCount} color={hitCount > 0 ? "rose" : "slate"} />
@@ -56,7 +56,7 @@ export function ShiroRememberMeControls({
                 type="button"
                 onClick={() => onCandidateFilterChange(item)}
                 className={`flex flex-1 items-center justify-center rounded-md text-[12px] font-semibold transition-colors ${
-                  candidateFilter === item ? "bg-white text-amber-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  candidateFilter === item ? "bg-amber-50 text-amber-700" : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {getShiroFilterLabel(item)}
@@ -70,7 +70,7 @@ export function ShiroRememberMeControls({
             onChange={(event) => onCustomKeysChange(event.target.value)}
             rows={3}
             placeholder="每行一个 base64 key，支持 label::base64Key"
-            className="min-h-[88px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-3 font-mono text-xs leading-relaxed text-slate-800 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-100/70"
+            className="min-h-[88px] w-full resize-y rounded-sm border border-slate-200 bg-background/80 px-3.5 py-3 font-mono text-xs leading-relaxed text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-100/70"
           />
         </Field>
         <div className="flex items-end gap-2">
@@ -79,7 +79,7 @@ export function ShiroRememberMeControls({
             variant="outline"
             onClick={onRefresh}
             disabled={!hasCapture || loading}
-            className="gap-2 bg-white text-amber-700"
+            className="gap-2 bg-amber-50 text-amber-700"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             {loading ? "分析中..." : "刷新 / 测试 Key"}

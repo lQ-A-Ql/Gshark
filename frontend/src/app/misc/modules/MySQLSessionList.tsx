@@ -10,14 +10,14 @@ interface MySQLSessionListProps {
 
 export function MySQLSessionList({ sessions, selectedStreamId, hasCapture, onSelectSession }: MySQLSessionListProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+    <div className="gshark-tile border-slate-200 bg-slate-50/60 p-3">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-800">MySQL 会话列表</div>
         <div className="text-[11px] text-slate-500">{sessions.length} 条</div>
       </div>
       <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
         {sessions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-[13px] text-slate-500">
+          <div className="gshark-tile border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[13px] text-slate-500">
             {hasCapture ? "当前筛选下没有匹配的 MySQL 会话" : "未加载抓包"}
           </div>
         ) : (
@@ -28,10 +28,10 @@ export function MySQLSessionList({ sessions, selectedStreamId, hasCapture, onSel
                 key={`mysql-session-${item.streamId}`}
                 type="button"
                 onClick={() => onSelectSession(item.streamId)}
-                className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
+                className={`w-full rounded-sm border px-3 py-3 text-left transition-colors ${
                   selected
-                    ? "border-emerald-400 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
-                    : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
+                    ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-100"
+                    : "border-slate-200 bg-slate-50/80 hover:border-emerald-200 hover:bg-emerald-50/40"
                 }`}
               >
                 <div className="flex flex-wrap items-center gap-2">

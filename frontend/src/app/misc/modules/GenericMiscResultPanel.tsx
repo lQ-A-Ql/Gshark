@@ -22,10 +22,13 @@ export function GenericMiscResultPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+    <div className="gshark-soft-fill space-y-3 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-800">{resultTitle}</div>
-        <Badge variant="outline" className="rounded-full border-emerald-100 bg-emerald-50 text-[11px] text-emerald-700">
+        <Badge
+          variant="outline"
+          className="gshark-diffuse-chip border-emerald-200/24 bg-emerald-50/16 text-[11px] text-emerald-700"
+        >
           Result
         </Badge>
       </div>
@@ -35,26 +38,26 @@ export function GenericMiscResultPanel({
           rowKey={(_, index) => `${moduleId}-row-${index}`}
           maxHeightClassName="max-h-72"
           tableClassName="min-w-full text-slate-700"
-          wrapperClassName="border-slate-200 bg-white shadow-sm"
-          headerClassName="bg-gradient-to-r from-slate-100 to-cyan-50 text-slate-800"
+          wrapperClassName="gshark-tile-table border-slate-200/18"
+          headerClassName="gshark-tile-header bg-white/12 text-slate-800"
           emptyText="暂无表格结果"
-          rowClassName="last:border-b-0 hover:bg-cyan-50/40"
+          rowClassName="last:border-b-0 hover:bg-cyan-50/20"
           columns={resultTable.columns.map((column) => ({
             key: column.key,
             header: column.label,
-            headerClassName: "whitespace-nowrap border-b border-slate-200 py-2.5 font-semibold",
+            headerClassName: "whitespace-nowrap border-b border-slate-200/18 py-2.5 font-semibold",
             cellClassName: "whitespace-pre-wrap py-2.5 align-top",
             render: (row) => row[column.key] ?? "",
           }))}
         />
       ) : null}
       {resultText ? (
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-700 shadow-inner">
+        <pre className="gshark-soft-fill max-h-72 overflow-auto whitespace-pre-wrap break-words p-3.5 text-xs leading-relaxed text-slate-700">
           {resultText}
         </pre>
       ) : null}
       {resultJSON ? (
-        <pre className="max-h-72 overflow-auto rounded-xl border border-slate-800 bg-[linear-gradient(135deg,#020617_0%,#0f172a_58%,#111827_100%)] p-3.5 text-xs leading-relaxed text-cyan-50 shadow-inner">
+        <pre className="max-h-72 overflow-auto border border-slate-900/35 bg-slate-950/88 p-3.5 text-xs leading-relaxed text-cyan-50 shadow-[inset_0_1px_24px_rgba(34,211,238,0.08)]">
           {resultJSON}
         </pre>
       ) : null}

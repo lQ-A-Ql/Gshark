@@ -139,7 +139,7 @@ export function CSDecryptForm({
 
 function RawKeyHint() {
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+    <div className="gshark-tile border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
       <div className="mb-1 flex items-center gap-1.5 font-semibold">
         <Info className="h-3.5 w-3.5" />
         Raw key 来源说明
@@ -160,7 +160,7 @@ function RSAPrivateKeyInput({ value, onChange }: { value: string; onChange: (val
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-[11px] text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+        className="gshark-soft-fill min-h-28 w-full px-3 py-2 font-mono text-[11px] text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
         placeholder="-----BEGIN RSA PRIVATE KEY-----"
       />
     </label>
@@ -185,7 +185,7 @@ function LabeledInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 font-mono text-[11px] text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+        className="gshark-soft-fill h-9 w-full px-3 font-mono text-[11px] text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
       />
     </label>
   );
@@ -193,7 +193,7 @@ function LabeledInput({
 
 function KeyModeHint({ icon, children }: { icon: string; children: ReactNode }) {
   return (
-    <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+    <div className="gshark-tile flex gap-2 border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
       <FileKey2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
       <div>
         <span className="font-semibold text-slate-800">{icon}</span>：{children}

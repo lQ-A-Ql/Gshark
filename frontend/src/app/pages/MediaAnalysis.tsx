@@ -53,7 +53,7 @@ export default function MediaAnalysis() {
   const error = analysisError || workflow.error;
 
   return (
-    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(251,113,133,0.26),transparent_36%),linear-gradient(180deg,#fff7f8_0%,#fbfbff_44%,#f8fafc_100%)]">
+    <PageShell>
       <AnalysisHero
         icon={<Clapperboard className="h-5 w-5" />}
         title="媒体流还原"

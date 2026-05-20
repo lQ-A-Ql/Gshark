@@ -37,8 +37,8 @@ export function UsbMassStoragePanel({
   onLunChange: (value: string) => void;
 }) {
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mt-0 space-y-0">
+      <div className="flex flex-wrap items-center gap-px">
         <SecondaryTabButton active={activeSubTab === "overview"} onClick={() => onSubTabChange("overview")}>
           概览
         </SecondaryTabButton>
@@ -52,14 +52,14 @@ export function UsbMassStoragePanel({
 
       {activeSubTab === "overview" && (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
             <StatCard title="总存储包" value={analysis.totalPackets.toLocaleString()} />
             <StatCard title="读请求数" value={analysis.readPackets.toLocaleString()} />
             <StatCard title="写请求数" value={analysis.writePackets.toLocaleString()} />
             <StatCard title="LUN 数" value={String(analysis.luns.length)} />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-0 xl:grid-cols-3">
             <Panel title="命令分布">
               <BucketChart data={analysis.commands} barClassName="bg-cyan-500" />
             </Panel>

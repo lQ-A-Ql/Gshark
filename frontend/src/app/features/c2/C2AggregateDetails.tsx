@@ -29,9 +29,7 @@ export function IntervalSparkline({
     .map((value) => `${value.toFixed(value >= 10 ? 0 : 1)}s`)
     .join(" / ");
   return (
-    <div
-      className={cn("rounded-2xl border border-slate-100 bg-white/80 px-3 py-2", compact ? "mt-2 px-2 py-1" : "mt-3")}
-    >
+    <div className={cn("gshark-tile border-slate-100 px-3 py-2", compact ? "mt-2 px-2 py-1" : "mt-3")}>
       <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         <span>Interval Sparkline</span>
         <span className="font-mono normal-case tracking-normal text-slate-500">
@@ -61,8 +59,8 @@ export function AggregateExpandButton({
       className={cn(
         "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-all duration-200",
         expanded
-          ? "border-cyan-200 bg-cyan-50 text-cyan-700 shadow-[0_12px_28px_-22px_rgba(8,145,178,0.75)]"
-          : "border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700",
+          ? "border-cyan-200 bg-cyan-50 text-cyan-700"
+          : "border-slate-200 bg-slate-50/70 text-slate-600 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700",
       )}
     >
       {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -92,7 +90,7 @@ export function CSDNSAggregateDetailPanel({ item }: { item: C2DNSAggregate }) {
   ].filter(Boolean);
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-rose-100 bg-white/95 p-4 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.55)] transition-all duration-200">
+    <div className="gshark-tile overflow-hidden border-rose-100 p-3.5 transition-all duration-200">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">DNS Aggregate Detail</div>
@@ -105,11 +103,11 @@ export function CSDNSAggregateDetailPanel({ item }: { item: C2DNSAggregate }) {
       <DetailMetricGrid rows={metrics} />
       <IntervalSparkline values={item.intervals} color="stroke-rose-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/70 p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">Query Type 分布</div>
           <TagLine values={queryTypeTags.length > 0 ? queryTypeTags : ["--"]} />
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/70 p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">TXT / NULL / CNAME 形态</div>
           <TagLine values={dnsShapeTags.length > 0 ? dnsShapeTags : ["no-txt-null-cname"]} />
         </div>
@@ -133,7 +131,7 @@ export function VShellStreamAggregateDetailPanel({ item }: { item: C2StreamAggre
   const listenerTags = (item.listenerHints ?? []).map((hint) => `${hint.label}:${hint.count}`);
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-cyan-100 bg-white/95 p-4 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.55)] transition-all duration-200">
+    <div className="gshark-tile overflow-hidden border-cyan-100 p-3.5 transition-all duration-200">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">VShell Stream Detail</div>
@@ -152,11 +150,11 @@ export function VShellStreamAggregateDetailPanel({ item }: { item: C2StreamAggre
       <DetailMetricGrid rows={metrics} />
       <IntervalSparkline values={item.intervals} color="stroke-cyan-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/70 p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">架构标记 / Payload 形态</div>
           <TagLine values={archTags.length > 0 ? archTags : ["no-arch-marker"]} />
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/70 p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">Listener / 管理面提示</div>
           <TagLine values={listenerTags.length > 0 ? listenerTags : ["no-listener-hint"]} />
         </div>
@@ -169,7 +167,7 @@ function DetailMetricGrid({ rows }: { rows: Array<{ label: string; value?: strin
   const visibleRows = rows.filter((row) => row.value && row.value.trim() !== "");
   if (visibleRows.length === 0) return null;
   return (
-    <div className="grid gap-1.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2 md:grid-cols-2">
+    <div className="gshark-tile grid gap-1.5 border-slate-100 bg-slate-50/70 p-2 md:grid-cols-2">
       {visibleRows.map((row) => (
         <div key={row.label} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-[11px] leading-5">
           <span className="font-semibold text-slate-400">{row.label}</span>
@@ -187,7 +185,7 @@ export function TagLine({ values }: { values: string[] }) {
       {values.map((value) => (
         <span
           key={value}
-          className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+          className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
         >
           {value}
         </span>

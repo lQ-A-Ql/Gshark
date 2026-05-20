@@ -26,7 +26,7 @@ export function WorkspaceFilterSection({
 }: WorkspaceFilterSectionProps) {
   return (
     <>
-      <div className="border-b border-blue-100 bg-white/80 shadow-[0_12px_32px_rgba(148,163,184,0.12)] backdrop-blur-xl">
+      <div className="gshark-tile-toolbar border-b border-blue-100">
         <DisplayFilterBar
           value={value}
           suggestions={suggestions}

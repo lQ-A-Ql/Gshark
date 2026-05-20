@@ -22,7 +22,7 @@ export function MainFooter({
   | "totalPackets"
 >) {
   return (
-    <footer className="z-40 flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-white/90 px-4 text-[11px] font-medium tracking-wider text-slate-500 backdrop-blur">
+    <footer className="z-40 flex h-8 shrink-0 items-center justify-between border-t border-white/16 bg-white/36 px-4 text-[11px] font-medium tracking-wider text-slate-500 backdrop-blur-xl">
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-1">
           <Box className="h-3.5 w-3.5" /> 当前: {fileMeta.name} ({formatBytes(fileMeta.sizeBytes)})

@@ -20,8 +20,8 @@ export function CaptureFileControls({
   backendConnected,
 }: CaptureFileControlsProps) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1">
-      <div className="flex w-[320px] min-w-[220px] items-center overflow-hidden rounded-md border border-border bg-background shadow-sm focus-within:border-blue-500">
+    <div className="gshark-tile-toolbar flex min-w-0 flex-wrap items-center gap-2 px-2 py-1">
+      <div className="gshark-field flex w-[320px] min-w-[220px] items-center overflow-hidden">
         <FolderOpen className="ml-2 h-4 w-4 text-muted-foreground" />
         <input
           value={capturePath}
@@ -38,7 +38,7 @@ export function CaptureFileControls({
       <button
         onClick={onChooseFile}
         disabled={disabled}
-        className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground shadow-sm transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
         title={backendConnected ? "选择并打开 PCAP/PCAPNG 文件" : "后端未连接"}
       >
         <FolderOpen className="h-3.5 w-3.5 text-blue-600" /> 选择文件
@@ -46,7 +46,7 @@ export function CaptureFileControls({
       <button
         onClick={onOpenPath}
         disabled={disabled}
-        className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground shadow-sm transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
         title={backendConnected ? "按路径打开（适用于本机路径）" : "后端未连接"}
       >
         <FolderOpen className="h-3.5 w-3.5 text-indigo-600" /> 路径打开
@@ -54,7 +54,7 @@ export function CaptureFileControls({
       <button
         onClick={onStop}
         disabled={!backendConnected}
-        className="flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground shadow-sm transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:cursor-not-allowed disabled:opacity-60"
         title={backendConnected ? "关闭当前抓包并清理临时数据库" : "后端未连接"}
       >
         <Square className="h-3.5 w-3.5 text-rose-600" /> 关闭抓包

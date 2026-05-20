@@ -9,7 +9,7 @@ import { EvidenceActions } from "../../misc/EvidenceActions";
 
 export function ModbusSuspiciousWritesPanel({ suspiciousWrites }: { suspiciousWrites: ModbusSuspiciousWrite[] }) {
   return (
-    <Panel title={`Modbus 可疑写操作 (${suspiciousWrites.length})`} className="mt-4">
+    <Panel title={`Modbus 可疑写操作 (${suspiciousWrites.length})`} className="mt-0">
       <AnalysisCallout className="mb-2" tone="amber" icon={<AlertTriangle className="h-4 w-4" />}>
         以下为按写入次数排序的 Modbus 写操作聚合，高频写入可能对应灯控、阀门切换或寄存器篡改。
       </AnalysisCallout>

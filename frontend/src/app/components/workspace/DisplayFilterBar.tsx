@@ -21,10 +21,10 @@ export function DisplayFilterBar({
   onClearHistory: () => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
+    <div className="gshark-tile-toolbar flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
       <Filter className="h-4 w-4 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">显示过滤器</span>
-      <div className="flex flex-1 items-center overflow-hidden rounded-md border border-border bg-card shadow-sm transition-all focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+      <div className="gshark-field flex flex-1 items-center overflow-hidden transition-all">
         <input
           id="display-filter-input"
           list="gshark-filter-suggestions"
@@ -50,7 +50,11 @@ export function DisplayFilterBar({
           ))}
         </datalist>
         {value && (
-          <button onClick={onClear} className="px-2 text-muted-foreground transition-colors hover:text-rose-500" title="清空过滤">
+          <button
+            onClick={onClear}
+            className="px-2 text-muted-foreground transition-colors hover:text-rose-500"
+            title="清空过滤"
+          >
             <XCircle className="h-4 w-4" />
           </button>
         )}
@@ -58,20 +62,20 @@ export function DisplayFilterBar({
       <button
         onClick={onApply}
         disabled={disabled}
-        className="flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1 text-xs text-foreground shadow-sm transition-all hover:bg-accent disabled:opacity-60"
+        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:opacity-60"
       >
         <Play className="h-3 w-3 text-blue-600" /> 应用
       </button>
       <button
         onClick={onClear}
         disabled={disabled}
-        className="flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1 text-xs text-muted-foreground transition-all hover:bg-accent disabled:opacity-60"
+        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-muted-foreground transition-all disabled:opacity-60"
       >
         <RefreshCw className="h-3 w-3" /> 清除
       </button>
       <button
         onClick={onClearHistory}
-        className="rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground transition-all hover:bg-accent"
+        className="gshark-control px-2 py-1 text-[11px] text-muted-foreground transition-all"
         title="清空最近过滤历史"
       >
         清空历史

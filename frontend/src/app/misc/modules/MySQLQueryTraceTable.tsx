@@ -7,7 +7,7 @@ interface MySQLQueryTraceTableProps {
 
 export function MySQLQueryTraceTable({ session }: MySQLQueryTraceTableProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="gshark-tile border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold text-slate-800">查询轨迹</div>
         <div className="text-[11px] text-slate-500">{session?.queries.length ?? 0} 条</div>
@@ -16,8 +16,8 @@ export function MySQLQueryTraceTable({ session }: MySQLQueryTraceTableProps) {
         data={session?.queries ?? []}
         rowKey={(row) => `${session?.streamId ?? "mysql"}-${row.packetId}-${row.command || "row"}`}
         maxHeightClassName="max-h-[420px]"
-        wrapperClassName="border-slate-100 bg-white"
-        headerClassName="bg-slate-50/95 text-slate-500"
+        wrapperClassName="gshark-tile-table border-slate-100"
+        headerClassName="gshark-tile-header bg-slate-50/80 text-slate-500"
         emptyText="暂无查询轨迹"
         rowClassName="hover:bg-emerald-50/40"
         columns={[

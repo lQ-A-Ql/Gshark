@@ -15,7 +15,7 @@ export default function AnalysisCockpit() {
   }
 
   return (
-    <PageShell innerClassName="max-w-7xl px-6 py-6">
+    <PageShell>
       <AnalysisHero
         icon={<Radar className="h-5 w-5" />}
         title="分析驾驶舱"

@@ -40,7 +40,7 @@ export function ThreatHuntingConfigPanel({
   onYaraTimeoutMsChange,
 }: ThreatHuntingConfigPanelProps) {
   return (
-    <div className="shrink-0 border-b border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.88),rgba(255,255,255,0.98))] p-4">
+    <div className="gshark-tile-header shrink-0 border-b border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">运行参数与命中结果</div>
@@ -59,7 +59,7 @@ export function ThreatHuntingConfigPanel({
           <input
             value={prefixText}
             onChange={(event) => onPrefixTextChange(event.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-foreground outline-none ring-0 transition focus:border-blue-400"
+            className="gshark-field h-9 px-3 text-foreground outline-none transition"
             placeholder="flag{,ctf{"
           />
         </label>
@@ -69,7 +69,7 @@ export function ThreatHuntingConfigPanel({
           <input
             value={yaraBin}
             onChange={(event) => onYaraBinChange(event.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-foreground outline-none ring-0 transition focus:border-blue-400"
+            className="gshark-field h-9 px-3 text-foreground outline-none transition"
             placeholder="C:/tools/yara64.exe"
           />
         </label>
@@ -79,7 +79,7 @@ export function ThreatHuntingConfigPanel({
           <input
             value={yaraRules}
             onChange={(event) => onYaraRulesChange(event.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-foreground outline-none ring-0 transition focus:border-blue-400"
+            className="gshark-field h-9 px-3 text-foreground outline-none transition"
             placeholder="C:/rules/default.yar"
           />
         </label>
@@ -90,7 +90,7 @@ export function ThreatHuntingConfigPanel({
             <input
               value={yaraTimeoutMs}
               onChange={(event) => onYaraTimeoutMsChange(Number(event.target.value) || 0)}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-foreground outline-none ring-0 transition focus:border-blue-400"
+              className="gshark-field h-9 px-3 text-foreground outline-none transition"
               type="number"
               min={1000}
               step={1000}
@@ -110,21 +110,21 @@ export function ThreatHuntingConfigPanel({
           <button
             onClick={() => void onLoadConfig()}
             disabled={!backendConnected || configBusy || huntBusy}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="gshark-control h-9 px-3.5 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             重新读取参数
           </button>
           <button
             onClick={() => void onApplyConfigAndRun()}
             disabled={!backendConnected || configBusy || huntBusy}
-            className="h-9 rounded-xl border border-blue-200 bg-blue-50 px-3.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="gshark-control h-9 border-blue-200/18 px-3.5 text-xs font-medium text-blue-700 transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             保存并重跑狩猎
           </button>
           <button
             onClick={() => void onRunWithoutSave()}
             disabled={!backendConnected || configBusy || huntBusy}
-            className="h-9 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="gshark-control h-9 border-emerald-200/18 px-3.5 text-xs font-medium text-emerald-700 transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             仅重跑（不保存）
           </button>

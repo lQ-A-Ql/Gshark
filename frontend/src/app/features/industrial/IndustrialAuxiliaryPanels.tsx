@@ -14,7 +14,7 @@ export function IndustrialRuleHitsPanel({ ruleHits }: { ruleHits: IndustrialRule
   if (ruleHits.length === 0) return null;
 
   return (
-    <Panel title={`规则检测 / Modbus 异常命中 (${ruleHits.length})`} className="mt-4">
+    <Panel title={`规则检测 / Modbus 异常命中 (${ruleHits.length})`} className="mt-0">
       <AnalysisCallout className="mb-2" tone="blue" icon={<Shield className="h-4 w-4" />}>
         基于主从角色、功能码、数量字段、位长度一致性和高频写入行为生成规则命中，可直接定位可疑包与目标地址。
       </AnalysisCallout>
@@ -63,7 +63,7 @@ export function IndustrialControlCommandsPanel({ commands }: { commands: Industr
   if (commands.length === 0) return null;
 
   return (
-    <Panel title={`控制指令 (${commands.length})`} className="mt-4">
+    <Panel title={`控制指令 (${commands.length})`} className="mt-0">
       <AnalysisCallout className="mb-2" tone="rose" icon={<Shield className="h-4 w-4" />}>
         以下为从 IEC 104、DNP3、BACnet 等协议中提取的控制/操作类指令，可能涉及遥控、设点或设备重启。
       </AnalysisCallout>
@@ -94,14 +94,14 @@ export function IndustrialProtocolDetailsPanel({ details }: { details: Industria
   return (
     <>
       {details.map((detail) => (
-        <Panel key={detail.name} title={`${detail.name} 明细 (${detail.records.length})`} className="mt-4">
-          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Panel key={detail.name} title={`${detail.name} 明细 (${detail.records.length})`} className="mt-0">
+          <div className="mb-3 grid grid-cols-2 gap-0 lg:grid-cols-4">
             <StatCard title="总帧数" value={detail.totalFrames.toLocaleString()} />
             <StatCard title="操作类型" value={String(detail.operations.length)} />
             <StatCard title="目标对象" value={String(detail.targets.length)} />
             <StatCard title="结果项" value={String(detail.results.length)} />
           </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-0 xl:grid-cols-3">
             <Panel title="操作分布">
               <BucketChart data={detail.operations} barClassName="bg-blue-500" />
             </Panel>
@@ -112,7 +112,7 @@ export function IndustrialProtocolDetailsPanel({ details }: { details: Industria
               <BucketChart data={detail.results} barClassName="bg-amber-500" />
             </Panel>
           </div>
-          <div className="mt-4">
+          <div className="mt-0">
             <DataTable
               headers={["包号", "时间", "源", "目标", "操作", "对象", "结果", "值", "摘要"]}
               rows={detail.records.map((item) => [

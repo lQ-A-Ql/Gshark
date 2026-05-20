@@ -12,7 +12,7 @@ interface EvidenceStatusMessageProps {
 export function EvidenceStatusMessage({ error, loading }: EvidenceStatusMessageProps) {
   if (loading) {
     return (
-      <div className="mb-4 rounded-2xl border border-indigo-100 bg-white/80 px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
+      <div className="gshark-tile mb-3 border-indigo-100 bg-indigo-50/60 px-3 py-2.5 text-xs font-medium text-slate-500">
         正在聚合跨模块证据...
       </div>
     );
@@ -20,9 +20,7 @@ export function EvidenceStatusMessage({ error, loading }: EvidenceStatusMessageP
 
   if (error) {
     return (
-      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-700 shadow-sm">
-        {error}
-      </div>
+      <div className="gshark-tile mb-3 border-amber-200 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-700">{error}</div>
     );
   }
 
@@ -106,10 +104,7 @@ function EvidenceTags({ tags }: { tags: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {tags.slice(0, 3).map((tag) => (
-        <span
-          key={tag}
-          className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600"
-        >
+        <span key={tag} className="border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
           {tag}
         </span>
       ))}

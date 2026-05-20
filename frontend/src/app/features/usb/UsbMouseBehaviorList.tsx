@@ -7,11 +7,11 @@ export function MouseBehaviorList({ rows }: { rows: USBMouseEvent[] }) {
     return <UsbHidEmptyState>暂无鼠标行为</UsbHidEmptyState>;
   }
   return (
-    <div className="max-h-[320px] space-y-2 overflow-auto">
+    <div className="max-h-[320px] divide-y divide-slate-200/45 overflow-auto">
       {rows.map((row) => (
         <div
           key={`${row.packetId}-${row.positionX}-${row.positionY}`}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
+          className="px-3 py-2 text-xs"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-muted-foreground">

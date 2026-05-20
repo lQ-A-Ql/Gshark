@@ -70,7 +70,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
       {hasSchemaForm ? (
         <>
           {!embedded && module.formSchema?.description ? (
-            <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-sky-50 to-white px-4 py-3 text-[13px] leading-relaxed text-cyan-900 shadow-inner shadow-white/50">
+            <div className="gshark-soft-fill border-cyan-200/22 bg-cyan-50/16 px-4 py-3 text-[13px] leading-relaxed text-cyan-900">
               {module.formSchema.description}
             </div>
           ) : null}
@@ -85,10 +85,10 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
             }}
           />
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-slate-50 via-cyan-50/50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="gshark-tile-toolbar flex flex-col gap-3 border-cyan-200/20 bg-cyan-50/12 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1 text-xs text-slate-500">
               <div className="font-semibold uppercase tracking-[0.2em] text-cyan-700/80">Invoke endpoint</div>
-              <div className="break-all rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-700 shadow-inner">
+              <div className="gshark-diffuse-chip break-all px-2.5 py-1.5 font-mono text-[11px] text-slate-700">
                 {module.interfaceSchema?.invokePath}
               </div>
             </div>
@@ -96,7 +96,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
               type="button"
               onClick={() => void handleRun()}
               disabled={running}
-              className="h-11 min-w-32 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 px-5 font-semibold text-white shadow-[0_12px_28px_rgba(14,165,233,0.32)] hover:from-cyan-400 hover:via-sky-500 hover:to-indigo-500"
+              className="h-11 min-w-32 rounded-sm bg-cyan-600 px-5 font-semibold text-white hover:bg-cyan-700"
             >
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {running ? "运行中..." : (module.formSchema?.submitLabel ?? "运行模块")}
@@ -114,20 +114,16 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
           />
         </>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-[13px] text-slate-600 shadow-inner">
+        <div className="gshark-soft-fill p-4 text-[13px] text-slate-600">
           <div className="font-semibold text-slate-800">已注册模块</div>
           <div className="mt-2 break-all">
             API 前缀:{" "}
-            <span className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-700 shadow-sm">
-              {module.apiPrefix}
-            </span>
+            <span className="gshark-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.apiPrefix}</span>
           </div>
           {module.docsPath ? (
             <div className="mt-1 break-all">
               文档:{" "}
-              <span className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-700 shadow-sm">
-                {module.docsPath}
-              </span>
+              <span className="gshark-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.docsPath}</span>
             </div>
           ) : null}
           <div className="mt-3 leading-relaxed">

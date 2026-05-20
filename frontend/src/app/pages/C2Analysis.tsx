@@ -51,7 +51,7 @@ export default function C2Analysis() {
   const hasVShellCandidateEvidence = (analysis.vshell.candidates?.length ?? 0) > 0;
 
   return (
-    <PageShell innerClassName="max-w-7xl px-6 py-6">
+    <PageShell>
       <AnalysisHero
         icon={<Bug className="h-5 w-5" />}
         title="C2 样本分析"
@@ -75,7 +75,7 @@ export default function C2Analysis() {
         </StatusHint>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="gshark-tile-grid grid grid-cols-1 lg:grid-cols-4">
         <MetricCard
           label="命中包"
           value={analysis.totalMatchedPackets.toLocaleString()}
@@ -102,7 +102,7 @@ export default function C2Analysis() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title="Family 分布">
           <AnalysisBucketChart
             data={analysis.families}
@@ -122,7 +122,7 @@ export default function C2Analysis() {
         </C2Panel>
       </div>
 
-      <div className="mt-4 rounded-[28px] border border-white/80 bg-white/90 p-2 shadow-[0_24px_80px_-54px_rgba(15,23,42,0.45)] backdrop-blur">
+      <div className="gshark-tile-toolbar mt-0 p-2">
         <div className="grid gap-2 md:grid-cols-2">
           <C2FamilyTabButton
             active={activeTab === "cs"}
@@ -141,20 +141,20 @@ export default function C2Analysis() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 lg:grid-cols-4">
         <MetricCard label={`${familyLabel} 候选`} value={family.candidateCount.toLocaleString()} />
         <MetricCard label="规则位" value={family.matchedRuleCount.toLocaleString()} />
         <MetricCard label="通道种类" value={String(family.channels.length)} />
         <MetricCard label="周期画像" value={String(family.beaconPatterns?.length ?? 0)} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-3">
         {baseline.map((item) => (
           <C2FeatureCard key={item.title} title={item.title} text={item.text} />
         ))}
       </div>
       <InvestigationReportPanel
-        className="mt-4"
+        className="mt-0"
         preferredProtocol="HTTP"
         report={family.report}
         title={`${familyLabel} 调查报告`}
@@ -163,7 +163,7 @@ export default function C2Analysis() {
       {activeTab === "vshell" && (
         <>
           {hasVShellCandidateEvidence ? (
-            <StatusHint tone="cyan" className="mt-4">
+            <StatusHint tone="cyan" className="mt-0">
               已形成 VShell candidates 候选证据；摘要卡片会并列融合 stream 聚合与候选弱信号，短长包、心跳、listener hint
               仍需结合候选证据表人工复核。
             </StatusHint>
@@ -172,7 +172,7 @@ export default function C2Analysis() {
         </>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title={`${familyLabel} Channel 分布`}>
           <AnalysisBucketChart
             data={family.channels}
@@ -191,7 +191,7 @@ export default function C2Analysis() {
         </C2Panel>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title="Beacon / Heartbeat 模式">
           <C2BeaconPatternList family={activeTab} patterns={family.beaconPatterns ?? []} />
         </C2Panel>
@@ -201,32 +201,32 @@ export default function C2Analysis() {
       </div>
 
       {activeTab === "cs" && (
-        <C2Panel title="CS Host / URI 聚合画像" className="mt-4">
+        <C2Panel title="CS Host / URI 聚合画像" className="mt-0">
           <CSHostURIAggregates items={analysis.cs.hostUriAggregates ?? []} />
         </C2Panel>
       )}
 
       {activeTab === "cs" && (
-        <C2Panel title="CS DNS Beacon 聚合画像" className="mt-4">
+        <C2Panel title="CS DNS Beacon 聚合画像" className="mt-0">
           <CSDNSAggregates items={analysis.cs.dnsAggregates ?? []} />
         </C2Panel>
       )}
 
       {activeTab === "vshell" && (
-        <C2Panel title="VShell Stream 聚合画像" className="mt-4">
+        <C2Panel title="VShell Stream 聚合画像" className="mt-0">
           <VShellStreamAggregates items={analysis.vshell.streamAggregates ?? []} />
         </C2Panel>
       )}
 
-      <C2Panel title="流量解密工作台" className="mt-4">
+      <C2Panel title="流量解密工作台" className="mt-0">
         <C2DecryptWorkbench family={activeTab} familyAnalysis={family} captureRevision={captureRevision} />
       </C2Panel>
 
-      <C2Panel title={`${familyLabel} 候选证据表`} className="mt-4">
+      <C2Panel title={`${familyLabel} 候选证据表`} className="mt-0">
         <C2CandidateTable candidates={family.candidates} />
       </C2Panel>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title={`${familyLabel} Notes`}>
           <C2NotesPanel
             notes={family.notes}

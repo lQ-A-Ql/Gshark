@@ -1,5 +1,4 @@
 import { Badge } from "../../components/ui/badge";
-import { CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import type { MiscModuleManifest } from "../../core/types";
 import { GenericMiscDeleteAction } from "./GenericMiscDeleteAction";
 
@@ -19,14 +18,14 @@ export function GenericMiscEmbeddedHeader({
   onDelete,
 }: GenericMiscModuleHeaderProps) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 via-sky-50 to-white px-4 py-3">
+    <div className="gshark-tile-toolbar flex flex-wrap items-start justify-between gap-3 border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-cyan-200 bg-white text-cyan-800 shadow-sm">
+          <Badge variant="outline" className="border-cyan-200/28 bg-cyan-50/20 text-cyan-800">
             {module.kind === "custom" ? "Custom" : "Builtin"}
           </Badge>
           {module.interfaceSchema?.runtime ? (
-            <Badge variant="outline" className="border-cyan-200 bg-white text-cyan-800 shadow-sm">
+            <Badge variant="outline" className="border-cyan-200/28 bg-cyan-50/20 text-cyan-800">
               {module.interfaceSchema.runtime}
             </Badge>
           ) : null}
@@ -54,22 +53,20 @@ export function GenericMiscCardHeader({
   onDelete,
 }: GenericMiscModuleHeaderProps) {
   return (
-    <CardHeader className="relative gap-3 rounded-t-xl border-b border-cyan-100/70 bg-[radial-gradient(circle_at_12%_20%,rgba(34,211,238,0.22),transparent_34%),linear-gradient(135deg,#f8fafc_0%,#ecfeff_52%,#eff6ff_100%)] pb-5">
+    <div className="gshark-tile-header relative border-b border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="border-cyan-200 bg-white/80 text-cyan-700 shadow-sm backdrop-blur">
+            <Badge variant="outline" className="border-cyan-200/28 bg-cyan-50/20 text-cyan-700">
               {module.kind === "custom" ? "Custom" : "Builtin"}
             </Badge>
             {module.interfaceSchema?.runtime ? (
-              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 shadow-sm backdrop-blur">
+              <Badge variant="outline" className="border-blue-200/28 bg-blue-50/20 text-blue-700">
                 {module.interfaceSchema.runtime}
               </Badge>
             ) : null}
           </div>
-          <CardTitle className="break-words text-lg font-semibold tracking-tight text-slate-900">
-            {module.title}
-          </CardTitle>
+          <h2 className="break-words text-lg font-semibold tracking-tight text-slate-900">{module.title}</h2>
         </div>
         <GenericMiscDeleteAction
           canDelete={canDelete}
@@ -79,9 +76,7 @@ export function GenericMiscCardHeader({
           variant="card"
         />
       </div>
-      <CardDescription className="max-w-3xl text-[13px] leading-relaxed text-slate-600">
-        {module.summary}
-      </CardDescription>
-    </CardHeader>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600">{module.summary}</p>
+    </div>
   );
 }

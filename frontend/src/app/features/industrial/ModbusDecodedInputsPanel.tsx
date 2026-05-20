@@ -9,7 +9,7 @@ import { EvidenceActions } from "../../misc/EvidenceActions";
 
 export function ModbusDecodedInputsPanel({ decodedInputs }: { decodedInputs: ModbusDecodedInput[] }) {
   return (
-    <Panel title={`Modbus UTF-8 输入重组 (${decodedInputs.length})`} className="mt-4">
+    <Panel title={`Modbus UTF-8 输入重组 (${decodedInputs.length})`} className="mt-0">
       <AnalysisCallout className="mb-2" tone="blue" icon={<Workflow className="h-4 w-4" />}>
         将连续写寄存器中的 ASCII 数值按时间顺序重组；若重组结果本身是十六进制文本，则继续转为 UTF-8 显示。
       </AnalysisCallout>

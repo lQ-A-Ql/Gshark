@@ -22,8 +22,8 @@ export function UsbHidPanel({
   const state = useUsbHidState(analysis);
 
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mt-0 space-y-0">
+      <div className="flex flex-wrap items-center gap-px">
         <SecondaryTabButton
           active={state.activeSubTab === "keyboard"}
           onClick={() => state.setActiveSubTab("keyboard")}
@@ -63,14 +63,14 @@ function UsbKeyboardPanel({ state }: { state: UsbHidState }) {
         onSelect={state.setActiveKeyboardDevice}
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="当前设备事件" value={state.filteredKeyboardEvents.length.toLocaleString()} />
         <StatCard title="可打印输入" value={state.keyboardStats.printableCount.toLocaleString()} />
         <StatCard title="组合键事件" value={state.keyboardStats.comboCount.toLocaleString()} />
         <StatCard title="唯一按键" value={state.keyboardStats.uniqueKeyCount.toLocaleString()} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <div className="grid grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <Panel title="键入行为">
           <KeyboardReplay
             currentEvent={state.currentKeyboardEvent}
@@ -89,7 +89,7 @@ function UsbKeyboardPanel({ state }: { state: UsbHidState }) {
           />
         </Panel>
         <Panel title="完整文本流">
-          <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5">
+          <pre className="gshark-soft-fill max-h-[260px] overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs leading-5">
             {state.keyboardTextPreview}
           </pre>
         </Panel>

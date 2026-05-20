@@ -1053,6 +1053,11 @@ export const sourceSizeBudgets = [
     reason: "traffic simple bar chart should own only bucket bar presentation",
   },
   {
+    path: "src/app/features/traffic/TrafficGraphPanels.tsx",
+    maxLines: 130,
+    reason: "traffic graph panels should keep overview cards and bucket panel composition out of the page",
+  },
+  {
     path: "src/app/features/traffic/trafficGraphFilters.ts",
     maxLines: 80,
     reason: "traffic graph filters should remain pure bucket-to-display-filter rules",
@@ -1376,11 +1381,6 @@ export const sourceSizeBudgets = [
     path: "src/app/features/evidence/EvidencePanelSections.tsx",
     maxLines: 20,
     reason: "evidence panel sections should stay as a compatibility export layer",
-  },
-  {
-    path: "src/app/features/evidence/EvidenceHero.tsx",
-    maxLines: 55,
-    reason: "evidence hero should stay focused on heading, summary, and module chips",
   },
   {
     path: "src/app/features/evidence/EvidenceFilters.tsx",

@@ -9,15 +9,7 @@ type FloatingSurfaceProps = HTMLAttributes<HTMLDivElement> & {
   floatingRef?: Ref<HTMLDivElement>;
 };
 
-export function FloatingSurface({
-  x,
-  y,
-  children,
-  className,
-  floatingRef,
-  style,
-  ...props
-}: FloatingSurfaceProps) {
+export function FloatingSurface({ x, y, children, className, floatingRef, style, ...props }: FloatingSurfaceProps) {
   if (typeof document === "undefined") return null;
 
   const surfaceStyle: CSSProperties = {
@@ -30,7 +22,7 @@ export function FloatingSurface({
     <div
       ref={floatingRef}
       className={cn(
-        "fixed z-[1000] overflow-hidden rounded-xl border border-slate-200 bg-white/95 text-xs shadow-[0_24px_64px_rgba(15,23,42,0.16)] backdrop-blur",
+        "fixed z-[1000] overflow-hidden rounded-sm border border-slate-200/30 bg-white/86 text-xs shadow-[0_20px_58px_rgba(15,23,42,0.1),0_0_38px_rgba(255,255,255,0.28)] backdrop-blur-xl",
         className,
       )}
       style={surfaceStyle}

@@ -21,7 +21,7 @@ export interface CanIdDataGroup {
 export function CanIdDataBoard({ groups }: { groups: CanIdDataGroup[] }) {
   if (groups.length === 0) {
     return (
-      <div className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+      <div className="px-3 py-6 text-center text-xs text-muted-foreground">
         暂无可展示的 CAN ID 数据
       </div>
     );
@@ -33,7 +33,7 @@ export function CanIdDataBoard({ groups }: { groups: CanIdDataGroup[] }) {
         {groups.map((group) => (
           <div
             key={`${group.identifier}-${group.busId}`}
-            className="overflow-hidden rounded-lg border border-border bg-background"
+            className="gshark-soft-fill overflow-hidden"
           >
             <div className="grid grid-cols-[156px_1fr]">
               <div className="border-r border-border bg-accent/20 px-3 py-3">

@@ -27,7 +27,7 @@ export function WinRMDecryptActions({
       <Button
         onClick={onRun}
         disabled={loading || !hasCapture}
-        className="gap-2 bg-sky-600 text-white shadow-sm hover:bg-sky-700"
+        className="gap-2 bg-sky-600 text-white hover:bg-sky-700"
       >
         <Play className="h-4 w-4" fill="currentColor" />
         {loading ? "解密分析中..." : "启动提取"}
@@ -36,15 +36,15 @@ export function WinRMDecryptActions({
       {hasResult && (
         <>
           <div className="mx-1 h-6 w-px bg-slate-200" />
-          <Button variant="outline" onClick={onOpenPreview} className="gap-2 text-slate-700 shadow-sm">
+          <Button variant="outline" onClick={onOpenPreview} className="gap-2 text-slate-700">
             <Terminal className="h-4 w-4 text-sky-600" />
             打开预览视图
           </Button>
-          <Button variant="outline" onClick={onExport} className="gap-2 text-slate-700 shadow-sm">
+          <Button variant="outline" onClick={onExport} className="gap-2 text-slate-700">
             <Download className="h-4 w-4 text-emerald-600" />
             保存导出 TXT
           </Button>
-          <Button variant="outline" onClick={onCopy} className="gap-2 text-slate-700 shadow-sm">
+          <Button variant="outline" onClick={onCopy} className="gap-2 text-slate-700">
             <Copy className="h-4 w-4 text-blue-600" />
             复制结果
           </Button>

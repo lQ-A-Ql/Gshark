@@ -54,7 +54,7 @@ export default function IndustrialAnalysis() {
   }, [analysis.modbus.transactions, modbusUnitFilter, modbusFunctionFilter]);
 
   return (
-    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.26),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]">
+    <PageShell>
       <AnalysisHero
         icon={<Factory className="h-5 w-5" />}
         title="工控分析"
@@ -78,14 +78,14 @@ export default function IndustrialAnalysis() {
         </StatusHint>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="工控相关包" value={analysis.totalIndustrialPackets.toLocaleString()} />
         <StatCard title="识别协议" value={String(analysis.protocols.length)} />
         <StatCard title="Modbus 帧" value={analysis.modbus.totalFrames.toLocaleString()} />
         <StatCard title="异常响应" value={analysis.modbus.exceptions.toLocaleString()} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="工控协议分布">
           <BucketChart data={analysis.protocols} barClassName="bg-blue-500" />
         </Panel>
@@ -99,14 +99,14 @@ export default function IndustrialAnalysis() {
         </Panel>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="mt-0 grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="Modbus 请求" value={analysis.modbus.requests.toLocaleString()} />
         <StatCard title="Modbus 响应" value={analysis.modbus.responses.toLocaleString()} />
         <StatCard title="功能码种类" value={String(analysis.modbus.functionCodes.length)} />
         <StatCard title="目标 Unit 数" value={String(analysis.modbus.unitIds.length)} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="Modbus 功能码">
           <BucketChart data={analysis.modbus.functionCodes} barClassName="bg-indigo-500" />
         </Panel>
@@ -115,7 +115,7 @@ export default function IndustrialAnalysis() {
         </Panel>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="寄存器 / 线圈引用">
           <BucketChart data={analysis.modbus.referenceHits} barClassName="bg-emerald-500" />
         </Panel>
@@ -127,16 +127,16 @@ export default function IndustrialAnalysis() {
       <IndustrialRuleHitsPanel ruleHits={analysis.ruleHits ?? []} />
 
       <InvestigationReportPanel
-        className="mt-4"
+        className="mt-0"
         preferredProtocol="TCP"
         report={analysis.report}
         title="工控调查报告"
       />
 
-      <Panel title="分析提示" className="mt-4">
+      <Panel title="分析提示" className="mt-0">
         <div className="space-y-2 text-sm">
           {analysis.notes.length === 0 ? (
-            <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">
+            <div className="px-3 py-3 text-muted-foreground">
               当前抓包未识别到工控协议。
             </div>
           ) : (

@@ -40,7 +40,7 @@ export function NTLMSessionMaterialsToolbar({
 }: NTLMSessionMaterialsToolbarProps) {
   return (
     <>
-      <div className="flex flex-wrap gap-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4 text-[11px] shadow-sm">
+      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-violet-100 bg-violet-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={hasCapture ? captureName : "未加载"} color={hasCapture ? "sky" : "slate"} />
         <MetaChip label="总材料" value={materialCount} color="slate" />
         <MetaChip label="完整" value={completeCount} color="emerald" />
@@ -61,7 +61,7 @@ export function NTLMSessionMaterialsToolbar({
                 type="button"
                 onClick={() => onProtocolFilterChange(item)}
                 className={`flex flex-1 items-center justify-center rounded-md text-[12px] font-semibold transition-colors ${
-                  protocolFilter === item ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  protocolFilter === item ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {item === "ALL" ? "全部" : item}
@@ -83,7 +83,7 @@ export function NTLMSessionMaterialsToolbar({
             variant="outline"
             onClick={onRefresh}
             disabled={!hasCapture || loading}
-            className="gap-2 border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
+            className="gap-2 border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             {loading ? "扫描中..." : "刷新"}
@@ -92,7 +92,7 @@ export function NTLMSessionMaterialsToolbar({
       </div>
 
       {!error && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
+        <div className="gshark-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
           {hasCapture
             ? loading
               ? "正在从当前抓包提取 NTLM 会话材料..."

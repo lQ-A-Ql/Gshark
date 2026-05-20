@@ -22,14 +22,14 @@ export function UsbOverviewPanel({
 }) {
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="USB 包总数" value={analysis.totalUSBPackets.toLocaleString()} />
         <StatCard title="HID" value={String(analysis.hidPackets || analysis.keyboardPackets + analysis.mousePackets)} />
         <StatCard title="Mass Storage" value={String(analysis.massStoragePackets)} />
         <StatCard title="其他" value={analysis.otherUSBPackets.toLocaleString()} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-3">
         <Panel title="协议分布">
           <BucketChart data={analysis.protocols} barClassName="bg-blue-500" />
         </Panel>
@@ -41,7 +41,7 @@ export function UsbOverviewPanel({
         </Panel>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-0 flex flex-wrap items-center gap-px">
         <PrimaryTabButton
           active={activePrimaryTab === "hid"}
           onClick={() => onPrimaryTabChange("hid")}

@@ -14,7 +14,7 @@ export function CaptureTransactionBanner({
   onChooseAnother,
 }: CaptureTransactionBannerProps) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-amber-200 bg-amber-50/70 px-3 py-3 text-xs text-amber-900">
+    <div className="gshark-tile-toolbar flex items-start justify-between gap-3 border-b border-amber-200 bg-amber-50/70 px-3 py-3 text-xs text-amber-900">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 font-semibold">
           <AlertTriangle className="h-4 w-4 shrink-0" />

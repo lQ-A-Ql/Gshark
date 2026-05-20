@@ -65,13 +65,13 @@ export function UsbMousePanel({
         emptyLabel="未检测到鼠标设备"
         onSelect={state.setActiveMouseDevice}
       />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="事件数" value={state.filteredMouseEvents.length.toLocaleString()} />
         <StatCard title="轨迹总路程" value={`${state.mouseStats.distance}`} />
         <StatCard title="按钮动作数" value={`${state.mouseStats.buttonActions}`} />
         <StatCard title="滚轮事件数" value={`${state.mouseStats.wheelCount}`} />
       </div>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="混合轨迹图">
           {analysis.hidEventsTruncated ? (
             <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
@@ -136,7 +136,7 @@ function HIDSourceSelector({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-background/80 px-3 py-3">
+    <div className="gshark-tile-toolbar space-y-3 px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">HID 数据源</div>
@@ -161,7 +161,7 @@ function HIDSourceSelector({
             <span className="font-semibold text-slate-600">事件上限</span>
             <Input
               aria-label="HID 事件上限"
-              className="h-8 rounded-lg text-xs"
+              className="h-8 rounded-sm text-xs"
               inputMode="numeric"
               value={draftLimit}
               onBlur={submitLimit}
@@ -200,7 +200,7 @@ function MouseSplitTrajectories({
   geometry: ReturnType<typeof buildMouseTrajectoryGeometry>;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-0 xl:grid-cols-3">
       <Panel title="左键轨迹图">
         <MouseTrajectoryView
           coordinateMode="recovered"

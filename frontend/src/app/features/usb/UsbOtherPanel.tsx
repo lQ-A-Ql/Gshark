@@ -25,8 +25,8 @@ export function UsbOtherPanel({
   onSubTabChange: (tab: OtherSubTab) => void;
 }) {
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mt-0 space-y-0">
+      <div className="flex flex-wrap items-center gap-px">
         <SecondaryTabButton active={activeSubTab === "overview"} onClick={() => onSubTabChange("overview")}>
           概览
         </SecondaryTabButton>
@@ -40,7 +40,7 @@ export function UsbOtherPanel({
 
       {activeSubTab === "overview" && (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
             <StatCard title="其他 USB 包" value={analysis.totalPackets.toLocaleString()} />
             <StatCard title="设备数" value={String(analysis.devices.length)} />
             <StatCard title="端点数" value={String(analysis.endpoints.length)} />
@@ -50,7 +50,7 @@ export function UsbOtherPanel({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-0 xl:grid-cols-3">
             <Panel title="设备分布">
               <BucketChart data={analysis.devices} barClassName="bg-amber-500" />
             </Panel>

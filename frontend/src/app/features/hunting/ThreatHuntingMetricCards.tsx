@@ -13,7 +13,7 @@ export function ThreatHuntingMetricCards({ hits, stats }: ThreatHuntingMetricCar
   const highRiskCount = hits.filter((item) => item.level === "critical" || item.level === "high").length;
 
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="mb-0 grid grid-cols-1 gap-0 lg:grid-cols-3">
       <MetricCard
         label="总命中"
         value={hits.length.toLocaleString()}

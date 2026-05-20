@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { BarChart2, Flag, FolderCog, Shield } from "lucide-react";
-import { AnalysisBadge } from "../../components/analysis/AnalysisPrimitives";
+import { AnalysisBadge, AnalysisPanel } from "../../components/analysis/AnalysisPrimitives";
 import { Progress } from "../../components/ui/progress";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../components/ui/utils";
@@ -8,14 +8,14 @@ import type { ThreatHuntingProgressView, ThreatHuntingStats } from "./ThreatHunt
 
 export function ThreatHuntingProgressPanel({ progress }: { progress: ThreatHuntingProgressView }) {
   return (
-    <div className="mb-4 rounded-[24px] border border-blue-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-4 shadow-[0_20px_48px_-32px_rgba(37,99,235,0.35)]">
+    <div className="gshark-tile mb-3 border-blue-200 bg-blue-50/70 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">{progress.title}</div>
           <div className="mt-1 text-xs leading-5 text-slate-500">{progress.detail}</div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <AnalysisBadge tone="blue" className="bg-white/90 px-2.5 py-1">
+          <AnalysisBadge tone="blue" className="bg-blue-100/80 px-2.5 py-1">
             {progress.phaseLabel}
           </AnalysisBadge>
           <span className="text-[11px] font-medium text-slate-500">{Math.round(progress.value)}%</span>
@@ -35,15 +35,18 @@ export function ThreatHuntingProgressPanel({ progress }: { progress: ThreatHunti
 
 export function ThreatHuntingCategoryPanel({ stats }: { stats: ThreatHuntingStats }) {
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white/92 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] backdrop-blur">
-      <div className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(255,255,255,0.98))] px-4 py-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+    <AnalysisPanel
+      title={
+        <span className="flex items-center gap-2">
           <FolderCog className="h-4 w-4 text-blue-600" />
           规则分类
-        </div>
-        <div className="mt-1 text-xs leading-5 text-slate-500">
-          这里把命中结果按常见分析语义收在一起看，左侧能快速判断当前更偏 CTF、OWASP 还是异常流量。
-        </div>
+        </span>
+      }
+      tone="blue"
+      className="gshark-tile flex min-h-0 flex-col"
+    >
+      <div className="border-b border-slate-100 pb-3 text-xs leading-5 text-slate-500">
+        这里把命中结果按常见分析语义收在一起看，左侧能快速判断当前更偏 CTF、OWASP 还是异常流量。
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 p-3">
@@ -67,7 +70,7 @@ export function ThreatHuntingCategoryPanel({ stats }: { stats: ThreatHuntingStat
           />
         </div>
       </ScrollArea>
-    </div>
+    </AnalysisPanel>
   );
 }
 
@@ -90,13 +93,13 @@ function CategoryCard({
         : "border-amber-200 bg-amber-50/70";
 
   return (
-    <div className={cn("rounded-2xl border px-3 py-3", accentClass)}>
+    <div className={cn("gshark-tile px-3 py-3", accentClass)}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
           {icon}
           {title}
         </div>
-        <AnalysisBadge tone={accent} className="border-white/70 bg-white/80 px-2 text-xs text-slate-600 shadow-sm">
+        <AnalysisBadge tone={accent} className="border-slate-200/70 bg-slate-50/80 px-2 text-xs text-slate-600">
           {count}
         </AnalysisBadge>
       </div>

@@ -15,7 +15,7 @@ export function BatchTranscriptionStatusPanel({ batchStatus }: BatchTranscriptio
       : 0;
 
   return (
-    <div className="mb-3 rounded border border-border bg-card px-3 py-3">
+    <div className="gshark-soft-fill mb-0 px-3 py-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-foreground">批量音频转写</div>
@@ -42,10 +42,10 @@ export function BatchTranscriptionStatusPanel({ batchStatus }: BatchTranscriptio
         <div className="h-full bg-rose-600 transition-all" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
       </div>
       <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-        <span className="rounded bg-muted px-2 py-1">完成 {batchStatus.completed}</span>
-        <span className="rounded bg-muted px-2 py-1">跳过 {batchStatus.skipped}</span>
-        <span className="rounded bg-muted px-2 py-1">运行中 {batchStatus.running}</span>
-        <span className="rounded bg-muted px-2 py-1">失败 {batchStatus.failed}</span>
+        <span className="gshark-soft-fill px-2 py-1">完成 {batchStatus.completed}</span>
+        <span className="gshark-soft-fill px-2 py-1">跳过 {batchStatus.skipped}</span>
+        <span className="gshark-soft-fill px-2 py-1">运行中 {batchStatus.running}</span>
+        <span className="gshark-soft-fill px-2 py-1">失败 {batchStatus.failed}</span>
       </div>
     </div>
   );

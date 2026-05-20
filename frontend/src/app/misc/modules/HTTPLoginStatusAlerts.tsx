@@ -2,7 +2,7 @@ import { AlertTriangle, ShieldCheck } from "lucide-react";
 
 export function HTTPLoginBruteforceAlert({ bruteforceCount }: { bruteforceCount: number }) {
   return (
-    <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800 shadow-sm">
+    <div className="gshark-tile border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800">
       <div className="flex items-center gap-2 font-semibold">
         <AlertTriangle className="h-4 w-4" />
         发现疑似爆破 / 批量验证
@@ -17,7 +17,7 @@ export function HTTPLoginBruteforceAlert({ bruteforceCount }: { bruteforceCount:
 
 export function HTTPLoginSuccessHint() {
   return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800 shadow-sm">
+    <div className="gshark-tile border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800">
       <div className="flex items-center gap-2 font-semibold">
         <ShieldCheck className="h-4 w-4" />
         已识别成功认证信号

@@ -14,9 +14,9 @@ import {
   preferredProtocolForCandidate,
 } from "./C2CandidateTableRules";
 
-const C2_CANDIDATE_TABLE_WRAPPER_CLASS = "border-slate-200 bg-white shadow-sm";
-const C2_CANDIDATE_TABLE_HEADER_CLASS = "bg-gradient-to-r from-slate-100 to-rose-50 text-slate-700";
-const C2_CANDIDATE_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-white even:bg-slate-50/45";
+const C2_CANDIDATE_TABLE_WRAPPER_CLASS = "border-slate-200";
+const C2_CANDIDATE_TABLE_HEADER_CLASS = "gshark-tile-header bg-slate-50/80 text-slate-700";
+const C2_CANDIDATE_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-slate-50/45";
 const C2_CANDIDATE_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord[] }) {
@@ -111,8 +111,8 @@ export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord
                     className={cn(
                       "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-all duration-200",
                       expanded
-                        ? "border-rose-200 bg-rose-50 text-rose-700 shadow-[0_12px_28px_-22px_rgba(225,29,72,0.75)]"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700",
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : "border-slate-200 bg-slate-50/70 text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700",
                     )}
                   >
                     {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}

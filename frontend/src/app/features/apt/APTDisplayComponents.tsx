@@ -10,10 +10,10 @@ export function ActorTab({ profile, active, onClick }: { profile: APTDisplayProf
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-[22px] border px-4 py-3 text-left transition-all",
+        "gshark-tile px-4 py-3 text-left transition-all",
         active
-          ? "border-indigo-200 bg-indigo-50 text-indigo-900 shadow-[0_18px_50px_-34px_rgba(79,70,229,0.55)]"
-          : "border-slate-200 bg-white text-slate-700 hover:border-indigo-100 hover:bg-indigo-50/40",
+          ? "border-indigo-200 bg-indigo-50/30 text-indigo-900"
+          : "border-slate-200 bg-transparent text-slate-700 hover:border-indigo-100 hover:bg-indigo-50/20",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -29,7 +29,9 @@ export function ActorTab({ profile, active, onClick }: { profile: APTDisplayProf
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-        <span className="rounded-full border border-white/80 bg-white px-2 py-0.5 font-mono">{profile.frameworkOnly ? "不评分" : profile.evidenceCount}</span>
+        <span className="rounded-sm border border-slate-200/70 bg-transparent px-2 py-0.5 font-mono">
+          {profile.frameworkOnly ? "不评分" : profile.evidenceCount}
+        </span>
         {profile.frameworkOnly ? <span>需要人工补样本验证</span> : <span>证据计入当前评分</span>}
       </div>
     </button>
@@ -50,7 +52,7 @@ export function RegistryTagSection({ profile }: { profile: APTDisplayProfile }) 
 export function ActorEvidenceNeeds({ profile }: { profile: APTDisplayProfile }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+      <div className="gshark-soft-fill border-amber-100/70 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge label={profile.registry.statusLabel} tone={profile.registry.statusTone} />
           {profile.frameworkOnly && <StatusBadge label="不参与本轮评分" tone="rose" />}
@@ -79,7 +81,11 @@ export function StatusBadge({ label, tone }: { label: string; tone: APTActorStat
 
 export function AptPanel({ title, children, icon, className }: { title: string; children: ReactNode; icon?: ReactNode; className?: string }) {
   return (
-    <SurfacePanel title={title} icon={icon ?? <ShieldAlert className="h-4 w-4 text-indigo-600" />} className={className}>
+    <SurfacePanel
+      title={title}
+      icon={icon ?? <ShieldAlert className="h-4 w-4 text-indigo-600" />}
+      className={cn("gshark-tile", className)}
+    >
       {children}
     </SurfacePanel>
   );
@@ -87,7 +93,7 @@ export function AptPanel({ title, children, icon, className }: { title: string; 
 
 function RegistryTagBlock({ title, values }: { title: string; values: string[] }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+    <div className="gshark-soft-fill border-slate-100 px-3 py-2">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{title}</div>
       <TagLine values={values.length > 0 ? values : ["待补充"]} />
     </div>
@@ -99,7 +105,7 @@ function ListCallout({ title, values, tone }: { title: string; values: string[];
     ? "border-amber-100 bg-amber-50/50 text-amber-800"
     : "border-rose-100 bg-rose-50/50 text-rose-800";
   return (
-    <div className={cn("rounded-2xl border px-4 py-3", toneClass)}>
+    <div className={cn("gshark-tile px-4 py-3", toneClass)}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">{title}</div>
       <div className="mt-2 space-y-1">
         {values.length === 0 ? (
@@ -120,7 +126,10 @@ function TagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span key={value} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+        <span
+          key={value}
+          className="rounded-sm border border-slate-200/70 bg-transparent px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+        >
           {value}
         </span>
       ))}

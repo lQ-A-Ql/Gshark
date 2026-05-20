@@ -43,7 +43,7 @@ export function VShellStreamAggregates({ items }: { items: C2StreamAggregate[] }
       rowKey={(item) => item.streamId}
       maxHeightClassName="max-h-[360px]"
       wrapperClassName={C2_TABLE_WRAPPER_CLASS}
-      headerClassName="bg-gradient-to-r from-slate-100 to-cyan-50 text-slate-700"
+      headerClassName="gshark-tile-header bg-slate-50/80 text-slate-700"
       tableClassName="min-w-[1080px]"
       rowClassName={(item) =>
         cn(C2_TABLE_ROW_CLASS, expandedRows.has(item.streamId) ? "bg-cyan-50/30" : "hover:bg-cyan-50/30")

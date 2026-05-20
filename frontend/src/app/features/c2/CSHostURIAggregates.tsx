@@ -92,7 +92,7 @@ export function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[
             <>
               <div className="leading-5 text-slate-700">{item.summary || "--"}</div>
               {(item.scoreFactors ?? []).length > 0 && (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-3 py-2">
+                <div className="gshark-tile border-rose-100 bg-rose-50/50 px-3 py-2">
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-400">
                     Scoring Factors
                   </div>
@@ -119,7 +119,7 @@ export function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[
                 </div>
               )}
               {(item.signalTags ?? []).length > 0 && (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 px-3 py-2">
+                <div className="gshark-tile border-slate-100 bg-slate-50/50 px-3 py-2">
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Signal Tags
                   </div>

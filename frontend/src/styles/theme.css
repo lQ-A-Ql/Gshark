@@ -37,8 +37,28 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --gshark-curtain-bg: rgba(255, 255, 255, 0.72);
+  --gshark-curtain-border: rgba(148, 163, 184, 0.055);
+  --gshark-glass-shell-bg: rgba(255, 255, 255, 0.46);
+  --gshark-tile-bg: rgba(248, 250, 252, 0.045);
+  --gshark-tile-bg-strong: rgba(248, 250, 252, 0.075);
+  --gshark-tile-border: rgba(100, 116, 139, 0.052);
+  --gshark-tile-divider: rgba(100, 116, 139, 0.032);
+  --gshark-edge-fog: rgba(255, 255, 255, 0.32);
+  --gshark-edge-tint: rgba(224, 242, 254, 0.18);
+  --gshark-soft-edge-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(100, 116, 139, 0.018),
+    0 0 26px rgba(255, 255, 255, 0.1);
+  --gshark-soft-fill-border: rgba(100, 116, 139, 0.07);
+  --gshark-control-bg: rgba(248, 250, 252, 0.14);
+  --gshark-control-border: rgba(100, 116, 139, 0.045);
+  --gshark-control-hover-border: rgba(14, 165, 233, 0.14);
+  --gshark-control-focus: rgba(14, 165, 233, 0.2);
+  --gshark-control-primary-bg: rgba(37, 99, 235, 0.68);
+  --gshark-field-bg: rgba(255, 255, 255, 0.16);
+  --gshark-form-surface-bg: rgba(248, 250, 252, 0.1);
+  --gshark-table-header-bg: rgba(248, 250, 252, 0.54);
 }
-
 
 @theme inline {
   --color-background: var(--background);
@@ -159,29 +179,67 @@
       radial-gradient(circle at 12% 10%, rgb(var(--gshark-bg-accent, 59 130 246) / 0.18), transparent 30rem),
       radial-gradient(circle at 88% 16%, rgb(var(--gshark-bg-accent-2, 14 165 233) / 0.14), transparent 26rem),
       linear-gradient(145deg, rgb(var(--gshark-bg-accent, 59 130 246) / 0.08), transparent 38%),
-      linear-gradient(180deg, rgb(var(--gshark-bg-top, 248 250 252)) 0%, rgb(var(--gshark-bg-base, 239 246 255)) 54%, rgb(var(--gshark-bg-bottom, 248 250 252)) 100%);
-    background-position:
-      center,
-      center,
-      center,
-      center;
-    background-size:
-      auto,
-      auto,
-      auto,
-      auto;
+      linear-gradient(
+        180deg,
+        rgb(var(--gshark-bg-top, 248 250 252)) 0%,
+        rgb(var(--gshark-bg-base, 239 246 255)) 54%,
+        rgb(var(--gshark-bg-bottom, 248 250 252)) 100%
+      );
+    background-position: center, center, center, center;
+    background-size: auto, auto, auto, auto;
     transition:
       background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
       background-position 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .gshark-glass-shell {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .gshark-glass-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 4%, rgba(255, 255, 255, 0.62), transparent 30rem),
+      radial-gradient(circle at 80% 12%, rgba(255, 255, 255, 0.38), transparent 24rem),
+      radial-gradient(circle at 56% 82%, rgba(255, 255, 255, 0.26), transparent 32rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 34%, rgba(255, 255, 255, 0.2)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.56), var(--gshark-glass-shell-bg)), var(--gshark-curtain-bg);
+    backdrop-filter: blur(30px) saturate(1.22) contrast(1.02);
+    -webkit-backdrop-filter: blur(30px) saturate(1.22) contrast(1.02);
+  }
+
+  .gshark-glass-shell > * {
+    position: relative;
+    z-index: 1;
   }
 
   .gshark-theme-main {
     isolation: isolate;
   }
 
+  .gshark-theme-main::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 28% 8%, rgba(255, 255, 255, 0.22), transparent 26rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.44));
+    border-left: 1px solid var(--gshark-curtain-border);
+    box-shadow: inset 18px 0 36px rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(14px) saturate(1.12);
+    -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  }
+
   .gshark-theme-main > :not(.gshark-theme-fade) {
     position: relative;
-    z-index: 1;
+    z-index: 2;
   }
 
   .gshark-theme-fade {
@@ -199,6 +257,282 @@
     animation: gshark-route-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
     transform-origin: 50% 0%;
     will-change: opacity, transform, filter;
+  }
+
+  .gshark-tile-page {
+    position: relative;
+    min-height: 100%;
+  }
+
+  .gshark-tile-page > :where(.gshark-tile, .gshark-tile-grid, .gshark-tile-toolbar, .gshark-grid-section) {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .gshark-soft-fill {
+    border: 1px solid var(--gshark-soft-fill-border);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.42), transparent 20rem),
+      radial-gradient(circle at 84% 92%, rgba(186, 230, 253, 0.12), transparent 18rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(236, 254, 255, 0.09)), rgba(248, 250, 252, 0.12);
+    box-shadow: var(--gshark-soft-edge-shadow);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  }
+
+  .gshark-diffuse-edge {
+    border-color: var(--gshark-soft-fill-border);
+    background:
+      radial-gradient(circle at 12% 0%, var(--gshark-edge-fog), transparent 12rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.12), var(--gshark-edge-tint));
+    box-shadow: var(--gshark-soft-edge-shadow);
+  }
+
+  .gshark-diffuse-chip {
+    border: 1px solid var(--gshark-soft-fill-border);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.34), transparent 8rem), rgba(248, 250, 252, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  .gshark-control {
+    border: 1px solid var(--gshark-control-border);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.36), transparent 9rem),
+      radial-gradient(circle at 86% 100%, rgba(186, 230, 253, 0.1), transparent 8rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(224, 242, 254, 0.08)), var(--gshark-control-bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 0 20px rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px) saturate(1.08);
+    -webkit-backdrop-filter: blur(12px) saturate(1.08);
+  }
+
+  .gshark-control:hover {
+    border-color: var(--gshark-control-hover-border);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.46), transparent 9rem),
+      radial-gradient(circle at 86% 100%, rgba(186, 230, 253, 0.14), transparent 8rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(224, 242, 254, 0.1)), rgba(248, 250, 252, 0.18);
+  }
+
+  .gshark-control:where(:focus-visible, [data-state="open"]),
+  .gshark-field:where(:focus-visible, :focus-within, [data-state="open"]) {
+    border-color: color-mix(in srgb, rgb(14, 165, 233) 30%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 0 0 3px var(--gshark-control-focus),
+      0 0 34px rgba(14, 165, 233, 0.08);
+  }
+
+  .gshark-control-primary {
+    border-color: rgba(59, 130, 246, 0.16);
+    color: rgba(255, 255, 255, 0.96);
+    background:
+      radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.28), transparent 9rem),
+      linear-gradient(135deg, rgba(37, 99, 235, 0.74), rgba(8, 145, 178, 0.58)), var(--gshark-control-primary-bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 0 28px rgba(59, 130, 246, 0.12);
+  }
+
+  .gshark-control-primary:hover {
+    border-color: rgba(59, 130, 246, 0.22);
+    background:
+      radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.34), transparent 9rem),
+      linear-gradient(135deg, rgba(37, 99, 235, 0.82), rgba(8, 145, 178, 0.64)), rgba(37, 99, 235, 0.72);
+  }
+
+  .gshark-control-ghost {
+    border: 1px solid transparent;
+    border-radius: 0.125rem;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .gshark-control-ghost:hover,
+  .gshark-control-ghost:where(:focus-visible, [data-state="open"]) {
+    border-color: var(--gshark-control-border);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.3), transparent 8rem), rgba(248, 250, 252, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .gshark-field {
+    border: 1px solid var(--gshark-control-border);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.38), transparent 10rem),
+      linear-gradient(135deg, var(--gshark-field-bg), rgba(224, 242, 254, 0.07));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -1px 0 rgba(100, 116, 139, 0.018);
+    backdrop-filter: blur(10px) saturate(1.06);
+    -webkit-backdrop-filter: blur(10px) saturate(1.06);
+  }
+
+  .gshark-field:hover {
+    border-color: var(--gshark-control-hover-border);
+    background:
+      radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.44), transparent 10rem),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(224, 242, 254, 0.09));
+  }
+
+  .gshark-form-surface {
+    border: 1px solid rgba(100, 116, 139, 0.04);
+    border-radius: 0.125rem;
+    background:
+      radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.32), transparent 16rem),
+      radial-gradient(circle at 90% 100%, rgba(125, 211, 252, 0.08), transparent 14rem), var(--gshark-form-surface-bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 0 30px rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(12px) saturate(1.06);
+    -webkit-backdrop-filter: blur(12px) saturate(1.06);
+  }
+
+  .gshark-brand-mark {
+    opacity: 0.78;
+    filter: saturate(0.84) contrast(0.88) drop-shadow(0 0 18px rgba(255, 255, 255, 0.24));
+    mix-blend-mode: multiply;
+    transition:
+      opacity 180ms ease,
+      filter 180ms ease;
+  }
+
+  .gshark-brand-mark:hover {
+    opacity: 0.9;
+    filter: saturate(0.9) contrast(0.94) drop-shadow(0 0 22px rgba(255, 255, 255, 0.32));
+  }
+
+  .gshark-tile-grid {
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--gshark-tile-border);
+    background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.18), transparent 28rem), transparent;
+    box-shadow: var(--gshark-soft-edge-shadow);
+  }
+
+  .gshark-tile-grid > * {
+    min-width: 0;
+  }
+
+  .gshark-grid-cell,
+  .gshark-grid-section,
+  .gshark-tile {
+    min-width: 0;
+    border: 1px solid var(--gshark-tile-border);
+    border-radius: 0;
+    background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.14), transparent 18rem), var(--gshark-tile-bg);
+    box-shadow: var(--gshark-soft-edge-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .gshark-tile-strong {
+    background: var(--gshark-tile-bg-strong);
+  }
+
+  .gshark-tile-header {
+    min-width: 0;
+    border-bottom: 1px solid var(--gshark-tile-divider);
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.22), transparent 16rem), rgba(248, 250, 252, 0.08);
+  }
+
+  .gshark-tile-toolbar {
+    min-width: 0;
+    border: 1px solid var(--gshark-tile-border);
+    border-radius: 0;
+    background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.16), transparent 18rem), transparent;
+    box-shadow: var(--gshark-soft-edge-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .gshark-tile-table {
+    overflow: auto;
+    border: 1px solid var(--gshark-tile-border);
+    border-radius: 0;
+    background: radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.16), transparent 18rem), transparent;
+    box-shadow: var(--gshark-soft-edge-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .gshark-tile-page :where(.gshark-tile, .gshark-grid-section, .gshark-tile-toolbar, .gshark-tile-table) {
+    border-color: var(--gshark-tile-border);
+  }
+
+  .gshark-tile-page :where(.border-slate-100, .border-slate-200, .border-border) {
+    border-color: var(--gshark-tile-border);
+  }
+
+  .gshark-tile-page
+    :where(
+      .border-slate-300,
+      .border-blue-100,
+      .border-blue-200,
+      .border-cyan-100,
+      .border-cyan-200,
+      .border-cyan-300,
+      .border-emerald-100,
+      .border-emerald-200,
+      .border-emerald-300,
+      .border-amber-100,
+      .border-amber-200,
+      .border-amber-300,
+      .border-rose-100,
+      .border-rose-200,
+      .border-rose-300,
+      .border-sky-100,
+      .border-sky-200,
+      .border-sky-300,
+      .border-indigo-100,
+      .border-indigo-200,
+      .border-indigo-300,
+      .border-violet-100,
+      .border-violet-200,
+      .border-violet-300
+    ) {
+    border-color: color-mix(in srgb, currentColor 13%, transparent);
+  }
+
+  .gshark-tile-page
+    :where(.gshark-tile, .gshark-soft-fill, .gshark-diffuse-chip)
+    :where(
+      .bg-white,
+      .bg-slate-50,
+      .bg-blue-50,
+      .bg-cyan-50,
+      .bg-emerald-50,
+      .bg-amber-50,
+      .bg-rose-50,
+      .bg-sky-50,
+      .bg-indigo-50,
+      .bg-violet-50
+    ) {
+    background-color: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  .gshark-tile-page :where(.divide-slate-200\/45, .divide-slate-200\/70) > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--gshark-tile-divider);
+  }
+
+  .gshark-tile-page :where(.divide-slate-100, .divide-slate-200, .divide-border) > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--gshark-tile-divider);
+  }
+
+  .gshark-tile-page :where(input:not([type="checkbox"]):not([type="radio"]), textarea, [data-slot="select-trigger"]) {
+    border-color: var(--gshark-control-border);
+    background-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 0 20px rgba(255, 255, 255, 0.06);
   }
 
   .gshark-route-transition[data-route-motion="forward"] {

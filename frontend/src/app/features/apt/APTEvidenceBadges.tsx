@@ -20,7 +20,7 @@ export function CaveatLine({ values }: { values: string[] }) {
       {values.slice(0, 2).map((value) => (
         <div
           key={value}
-          className="rounded-xl border border-amber-100 bg-amber-50/50 px-2 py-1 text-[10px] leading-4 text-amber-700"
+          className="rounded-sm border border-amber-100 bg-amber-50/50 px-2 py-1 text-[10px] leading-4 text-amber-700"
         >
           {value}
         </div>

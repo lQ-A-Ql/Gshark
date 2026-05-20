@@ -3,7 +3,7 @@ import type { PropsWithChildren, ReactNode } from "react";
 
 export function RuntimeSettingsSectionShell({ children }: PropsWithChildren) {
   return (
-    <section className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)]">
+    <section className="space-y-3 rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.3)]">
       {children}
     </section>
   );

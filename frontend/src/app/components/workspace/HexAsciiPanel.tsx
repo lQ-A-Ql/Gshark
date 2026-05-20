@@ -21,8 +21,8 @@ export function HexAsciiPanel({
   const rows = useMemo(() => buildHexRows(frameBytes), [frameBytes]);
 
   return (
-    <Panel defaultSize={50} minSize={20} className="flex flex-col bg-white/95">
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-gradient-to-r from-amber-50 via-white to-slate-50 px-4 py-2 text-[13px] font-semibold text-slate-800">
+    <Panel defaultSize={50} minSize={20} className="gshark-tile flex flex-col">
+      <div className="gshark-tile-header flex shrink-0 items-center gap-2 border-b border-slate-200 bg-amber-50/60 px-4 py-2 text-[13px] font-semibold text-slate-800">
         <FileText className="h-4 w-4 text-amber-600" /> 十六进制与 ASCII 视图
         {packet && (
           <span className="ml-2 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
@@ -32,7 +32,7 @@ export function HexAsciiPanel({
       </div>
       <div ref={panelRef} className="flex-1 overflow-auto p-3 font-mono text-[12.5px] leading-5">
         {frameBytes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+          <div className="gshark-tile border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
             暂无 hex 数据
           </div>
         ) : (

@@ -53,8 +53,8 @@ export function PayloadWebShellInputPanel({
     <div
       className={
         embedded
-          ? "overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/60"
-          : "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          ? "gshark-tile overflow-hidden border-slate-100 bg-slate-50/60"
+          : "gshark-tile overflow-hidden border-slate-200"
       }
     >
       <div
@@ -80,18 +80,18 @@ export function PayloadWebShellInputPanel({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={onUseSample} className="h-8 gap-2 bg-white text-xs">
+            <Button type="button" variant="outline" onClick={onUseSample} className="h-8 gap-2 bg-slate-50 text-xs">
               <ClipboardPaste className="h-3.5 w-3.5" />
               示例
             </Button>
-            <Button type="button" variant="outline" onClick={onClear} className="h-8 gap-2 bg-white text-xs">
+            <Button type="button" variant="outline" onClick={onClear} className="h-8 gap-2 bg-slate-50 text-xs">
               <Eraser className="h-3.5 w-3.5" />
               清空
             </Button>
             <Button
               type="button"
               onClick={onAnalyze}
-              className="h-8 gap-2 bg-cyan-600 text-xs text-white shadow-sm hover:bg-cyan-700"
+              className="h-8 gap-2 bg-cyan-600 text-xs text-white hover:bg-cyan-700"
             >
               <Search className="h-3.5 w-3.5" />
               识别候选
@@ -114,7 +114,7 @@ export function PayloadWebShellInputPanel({
           onSelect={onSelectSource}
         />
         {selectedSource ? (
-          <div className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-xs leading-5 text-cyan-900">
+          <div className="gshark-tile mb-3 border-cyan-100 bg-cyan-50/70 px-3 py-2 text-xs leading-5 text-cyan-900">
             {formatPayloadWebShellSelectedSource(selectedSource)}
           </div>
         ) : null}
@@ -122,11 +122,11 @@ export function PayloadWebShellInputPanel({
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
           placeholder={PAYLOAD_WEBSHELL_TEXTAREA_PLACEHOLDER}
-          className="min-h-[180px] w-full resize-y rounded-xl border border-slate-200 bg-white/95 px-4 py-3 font-mono text-xs leading-6 text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+          className="min-h-[180px] w-full resize-y rounded-sm border border-slate-200 bg-background/85 px-4 py-3 font-mono text-xs leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
           spellCheck={false}
         />
         {inputHint ? (
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <div className="gshark-tile mt-3 border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
             {inputHint}
           </div>
         ) : null}

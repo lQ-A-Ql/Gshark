@@ -10,7 +10,7 @@ interface ShiroRememberMeKeyResultsPanelProps {
 export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRememberMeKeyResultsPanelProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="gshark-tile border-slate-200 p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <div className="text-sm font-semibold text-slate-800">候选详情</div>
@@ -42,7 +42,7 @@ export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRemem
             </div>
             <EvidenceActions packetId={selectedCandidate.packetId} preferredProtocol="HTTP" />
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="gshark-tile border-slate-200 bg-slate-50/70 p-3">
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Cookie Value
               </div>
@@ -59,7 +59,7 @@ export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRemem
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="gshark-tile border-slate-200 p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-800">密钥测试结果</div>
           <div className="text-[11px] text-slate-500">{selectedCandidate?.keyResults?.length ?? 0} 个 key</div>
@@ -73,7 +73,7 @@ export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRemem
             selectedCandidate!.keyResults!.map((item) => (
               <div
                 key={`${item.label}-${item.base64}`}
-                className={`rounded-xl border p-3 ${item.hit ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-slate-50/70"}`}
+                className={`gshark-tile p-3 ${item.hit ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-slate-50/70"}`}
               >
                 <div className="flex flex-wrap items-center gap-2">
                   {item.hit ? (
@@ -83,7 +83,9 @@ export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRemem
                   )}
                   <span className="font-mono text-xs font-semibold text-slate-800">{item.label || "custom"}</span>
                   {item.algorithm ? (
-                    <span className="rounded bg-white px-2 py-0.5 text-[11px] text-slate-600">{item.algorithm}</span>
+                    <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                      {item.algorithm}
+                    </span>
                   ) : null}
                   {item.hit ? (
                     <span className="rounded bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">

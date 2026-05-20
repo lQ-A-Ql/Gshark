@@ -20,8 +20,8 @@ export function GenericMiscDeleteAction({
 
   const className =
     variant === "embedded"
-      ? "border-rose-200 bg-white text-rose-700 shadow-sm hover:bg-rose-50"
-      : "border-rose-200 bg-white/80 text-rose-600 shadow-sm backdrop-blur hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700";
+      ? "gshark-diffuse-chip border-rose-200/28 bg-rose-50/18 text-rose-700 hover:bg-rose-50/24"
+      : "gshark-diffuse-chip border-rose-200/24 bg-rose-50/14 text-rose-600 hover:border-rose-300/35 hover:bg-rose-50/22 hover:text-rose-700";
 
   return (
     <Button

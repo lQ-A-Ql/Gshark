@@ -9,8 +9,8 @@ interface HTTPLoginAttemptTableProps {
 
 export function HTTPLoginAttemptTable({ attempts }: HTTPLoginAttemptTableProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+    <div className="gshark-tile overflow-hidden border-slate-200">
+      <div className="gshark-tile-header flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
         <div>
           <div className="text-sm font-semibold text-slate-800">认证尝试明细</div>
           <div className="mt-0.5 text-[11px] text-slate-500">按包号串联请求、响应、凭据线索与判定原因。</div>
@@ -24,11 +24,11 @@ export function HTTPLoginAttemptTable({ attempts }: HTTPLoginAttemptTableProps) 
         rowKey={(item) => `${item.packetId}-${item.responsePacketId || 0}`}
         maxHeightClassName="max-h-[460px]"
         tableClassName="min-w-[1040px] border-separate border-spacing-0"
-        wrapperClassName="rounded-none border-0 bg-white"
-        headerClassName="z-10 bg-slate-100/95 text-[11px] uppercase tracking-[0.12em] shadow-[0_1px_0_0_rgba(148,163,184,0.35)] backdrop-blur"
+        wrapperClassName="gshark-tile-table rounded-none border-0"
+        headerClassName="gshark-tile-header z-10 bg-slate-50/80 text-[11px] uppercase tracking-[0.12em]"
         headerCellClassName="py-3 font-semibold"
         emptyText="暂无认证尝试"
-        rowClassName="odd:bg-white even:bg-slate-50/45 hover:bg-cyan-50/45"
+        rowClassName="odd:bg-transparent even:bg-slate-50/45 hover:bg-cyan-50/45"
         cellClassName="py-3"
         columns={[
           {

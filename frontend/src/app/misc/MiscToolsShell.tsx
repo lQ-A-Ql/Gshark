@@ -47,10 +47,7 @@ export function MiscToolsShell({
   }, [modules]);
 
   return (
-    <PageShell
-      className="bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.42),transparent_38%),linear-gradient(180deg,#ecfeff_0%,#f0fdfa_36%,#f8fafc_100%)]"
-      innerClassName="mx-auto flex w-full max-w-[1160px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8"
-    >
+    <PageShell>
       <MiscToolsHero
         activeCategory={activeCategory}
         heroDescription={heroDescription}
@@ -62,14 +59,11 @@ export function MiscToolsShell({
       {error && <ErrorBlock message={error} />}
 
       {loading ? (
-        <StatusHint
-          className="px-4 py-12 text-center text-sm font-medium shadow-[0_20px_55px_rgba(148,163,184,0.16)]"
-          tone="cyan"
-        >
+        <StatusHint className="gshark-tile px-4 py-12 text-center text-sm font-medium" tone="cyan">
           正在加载 MISC 模块...
         </StatusHint>
       ) : (
-        <div className="space-y-4">
+        <div className="gshark-tile-grid">
           {filteredModules.map((module) => (
             <MiscModuleCard
               key={module.id}
@@ -82,9 +76,7 @@ export function MiscToolsShell({
           ))}
 
           {filteredModules.length === 0 && !error && (
-            <EmptyState className="border-white/80 bg-white/86 px-4 py-12 text-sm shadow-[0_18px_50px_rgba(148,163,184,0.12)]">
-              当前筛选下没有可展示的 MISC 模块。
-            </EmptyState>
+            <EmptyState className="gshark-tile px-4 py-12 text-sm">当前筛选下没有可展示的 MISC 模块。</EmptyState>
           )}
         </div>
       )}

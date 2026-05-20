@@ -36,11 +36,11 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_36%),linear-gradient(180deg,_#f8fbff_0%,_#f6f8fb_100%)] p-6 text-foreground">
-      <section className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
+    <div className="gshark-page-bg flex h-full min-h-0 flex-col overflow-auto p-3 text-foreground sm:p-4">
+      <section className="gshark-tile gshark-tile-strong flex min-h-0 flex-1 overflow-hidden">
         <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
           <div className="relative border-b border-slate-200/80 p-8 lg:min-h-0 lg:border-b-0 lg:border-r lg:overflow-hidden">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
+            <div className="gshark-diffuse-chip mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
               GSHARK QUICK START
             </div>
@@ -62,12 +62,12 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                 autoCapitalize="none"
                 spellCheck={false}
                 placeholder="直接输入 PCAP / PCAPNG 绝对路径"
-                className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
+                className="gshark-field h-12 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400"
               />
               <button
                 onClick={() => void handleOpenCapture()}
                 disabled={captureActionsDisabled}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-600 px-5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="gshark-control-primary inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FolderOpen className="h-4 w-4" />
                 选择文件
@@ -75,7 +75,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               <button
                 onClick={() => void handleOpenCapture(capturePath.trim())}
                 disabled={captureActionsDisabled || !capturePath.trim()}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="gshark-control inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium text-slate-700 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FolderOpen className="h-4 w-4" />
                 路径打开
@@ -101,17 +101,17 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
             </div>
 
             {/* Empty space logo filler */}
-            <div className="pointer-events-none absolute -bottom-10 left-0 right-8 z-[0] flex justify-end opacity-10 mix-blend-multiply select-none">
+            <div className="pointer-events-none absolute -bottom-10 left-0 right-8 z-[0] flex justify-end opacity-[0.085] blur-[0.3px] select-none">
               <img
                 src={logoImg}
                 alt="GShark Background"
-                className="w-full max-w-[440px] object-contain drop-shadow-sm transition-opacity duration-700 hover:opacity-[0.85]"
+                className="gshark-brand-mark w-full max-w-[440px] object-contain"
               />
             </div>
           </div>
 
           <div className="flex min-h-0 flex-col p-8">
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="gshark-form-surface p-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ENGINE STATUS</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
                 <span
@@ -127,11 +127,9 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                   ? `tshark 已就绪: ${tsharkStatus.path || "tshark"}`
                   : tsharkStatus.message || "等待配置 tshark"}
               </div>
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-600">
-                {backendStatus}
-              </div>
+              <div className="gshark-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-slate-600">{backendStatus}</div>
               {captureTransaction.phase === "failed" && !captureTransaction.hasActiveCapture && (
-                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                <div className="gshark-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-amber-900">
                   <div className="font-semibold">
                     {captureTransaction.reason === "open_failed" ? "抓包打开失败" : "抓包预加载失败"}
                   </div>
@@ -140,7 +138,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               )}
             </div>
 
-            <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="gshark-form-surface mt-5 flex min-h-0 flex-1 flex-col p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RECENT FILES</div>
@@ -150,7 +148,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               </div>
 
               {recentItems.length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs leading-5 text-slate-500">
+                <div className="mt-4 px-4 py-6 text-center text-xs leading-5 text-slate-500">
                   这里会保留最近打开过的抓包路径，方便你反复对照样本与回归测试。
                 </div>
               ) : (
@@ -161,7 +159,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                         key={item.path}
                         onClick={() => void handleOpenCapture(item.path)}
                         disabled={captureActionsDisabled}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-all hover:border-blue-200 hover:bg-blue-50/60 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="gshark-control-ghost w-full px-4 py-3 text-left transition-all hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <div className="truncate text-sm font-medium text-slate-900">
                           {item.name || item.path.split(/[\\/]/).pop() || item.path}
@@ -186,7 +184,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
 
 function GuideCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4">
+    <div className="gshark-form-surface px-4 py-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         {icon}
         {title}

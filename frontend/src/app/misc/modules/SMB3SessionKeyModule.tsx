@@ -4,12 +4,12 @@ import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { SMB3RandomSessionKeyResult, SMB3SessionCandidate } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { SMB3SessionCandidateSelector } from "./SMB3SessionCandidateSelector";
 import { SMB3SessionKeyInputForm } from "./SMB3SessionKeyInputForm";
 import { SMB3SessionKeyResultPanel } from "./SMB3SessionKeyResultPanel";
 import { buildSMB3CandidateSummary, createSMB3KeyRequest, findSMB3CandidateByFrame } from "./SMB3SessionKeyUtils";
+import { MiscModuleSurface } from "./MiscModuleSurface";
 
 export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -147,60 +147,49 @@ export function SMB3SessionKeyModule({ module, surfaceVariant = "card" }: MiscMo
   }
 
   return (
-    <Card
-      className={
-        embedded
-          ? "min-w-0 h-fit border-0 bg-transparent shadow-none"
-          : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"
-      }
+    <MiscModuleSurface
+      module={module}
+      embedded={embedded}
+      icon={<Key className="h-4 w-4" />}
+      tone="indigo"
+      bodyClassName="space-y-6"
     >
-      <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
-            <Key className="h-4 w-4" />
-          </div>
-          <CardTitle className="text-base text-slate-800">{module.title}</CardTitle>
-        </div>
-        <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
-      </CardHeader>
-      <CardContent className={embedded ? "space-y-6 px-0 pt-0" : "space-y-6 pt-6"}>
-        <div className="grid gap-4">
-          <SMB3SessionCandidateSelector
-            candidates={smbCandidates}
-            error={smbCandidatesError}
-            hasCapture={hasCapture}
-            loading={smbCandidatesLoading}
-            onRefresh={refreshSMB3Candidates}
-            onSelectCandidate={applySMB3Candidate}
-            selectedFrame={smbSelectedCandidateFrame}
-            summary={smbCandidateSummary}
-          />
-          <SMB3SessionKeyInputForm
-            domain={smbDomain}
-            encryptedSessionKey={smbKey}
-            ntProofStr={smbProof}
-            ntlmHash={smbHash}
-            onDomainChange={setSmbDomain}
-            onEncryptedSessionKeyChange={setSmbKey}
-            onNtProofStrChange={setSmbProof}
-            onNtlmHashChange={setSmbHash}
-            onUsernameChange={setSmbUser}
-            username={smbUser}
-          />
-        </div>
-
-        <SMB3SessionKeyResultPanel
-          error={smbError}
-          loading={smbLoading}
-          onClearResult={() => {
-            setSmbResult(null);
-            setSmbError("");
-          }}
-          onCopyResult={copySMBResult}
-          onRun={runSMB}
-          result={smbResult}
+      <div className="grid gap-4">
+        <SMB3SessionCandidateSelector
+          candidates={smbCandidates}
+          error={smbCandidatesError}
+          hasCapture={hasCapture}
+          loading={smbCandidatesLoading}
+          onRefresh={refreshSMB3Candidates}
+          onSelectCandidate={applySMB3Candidate}
+          selectedFrame={smbSelectedCandidateFrame}
+          summary={smbCandidateSummary}
         />
-      </CardContent>
-    </Card>
+        <SMB3SessionKeyInputForm
+          domain={smbDomain}
+          encryptedSessionKey={smbKey}
+          ntProofStr={smbProof}
+          ntlmHash={smbHash}
+          onDomainChange={setSmbDomain}
+          onEncryptedSessionKeyChange={setSmbKey}
+          onNtProofStrChange={setSmbProof}
+          onNtlmHashChange={setSmbHash}
+          onUsernameChange={setSmbUser}
+          username={smbUser}
+        />
+      </div>
+
+      <SMB3SessionKeyResultPanel
+        error={smbError}
+        loading={smbLoading}
+        onClearResult={() => {
+          setSmbResult(null);
+          setSmbError("");
+        }}
+        onCopyResult={copySMBResult}
+        onRun={runSMB}
+        result={smbResult}
+      />
+    </MiscModuleSurface>
   );
 }

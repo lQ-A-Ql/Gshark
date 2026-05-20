@@ -24,7 +24,7 @@ export function MassStorageFilters({
   onLunChange: (value: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-card p-4 shadow-sm md:grid-cols-2">
+    <div className="gshark-tile-toolbar grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
       <SelectField
         label="设备"
         value={activeDevice}
@@ -68,7 +68,7 @@ function SelectField({
       onValueChange={onChange}
       options={selectOptions}
       tone="blue"
-      triggerClassName="bg-background text-sm"
+      triggerClassName="bg-transparent text-sm"
       labelClassName="font-medium text-muted-foreground"
     />
   );

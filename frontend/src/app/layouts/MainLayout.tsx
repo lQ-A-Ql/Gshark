@@ -180,7 +180,7 @@ export function MainLayout() {
       }
     >
       <div
-        className="gshark-page-bg flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
+        className="gshark-page-bg gshark-glass-shell flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
         style={pageThemeStyle}
         onDragStartCapture={preventBrowserPageDrag}
         onDragOverCapture={preventBrowserPageDrag}

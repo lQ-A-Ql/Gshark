@@ -59,7 +59,7 @@ export function VehicleUdsTransactionsPanel({
   onStatusFilterChange,
 }: VehicleUdsTransactionsPanelProps) {
   return (
-    <Panel title={`UDS 配对事务预览 (${filteredTransactions.length})`} className="mt-4">
+    <Panel title={`UDS 配对事务预览 (${filteredTransactions.length})`} className="mt-0">
       <div className="mb-3 flex flex-wrap gap-2">
         {UDS_STATUS_OPTIONS.map((opt) => {
           const active = statusFilter === opt.value;
@@ -71,10 +71,10 @@ export function VehicleUdsTransactionsPanel({
               type="button"
               onClick={() => onStatusFilterChange(opt.value)}
               className={cn(
-                "rounded-full border px-3 py-1 text-[11px] font-medium transition-all",
+                "border px-3 py-1 text-[11px] font-medium transition-all",
                 active
-                  ? "border-emerald-200 bg-emerald-100 text-emerald-700 shadow-sm"
-                  : "border-slate-200 bg-white/80 text-slate-500 hover:border-emerald-200 hover:text-emerald-700",
+                  ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                  : "border-slate-200 bg-slate-50/70 text-slate-500 hover:border-emerald-200 hover:text-emerald-700",
               )}
             >
               {opt.label} · {count}

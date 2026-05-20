@@ -23,17 +23,17 @@ export function AnalysisBucketChart({
     return <AnalysisEmptyState>{emptyText}</AnalysisEmptyState>;
   }
   return (
-    <div className={cn("overflow-auto pr-1", maxHeightClassName)}>
-      <div className="space-y-2">
+    <div className={cn("overflow-auto", maxHeightClassName)}>
+      <div className="divide-y divide-slate-200/70">
         {data.map((row) => {
           const rowContent = (
             <>
               <div className="truncate font-medium text-slate-500" title={row.label}>
                 {row.label}
               </div>
-              <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-2 rounded-sm bg-slate-500/10">
                 <div
-                  className={cn("h-2 rounded-full", barClassName)}
+                  className={cn("h-2 rounded-sm", barClassName)}
                   style={{ width: `${Math.max(2, (row.count / max) * 100)}%` }}
                 />
               </div>
@@ -46,7 +46,7 @@ export function AnalysisBucketChart({
                 key={row.label}
                 type="button"
                 className={cn(
-                  "grid w-full items-center gap-3 rounded-2xl px-2 py-2 text-left text-xs transition-colors hover:bg-slate-50/80",
+                  "grid w-full items-center gap-3 px-2 py-2 text-left text-xs transition-colors hover:bg-slate-500/5",
                   labelWidthClassName,
                 )}
                 onClick={() => onSelect(row)}
@@ -58,7 +58,7 @@ export function AnalysisBucketChart({
           return (
             <div
               key={row.label}
-              className={cn("grid items-center gap-3 rounded-2xl px-2 py-2 text-xs", labelWidthClassName)}
+              className={cn("grid items-center gap-3 px-2 py-2 text-xs", labelWidthClassName)}
             >
               {rowContent}
             </div>
@@ -82,11 +82,11 @@ export function AnalysisList({
     return <AnalysisEmptyState>{emptyText}</AnalysisEmptyState>;
   }
   return (
-    <div className={cn("space-y-2 overflow-auto pr-1", maxHeightClassName)}>
+    <div className={cn("gshark-tile divide-y divide-slate-200/70 overflow-auto", maxHeightClassName)}>
       {items.map((item) => (
         <div
           key={`${item.label}-${item.count}`}
-          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs shadow-sm"
+          className="flex items-center justify-between px-3 py-2 text-xs"
         >
           <span className="truncate font-medium text-slate-500" title={item.label}>
             {item.label}

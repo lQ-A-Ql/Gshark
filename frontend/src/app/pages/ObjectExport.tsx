@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
+import { FileDown } from "lucide-react";
+import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
+import { AnalysisPanel } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
 import { useSentinel } from "../state/SentinelContext";
 import {
   ObjectExportFooter,
-  ObjectExportHero,
   ObjectExportToolbar,
   ObjectGroupChips,
   ObjectGroupGrid,
@@ -34,12 +36,17 @@ export default function ObjectExport() {
   };
 
   return (
-    <PageShell
-      className="bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.26),transparent_36%),linear-gradient(180deg,#fffaf0_0%,#fbfbff_44%,#f8fafc_100%)]"
-      innerClassName="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8"
-    >
-      <section className="rounded-[28px] border border-white/70 bg-white/72 px-6 py-6 shadow-[0_30px_80px_rgba(251,191,36,0.16)] backdrop-blur-xl sm:px-8 lg:px-10">
-        <ObjectExportHero tags={OBJECT_EXPORT_TAGS} />
+    <PageShell>
+      <AnalysisHero
+        icon={<FileDown className="h-5 w-5" />}
+        title="附件提取"
+        subtitle="EXTRACTED OBJECTS"
+        description="按文件类型（magic bytes）统一查看当前抓包里可导出的对象，快速筛选、分组并批量导出。"
+        tags={OBJECT_EXPORT_TAGS}
+        tagsLabel="对象域"
+        theme="amber"
+      />
+      <AnalysisPanel title="对象筛选" tone="amber">
         <ObjectExportToolbar
           count={objects.length}
           query={query}
@@ -48,7 +55,9 @@ export default function ObjectExport() {
           onTypeFilterChange={setTypeFilter}
         />
         <ObjectGroupChips groups={magicGroups} />
-        <InvestigationReportPanel className="mt-6" report={report} title="对象调查报告" />
+      </AnalysisPanel>
+      <InvestigationReportPanel report={report} title="对象调查报告" />
+      <AnalysisPanel title={`对象分组 (${objects.length})`} tone="amber">
         <ObjectGroupGrid
           expandedGroups={expandedGroups}
           groups={magicGroups}
@@ -56,6 +65,8 @@ export default function ObjectExport() {
           onExpandGroup={(label) => setExpandedGroups((prev) => ({ ...prev, [label]: true }))}
           onToggleSelect={toggleSelect}
         />
+      </AnalysisPanel>
+      <AnalysisPanel title="导出队列" tone="amber">
         <ObjectExportFooter
           objectCount={objects.length}
           selectedBytes={selectedBytes}
@@ -63,7 +74,7 @@ export default function ObjectExport() {
           onDownloadAll={() => downloadZip(objects.map((item) => item.id))}
           onDownloadSelected={() => downloadZip(selectedObjects.map((item) => item.id))}
         />
-      </section>
+      </AnalysisPanel>
     </PageShell>
   );
 }

@@ -16,7 +16,7 @@ export function CaptureSuspiciousHitsPanel({
   onOpenStream,
 }: CaptureSuspiciousHitsPanelProps) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+    <div className="gshark-tile border-slate-200 bg-slate-50/80 p-3.5">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-900">优先处理的命中</div>
         <button onClick={onOpenAll} className="text-xs font-medium text-blue-700 hover:text-blue-800">
@@ -24,13 +24,13 @@ export function CaptureSuspiciousHitsPanel({
         </button>
       </div>
       {hits.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-xs leading-5 text-slate-500">
+        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-xs leading-5 text-slate-500">
           当前默认规则还没有给出明显命中，可以先从推荐过滤器和协议分布切入，再按需要重跑狩猎。
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {hits.map((hit) => (
-            <div key={hit.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div key={hit.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -53,14 +53,14 @@ export function CaptureSuspiciousHitsPanel({
                   <button
                     onClick={() => void onJumpToPacket(hit.packetId)}
                     disabled={pendingAction.length > 0}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {pendingAction === `packet:${hit.packetId}` ? "定位中" : "定位到包"}
                   </button>
                   <button
                     onClick={() => void onOpenStream(hit.packetId)}
                     disabled={pendingAction.length > 0}
-                    className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {pendingAction === `stream:${hit.packetId}` ? "打开中" : "打开关联流"}
                   </button>

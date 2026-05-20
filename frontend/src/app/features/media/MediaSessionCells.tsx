@@ -83,7 +83,7 @@ export function TranscriptionCell({
         )}
         {text && (
           <button
-            className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-accent"
+            className="gshark-soft-fill inline-flex items-center gap-1 px-2 py-0.5 text-[11px] hover:bg-accent"
             onClick={() => void onCopyText(text)}
           >
             <Copy className="h-3 w-3" />
@@ -92,11 +92,11 @@ export function TranscriptionCell({
         )}
       </div>
       {text ? (
-        <div className="max-w-[28rem] rounded border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] leading-5 text-emerald-950">
+        <div className="gshark-soft-fill max-w-[28rem] px-2.5 py-2 text-[11px] leading-5 text-emerald-950">
           <div className="line-clamp-4 whitespace-pre-wrap break-words">{text}</div>
         </div>
       ) : progress ? (
-        <div className="max-w-[22rem] rounded border border-slate-200 bg-slate-50 px-2.5 py-2">
+        <div className="gshark-soft-fill max-w-[22rem] px-2.5 py-2">
           <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] text-slate-600">
             <span>{progress.label}</span>
             <span>{progress.percent}%</span>
@@ -109,7 +109,7 @@ export function TranscriptionCell({
           </div>
         </div>
       ) : errorText ? (
-        <div className="max-w-[22rem] rounded border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] leading-5 text-rose-700">
+        <div className="gshark-soft-fill max-w-[22rem] px-2.5 py-2 text-[11px] leading-5 text-rose-700">
           {errorText}
         </div>
       ) : (
@@ -152,10 +152,10 @@ export function ExportActionsCell({
     (!!batchStatus.taskId && !batchStatus.done && batchStatus.currentToken === session.artifact.token);
 
   return (
-    <div className="w-full max-w-[13rem] rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] p-2 shadow-sm">
+    <div className="gshark-soft-fill w-full max-w-[13rem] p-2">
       <div className="flex flex-col gap-2">
         <button
-          className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-sm border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
           onClick={() => void onDownloadArtifact(session)}
         >
           <Download className="h-3.5 w-3.5" />
@@ -164,7 +164,7 @@ export function ExportActionsCell({
         </button>
         {canPlayArtifact(session) && (
           <button
-            className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1 rounded-sm border border-blue-200 bg-blue-50/80 px-2.5 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => void onOpenPlayback(session)}
             disabled={playbackLoadingToken === session.artifact.token}
           >
@@ -178,7 +178,7 @@ export function ExportActionsCell({
         )}
         {isAudio && (
           <button
-            className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1 rounded-sm border border-emerald-200 bg-emerald-50/80 px-2.5 py-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => void onRunTranscription(session, false)}
             disabled={transcriptionRunning}
           >
@@ -190,7 +190,7 @@ export function ExportActionsCell({
             转写
           </button>
         )}
-        <div className="rounded-xl bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">
+        <div className="gshark-soft-fill px-2.5 py-2 text-[11px] text-slate-500">
           <div className="truncate font-medium text-slate-700">{session.artifact.name}</div>
           <div className="mt-1">
             {isAudio ? "音频文件已准备好，可下载、播放或直接转写。" : "视频裸流已导出，可继续下载或转为可播放格式。"}

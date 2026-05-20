@@ -28,7 +28,7 @@ export function SMB3SessionCandidateSelector({
     <>
       <Field label="Session 候选选择器">
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
+          <div className="gshark-tile-toolbar flex items-center justify-between gap-3 border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
             <div className="min-w-0">
               <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-indigo-500">Session 候选</div>
               <div className="mt-1 text-[13px] text-slate-600">
@@ -46,7 +46,7 @@ export function SMB3SessionCandidateSelector({
               data-testid="smb-session-candidate-refresh"
               onClick={() => void onRefresh()}
               disabled={!hasCapture || loading}
-              className="shrink-0 border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50"
+              className="shrink-0 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
             >
               刷新候选
             </Button>
@@ -55,8 +55,10 @@ export function SMB3SessionCandidateSelector({
           <div
             data-testid="smb-session-candidate-select"
             aria-disabled={!hasCapture || loading || candidates.length === 0}
-            className={`rounded-xl border p-3 transition-colors ${
-              !hasCapture || candidates.length === 0 ? "border-slate-200 bg-slate-50" : "border-indigo-100 bg-white"
+            className={`gshark-tile p-3 transition-colors ${
+              !hasCapture || candidates.length === 0
+                ? "border-slate-200 bg-slate-50"
+                : "border-indigo-100 bg-slate-50/40"
             }`}
           >
             {candidates.length > 0 ? (
@@ -71,7 +73,7 @@ export function SMB3SessionCandidateSelector({
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-6 text-center text-[13px] text-slate-500">
+              <div className="gshark-tile border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[13px] text-slate-500">
                 {hasCapture ? "未在当前抓包中发现可用的 SMB3 Session 候选" : "未加载抓包，请先在主工作区导入文件"}
               </div>
             )}
@@ -79,9 +81,7 @@ export function SMB3SessionCandidateSelector({
         </div>
       </Field>
       {!error && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
-          {summary}
-        </div>
+        <div className="gshark-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{summary}</div>
       )}
       {error && <ErrorBlock message={error} />}
     </>
@@ -104,9 +104,9 @@ function SMB3SessionCandidateCard({
       type="button"
       data-testid={`smb-session-candidate-${candidate.frameNumber}`}
       onClick={() => onSelectCandidate(candidate.frameNumber)}
-      className={`rounded-xl border px-3 py-3 text-left transition-all ${
+      className={`rounded-sm border px-3 py-3 text-left transition-colors ${
         selected
-          ? "border-indigo-400 bg-indigo-50 shadow-sm ring-2 ring-indigo-100"
+          ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-100"
           : "border-slate-200 bg-slate-50/70 hover:border-indigo-200 hover:bg-indigo-50/40"
       }`}
     >

@@ -28,7 +28,7 @@ export function MediaBatchActions({
   const batchRunning = Boolean(batchStatus.taskId) && !batchStatus.done;
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="mb-0 flex flex-wrap items-center gap-2">
       <button
         className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
         onClick={() => onStartBatchTranscription(false)}
@@ -38,7 +38,7 @@ export function MediaBatchActions({
         批量转写音频
       </button>
       <button
-        className="inline-flex items-center gap-1 rounded border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="gshark-soft-fill inline-flex items-center gap-1 px-3 py-1.5 text-xs hover:bg-accent/45 disabled:cursor-not-allowed disabled:opacity-60"
         onClick={() => onStartBatchTranscription(true)}
         disabled={batchStarting || batchRunning}
       >
@@ -67,7 +67,7 @@ export function MediaLoadingNotice({ loading }: MediaLoadingNoticeProps) {
   }
 
   return (
-    <div className="mb-3 rounded border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+    <div className="gshark-soft-fill mb-0 px-3 py-2 text-xs text-muted-foreground">
       正在识别 RTP / RTSP / Moonlight / GameStream 并尝试还原媒体流...
     </div>
   );
@@ -79,7 +79,7 @@ interface MediaOverviewStatsProps {
 
 export function MediaOverviewStats({ analysis }: MediaOverviewStatsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
       <StatCard title="相关流量包" value={analysis.totalMediaPackets.toLocaleString()} />
       <StatCard title="协议标签" value={String(analysis.protocols.length)} />
       <StatCard title="会话数" value={analysis.sessions.length.toLocaleString()} />
@@ -97,7 +97,7 @@ interface MediaDistributionPanelsProps {
 
 export function MediaDistributionPanels({ analysis }: MediaDistributionPanelsProps) {
   return (
-    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
       <Panel title="协议分布">
         <BucketChart data={analysis.protocols} barClassName="bg-blue-500" maxHeightClassName="max-h-[320px]" />
       </Panel>
@@ -114,18 +114,13 @@ interface MediaNotesPanelProps {
 
 export function MediaNotesPanel({ notes }: MediaNotesPanelProps) {
   return (
-    <Panel title="分析提示" className="mt-4">
+    <Panel title="分析提示" className="mt-0">
       <div className="space-y-2 text-sm">
         {notes.length === 0 ? (
-          <div className="rounded border border-dashed border-border px-3 py-3 text-muted-foreground">
-            当前抓包未识别到媒体流。
-          </div>
+          <div className="px-3 py-3 text-muted-foreground">当前抓包未识别到媒体流。</div>
         ) : (
           notes.map((note, index) => (
-            <div
-              key={`${note}-${index}`}
-              className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2"
-            >
+            <div key={`${note}-${index}`} className="gshark-soft-fill flex items-start gap-2 px-3 py-2">
               <Video className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
               <span>{note}</span>
             </div>

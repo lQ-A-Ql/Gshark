@@ -13,7 +13,7 @@ export function YaraSettingsSection(props: RuntimeSettingsSectionProps) {
       <RuntimeSettingsSectionTitle Icon={ShieldAlert} iconClassName="bg-amber-50 text-amber-600">
         YARA 狩猎
       </RuntimeSettingsSectionTitle>
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <div className="flex items-center justify-between rounded-sm border border-slate-200 bg-slate-50 px-3 py-2.5">
         <div>
           <div className="text-xs font-semibold text-slate-800">启用 YARA 狩猎</div>
           <div className="mt-0.5 text-[11px] text-slate-500">

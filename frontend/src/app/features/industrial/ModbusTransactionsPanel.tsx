@@ -27,7 +27,7 @@ export function ModbusTransactionsPanel({
   onFunctionFilterChange,
 }: ModbusTransactionsPanelProps) {
   return (
-    <Panel title={`Modbus 事务明细 (${transactions.length})`} className="mt-4">
+    <Panel title={`Modbus 事务明细 (${transactions.length})`} className="mt-0">
       <ModbusTransactionFilters
         unitOptions={unitOptions}
         functionOptions={functionOptions}
@@ -134,10 +134,10 @@ function ModbusTransactionFilters({
           type="button"
           onClick={() => onUnitFilterChange(unit)}
           className={cn(
-            "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all",
+            "border px-2.5 py-0.5 text-[11px] font-medium transition-all",
             unitFilter === unit
               ? "border-blue-200 bg-blue-100 text-blue-700"
-              : "border-slate-200 bg-white/80 text-slate-500 hover:border-blue-200",
+              : "border-slate-200 bg-slate-50/70 text-slate-500 hover:border-blue-200",
           )}
         >
           {unit === "all" ? "全部" : unit}
@@ -150,10 +150,10 @@ function ModbusTransactionFilters({
           type="button"
           onClick={() => onFunctionFilterChange(functionCode)}
           className={cn(
-            "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all",
+            "border px-2.5 py-0.5 text-[11px] font-medium transition-all",
             functionFilter === functionCode
               ? "border-blue-200 bg-blue-100 text-blue-700"
-              : "border-slate-200 bg-white/80 text-slate-500 hover:border-blue-200",
+              : "border-slate-200 bg-slate-50/70 text-slate-500 hover:border-blue-200",
           )}
         >
           {functionCode === "all" ? "全部" : functionCode}

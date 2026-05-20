@@ -11,7 +11,7 @@ export function buildInitialValues(fields: MiscModuleFormField[] = []): Record<s
 }
 
 function renderField(field: MiscModuleFormField, value: string, onChange: (next: string) => void, disabled: boolean) {
-  const commonClass = "border-slate-200 bg-white text-slate-900";
+  const commonClass = "text-slate-900";
   if (field.type === "textarea") {
     return (
       <textarea
@@ -20,7 +20,7 @@ function renderField(field: MiscModuleFormField, value: string, onChange: (next:
         rows={field.rows ?? 6}
         placeholder={field.placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className={`min-h-[140px] w-full resize-y rounded-2xl border px-4 py-3 text-sm leading-relaxed outline-none ${miscFieldSurfaceClass}`}
+        className={`min-h-[140px] w-full resize-y px-4 py-3 text-sm leading-relaxed outline-none ${miscFieldSurfaceClass}`}
       />
     );
   }
@@ -34,7 +34,7 @@ function renderField(field: MiscModuleFormField, value: string, onChange: (next:
       type={field.secret ? "password" : field.type === "number" ? "number" : "text"}
       placeholder={field.placeholder}
       onChange={(event) => onChange(event.target.value)}
-      className={`h-11 rounded-xl px-3.5 text-sm ${commonClass} ${miscFieldSurfaceClass}`}
+      className={`h-11 px-3.5 text-sm ${commonClass} ${miscFieldSurfaceClass}`}
     />
   );
 }
@@ -55,7 +55,7 @@ export function GenericMiscFormFields({
   onValueChange,
 }: GenericMiscFormFieldsProps) {
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_30px_rgba(15,23,42,0.04)]">
+    <div className="gshark-form-surface grid gap-4 p-4">
       {fields.map((field) => (
         <Field key={`${moduleId}-${field.name}`} label={field.label}>
           {renderField(
@@ -67,7 +67,7 @@ export function GenericMiscFormFields({
             running,
           )}
           {field.helpText ? (
-            <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs leading-relaxed text-slate-500">
+            <span className="gshark-diffuse-chip px-2.5 py-1.5 text-xs leading-relaxed text-slate-500">
               {field.helpText}
             </span>
           ) : null}

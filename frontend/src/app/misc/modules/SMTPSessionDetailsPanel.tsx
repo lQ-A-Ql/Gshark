@@ -11,7 +11,7 @@ interface SMTPSessionDetailsPanelProps {
 export function SMTPSessionDetailsPanel({ selectedSession }: SMTPSessionDetailsPanelProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="gshark-tile border-slate-200 p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <div className="text-sm font-semibold text-slate-800">会话详情</div>
@@ -116,7 +116,7 @@ function InfoBlock({
           {values.map((value) => (
             <span
               key={`${title}-${value}`}
-              className="rounded-md border border-white/80 bg-white px-2 py-1 font-mono text-[11px] text-slate-700 shadow-sm"
+              className="rounded-sm border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[11px] text-slate-700"
             >
               {value}
             </span>

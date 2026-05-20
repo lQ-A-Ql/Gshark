@@ -47,7 +47,7 @@ export function MediaSessionTable({
   const audioCount = useMemo(() => sessions.filter((session) => session.mediaType === "audio").length, [sessions]);
 
   return (
-    <Panel title={`媒体会话 (${sessions.length})`} className="mt-4">
+    <Panel title={`媒体会话 (${sessions.length})`} className="mt-0">
       <div className="mb-3 flex items-center gap-1 border-b border-border pb-2">
         {[
           {

@@ -29,8 +29,8 @@ export function KeyboardReplay({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-[linear-gradient(180deg,#eff6ff,#f8fafc)] p-4">
+    <div className="space-y-3">
+      <div className="gshark-tile border-blue-100 p-4">
         <KeyboardReplayControls
           currentIndex={currentIndex}
           isPlaying={isPlaying}
@@ -52,7 +52,7 @@ export function KeyboardReplay({
         <StatCard title="释放键" value={currentEvent?.releasedKeys.join(", ") || "--"} />
       </div>
 
-      <div className="rounded-lg border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
+      <div className="gshark-soft-fill px-3 py-3 text-xs text-muted-foreground">
         <div className="font-medium text-foreground">{currentEvent?.summary || "当前事件无摘要"}</div>
         <div className="mt-1">
           文本输出：
@@ -90,21 +90,21 @@ function KeyboardReplayControls({
         <button
           type="button"
           onClick={onPrev}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent"
+          className="inline-flex h-9 w-9 items-center justify-center border border-border bg-transparent text-foreground hover:bg-accent/55"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={onTogglePlay}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-white hover:bg-blue-700"
+          className="inline-flex h-9 w-9 items-center justify-center border border-blue-500 bg-blue-600 text-white hover:bg-blue-700"
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </button>
         <button
           type="button"
           onClick={onNext}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-accent"
+          className="inline-flex h-9 w-9 items-center justify-center border border-border bg-transparent text-foreground hover:bg-accent/55"
         >
           <ChevronRight className="h-4 w-4" />
         </button>

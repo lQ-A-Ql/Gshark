@@ -92,12 +92,12 @@ export function severityTone(severity: EvidenceSeverity): AnalysisTone {
 export function severityActiveStyle(severity: EvidenceSeverity): string {
   return (
     {
-      critical: "border-rose-300 bg-rose-100 text-rose-700 shadow-sm",
-      high: "border-rose-200 bg-rose-50 text-rose-700 shadow-sm",
-      medium: "border-amber-200 bg-amber-100 text-amber-700 shadow-sm",
-      low: "border-blue-200 bg-blue-50 text-blue-700 shadow-sm",
-      info: "border-slate-300 bg-slate-100 text-slate-700 shadow-sm",
-    }[severity] ?? "border-slate-200 bg-white text-slate-600"
+      critical: "border-rose-300 bg-rose-100 text-rose-700",
+      high: "border-rose-200 bg-rose-50 text-rose-700",
+      medium: "border-amber-200 bg-amber-100 text-amber-700",
+      low: "border-blue-200 bg-blue-50 text-blue-700",
+      info: "border-slate-300 bg-slate-100 text-slate-700",
+    }[severity] ?? "border-slate-200 bg-slate-50 text-slate-600"
   );
 }
 

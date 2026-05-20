@@ -4,7 +4,6 @@ import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { WinRMDecryptResult } from "../../core/types";
 import type { MiscModuleRendererProps } from "../types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { ErrorBlock } from "../ui";
 import { copyTextToClipboard } from "../../utils/browserFile";
 import { WinRMDecryptActions } from "./WinRMDecryptActions";
@@ -17,6 +16,7 @@ import {
   DEFAULT_WINRM_PREVIEW_LINES,
   getWinRMResultResetState,
 } from "./WinRMDecryptUtils";
+import { MiscModuleSurface } from "./MiscModuleSurface";
 
 export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModuleRendererProps) {
   const { fileMeta } = useSentinel();
@@ -122,58 +122,47 @@ export function WinRMDecryptModule({ module, surfaceVariant = "card" }: MiscModu
 
   return (
     <>
-      <Card
-        className={
-          embedded
-            ? "min-w-0 border-0 bg-transparent shadow-none"
-            : "min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm"
-        }
+      <MiscModuleSurface
+        module={module}
+        embedded={embedded}
+        icon={<Terminal className="h-4 w-4" />}
+        tone="sky"
+        bodyClassName="space-y-6"
       >
-        <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-              <Terminal className="h-4 w-4" />
-            </div>
-            <CardTitle className="text-base text-slate-800">{module.title}</CardTitle>
+        <WinRMDecryptForm
+          authMode={winrmAuthMode}
+          captureName={fileMeta.name}
+          capturePath={fileMeta.path}
+          hasCapture={hasCapture}
+          hash={winrmHash}
+          onAuthModeChange={setWinrmAuthMode}
+          onHashChange={setWinrmHash}
+          onPasswordChange={setWinrmPassword}
+          onPortChange={setWinrmPort}
+          onPreviewLinesChange={setWinrmPreviewLines}
+          password={winrmPassword}
+          port={winrmPort}
+          previewLines={winrmPreviewLines}
+        />
+
+        <WinRMDecryptActions
+          hasCapture={hasCapture}
+          hasResult={Boolean(winrmResult)}
+          loading={winrmLoading}
+          onClear={clearWinRMResult}
+          onCopy={() => void copyWinRMPreview()}
+          onExport={() => void exportWinRM()}
+          onOpenPreview={() => void openWinRMPreview()}
+          onRun={() => void runWinRM()}
+        />
+
+        {winrmError && (
+          <div className="animate-in slide-in-from-bottom-2 duration-300 fade-in">
+            <ErrorBlock message={winrmError} />
           </div>
-          <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
-        </CardHeader>
-        <CardContent className={embedded ? "space-y-6 px-0 pt-0" : "space-y-6 pt-6"}>
-          <WinRMDecryptForm
-            authMode={winrmAuthMode}
-            captureName={fileMeta.name}
-            capturePath={fileMeta.path}
-            hasCapture={hasCapture}
-            hash={winrmHash}
-            onAuthModeChange={setWinrmAuthMode}
-            onHashChange={setWinrmHash}
-            onPasswordChange={setWinrmPassword}
-            onPortChange={setWinrmPort}
-            onPreviewLinesChange={setWinrmPreviewLines}
-            password={winrmPassword}
-            port={winrmPort}
-            previewLines={winrmPreviewLines}
-          />
-
-          <WinRMDecryptActions
-            hasCapture={hasCapture}
-            hasResult={Boolean(winrmResult)}
-            loading={winrmLoading}
-            onClear={clearWinRMResult}
-            onCopy={() => void copyWinRMPreview()}
-            onExport={() => void exportWinRM()}
-            onOpenPreview={() => void openWinRMPreview()}
-            onRun={() => void runWinRM()}
-          />
-
-          {winrmError && (
-            <div className="animate-in slide-in-from-bottom-2 duration-300 fade-in">
-              <ErrorBlock message={winrmError} />
-            </div>
-          )}
-          {winrmResult && <WinRMResultSummary result={winrmResult} />}
-        </CardContent>
-      </Card>
+        )}
+        {winrmResult && <WinRMResultSummary result={winrmResult} />}
+      </MiscModuleSurface>
 
       <WinRMPreviewDialog
         error={winrmPreviewDialogError}

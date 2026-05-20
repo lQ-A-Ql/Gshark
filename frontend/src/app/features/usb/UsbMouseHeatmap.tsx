@@ -36,7 +36,7 @@ export function MouseHeatmap({
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_top,#bfdbfe,transparent_55%),linear-gradient(180deg,#f8fafc,#eef2ff)]">
+      <div className="gshark-tile overflow-hidden border-border bg-blue-50/45">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[320px] w-full">
           <rect width={width} height={height} fill="rgba(255,255,255,0.3)" />
           {hotspots.map((item) => {

@@ -50,7 +50,7 @@ export default function VehicleAnalysis() {
   }, [isPreloadingCapture, refreshAnalysis]);
 
   return (
-    <PageShell className="bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.24),transparent_36%),linear-gradient(180deg,#f4fffb_0%,#f6f7ff_44%,#f8fafc_100%)]">
+    <PageShell>
       <AnalysisHero
         icon={<Car className="h-5 w-5" />}
         title="车机流量分析"
@@ -85,7 +85,7 @@ export default function VehicleAnalysis() {
 
       <VehicleOverviewPanel analysis={analysis} />
       <InvestigationReportPanel
-        className="mt-4"
+        className="mt-0"
         preferredProtocol="TCP"
         report={analysis.report}
         title="车机调查报告"

@@ -20,11 +20,11 @@ export function MediaAnalysisProgressPanel({ progress }: MediaAnalysisProgressPa
   }
 
   return (
-    <div className="mb-3 rounded border border-border bg-card px-3 py-3">
+    <div className="gshark-soft-fill mb-0 px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-medium text-rose-700">
+            <span className="inline-flex rounded-sm border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 font-medium text-rose-700">
               {progress.phaseLabel || "处理中"}
             </span>
             <span>{Math.round(progress.percent)}%</span>
@@ -56,10 +56,10 @@ export function MediaAnalysisProgressPanel({ progress }: MediaAnalysisProgressPa
               key={item.key}
               className={`rounded border px-2 py-1 text-center transition-colors ${
                 active
-                  ? "border-rose-300 bg-rose-50 text-rose-700"
+                  ? "border-rose-300/70 bg-rose-50/65 text-rose-700"
                   : completed
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-border bg-background"
+                    ? "border-emerald-200/70 bg-emerald-50/60 text-emerald-700"
+                    : "border-slate-200/60 bg-slate-50/20"
               }`}
             >
               {item.label}

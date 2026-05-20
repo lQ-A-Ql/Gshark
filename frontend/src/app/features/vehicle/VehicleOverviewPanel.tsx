@@ -12,14 +12,14 @@ export const VEHICLE_PROTOCOL_TAGS = ["CAN", "J1939", "DoIP", "UDS"];
 export function VehicleOverviewPanel({ analysis }: { analysis: VehicleAnalysis }) {
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-4">
         <StatCard title="车载相关包" value={analysis.totalVehiclePackets.toLocaleString()} />
         <StatCard title="识别协议" value={String(analysis.protocols.length)} />
         <StatCard title="CAN 帧" value={analysis.can.totalFrames.toLocaleString()} />
         <StatCard title="DBC 解码报文" value={analysis.can.decodedMessages.length.toLocaleString()} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
         <Panel title="车载协议分布">
           <BucketChart data={analysis.protocols} barClassName="bg-blue-500" maxHeightClassName="max-h-[320px]" />
         </Panel>
@@ -33,7 +33,7 @@ export function VehicleOverviewPanel({ analysis }: { analysis: VehicleAnalysis }
         </Panel>
       </div>
 
-      <Panel title="分析方案" className="mt-4">
+      <Panel title="分析方案" className="mt-0">
         <div className="space-y-2 text-sm">
           <VehiclePlanItem>
             第一层先做总线基线：看 CAN ID、总线错误帧、J1939 PGN 分布，识别异常节点和异常广播。
@@ -52,7 +52,7 @@ export function VehicleOverviewPanel({ analysis }: { analysis: VehicleAnalysis }
 
 function VehiclePlanItem({ children }: { children: string }) {
   return (
-    <div className="flex items-start gap-2 rounded border border-border bg-background px-3 py-2">
+    <div className="gshark-soft-fill flex items-start gap-2 px-3 py-2">
       <Route className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
       <span>{children}</span>
     </div>

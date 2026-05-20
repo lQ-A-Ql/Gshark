@@ -46,22 +46,22 @@ export function resolveModuleIcon(module: MiscModuleManifest): { Icon: LucideIco
     .join(" ")
     .toLowerCase();
   if (haystack.includes("mysql")) {
-    return { Icon: Database, surface: "border-emerald-200 bg-emerald-50", text: "text-emerald-700" };
+    return { Icon: Database, surface: "gshark-soft-fill border-emerald-200/28 bg-emerald-50/20", text: "text-emerald-700" };
   }
   if (haystack.includes("shiro") || haystack.includes("rememberme")) {
-    return { Icon: KeyRound, surface: "border-amber-200 bg-amber-50", text: "text-amber-700" };
+    return { Icon: KeyRound, surface: "gshark-soft-fill border-amber-200/28 bg-amber-50/20", text: "text-amber-700" };
   }
   if (haystack.includes("smtp") || haystack.includes("mail")) {
-    return { Icon: Mail, surface: "border-sky-200 bg-sky-50", text: "text-sky-700" };
+    return { Icon: Mail, surface: "gshark-soft-fill border-sky-200/28 bg-sky-50/20", text: "text-sky-700" };
   }
   if (haystack.includes("payload") || haystack.includes("webshell") || haystack.includes("decode") || haystack.includes("base64")) {
-    return { Icon: Binary, surface: "border-cyan-200 bg-cyan-50", text: "text-cyan-700" };
+    return { Icon: Binary, surface: "gshark-soft-fill border-cyan-200/28 bg-cyan-50/20", text: "text-cyan-700" };
   }
   if (haystack.includes("ntlm") || haystack.includes("smb3") || haystack.includes("winrm")) {
-    return { Icon: KeyRound, surface: "border-sky-200 bg-sky-50", text: "text-sky-700" };
+    return { Icon: KeyRound, surface: "gshark-soft-fill border-sky-200/28 bg-sky-50/20", text: "text-sky-700" };
   }
   if (haystack.includes("http") || haystack.includes("auth")) {
-    return { Icon: Shield, surface: "border-indigo-200 bg-indigo-50", text: "text-indigo-700" };
+    return { Icon: Shield, surface: "gshark-soft-fill border-indigo-200/28 bg-indigo-50/20", text: "text-indigo-700" };
   }
-  return { Icon: Wrench, surface: "border-slate-200 bg-slate-50", text: "text-slate-700" };
+  return { Icon: Wrench, surface: "gshark-soft-fill border-slate-200/28 bg-slate-50/20", text: "text-slate-700" };
 }

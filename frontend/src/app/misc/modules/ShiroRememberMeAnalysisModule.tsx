@@ -4,7 +4,6 @@ import type { ShiroRememberMeAnalysis } from "../../core/types";
 import { backendClients } from "../../integrations/backendClients";
 import { useSentinel } from "../../state/SentinelContext";
 import type { MiscModuleRendererProps } from "../types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { InvestigationReportPanel } from "../../components/InvestigationReportPanel";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { exportStructuredResult, type MiscExportFormat } from "../exportResult";
@@ -21,6 +20,7 @@ import {
   type ShiroRememberMeCandidateFilter,
 } from "./ShiroRememberMeUtils";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
+import { MiscModuleSurface } from "./MiscModuleSurface";
 
 const EMPTY_ANALYSIS: ShiroRememberMeAnalysis = {
   candidateCount: 0,
@@ -99,53 +99,36 @@ export function ShiroRememberMeAnalysisModule({ module, surfaceVariant = "card" 
   }
 
   return (
-    <Card
-      className={
-        embedded
-          ? "min-w-0 h-fit border-0 bg-transparent shadow-none"
-          : "min-w-0 h-fit overflow-hidden border-slate-200 bg-white shadow-sm"
-      }
-    >
-      <CardHeader className={embedded ? "hidden" : "gap-2 border-b border-slate-100 bg-slate-50/70 pb-5"}>
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-            <KeyRound className="h-4 w-4" />
-          </div>
-          <CardTitle className="text-base text-slate-800">{module.title}</CardTitle>
-        </div>
-        <CardDescription className="text-[13px] leading-relaxed">{module.summary}</CardDescription>
-      </CardHeader>
-      <CardContent className={embedded ? "space-y-5 px-0 pt-0" : "space-y-5 pt-6"}>
-        <ShiroRememberMeControls
-          candidateCount={analysis.candidateCount}
-          candidateFilter={candidateFilter}
-          captureName={fileMeta.name}
-          customKeyCount={keyLines.length}
-          customKeys={customKeys}
+    <MiscModuleSurface module={module} embedded={embedded} icon={<KeyRound className="h-4 w-4" />} tone="amber">
+      <ShiroRememberMeControls
+        candidateCount={analysis.candidateCount}
+        candidateFilter={candidateFilter}
+        captureName={fileMeta.name}
+        customKeyCount={keyLines.length}
+        customKeys={customKeys}
+        hasCapture={hasCapture}
+        hitCount={analysis.hitCount}
+        loading={loading}
+        module={module}
+        onCandidateFilterChange={setCandidateFilter}
+        onCustomKeysChange={setCustomKeys}
+        onExport={exportAnalysis}
+        onRefresh={() => void loadAnalysis(keyLines, true)}
+      />
+
+      {!error && <NotesList notes={analysis.notes} />}
+      {error && <ErrorBlock message={error} />}
+      <InvestigationReportPanel report={analysis.report} preferredProtocol="HTTP" />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)]">
+        <ShiroRememberMeCandidateList
+          candidates={filteredCandidates}
           hasCapture={hasCapture}
-          hitCount={analysis.hitCount}
-          loading={loading}
-          module={module}
-          onCandidateFilterChange={setCandidateFilter}
-          onCustomKeysChange={setCustomKeys}
-          onExport={exportAnalysis}
-          onRefresh={() => void loadAnalysis(keyLines, true)}
+          onSelectCandidate={setSelectedPacketId}
+          selectedCandidate={selectedCandidate}
         />
-
-        {!error && <NotesList notes={analysis.notes} />}
-        {error && <ErrorBlock message={error} />}
-        <InvestigationReportPanel report={analysis.report} preferredProtocol="HTTP" />
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)]">
-          <ShiroRememberMeCandidateList
-            candidates={filteredCandidates}
-            hasCapture={hasCapture}
-            onSelectCandidate={setSelectedPacketId}
-            selectedCandidate={selectedCandidate}
-          />
-          <ShiroRememberMeKeyResultsPanel selectedCandidate={selectedCandidate} />
-        </div>
-      </CardContent>
-    </Card>
+        <ShiroRememberMeKeyResultsPanel selectedCandidate={selectedCandidate} />
+      </div>
+    </MiscModuleSurface>
   );
 }

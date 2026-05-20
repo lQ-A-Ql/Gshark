@@ -13,8 +13,8 @@ export function CapturePayloadShortcutPanel({
   onOpenMisc,
 }: CapturePayloadShortcutPanelProps) {
   return (
-    <div className="border-t border-slate-200 p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="border-t border-slate-200 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">Payload 快速解码</div>
           <div className="mt-1 text-xs text-slate-500">
@@ -47,10 +47,10 @@ export function CapturePayloadShortcutPanel({
       </div>
 
       {selectedPacket ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
+          <div className="gshark-tile border-slate-200 bg-slate-50/80 p-3.5">
             <div className="text-sm font-semibold text-slate-900">当前数据包上下文</div>
-            <div className="mt-3 space-y-3 text-xs">
+            <div className="mt-2.5 space-y-2 text-xs">
               <InfoRow
                 label="端点"
                 value={`${selectedPacket.src}:${selectedPacket.srcPort} -> ${selectedPacket.dst}:${selectedPacket.dstPort}`}
@@ -61,7 +61,7 @@ export function CapturePayloadShortcutPanel({
               <InfoRow label="说明" value={selectedPacket.info || "(no info)"} />
             </div>
           </div>
-          <div className="rounded-[24px] border border-cyan-100 bg-cyan-50/60 p-4">
+          <div className="gshark-tile border-cyan-100 bg-cyan-50/60 p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-slate-900">Payload 预览</div>
@@ -82,7 +82,7 @@ export function CapturePayloadShortcutPanel({
           </div>
         </div>
       ) : (
-        <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs leading-5 text-slate-500">
+        <div className="gshark-tile border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs leading-5 text-slate-500">
           选中一条数据包后，这里会展示 payload 预览；完整解码请前往 MISC 工具箱。
         </div>
       )}

@@ -12,7 +12,7 @@ export function NotesPanel({ notes, emptyText }: { notes: string[]; emptyText: s
       {notes.map((note, index) => (
         <div
           key={`${note}-${index}`}
-          className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs leading-5 text-indigo-800"
+          className="gshark-tile border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs leading-5 text-indigo-800"
         >
           {note}
         </div>
@@ -50,9 +50,9 @@ export function AttributionExplainer({
   const caveatCount = profile.frameworkOnly ? profile.registry.caveats.length : negativeFactors.length;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-4">
+        <div className="gshark-tile border-emerald-100 bg-emerald-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
             Supporting Evidence
           </div>
@@ -61,17 +61,17 @@ export function AttributionExplainer({
             {hasStructuredFactors ? "结构化正向评分因子" : "置信度 ≥ 60 的正向证据"}
           </div>
         </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 px-4 py-3">
+        <div className="gshark-tile border-amber-100 bg-amber-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-600">Weak Observations</div>
           <div className="mt-1 text-lg font-semibold text-amber-900">{weak.length}</div>
           <div className="mt-1 text-[11px] text-amber-700">中弱权重或弱观察因子</div>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 px-4 py-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Missing Evidence</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{missing.length}</div>
           <div className="mt-1 text-[11px] text-slate-700">基于真实证据动态判断</div>
         </div>
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-4 py-3">
+        <div className="gshark-tile border-rose-100 bg-rose-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">
             Suppression / Caveat
           </div>
@@ -82,7 +82,7 @@ export function AttributionExplainer({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/30 px-4 py-3">
+      <div className="gshark-tile border-indigo-100 bg-indigo-50/30 px-4 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
           Confidence Rationale
         </div>
@@ -113,7 +113,7 @@ export function AttributionExplainer({
         )}
 
       {missing.length > 0 && (
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 px-4 py-3">
+        <div className="gshark-tile border-slate-100 bg-slate-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
             Missing Evidence Details
           </div>
@@ -129,7 +129,7 @@ export function AttributionExplainer({
       )}
 
       {profile.frameworkOnly && profile.registry.caveats.length > 0 && (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 px-4 py-3">
+        <div className="gshark-tile border-rose-100 bg-rose-50/50 px-4 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">Framework Caveat</div>
           <div className="mt-2 space-y-1">
             {profile.registry.caveats.map((item) => (
@@ -160,7 +160,7 @@ function ScoreFactorColumn({
     rose: "border-rose-100 bg-rose-50/40 text-rose-800",
   }[tone];
   return (
-    <div className={cn("rounded-2xl border px-4 py-3", toneClass)}>
+    <div className={cn("gshark-tile px-4 py-3", toneClass)}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">{title}</div>
       <div className="mt-2 space-y-2">
         {factors.length === 0 ? (

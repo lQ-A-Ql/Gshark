@@ -85,10 +85,7 @@ export default function ThreatHunting() {
   };
 
   return (
-    <PageShell
-      className="bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.24),transparent_36%),linear-gradient(180deg,#f7fbff_0%,#f6f7ff_44%,#f8fafc_100%)]"
-      innerClassName="max-w-7xl px-6 py-6"
-    >
+    <PageShell>
       <AnalysisHero
         icon={<ShieldAlert className="h-5 w-5" />}
         title="威胁狩猎中心"
@@ -104,9 +101,9 @@ export default function ThreatHunting() {
       <ThreatHuntingMetricCards hits={hits} stats={stats} />
 
       {progress && <ThreatHuntingProgressPanel progress={progress} />}
-      <InvestigationReportPanel className="mt-4" preferredProtocol="TCP" report={report} title="威胁狩猎调查报告" />
+      <InvestigationReportPanel className="mt-0" preferredProtocol="TCP" report={report} title="威胁狩猎调查报告" />
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="grid min-h-0 gap-0 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <ThreatHuntingCategoryPanel stats={stats} />
         <ThreatHuntingWorkbenchPanel
           actionBusy={actionBusy}

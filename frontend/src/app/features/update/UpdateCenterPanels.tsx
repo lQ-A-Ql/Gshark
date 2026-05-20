@@ -1,8 +1,8 @@
 import { AlertTriangle, ArrowDownToLine, CheckCircle2, Github, LoaderCircle, RefreshCw } from "lucide-react";
+import { AnalysisPanel } from "../../components/analysis/AnalysisPrimitives";
 import type { AppUpdateStatus } from "../../core/types";
 import { LazyMarkdown } from "../../components/LazyMarkdown";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import { formatBytes } from "../../state/formatBytes";
 import { releaseMarkdownComponents } from "./UpdateReleaseMarkdown";
@@ -30,9 +30,9 @@ export function UpdateStatusPanel({
   const actionDisabled = loading || installing || !status?.hasUpdate || !status?.canInstall;
 
   return (
-    <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white via-blue-50 to-cyan-50 shadow-sm">
-      <CardContent className="space-y-5 pt-6">
-        <div className="grid gap-4 md:grid-cols-4">
+    <AnalysisPanel title="更新状态" tone="blue" className="gshark-tile">
+      <div className="space-y-5">
+        <div className="grid gap-0 md:grid-cols-4">
           <StatusTile
             title="当前版本"
             value={status?.currentVersionDisplay || "读取中"}
@@ -62,7 +62,7 @@ export function UpdateStatusPanel({
         </div>
 
         {(loading || installing) && (
-          <div className="rounded-xl border border-blue-100 bg-white/80 p-4 shadow-sm">
+          <div className="gshark-tile border-blue-100 bg-blue-50/55 p-3.5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <LoaderCircle className="h-4 w-4 animate-spin text-blue-600" />
               {installing ? "正在下载并替换程序" : "正在检查 GitHub Release"}
@@ -97,35 +97,35 @@ export function UpdateStatusPanel({
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </AnalysisPanel>
   );
 }
 
 export function UpdateReleaseNotesPanel({ notes }: { notes: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-slate-900">Release 说明</CardTitle>
-        <CardDescription>这里展示 GitHub 最新 Release 的正文内容，方便确认变更范围。</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="max-h-[420px] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <LazyMarkdown components={releaseMarkdownComponents}>{notes}</LazyMarkdown>
-        </div>
-      </CardContent>
-    </Card>
+    <AnalysisPanel
+      title="Release 说明"
+      tone="blue"
+      className="gshark-tile"
+      actions={<span className="text-xs font-normal text-slate-500">GitHub 最新 Release 正文</span>}
+    >
+      <div className="gshark-tile max-h-[420px] overflow-auto border-slate-200 bg-slate-50/80 p-3.5">
+        <LazyMarkdown components={releaseMarkdownComponents}>{notes}</LazyMarkdown>
+      </div>
+    </AnalysisPanel>
   );
 }
 
 export function UpdateDiagnosticsPanel({ status, error }: { status: AppUpdateStatus | null; error: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-slate-900">查询诊断</CardTitle>
-        <CardDescription>用于确认更新中心到底访问了哪个仓库和接口，也方便区分代码问题与网络环境问题。</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm text-slate-700">
+    <AnalysisPanel
+      title="查询诊断"
+      tone="slate"
+      className="gshark-tile"
+      actions={<span className="text-xs font-normal text-slate-500">仓库与接口状态</span>}
+    >
+      <div className="space-y-3 text-sm text-slate-700">
         <DiagnosticRow label="目标仓库" value={status?.repo || "读取中"} />
         <DiagnosticRow label="检查方式" value={status?.authMode || "读取中"} />
         <DiagnosticRow label="更新清单" value={status?.apiUrl || "读取中"} />
@@ -138,19 +138,20 @@ export function UpdateDiagnosticsPanel({ status, error }: { status: AppUpdateSta
               : "当前检查走公开 version.json 清单，不依赖 GitHub API Token 或限流额度。"
           }
         />
-      </CardContent>
-    </Card>
+      </div>
+    </AnalysisPanel>
   );
 }
 
 export function UpdateStepsPanel() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-slate-900">更新步骤</CardTitle>
-        <CardDescription>当前流程只替换主程序本体，不会动你的本地抓包文件和分析记录。</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <AnalysisPanel
+      title="更新步骤"
+      tone="blue"
+      className="gshark-tile"
+      actions={<span className="text-xs font-normal text-slate-500">仅替换主程序本体</span>}
+    >
+      <div className="space-y-3">
         <StepCard
           index="01"
           title="读取更新清单"
@@ -167,14 +168,14 @@ export function UpdateStepsPanel() {
           description="程序退出后由外部脚本执行覆盖替换，规避 Windows 正在运行的 exe 无法直接覆盖的问题。"
         />
         <StepCard index="04" title="自动重启" description="替换成功后会自动拉起新版本，无需手动重新打开。" />
-      </CardContent>
-    </Card>
+      </div>
+    </AnalysisPanel>
   );
 }
 
 function UpdateErrorNotice({ error }: { error: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+    <div className="gshark-tile flex items-start gap-3 border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
         <div className="font-medium">更新检查失败</div>
@@ -187,7 +188,7 @@ function UpdateErrorNotice({ error }: { error: string }) {
 function UpdateStateNotice({ status }: { status: AppUpdateStatus }) {
   return (
     <div
-      className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+      className={`gshark-tile flex items-start gap-3 px-4 py-3 text-sm ${
         status.hasUpdate
           ? "border-amber-200 bg-amber-50 text-amber-700"
           : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -208,7 +209,7 @@ function UpdateStateNotice({ status }: { status: AppUpdateStatus }) {
 
 function StatusTile({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="gshark-tile bg-slate-50/75 p-3.5">
       <div className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">{title}</div>
       <div className="mt-3 break-all text-lg font-semibold text-slate-900">{value}</div>
       <div className="mt-2 text-xs leading-5 text-slate-500">{hint}</div>
@@ -218,11 +219,9 @@ function StatusTile({ title, value, hint }: { title: string; value: string; hint
 
 function StepCard({ index, title, description }: { index: string; title: string; description: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <div className="gshark-tile border-slate-200 bg-slate-50/75 p-3.5">
       <div className="flex items-center gap-3">
-        <div className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold tracking-[0.18em] text-white">
-          {index}
-        </div>
+        <div className="bg-blue-600 px-2.5 py-1 text-xs font-semibold tracking-[0.18em] text-white">{index}</div>
         <div className="text-sm font-semibold text-slate-900">{title}</div>
       </div>
       <div className="mt-3 text-sm leading-6 text-slate-600">{description}</div>
@@ -232,7 +231,7 @@ function StepCard({ index, title, description }: { index: string; title: string;
 
 function DiagnosticRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="gshark-tile border-slate-200 bg-slate-50/75 px-3.5 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
       <div className="mt-2 break-all font-mono text-[13px] leading-6 text-slate-800">{value}</div>
     </div>

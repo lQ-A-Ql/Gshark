@@ -14,7 +14,7 @@ export function CaptureRecommendationsPanel({
   onApplyFilter,
 }: CaptureRecommendationsPanelProps) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+    <div className="gshark-tile border-slate-200 bg-slate-50/80 p-3.5">
       <div className="mb-3 text-sm font-semibold text-slate-900">推荐入口</div>
       <div className="grid gap-3 md:grid-cols-2">
         {recommendations.map((item) => (
@@ -58,7 +58,7 @@ function RecommendationCard({
   onFilter?: () => void;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="gshark-tile border-slate-200 px-3.5 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
           {icon}
@@ -68,11 +68,11 @@ function RecommendationCard({
           匹配度 {score}
         </div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-slate-600">{summary}</p>
-      <div className="mt-4 flex items-center gap-2">
+      <p className="mt-2 text-xs leading-5 text-slate-600">{summary}</p>
+      <div className="mt-3 flex items-center gap-2">
         <button
           onClick={onOpen}
-          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
         >
           进入模块
           <ArrowRight className="h-3.5 w-3.5" />
@@ -80,7 +80,7 @@ function RecommendationCard({
         {onFilter && (
           <button
             onClick={onFilter}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
           >
             先应用过滤器
           </button>

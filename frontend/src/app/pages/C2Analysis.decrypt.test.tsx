@@ -63,39 +63,41 @@ describe("C2Analysis decrypt workflow", () => {
     mocks.sentinelState.preparePacketStream.mockReset();
     mocks.sentinelState.locatePacketById.mockResolvedValue(null);
     mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "TCP", streamId: 9 });
-    mocks.getC2SampleAnalysis.mockResolvedValue(createAnalysis({
-      totalMatchedPackets: 1,
-      families: [{ label: "VShell", count: 1 }],
-      conversations: [{ label: "10.0.0.5 -> 10.0.0.8", protocol: "TCP", count: 2 }],
-      vshell: {
-        ...createAnalysis().vshell,
-        candidateCount: 1,
-        matchedRuleCount: 1,
-        channels: [{ label: "tcp", count: 1 }],
-        streamAggregates: [
-          {
-            streamId: 9,
-            protocol: "TCP",
-            totalPackets: 6,
-            archMarkers: [{ label: "l64", count: 1 }],
-            lengthPrefixCount: 3,
-            shortPackets: 4,
-            longPackets: 1,
-            transitions: 2,
-            heartbeatAvg: "10.0s",
-            heartbeatJitter: "0%",
-            intervals: [10, 10, 10],
-            hasWebSocket: false,
-            listenerHints: [{ label: "vshell-listener-port", count: 1 }],
-            packets: [81, 82, 83],
-            confidence: 74,
-            summary: "VShell stream-level 候选",
-          },
-        ],
-        notes: ["VShell listener 证据已汇总"],
-      },
-      notes: ["C2 evidence model ready"],
-    }));
+    mocks.getC2SampleAnalysis.mockResolvedValue(
+      createAnalysis({
+        totalMatchedPackets: 1,
+        families: [{ label: "VShell", count: 1 }],
+        conversations: [{ label: "10.0.0.5 -> 10.0.0.8", protocol: "TCP", count: 2 }],
+        vshell: {
+          ...createAnalysis().vshell,
+          candidateCount: 1,
+          matchedRuleCount: 1,
+          channels: [{ label: "tcp", count: 1 }],
+          streamAggregates: [
+            {
+              streamId: 9,
+              protocol: "TCP",
+              totalPackets: 6,
+              archMarkers: [{ label: "l64", count: 1 }],
+              lengthPrefixCount: 3,
+              shortPackets: 4,
+              longPackets: 1,
+              transitions: 2,
+              heartbeatAvg: "10.0s",
+              heartbeatJitter: "0%",
+              intervals: [10, 10, 10],
+              hasWebSocket: false,
+              listenerHints: [{ label: "vshell-listener-port", count: 1 }],
+              packets: [81, 82, 83],
+              confidence: 74,
+              summary: "VShell stream-level 候选",
+            },
+          ],
+          notes: ["VShell listener 证据已汇总"],
+        },
+        notes: ["C2 evidence model ready"],
+      }),
+    );
     mocks.decryptC2Traffic.mockResolvedValue({
       family: "vshell",
       status: "completed",
@@ -110,7 +112,7 @@ describe("C2Analysis decrypt workflow", () => {
           algorithm: "vshell-aes-gcm-md5-salt",
           keyStatus: "verified",
           confidence: 90,
-          plaintextPreview: "{\"cmd\":\"whoami\"}",
+          plaintextPreview: '{"cmd":"whoami"}',
           rawLength: 64,
           decryptedLength: 16,
           tags: ["base64"],
@@ -126,21 +128,30 @@ describe("C2Analysis decrypt workflow", () => {
     fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
     const modeSelect = screen.getByRole("combobox", { name: "模式" });
     expect(modeSelect).toHaveTextContent("auto：三 KDF + GCM/CBC 自动尝试");
-    expect(modeSelect).toHaveClass("rounded-xl", "border-slate-200", "shadow-sm");
+    expect(modeSelect).toHaveClass("gshark-field", "rounded-sm");
+    expect(modeSelect).not.toHaveClass("shadow-sm");
     fireEvent.change(screen.getByLabelText(/vkey/), { target: { value: "verify-me" } });
     fireEvent.change(screen.getByLabelText(/salt/), { target: { value: "qwe123qwe" } });
     fireEvent.click(screen.getByRole("button", { name: /批量解密候选流量/ }));
 
     await waitFor(() => {
-      expect(mocks.decryptC2Traffic).toHaveBeenCalledWith(expect.objectContaining({
-        family: "vshell",
-        vshell: expect.objectContaining({ vkey: "verify-me", salt: "qwe123qwe", mode: "auto" }),
-      }));
+      expect(mocks.decryptC2Traffic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          family: "vshell",
+          vshell: expect.objectContaining({ vkey: "verify-me", salt: "qwe123qwe", mode: "auto" }),
+        }),
+      );
       expect(screen.getByText(/解密结果 · completed/)).toBeInTheDocument();
-      const preview = screen.getByText("{\"cmd\":\"whoami\"}");
+      const preview = screen.getByText('{"cmd":"whoami"}');
       expect(preview).toBeInTheDocument();
       expect(preview.tagName.toLowerCase()).toBe("pre");
-      expect(preview).toHaveClass("max-h-72", "overflow-x-auto", "overflow-y-auto", "whitespace-pre-wrap", "break-words");
+      expect(preview).toHaveClass(
+        "max-h-72",
+        "overflow-x-auto",
+        "overflow-y-auto",
+        "whitespace-pre-wrap",
+        "break-words",
+      );
       expect(preview).not.toHaveClass("max-h-32", "overflow-auto");
       const boundedTable = findAncestorWithClass(preview, "max-h-[520px]");
       expect(boundedTable).not.toBeNull();

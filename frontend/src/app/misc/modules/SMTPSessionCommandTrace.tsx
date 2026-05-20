@@ -7,7 +7,7 @@ interface SMTPSessionCommandTraceProps {
 
 export function SMTPSessionCommandTrace({ selectedSession }: SMTPSessionCommandTraceProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="gshark-tile border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold text-slate-800">命令轨迹</div>
         <div className="text-[11px] text-slate-500">{selectedSession?.commands?.length ?? 0} 条</div>
@@ -18,8 +18,8 @@ export function SMTPSessionCommandTrace({ selectedSession }: SMTPSessionCommandT
           `${selectedSession?.streamId ?? "smtp"}-${command.packetId}-${command.summary || command.command || command.statusCode || "row"}`
         }
         maxHeightClassName="max-h-[320px]"
-        wrapperClassName="border-slate-100 bg-white"
-        headerClassName="bg-slate-50/95 text-slate-500"
+        wrapperClassName="gshark-tile-table border-slate-100"
+        headerClassName="gshark-tile-header bg-slate-50/80 text-slate-500"
         emptyText="暂无命令轨迹"
         rowClassName="hover:bg-sky-50/40"
         columns={[

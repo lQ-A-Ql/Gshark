@@ -38,7 +38,7 @@ export function WorkspacePreloadProgress({
     diagnostics?.phase === "path_mismatch";
   const showDetailedDiagnostics = elapsedMs >= 20000;
   return (
-    <div className="border-b border-blue-100 bg-white/78 px-3 py-2 backdrop-blur-xl">
+    <div className="gshark-tile-toolbar border-b border-blue-100 px-3 py-2">
       <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
         <span>正在预加载全部流量</span>
         <span>
@@ -134,7 +134,7 @@ function PreloadDiagnosticActions({ onRetryConfirm, onStop }: { onRetryConfirm: 
     <div className="flex shrink-0 gap-1">
       <button
         type="button"
-        className="inline-flex h-7 items-center gap-1 rounded border border-amber-300 bg-white px-2 font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
+        className="inline-flex h-7 items-center gap-1 rounded-sm border border-amber-300 bg-transparent px-2 font-semibold text-amber-900 transition hover:bg-amber-50/45"
         onClick={onRetryConfirm}
       >
         <RefreshCw className="h-3.5 w-3.5" />
@@ -142,7 +142,7 @@ function PreloadDiagnosticActions({ onRetryConfirm, onStop }: { onRetryConfirm: 
       </button>
       <button
         type="button"
-        className="inline-flex h-7 items-center gap-1 rounded border border-slate-300 bg-white px-2 font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+        className="inline-flex h-7 items-center gap-1 rounded-sm border border-slate-300 bg-transparent px-2 font-semibold text-slate-700 transition hover:bg-slate-50/45"
         onClick={onStop}
       >
         <Square className="h-3.5 w-3.5" />

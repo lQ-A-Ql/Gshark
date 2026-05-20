@@ -52,26 +52,17 @@ export function AnalysisDataTable<T = ReactNode[]>({
   const hasStructuredRows = Boolean(columns && data);
 
   return (
-    <div
-      className={cn(
-        "overflow-auto rounded-2xl border border-slate-100 bg-white/70",
-        maxHeightClassName,
-        wrapperClassName,
-      )}
-    >
+    <div className={cn("gshark-tile-table", maxHeightClassName, wrapperClassName)}>
       <table className={cn("w-full table-fixed border-collapse text-left text-xs", tableClassName)}>
         <thead
-          className={cn(
-            "sticky top-0 bg-slate-50/95 text-slate-500 shadow-[0_1px_0_0_rgba(226,232,240,0.9)]",
-            headerClassName,
-          )}
+          className={cn("sticky top-0 bg-[var(--gshark-table-header-bg)] text-[11px] text-slate-500", headerClassName)}
         >
           <tr>
             {effectiveHeaders.map((header, index) => (
               <th
                 key={columns?.[index]?.key ?? `${String(header)}-${index}`}
                 className={cn(
-                  "px-3 py-2 font-medium",
+                  "px-2.5 py-2 font-semibold",
                   columns?.[index]?.widthClassName,
                   columns?.[index]?.headerClassName,
                   headerCellClassName,
@@ -86,7 +77,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
           {hasStructuredRows ? (
             (data ?? []).length === 0 ? (
               <tr>
-                <td colSpan={effectiveHeaders.length} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={effectiveHeaders.length} className="px-3 py-5 text-center text-slate-500">
                   {emptyText}
                 </td>
               </tr>
@@ -110,7 +101,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                   <Fragment key={resolvedRowKey}>
                     <tr
                       className={cn(
-                        "border-b border-slate-100 align-top transition-colors hover:bg-slate-50/70",
+                        "border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-slate-500/5",
                         onRowClick && "cursor-pointer",
                         resolvedRowClassName,
                       )}
@@ -125,7 +116,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                           <td
                             key={column.key}
                             className={cn(
-                              "break-words px-3 py-2",
+                              "break-words px-2.5 py-1.5",
                               column.className,
                               resolvedCellClassName,
                               cellClassName,
@@ -139,11 +130,14 @@ export function AnalysisDataTable<T = ReactNode[]>({
                     {hasExpandedContent && (
                       <tr
                         key={`${resolvedRowKey}-expanded`}
-                        className={cn("border-b border-slate-100 bg-slate-50/50", resolvedExpandedRowClassName)}
+                        className={cn(
+                          "border-b border-[var(--gshark-tile-divider)] bg-slate-500/5",
+                          resolvedExpandedRowClassName,
+                        )}
                       >
                         <td
                           colSpan={effectiveHeaders.length}
-                          className={cn("px-3 pb-4 pt-0", resolvedExpandedCellClassName)}
+                          className={cn("px-2.5 pb-3 pt-0", resolvedExpandedCellClassName)}
                         >
                           {expandedContent}
                         </td>
@@ -155,15 +149,18 @@ export function AnalysisDataTable<T = ReactNode[]>({
             )
           ) : (rows ?? []).length === 0 ? (
             <tr>
-              <td colSpan={effectiveHeaders.length} className="px-3 py-6 text-center text-slate-500">
+              <td colSpan={effectiveHeaders.length} className="px-3 py-5 text-center text-slate-500">
                 {emptyText}
               </td>
             </tr>
           ) : (
             (rows ?? []).map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-slate-100 align-top transition-colors hover:bg-slate-50/70">
+              <tr
+                key={rowIndex}
+                className="border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-slate-500/5"
+              >
                 {row.map((value, cellIndex) => (
-                  <td key={`${rowIndex}-${cellIndex}`} className={cn("break-words px-3 py-2", cellClassName)}>
+                  <td key={`${rowIndex}-${cellIndex}`} className={cn("break-words px-2.5 py-1.5", cellClassName)}>
                     {value}
                   </td>
                 ))}
