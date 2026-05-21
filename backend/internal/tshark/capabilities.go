@@ -100,8 +100,9 @@ var optionalCapabilityFields = []string{
 }
 
 var capabilityFieldAliases = map[string][]string{
-	"_ws.col.Protocol": {"_ws.col.protocol"},
-	"_ws.col.Info":     {"_ws.col.info"},
+	"_ws.col.Protocol":  {"_ws.col.protocol"},
+	"_ws.col.Info":      {"_ws.col.info"},
+	"usbms.scsi.opcode": {"scsi.spc.opcode"},
 }
 
 func CurrentCapabilities(ctx context.Context, binary string) Capabilities {

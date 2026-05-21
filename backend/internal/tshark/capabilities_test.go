@@ -112,6 +112,30 @@ func TestCurrentCapabilitiesAcceptsColumnFieldAliases(t *testing.T) {
 	}
 }
 
+func TestCurrentCapabilitiesAcceptsUSBMassStorageOpcodeAlias(t *testing.T) {
+	ClearCapabilityCache()
+	t.Cleanup(ClearCapabilityCache)
+
+	fields := append([]string{}, requiredCapabilityFields...)
+	fields = append(fields, displayLayerCapabilityFields...)
+	for _, field := range optionalCapabilityFields {
+		if field == "usbms.scsi.opcode" {
+			fields = append(fields, "scsi.spc.opcode")
+			continue
+		}
+		fields = append(fields, field)
+	}
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	capabilities := CurrentCapabilities(context.Background(), binary)
+
+	if capabilities.FieldProfile != FieldProfileFull || capabilities.CapabilityCheckDegraded {
+		t.Fatalf("expected scsi.spc.opcode alias to satisfy usbms.scsi.opcode, got %+v", capabilities)
+	}
+	if stringSliceHas(capabilities.MissingOptionalFields, "usbms.scsi.opcode") {
+		t.Fatalf("usbms.scsi.opcode should be satisfied by scsi.spc.opcode alias, got %+v", capabilities.MissingOptionalFields)
+	}
+}
+
 func TestParseFieldRegistryName(t *testing.T) {
 	tests := map[string]string{
 		"F\tFrame number\tframe.number\tFT_UINT32\tframe\tBASE_DEC\t0x0\tFrame number": "frame.number",

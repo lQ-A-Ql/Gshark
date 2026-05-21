@@ -42,6 +42,13 @@ type fieldScanCacheEntry struct {
 	rows       [][]string
 }
 
+// FieldScanFallback describes one candidate field layout in a version-tolerant
+// scan. RequiredNonEmpty is evaluated against the caller's requested layout.
+type FieldScanFallback struct {
+	Fields           []string
+	RequiredNonEmpty []int
+}
+
 func scanFieldRows(filePath string, fields []string, onRow func([]string)) error {
 	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{}, onRow)
 }
@@ -55,6 +62,51 @@ func ScanFieldRowsWithDisplayFilter(filePath string, fields []string, displayFil
 // ScanFieldRows is the exported no-options field-scan entry point.
 func ScanFieldRows(filePath string, fields []string, onRow func([]string)) error {
 	return scanFieldRows(filePath, fields, onRow)
+}
+
+// ScanFieldRowsWithFallbacks tries several candidate field layouts until one
+// returns rows with required payload columns populated. It is intended for
+// protocol body extraction where Wireshark versions expose equivalent bytes
+// through different display fields.
+func ScanFieldRowsWithFallbacks(filePath string, displayFilter string, fallbacks []FieldScanFallback, onRow func([]string)) error {
+	var lastErr error
+	for _, fallback := range fallbacks {
+		rows := make([][]string, 0, 64)
+		err := scanFieldRowsWithOptions(filePath, fallback.Fields, fieldScanOptions{DisplayFilter: displayFilter}, func(parts []string) {
+			rows = append(rows, append([]string(nil), parts...))
+		})
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if len(rows) == 0 || !fieldScanRowsHaveRequiredValues(rows, fallback.RequiredNonEmpty) {
+			continue
+		}
+		if onRow != nil {
+			for _, row := range rows {
+				onRow(append([]string(nil), row...))
+			}
+		}
+		return nil
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func fieldScanRowsHaveRequiredValues(rows [][]string, required []int) bool {
+	if len(required) == 0 {
+		return len(rows) > 0
+	}
+	for _, row := range rows {
+		for _, index := range required {
+			if index >= 0 && index < len(row) && strings.TrimSpace(row[index]) != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // scanFieldRowsWithOptions is the single cache-aware code path that every

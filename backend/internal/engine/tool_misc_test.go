@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 func TestGenerateSMB3RandomSessionKey(t *testing.T) {
@@ -228,6 +230,56 @@ func TestRunWinRMDecryptRejectsMissingCapture(t *testing.T) {
 	}
 }
 
+func TestRunWinRMDecryptReturnsDiagnosticWhenNoPreviewIsExtracted(t *testing.T) {
+	original := scanWinRMRowsWithFallbacks
+	defer func() { scanWinRMRowsWithFallbacks = original }()
+
+	scanWinRMRowsWithFallbacks = func(_ string, _ string, _ []tshark.FieldScanFallback, onRow func([]string)) error {
+		onRow([]string{"1272", "time", "10.0.0.1", "10.0.0.2", "40000", "5985", "", "", "01 02:03-04"})
+		return nil
+	}
+
+	svc := NewService(nil, nil)
+	svc.pcap = "case.pcapng"
+
+	result, err := svc.RunWinRMDecrypt(model.WinRMDecryptRequest{
+		Port:         5985,
+		AuthMode:     "password",
+		Password:     "pass",
+		PreviewLines: 20,
+	})
+	if err != nil {
+		t.Fatalf("RunWinRMDecrypt error = %v", err)
+	}
+	if !strings.Contains(result.Message, "未提取到可预览的 WinRM 明文") {
+		t.Fatalf("expected diagnostic message, got %q", result.Message)
+	}
+	if !strings.Contains(result.PreviewText, "WinRM 解密分析已完成") {
+		t.Fatalf("expected diagnostic preview, got %q", result.PreviewText)
+	}
+	if result.FrameCount != 0 {
+		t.Fatalf("expected no decrypted frames, got %d", result.FrameCount)
+	}
+	if result.LineCount == 0 {
+		t.Fatal("expected diagnostic line count")
+	}
+
+	path, filename, err := svc.WinRMExportFile(result.ResultID)
+	if err != nil {
+		t.Fatalf("WinRMExportFile error = %v", err)
+	}
+	if filename != result.ExportFilename {
+		t.Fatalf("export filename mismatch: %q vs %q", filename, result.ExportFilename)
+	}
+	exported, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	if !strings.Contains(string(exported), "未提取到可预览的明文") {
+		t.Fatalf("expected diagnostic export, got %q", string(exported))
+	}
+}
+
 func TestNTOWFV1ProducesNTHash(t *testing.T) {
 	got := hex.EncodeToString(ntowfv1("password"))
 	if got != "8846f7eaee8fb117ad06bdd830b7586c" {
@@ -282,30 +334,20 @@ func TestExplainWinRMScanErrorIncludesSMB2Hint(t *testing.T) {
 }
 
 func TestScanWinRMRowsFallsBackWhenMimeMultipartFieldUnsupported(t *testing.T) {
-	original := scanWinRMRowsWithDisplayFilter
-	defer func() { scanWinRMRowsWithDisplayFilter = original }()
+	original := scanWinRMRowsWithFallbacks
+	defer func() { scanWinRMRowsWithFallbacks = original }()
 
-	calls := 0
-	scanWinRMRowsWithDisplayFilter = func(_ string, fields []string, _ string, onRow func([]string)) error {
-		calls++
-		lastField := fields[len(fields)-1]
-		switch lastField {
-		case "mime_multipart.data":
-			return fmt.Errorf("wait tshark: exit status 1: Some fields aren't valid: mime_multipart.data")
-		case "http.file_data":
-			onRow([]string{"1272", "time", "1.1.1.1", "2.2.2.2", "5985", "40000", "", "", "aa bb"})
-			return nil
-		default:
-			return fmt.Errorf("unexpected fallback field %s", lastField)
+	scanWinRMRowsWithFallbacks = func(_ string, _ string, fallbacks []tshark.FieldScanFallback, onRow func([]string)) error {
+		if len(fallbacks) < 2 || fallbacks[0].Fields[len(fallbacks[0].Fields)-1] != "http.file_data" {
+			return fmt.Errorf("expected stable HTTP payload field first, got %#v", fallbacks)
 		}
+		onRow([]string{"1272", "time", "1.1.1.1", "2.2.2.2", "5985", "40000", "", "", "aa bb"})
+		return nil
 	}
 
 	rows, err := scanWinRMRows("demo.pcapng", 5985)
 	if err != nil {
 		t.Fatalf("scanWinRMRows error = %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected 2 scan attempts, got %d", calls)
 	}
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rows))
@@ -315,11 +357,35 @@ func TestScanWinRMRowsFallsBackWhenMimeMultipartFieldUnsupported(t *testing.T) {
 	}
 }
 
-func TestScanWinRMRowsDecoratesSMB2PreferenceError(t *testing.T) {
-	original := scanWinRMRowsWithDisplayFilter
-	defer func() { scanWinRMRowsWithDisplayFilter = original }()
+func TestScanWinRMRowsFallsBackWhenMimeMultipartProjectsEmptyPayload(t *testing.T) {
+	original := scanWinRMRowsWithFallbacks
+	defer func() { scanWinRMRowsWithFallbacks = original }()
 
-	scanWinRMRowsWithDisplayFilter = func(_ string, _ []string, _ string, _ func([]string)) error {
+	scanWinRMRowsWithFallbacks = func(_ string, _ string, fallbacks []tshark.FieldScanFallback, onRow func([]string)) error {
+		if len(fallbacks) < 4 {
+			return fmt.Errorf("expected multiple payload fallbacks, got %#v", fallbacks)
+		}
+		onRow([]string{"1272", "time", "1.1.1.1", "2.2.2.2", "5985", "40000", "Negotiate token", "", "aa bb"})
+		return nil
+	}
+
+	rows, err := scanWinRMRows("demo.pcapng", 5985)
+	if err != nil {
+		t.Fatalf("scanWinRMRows error = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	if rows[0].mimeData != "aa bb" {
+		t.Fatalf("expected http.file_data payload fallback, got %q", rows[0].mimeData)
+	}
+}
+
+func TestScanWinRMRowsDecoratesSMB2PreferenceError(t *testing.T) {
+	original := scanWinRMRowsWithFallbacks
+	defer func() { scanWinRMRowsWithFallbacks = original }()
+
+	scanWinRMRowsWithFallbacks = func(_ string, _ string, _ []tshark.FieldScanFallback, _ func([]string)) error {
 		return fmt.Errorf("wait tshark: exit status 1: tshark: Error loading table 'Secret session key to use for decryption': smb2_seskey_list:5: unexpected char 6")
 	}
 

@@ -435,8 +435,19 @@ var csHTTPFieldDecryptFields = []string{
 	"http.response.code",
 	"http.cookie",
 	"http.authorization",
+	"http.body.reassembled.data",
+	"http.body.segment",
 	"http.file_data",
 	"data.data",
+}
+
+var csHTTPPayloadFieldIndices = []int{12, 13, 14, 15}
+
+var csHTTPPayloadFieldLabels = map[int]string{
+	12: "http_body_reassembled_data",
+	13: "http_body_segment",
+	14: "http_file_data",
+	15: "data_data",
 }
 
 func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
@@ -446,35 +457,17 @@ func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen 
 	if pcap == "" || len(*out) >= c2DecryptMaxRecords {
 		return nil
 	}
-	plannedScan, err := tshark.BuildPlannedFieldArgs([]string{
-		"-r", pcap,
-		"-Y", `http && (http.request.method == POST || (http.response.code == 200 && http.content_length < 100000) || http.cookie || http.authorization)`,
-		"-T", "fields",
-		"-E", "separator=/t",
-	}, csHTTPFieldDecryptFields)
-	if err != nil {
-		return err
-	}
-	cmd, err := tshark.CommandContext(ctx, plannedScan.Args...)
-	if err != nil {
-		return err
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	readErr := readCSHTTPFieldCandidates(ctx, stdout, plannedScan, seen, out)
-	waitErr := cmd.Wait()
-	if readErr != nil {
-		return readErr
-	}
-	if waitErr != nil {
-		return waitErr
-	}
-	return nil
+	return tshark.ScanFieldRowsWithFallbacks(
+		pcap,
+		`http && (http.request.method == POST || (http.response.code == 200 && http.content_length < 100000) || http.cookie || http.authorization)`,
+		[]tshark.FieldScanFallback{{Fields: csHTTPFieldDecryptFields, RequiredNonEmpty: csHTTPPayloadFieldIndices}},
+		func(fields []string) {
+			if len(*out) >= c2DecryptMaxRecords {
+				return
+			}
+			appendCSHTTPFieldCandidatesFromFields(fields, seen, out)
+		},
+	)
 }
 
 func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, plannedScan tshark.PlannedFieldScan, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
@@ -499,7 +492,11 @@ func readCSHTTPFieldCandidates(ctx context.Context, reader io.Reader, plannedSca
 func appendCSHTTPFieldCandidatesFromLine(line string, plannedScan tshark.PlannedFieldScan, seen map[string]struct{}, out *[]c2DecryptCandidate) {
 	fields := strings.Split(strings.TrimRight(line, "\r\n"), "\t")
 	fields = plannedScan.ProjectRow(fields)
-	for len(fields) < 14 {
+	appendCSHTTPFieldCandidatesFromFields(fields, seen, out)
+}
+
+func appendCSHTTPFieldCandidatesFromFields(fields []string, seen map[string]struct{}, out *[]c2DecryptCandidate) {
+	for len(fields) < len(csHTTPFieldDecryptFields) {
 		fields = append(fields, "")
 	}
 	frameID, _ := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
@@ -524,22 +521,17 @@ func appendCSHTTPFieldCandidatesFromLine(line string, plannedScan tshark.Planned
 	} else if status == "200" {
 		direction = "server_to_client"
 	}
-	for _, item := range []struct {
-		value string
-		tag   string
-	}{
-		{fields[12], "http_file_data"},
-		{fields[13], "data_data"},
-	} {
-		raw, ok := decodeColonOrPlainHex(item.value)
+	for _, index := range csHTTPPayloadFieldIndices {
+		tag := csHTTPPayloadFieldLabels[index]
+		raw, ok := decodeColonOrPlainHex(fields[index])
 		if !ok || len(raw) < 8 || len(raw) > 128*1024 {
 			continue
 		}
 		candidate := c2DecryptCandidate{
 			packet:    packet,
 			raw:       raw,
-			label:     "tshark:" + item.tag,
-			transform: "cs-http-tshark-" + item.tag + "-hex",
+			label:     "tshark:" + tag,
+			transform: "cs-http-tshark-" + tag + "-hex",
 			direction: direction,
 		}
 		if appendC2DecryptCandidate(out, seen, candidate) {

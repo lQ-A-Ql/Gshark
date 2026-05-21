@@ -144,7 +144,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 - 运行时组件设置里的输入框为空，不等于组件不可用。输入框代表用户固定保存的显式路径；下方状态卡显示后端从环境变量、`PATH` 或默认目录探测到的当前实际路径。
 - 保存空的 FFmpeg / Python / Vosk 字段会清除当前后端进程中的对应 `GSHARK_*` 显式配置，随后回到 `PATH` 或默认目录探测。
 - 旧版前端可能留下全空的运行时配置缓存；新版启动会把这类缓存迁移为“自动观测配置”，不会再用空值覆盖后端进程已经读取到的 `GSHARK_*` 环境变量。只有用户在设置侧栏点击“保存并应用”的字段才会作为显式配置写回后端。
-- `tshark` 能力探测中出现 `profile=compat` 或缺少 `usbms.scsi.opcode` 等可选字段时，表示部分专项分析降级，不表示 `tshark` 不可用。抓包入口只以 `tshark.available` 作为可用判断。
+- `tshark` 能力探测中出现 `profile=compat` 或缺少可选字段时，表示部分专项分析降级，不表示 `tshark` 不可用。4.6.5 中 USB Mass Storage SCSI opcode 使用 `scsi.spc.opcode`，后端会兼容旧请求名 `usbms.scsi.opcode`。抓包入口只以 `tshark.available` 作为可用判断。
 - 语音转写状态会拆分显示 Python、`vosk` 包、Vosk 模型目录和 FFmpeg。Python 已就绪但默认模型目录不存在时，`speech.available=false` 是模型缺失，不是 Python 不可读。
 - Wails 配置默认使用 `pnpm install` 和 `pnpm run build:wails`。
 

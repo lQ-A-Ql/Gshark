@@ -80,6 +80,32 @@ func TestPlanFieldScanByCapabilitiesUsesRegisteredAliases(t *testing.T) {
 	}
 }
 
+func TestPlanFieldScanByCapabilitiesUsesUSBMassStorageOpcodeAlias(t *testing.T) {
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+		ClearCapabilityCache()
+	})
+	ClearCapabilityCache()
+
+	fields := append([]string{}, requiredCapabilityFields...)
+	fields = append(fields, "scsi.spc.opcode")
+	binary := writeFakeTShark(t, "TShark 4.6.5", fields)
+	SetBinaryPath(binary)
+
+	plan, err := planFieldScanByCapabilities([]string{"frame.number", "usbms.scsi.opcode"})
+	if err != nil {
+		t.Fatalf("planFieldScanByCapabilities() error = %v", err)
+	}
+	if len(plan.tsharkFields) != 2 || plan.tsharkFields[1] != "scsi.spc.opcode" {
+		t.Fatalf("expected usbms.scsi.opcode to resolve to scsi.spc.opcode, got %#v", plan.tsharkFields)
+	}
+	row := projectCapabilityFieldScanRow([]string{"9", "0x2a"}, plan)
+	if len(row) != 2 || row[1] != "0x2a" {
+		t.Fatalf("unexpected projected row: %#v", row)
+	}
+}
+
 func TestAppendPlannedFieldArgsUsesAliasesAndSkipsOptional(t *testing.T) {
 	oldBinary := ConfiguredBinaryPath()
 	t.Cleanup(func() {
@@ -172,6 +198,43 @@ func TestScanFieldRowsWithOptionsReusesSupersetCache(t *testing.T) {
 	}
 	if rows[0][0] != "GET /index" || rows[0][1] != "7" {
 		t.Fatalf("unexpected projected row: %#v", rows[0])
+	}
+}
+
+func TestScanFieldRowsWithFallbacksSkipsEmptyRequiredProjection(t *testing.T) {
+	ClearFieldScanCache("")
+	t.Cleanup(func() {
+		ClearFieldScanCache("")
+		ClearCapabilityCache()
+	})
+	oldBinary := ConfiguredBinaryPath()
+	t.Cleanup(func() {
+		SetBinaryPath(oldBinary)
+	})
+	ClearCapabilityCache()
+
+	binary := writeFakeTShark(t, "TShark 4.6.5", []string{"frame.number", "http.file_data"})
+	SetBinaryPath(binary)
+
+	key := cacheKey(buildFieldScanCacheParams("demo.pcap", normalizeFieldScanOptions(fieldScanOptions{DisplayFilter: "http"})))
+	storeFieldScanCacheEntry(key, "demo.pcap", []string{"frame.number"}, [][]string{{"7"}})
+	storeFieldScanCacheEntry(key, "demo.pcap", []string{"frame.number", "http.file_data"}, [][]string{{"7", "aa bb"}})
+
+	var rows [][]string
+	err := ScanFieldRowsWithFallbacks("demo.pcap", "http", []FieldScanFallback{
+		{Fields: []string{"frame.number", "mime_multipart.data"}, RequiredNonEmpty: []int{1}},
+		{Fields: []string{"frame.number", "http.file_data"}, RequiredNonEmpty: []int{1}},
+	}, func(parts []string) {
+		rows = append(rows, parts)
+	})
+	if err != nil {
+		t.Fatalf("ScanFieldRowsWithFallbacks() error = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one fallback row, got %d", len(rows))
+	}
+	if rows[0][0] != "7" || rows[0][1] != "aa bb" {
+		t.Fatalf("expected stable payload fallback row, got %#v", rows[0])
 	}
 }
 

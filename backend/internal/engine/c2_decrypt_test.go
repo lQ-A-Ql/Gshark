@@ -775,7 +775,7 @@ func TestAppendCSHTTPFieldCandidatesUsesPlannedProjection(t *testing.T) {
 	setField("ip.dst", "10.0.0.2")
 	setField("tcp.dstport", "80")
 	setField("http.response.code", "200")
-	setField("http.file_data", "4142434445464748")
+	setField("http.body.reassembled.data", "4142434445464748")
 
 	seen := map[string]struct{}{}
 	out := []c2DecryptCandidate{}
@@ -789,6 +789,9 @@ func TestAppendCSHTTPFieldCandidatesUsesPlannedProjection(t *testing.T) {
 	}
 	if string(out[0].raw) != "ABCDEFGH" {
 		t.Fatalf("unexpected raw candidate: %x", out[0].raw)
+	}
+	if out[0].label != "tshark:http_body_reassembled_data" {
+		t.Fatalf("unexpected payload label: %s", out[0].label)
 	}
 }
 

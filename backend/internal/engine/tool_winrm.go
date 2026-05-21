@@ -24,9 +24,18 @@ import (
 	"golang.org/x/text/transform"
 )
 
-var scanWinRMRowsWithDisplayFilter = tshark.ScanFieldRowsWithDisplayFilter
+var scanWinRMRowsWithFallbacks = tshark.ScanFieldRowsWithFallbacks
 
 const defaultWinRMPreviewLines = 200
+
+var winRMHTTPPayloadFields = []string{
+	"http.file_data",
+	"http.body.reassembled.data",
+	"http.body.segment",
+	"data.data",
+	"mime_multipart.data",
+	"mime_multipart.part",
+}
 
 type winrmDecryptOptions struct {
 	includeErrorFrames   bool
@@ -139,7 +148,7 @@ func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinR
 	}
 	fullText := report.text
 	if strings.TrimSpace(fullText) == "" {
-		return model.WinRMDecryptResult{}, fmt.Errorf("未提取到可预览的 WinRM 明文")
+		fullText = buildWinRMNoPreviewReport(capturePath, req.Port, len(rows), report)
 	}
 
 	lines := splitNonEmptyLines(fullText)
@@ -162,8 +171,44 @@ func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinR
 		ErrorFrameCount:     report.errorFrameCount,
 		ExtractedFrameCount: report.extractedFrameCount,
 		ExportFilename:      filename,
-		Message:             "ok",
+		Message:             winRMDecryptResultMessage(report),
 	}, nil
+}
+
+func winRMDecryptResultMessage(report winrmDecryptReport) string {
+	if strings.TrimSpace(report.text) != "" {
+		return "ok"
+	}
+	return "未提取到可预览的 WinRM 明文，已生成诊断结果"
+}
+
+func buildWinRMNoPreviewReport(capturePath string, port int, rowCount int, report winrmDecryptReport) string {
+	lines := []string{
+		"WinRM 解密分析已完成，但未提取到可预览的明文。",
+		fmt.Sprintf("抓包: %s", filepath.Base(capturePath)),
+		fmt.Sprintf("端口: %d", port),
+		fmt.Sprintf("扫描命中行: %d", rowCount),
+		fmt.Sprintf("已解密载荷帧: %d", report.frameCount),
+		fmt.Sprintf("解密失败帧: %d", report.errorFrameCount),
+		fmt.Sprintf("含命令/回显提取帧: %d", report.extractedFrameCount),
+		"",
+	}
+
+	switch {
+	case rowCount == 0:
+		lines = append(lines, "判断: 未发现目标端口上的 HTTP / WinRM 候选行。请确认端口、抓包方向和 display filter 可命中 WinRM 流量。")
+	case report.frameCount == 0 && report.errorFrameCount > 0:
+		lines = append(lines, "判断: 已发现候选行，但解密或签名校验失败。请核对密码、NT Hash、NTLM 会话完整性与加密 payload 是否连续。")
+	case report.frameCount == 0:
+		lines = append(lines, "判断: 已发现候选行，但未建立完整 NTLM 安全上下文，或未找到可解封装的 WinRM 加密 payload。")
+	case report.extractedFrameCount == 0:
+		lines = append(lines, "判断: 已解密到 WinRM 消息，但当前结果没有可抽取的 Command / stdin / stdout / stderr 内容。")
+	default:
+		lines = append(lines, "判断: 当前结果为空，可能仅包含空消息、控制消息，或该会话没有可展示正文。")
+	}
+
+	lines = append(lines, "", "建议: 若抓包只包含认证握手、控制帧或非交互命令，这属于正常空结果；若期望看到命令回显，请确认抓包包含完整 NTLM Type1/Type2/Type3 握手及其后的加密 WinRM 请求/响应。")
+	return strings.Join(lines, "\n")
 }
 
 func (s *Service) WinRMExportFile(resultID string) (string, string, error) {
@@ -185,73 +230,43 @@ func scanWinRMRowsWithContext(ctx context.Context, capturePath string, port int)
 		ctx = context.Background()
 	}
 	filter := fmt.Sprintf("http && tcp.port == %d", port)
-	fieldSets := [][]string{
-		{
-			"frame.number",
-			"frame.time",
-			"ip.src",
-			"ip.dst",
-			"tcp.srcport",
-			"tcp.dstport",
-			"http.authorization",
-			"http.www_authenticate",
-			"mime_multipart.data",
-		},
-		{
-			"frame.number",
-			"frame.time",
-			"ip.src",
-			"ip.dst",
-			"tcp.srcport",
-			"tcp.dstport",
-			"http.authorization",
-			"http.www_authenticate",
-			"http.file_data",
-		},
-		{
-			"frame.number",
-			"frame.time",
-			"ip.src",
-			"ip.dst",
-			"tcp.srcport",
-			"tcp.dstport",
-			"http.authorization",
-			"http.www_authenticate",
-			"data.data",
-		},
+	baseFields := []string{
+		"frame.number",
+		"frame.time",
+		"ip.src",
+		"ip.dst",
+		"tcp.srcport",
+		"tcp.dstport",
+		"http.authorization",
+		"http.www_authenticate",
 	}
-	var lastErr error
-	for index, fields := range fieldSets {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+	fallbacks := make([]tshark.FieldScanFallback, 0, len(winRMHTTPPayloadFields))
+	for _, payloadField := range winRMHTTPPayloadFields {
+		fields := append(append([]string{}, baseFields...), payloadField)
+		fallbacks = append(fallbacks, tshark.FieldScanFallback{Fields: fields, RequiredNonEmpty: []int{len(fields) - 1}})
+	}
+
+	rows := make([]winrmMessageRow, 0, 64)
+	err := scanWinRMRowsWithFallbacks(capturePath, filter, fallbacks, func(parts []string) {
+		if len(parts) < len(baseFields)+1 {
+			return
 		}
-		rows := make([]winrmMessageRow, 0, 64)
-		err := scanWinRMRowsWithDisplayFilter(capturePath, fields, filter, func(parts []string) {
-			if len(parts) < len(fields) {
-				return
-			}
-			rows = append(rows, winrmMessageRow{
-				frameNumber: parts[0],
-				timestamp:   parts[1],
-				src:         parts[2],
-				dst:         parts[3],
-				srcPort:     parts[4],
-				dstPort:     parts[5],
-				authHeader:  parts[6],
-				wwwAuth:     parts[7],
-				mimeData:    parts[8],
-			})
+		rows = append(rows, winrmMessageRow{
+			frameNumber: parts[0],
+			timestamp:   parts[1],
+			src:         parts[2],
+			dst:         parts[3],
+			srcPort:     parts[4],
+			dstPort:     parts[5],
+			authHeader:  parts[6],
+			wwwAuth:     parts[7],
+			mimeData:    parts[8],
 		})
-		if err == nil {
-			return rows, nil
-		}
-		lastErr = err
-		if index < len(fieldSets)-1 && isWinRMFieldCompatibilityError(err) {
-			continue
-		}
-		break
+	})
+	if err != nil {
+		return nil, fmt.Errorf("扫描 WinRM 字段失败: %s", explainWinRMScanError(err))
 	}
-	return nil, fmt.Errorf("扫描 WinRM 字段失败: %s", explainWinRMScanError(lastErr))
+	return rows, ctx.Err()
 }
 
 func isWinRMFieldCompatibilityError(err error) bool {
