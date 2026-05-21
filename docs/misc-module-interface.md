@@ -1,5 +1,7 @@
 # MISC 模块接口规范 v3
 
+> 品牌已更名为 `meow~traffic`；但 `%AppData%/gshark-sentinel/...`、`GSHARK_MISC_*`、`gshark_misc_host` 等内部兼容标识仍保持旧名，以下说明以当前真实运行行为为准。
+
 本文档描述当前 `MISC` 区模块化能力的真实落地形态，重点覆盖：
 
 - 单 `exe` 客户端下为什么采用 zip 模块包

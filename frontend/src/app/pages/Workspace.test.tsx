@@ -89,7 +89,7 @@ describe("Workspace", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByText(/GSHARK QUICK START/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/MEOW~TRAFFIC QUICK START/)).not.toBeInTheDocument();
     expect(screen.getByText("流量工作区")).toBeInTheDocument();
     expect(screen.getByText("正在预加载全部流量")).toBeInTheDocument();
   });

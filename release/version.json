@@ -1,6 +1,6 @@
 {
   "version": "v1.0.3",
-  "name": "Gshark v1.0.3",
+  "name": "meow~traffic v1.0.3",
   "published_at": "2026-05-19T15:57:53.629520Z",
   "release_url": "https://github.com/lQ-A-Ql/Gshark/releases/tag/v1.0.3",
   "notes": "\n- 强化了IPC与HTTP的兼容 \n- 优化了USB流量的使用体验 \n",
@@ -8,8 +8,8 @@
   "generated_at": "2026-05-19T15:57:53.629520Z",
   "assets": [
     {
-      "name": "gshark.v1.0.3.exe",
-      "download_url": "https://github.com/lQ-A-Ql/Gshark/releases/download/v1.0.3/gshark.v1.0.3.exe",
+      "name": "meow-traffic.v1.0.3.exe",
+      "download_url": "https://github.com/lQ-A-Ql/Gshark/releases/download/v1.0.3/meow-traffic.v1.0.3.exe",
       "size": 47793664,
       "content_type": "application/vnd.microsoft.portable-executable",
       "sha256": "97fc15d08d6fce22f9fcf4eb4c9d01238a82f485521fb689c900bb0a79e8275b",

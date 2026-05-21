@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "gshark-sentinel",
-  "outputfilename": "gshark-sentinel",
+  "name": "meow~traffic",
+  "outputfilename": "meow-traffic",
   "frontend:dir": "frontend",
   "frontend:install": "pnpm install",
   "frontend:build": "pnpm run build:wails",
@@ -9,7 +9,7 @@
   "frontend:dev:build": "pnpm run build:wails",
   "assetdir": "frontend/dist",
   "author": {
-    "name": "GShark Team",
+    "name": "meow~traffic Team",
     "email": "dev@gshark.local"
   }
 }

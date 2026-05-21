@@ -2,7 +2,7 @@
 
 ## Overview
 
-本设计文档描述 GShark-Sentinel **迭代式开发治理（iterative-dev-governance）** 系统的技术架构。
+本设计文档描述 meow~traffic **迭代式开发治理（iterative-dev-governance）** 系统的技术架构。
 
 治理系统的核心目标是：让 Governance_Agent（Codex / Kiro）能够**自主、持续、可追溯**地消解已知架构缺陷，同时不中断主线能力交付。系统通过三个机制实现这一目标：
 

@@ -33,7 +33,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Name)) {
-  $Name = "Gshark $Version"
+  $Name = "meow~traffic $Version"
 }
 
 if ([string]::IsNullOrWhiteSpace($AssetUrl)) {
@@ -86,8 +86,8 @@ if (-not (Test-Path $outputDir)) {
 $json = $manifest | ConvertTo-Json -Depth 6
 Set-Content -Path $OutputPath -Value $json -Encoding UTF8
 
-Write-Host "[gshark] update manifest written to $OutputPath" -ForegroundColor Green
-Write-Host "[gshark] manifest asset: $AssetName" -ForegroundColor Cyan
+Write-Host "[meow-traffic] update manifest written to $OutputPath" -ForegroundColor Green
+Write-Host "[meow-traffic] manifest asset: $AssetName" -ForegroundColor Cyan
 if ($sha256) {
-  Write-Host "[gshark] manifest sha256: $sha256" -ForegroundColor Cyan
+  Write-Host "[meow-traffic] manifest sha256: $sha256" -ForegroundColor Cyan
 }

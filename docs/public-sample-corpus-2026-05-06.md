@@ -6,7 +6,7 @@ Timestamp: 2026-05-06 20:36:55 +08:00
 
 ## Goal
 
-Collect a modest, reproducible public PCAP set for blue-team validation of the current GShark analysis modules without downloading malware binaries or large research datasets. This corpus is meant to supplement the user's local CS, VShell, WebShell, Modbus, CAN, HTTP, and object samples.
+Collect a modest, reproducible public PCAP set for blue-team validation of the current meow~traffic analysis modules without downloading malware binaries or large research datasets. This corpus is meant to supplement the user's local CS, VShell, WebShell, Modbus, CAN, HTTP, and object samples.
 
 ## Collection Policy
 

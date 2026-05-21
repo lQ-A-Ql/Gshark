@@ -75,7 +75,7 @@ func (a *DesktopApp) readBackendEvents(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("build event request: %w", err)
 	}
 	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("User-Agent", "GShark-Sentinel-DesktopEventBridge")
+	req.Header.Set("User-Agent", "meow-traffic-DesktopEventBridge")
 	if token := strings.TrimSpace(a.GetBackendAuthToken()); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

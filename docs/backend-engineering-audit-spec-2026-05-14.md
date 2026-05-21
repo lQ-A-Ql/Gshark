@@ -6,7 +6,7 @@ Timestamp: 2026-05-14 23:07:29 +08:00
 
 ## 1. Background
 
-GShark-Sentinel backend has moved from rapid feature accumulation into an engineering-governance phase. Current versioned documentation says the project direction remains offline traffic analysis, protocol-specific investigation, dangerous-application triage, and evidence-chain workbench delivery.
+meow~traffic backend has moved from rapid feature accumulation into an engineering-governance phase. Current versioned documentation says the project direction remains offline traffic analysis, protocol-specific investigation, dangerous-application triage, and evidence-chain workbench delivery.
 
 This spec audits the current backend engineering position and defines the next executable task plan. It treats `docs/README.md`, `docs/governance-defect-register.json`, and interface documents as current facts. Historical `docs/audit-development-report-archive-*` reports are used only as local evidence trails.
 

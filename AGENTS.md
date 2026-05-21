@@ -14,6 +14,7 @@ cd backend && go test ./...
 
 ## Two Go modules, one workspace
 
+- Product branding is `meow~traffic`. Internal compatibility identifiers stay on the historical `gshark` / `sentinel` names unless explicitly migrated.
 - Root (`go.mod`): `github.com/gshark/sentinel/desktop`, Go 1.22 — Wails desktop shell only
 - `backend/` (`go.mod`): `github.com/gshark/sentinel/backend`, Go 1.25 — all real logic
 - `go.work` at root ties them together for IDE/`go test` convenience

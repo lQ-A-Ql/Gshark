@@ -17,7 +17,7 @@ var assets embed.FS
 func main() {
 	app := NewDesktopApp()
 	err := wails.Run(&options.App{
-		Title:       "GShark-Sentinel",
+		Title:       "meow~traffic",
 		Width:       1680,
 		Height:      1020,
 		AssetServer: &assetserver.Options{Assets: assets},

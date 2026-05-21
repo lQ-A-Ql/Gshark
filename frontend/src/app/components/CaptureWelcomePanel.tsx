@@ -42,7 +42,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
           <div className="relative p-8 lg:min-h-0 lg:overflow-hidden">
             <div className="gshark-diffuse-chip mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
-              GSHARK QUICK START
+              MEOW~TRAFFIC QUICK START
             </div>
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-slate-950">
               先帮你找到方向，再进入流量细节。
@@ -104,7 +104,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
             <div className="pointer-events-none absolute -bottom-10 left-0 right-8 z-[0] flex justify-end opacity-[0.085] blur-[0.3px] select-none">
               <img
                 src={logoImg}
-                alt="GShark Background"
+                alt="meow~traffic Background"
                 className="gshark-brand-mark w-full max-w-[440px] object-contain"
               />
             </div>

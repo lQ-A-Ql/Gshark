@@ -7,7 +7,7 @@ import "testing"
 func TestNormalizeSemanticVersion(t *testing.T) {
 	t.Parallel()
 
-	if got := normalizeSemanticVersion("gshark.v0.0.3.exe"); got != "v0.0.3" {
+	if got := normalizeSemanticVersion("meow-traffic.v0.0.3.exe"); got != "v0.0.3" {
 		t.Fatalf("normalizeSemanticVersion() = %q, want %q", got, "v0.0.3")
 	}
 	if got := normalizeSemanticVersion("release-2026"); got != "" {
@@ -35,7 +35,7 @@ func TestSelectReleaseAssetPrefersWindowsExecutable(t *testing.T) {
 	release := githubRelease{
 		Assets: []githubReleaseAsset{
 			{Name: "gshark-v0.0.3-linux.tar.gz", BrowserDownloadURL: "https://example.com/linux"},
-			{Name: "gshark.v0.0.3.exe", BrowserDownloadURL: "https://example.com/windows"},
+			{Name: "meow-traffic.v0.0.3.exe", BrowserDownloadURL: "https://example.com/windows"},
 			{Name: "gshark-v0.0.3-windows.zip", BrowserDownloadURL: "https://example.com/windows-zip"},
 		},
 	}
@@ -44,8 +44,8 @@ func TestSelectReleaseAssetPrefersWindowsExecutable(t *testing.T) {
 	if asset == nil {
 		t.Fatalf("selectReleaseAsset() returned nil")
 	}
-	if asset.Name != "gshark.v0.0.3.exe" {
-		t.Fatalf("selectReleaseAsset() = %q, want %q", asset.Name, "gshark.v0.0.3.exe")
+	if asset.Name != "meow-traffic.v0.0.3.exe" {
+		t.Fatalf("selectReleaseAsset() = %q, want %q", asset.Name, "meow-traffic.v0.0.3.exe")
 	}
 }
 
@@ -56,7 +56,7 @@ func TestExtractReleaseVersionFallsBackToAssetName(t *testing.T) {
 		TagName: "gshark",
 		Name:    "gshark release",
 		Assets: []githubReleaseAsset{
-			{Name: "gshark.v0.0.2.exe"},
+			{Name: "meow-traffic.v0.0.2.exe"},
 		},
 	}
 

@@ -21,7 +21,7 @@ $bundledBackendPath = Join-Path $root "frontend/dist/sentinel-backend.exe"
 $bundledRulePath = Join-Path $root "frontend/dist/rules/yara/default.yar"
 
 if ([string]::IsNullOrWhiteSpace($AssetName)) {
-  $AssetName = "gshark.$Version.exe"
+  $AssetName = "meow-traffic.$Version.exe"
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
@@ -35,7 +35,7 @@ if (-not (Test-Path $OutputDir)) {
 Set-Location $root
 
 if (-not $SkipBuild) {
-  Write-Host "[gshark] building desktop release with wails build" -ForegroundColor Cyan
+  Write-Host "[meow-traffic] building desktop release with wails build" -ForegroundColor Cyan
   wails build
 }
 
@@ -49,7 +49,7 @@ if (-not (Test-Path $bundledRulePath)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($SourceExePath)) {
-  $SourceExePath = Join-Path $root "build/bin/gshark-sentinel.exe"
+  $SourceExePath = Join-Path $root "build/bin/meow-traffic.exe"
 }
 
 $resolvedSourceExe = (Resolve-Path -Path $SourceExePath).Path
@@ -59,7 +59,7 @@ if (-not (Test-Path $resolvedSourceExe)) {
 
 $releaseExePath = Join-Path $OutputDir $AssetName
 Copy-Item -LiteralPath $resolvedSourceExe -Destination $releaseExePath -Force
-Write-Host "[gshark] release asset prepared: $releaseExePath" -ForegroundColor Green
+Write-Host "[meow-traffic] release asset prepared: $releaseExePath" -ForegroundColor Green
 
 if ([string]::IsNullOrWhiteSpace($ReleaseUrl)) {
   $ReleaseUrl = "https://github.com/$Repo/releases/tag/$Version"
@@ -94,10 +94,10 @@ if (-not [string]::IsNullOrWhiteSpace($NotesFile)) {
 if (-not $NoRepoManifestUpdate) {
   $repoManifestPath = Join-Path $root "release/version.json"
   Copy-Item -LiteralPath $manifestPath -Destination $repoManifestPath -Force
-  Write-Host "[gshark] repository manifest updated: $repoManifestPath" -ForegroundColor Green
+  Write-Host "[meow-traffic] repository manifest updated: $repoManifestPath" -ForegroundColor Green
 }
 
-Write-Host "[gshark] running release smoke check" -ForegroundColor Cyan
+Write-Host "[meow-traffic] running release smoke check" -ForegroundColor Cyan
 $previousSmokeCheck = $env:GSHARK_RELEASE_SMOKE_CHECK
 $previousSmokeResultPath = $env:GSHARK_RELEASE_SMOKE_RESULT_PATH
 $smokeResultPath = Join-Path $OutputDir "release-smoke-result.txt"
@@ -147,7 +147,7 @@ if (-not $smokeText.Contains("release smoke check: ok")) {
 }
 Write-Host "release smoke check: ok" -ForegroundColor Green
 
-Write-Host "[gshark] release package ready" -ForegroundColor Green
-Write-Host "[gshark] asset: $releaseExePath" -ForegroundColor Cyan
-Write-Host "[gshark] manifest: $manifestPath" -ForegroundColor Cyan
-Write-Host "[gshark] next step: upload $AssetName to GitHub Release $Version, then commit release/version.json" -ForegroundColor Yellow
+Write-Host "[meow-traffic] release package ready" -ForegroundColor Green
+Write-Host "[meow-traffic] asset: $releaseExePath" -ForegroundColor Cyan
+Write-Host "[meow-traffic] manifest: $manifestPath" -ForegroundColor Cyan
+Write-Host "[meow-traffic] next step: upload $AssetName to GitHub Release $Version, then commit release/version.json" -ForegroundColor Yellow

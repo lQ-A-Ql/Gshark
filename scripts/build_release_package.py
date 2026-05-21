@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO = "lQ-A-Ql/Gshark"
-DEFAULT_SOURCE_EXE = ROOT / "build" / "bin" / "gshark-sentinel.exe"
+DEFAULT_SOURCE_EXE = ROOT / "build" / "bin" / "meow-traffic.exe"
 BUNDLED_BACKEND_PATH = ROOT / "frontend" / "dist" / "sentinel-backend.exe"
 BUNDLED_RULE_PATH = ROOT / "frontend" / "dist" / "rules" / "yara" / "default.yar"
 
@@ -104,7 +104,7 @@ def run_release_smoke_check(exe_path: Path) -> None:
 
 def build_release(config: ReleaseConfig) -> tuple[Path, Path]:
     if not config.skip_build:
-        print("[gshark] building desktop release with wails build")
+        print("[meow-traffic] building desktop release with wails build")
         run_command(["wails", "build"], ROOT)
 
     ensure_release_inputs()
@@ -116,7 +116,7 @@ def build_release(config: ReleaseConfig) -> tuple[Path, Path]:
 
     release_exe_path = config.output_dir / config.asset_name
     shutil.copy2(config.source_exe_path, release_exe_path)
-    print(f"[gshark] release asset prepared: {release_exe_path}")
+    print(f"[meow-traffic] release asset prepared: {release_exe_path}")
 
     manifest_path = config.output_dir / "version.json"
     write_manifest(config, release_exe_path, manifest_path)
@@ -125,9 +125,9 @@ def build_release(config: ReleaseConfig) -> tuple[Path, Path]:
         repo_manifest_path = ROOT / "release" / "version.json"
         repo_manifest_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest_path, repo_manifest_path)
-        print(f"[gshark] repository manifest updated: {repo_manifest_path}")
+        print(f"[meow-traffic] repository manifest updated: {repo_manifest_path}")
 
-    print("[gshark] running release smoke check")
+    print("[meow-traffic] running release smoke check")
     run_release_smoke_check(release_exe_path)
 
     return release_exe_path, manifest_path
@@ -138,7 +138,7 @@ def write_manifest(config: ReleaseConfig, release_exe_path: Path, manifest_path:
     size = release_exe_path.stat().st_size
     manifest = {
         "version": config.version,
-        "name": f"Gshark {config.version}",
+        "name": f"meow~traffic {config.version}",
         "published_at": utc_now_iso(),
         "release_url": config.release_url,
         "notes": config.notes,
@@ -162,14 +162,14 @@ def write_manifest(config: ReleaseConfig, release_exe_path: Path, manifest_path:
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"[gshark] update manifest written to {manifest_path}")
-    print(f"[gshark] manifest asset: {config.asset_name}")
-    print(f"[gshark] manifest sha256: {sha256}")
+    print(f"[meow-traffic] update manifest written to {manifest_path}")
+    print(f"[meow-traffic] manifest asset: {config.asset_name}")
+    print(f"[meow-traffic] manifest sha256: {sha256}")
 
 
 def build_config(args: argparse.Namespace) -> ReleaseConfig:
     version = args.version.strip()
-    asset_name = args.asset_name.strip() or f"gshark.{version}.exe"
+    asset_name = args.asset_name.strip() or f"meow-traffic.{version}.exe"
     output_dir = Path(args.output_dir).resolve() if args.output_dir else (ROOT / "release" / "out" / version)
     source_exe_path = Path(args.source_exe_path).resolve() if args.source_exe_path else DEFAULT_SOURCE_EXE
     release_url = args.release_url.strip() or f"https://github.com/{args.repo}/releases/tag/{version}"
@@ -219,20 +219,20 @@ def main(argv: list[str]) -> int:
         args = parse_args(argv)
         config = build_config(args)
         release_exe_path, manifest_path = build_release(config)
-        print("[gshark] release package ready")
-        print(f"[gshark] asset: {release_exe_path}")
-        print(f"[gshark] manifest: {manifest_path}")
+        print("[meow-traffic] release package ready")
+        print(f"[meow-traffic] asset: {release_exe_path}")
+        print(f"[meow-traffic] manifest: {manifest_path}")
         if not config.notes.strip():
-            print(f"[gshark] tip: create release/notes/{config.version}.md to manage release notes more easily")
+            print(f"[meow-traffic] tip: create release/notes/{config.version}.md to manage release notes more easily")
         print(
-            f"[gshark] next step: upload {config.asset_name} to GitHub Release {config.version}, then commit release/version.json"
+            f"[meow-traffic] next step: upload {config.asset_name} to GitHub Release {config.version}, then commit release/version.json"
         )
         return 0
     except subprocess.CalledProcessError as exc:
-        print(f"[gshark] command failed with exit code {exc.returncode}: {exc.cmd}", file=sys.stderr)
+        print(f"[meow-traffic] command failed with exit code {exc.returncode}: {exc.cmd}", file=sys.stderr)
         return exc.returncode or 1
     except Exception as exc:  # noqa: BLE001
-        print(f"[gshark] release packaging failed: {exc}", file=sys.stderr)
+        print(f"[meow-traffic] release packaging failed: {exc}", file=sys.stderr)
         return 1
 
 

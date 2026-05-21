@@ -1,4 +1,6 @@
-# GShark-Sentinel 文档中心
+# meow~traffic 文档中心
+
+> 品牌已更名为 `meow~traffic`；本文档中出现的 `github.com/gshark/sentinel/...`、`GSHARK_*`、`gshark-sentinel`、`sentinel-backend.exe` 等名称仍是当前真实可用的内部兼容标识，本轮不迁移。
 
 本目录是项目文档总入口。当前项目已经从早期 PRD / 实施方案阶段进入多方向并行开发阶段，阅读时建议优先从“当前状态与路线图”进入，再按方向查看合并摘要。
 

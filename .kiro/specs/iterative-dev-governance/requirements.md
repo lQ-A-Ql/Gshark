@@ -2,7 +2,7 @@
 
 ## Introduction
 
-本 spec 定义 **GShark-Sentinel 迭代式开发治理（iterative-dev-governance）** 的需求。
+本 spec 定义 **meow~traffic 迭代式开发治理（iterative-dev-governance）** 的需求。
 
 项目当前已积累两份审计输入：
 1. 初步安全与架构审计报告（覆盖后端安全边界、并发安全、测试覆盖、文档一致性）

@@ -38,7 +38,7 @@ var (
 const (
 	defaultReleaseRepo = "lQ-A-Ql/Gshark"
 	defaultManifestRef = "master/release/version.json"
-	updaterUserAgent   = "GShark-Sentinel-Updater"
+	updaterUserAgent   = "meow-traffic-Updater"
 )
 
 var (
@@ -442,7 +442,7 @@ func fetchLatestUpdateManifest(ctx context.Context, manifestURL string) (*update
 		return nil, fmt.Errorf("更新清单缺少 version 字段")
 	}
 	if strings.TrimSpace(manifest.Name) == "" {
-		manifest.Name = fmt.Sprintf("GShark %s", strings.TrimSpace(manifest.Version))
+		manifest.Name = fmt.Sprintf("meow~traffic %s", strings.TrimSpace(manifest.Version))
 	}
 	updateLogf("http-response-parsed stage=%q version=%q asset_count=%d", "update-manifest", manifest.Version, len(manifest.Assets))
 	return &manifest, nil

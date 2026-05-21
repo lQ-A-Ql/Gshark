@@ -6,7 +6,7 @@ Timestamp: 2026-05-15 00:30:47 +08:00
 
 ## 1. Background
 
-GShark-Sentinel frontend has moved beyond rapid feature delivery into an engineering-governance phase. The application is a dense security traffic analysis workbench rather than a marketing-style web UI: packet navigation, stream inspection, C2/APT evidence, protocol-specific panels, media/object extraction, MISC tools, runtime settings, and long-running capture workflows are all active frontend surfaces.
+meow~traffic frontend has moved beyond rapid feature delivery into an engineering-governance phase. The application is a dense security traffic analysis workbench rather than a marketing-style web UI: packet navigation, stream inspection, C2/APT evidence, protocol-specific panels, media/object extraction, MISC tools, runtime settings, and long-running capture workflows are all active frontend surfaces.
 
 This audit records the current frontend engineering position and defines the next executable improvement plan. It treats `docs/README.md`, `docs/governance-defect-register.json`, `docs/misc-module-interface.md`, and `docs/backend-engineering-audit-spec-2026-05-14.md` as current facts. Historical `docs/audit-development-report-archive-*` reports are evidence trails only.
 

@@ -89,7 +89,7 @@ export function StartupGate() {
       <div className="gshark-page-bg gshark-glass-shell flex h-screen w-screen items-center justify-center overflow-hidden px-6 text-slate-900">
         <div className="gshark-tile gshark-workbench-panel gshark-forensic-scan w-full max-w-[600px] overflow-hidden">
           <div className="gshark-tile-header px-5 py-4">
-            <div className="text-[11px] font-semibold tracking-[0.24em] text-blue-600">GSHARK SENTINEL</div>
+            <div className="text-[11px] font-semibold tracking-[0.24em] text-blue-600">MEOW~TRAFFIC</div>
             <h1 className="mt-2 text-2xl font-semibold text-slate-950">启动中</h1>
             <p className="mt-1 text-sm leading-6 text-slate-600">正在拉起后端服务并初始化前端界面。</p>
           </div>

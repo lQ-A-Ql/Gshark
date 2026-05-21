@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GShark-Sentinel is a desktop-first offline traffic analysis tool for PCAP/PCAPNG.
+meow~traffic is a desktop-first offline traffic analysis tool for PCAP/PCAPNG.
+
+Branding note: the product display name is now `meow~traffic`, while compatibility identifiers such as `github.com/gshark/sentinel/...`, `GSHARK_*`, `gshark-sentinel`, and `sentinel-backend.exe` intentionally remain unchanged in this repository.
 
 - Desktop shell: Go + Wails (`github.com/gshark/sentinel/desktop`)
 - Backend API/SSE service: Go (`github.com/gshark/sentinel/backend`)

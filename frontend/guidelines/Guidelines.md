@@ -1,6 +1,6 @@
-# GShark Sentinel Frontend Visual System
+# meow~traffic Frontend Visual System
 
-GShark Sentinel is a dense security traffic investigation workbench. The UI should feel like a light forensic operations console: precise, calm, data-heavy, and purpose-built for repeated packet, stream, payload, and evidence review.
+meow~traffic is a dense security traffic investigation workbench. The UI should feel like a light forensic operations console: precise, calm, data-heavy, and purpose-built for repeated packet, stream, payload, and evidence review.
 
 ## Direction
 

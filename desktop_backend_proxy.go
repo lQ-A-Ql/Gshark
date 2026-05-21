@@ -116,7 +116,7 @@ func newBackendProxyClientWithBaseURL(baseURL, token string) *backendProxyClient
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 		},
-		userAgent: "GShark-Sentinel-DesktopProxy",
+		userAgent: "meow-traffic-DesktopProxy",
 	}
 }
 

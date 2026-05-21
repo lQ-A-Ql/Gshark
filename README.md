@@ -1,6 +1,8 @@
-# GShark-Sentinel
+# meow~traffic
 
-GShark-Sentinel 是一款面向安全分析师、CTF 选手、应急响应人员、协议研究和危险应用分析场景的桌面端离线流量分析工具。项目以 `tshark` 为解析核心，前端提供高信息密度的分析工作区与专项页面，后端负责抓包加载、分页、流重组、对象提取、协议专项分析、威胁狩猎和 MISC 模块执行。
+meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、协议研究和危险应用分析场景的桌面端离线流量分析工具。项目以 `tshark` 为解析核心，前端提供高信息密度的分析工作区与专项页面，后端负责抓包加载、分页、流重组、对象提取、协议专项分析、威胁狩猎和 MISC 模块执行。
+
+> 品牌已更名为 `meow~traffic`；为保持兼容，仓库、Go module path、`GSHARK_*` 环境变量、`gshark-sentinel` 目录名、`gshark:*` 事件名和 `sentinel-backend.exe` 等内部标识仍暂时保留旧名。
 
 ## 核心特性
 
