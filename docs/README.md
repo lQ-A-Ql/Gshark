@@ -23,6 +23,7 @@
 
 ## 接口与开发文档
 
+- [本地 MCP 接入文档](./mcp-interface.md)：本地只读 MCP 的启用方式、鉴权、tools/resources/prompts 清单与客户端接入示例。
 - [MISC 模块接口文档](./misc-module-interface.md)：内建与 zip 自定义 MISC 模块的 manifest、API、表单和运行时说明。
 - [插件接口文档](./plugin-interface.md)：威胁狩猎插件的输入、输出和运行方式。
 - [车机流量分析方案](./automotive-analysis-plan.md)：车机方向能力规划。

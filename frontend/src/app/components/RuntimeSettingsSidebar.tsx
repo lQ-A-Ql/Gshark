@@ -1,5 +1,6 @@
 import {
   CaptureSettingsSection,
+  MCPSettingsSection,
   MediaSettingsSection,
   SpeechSettingsSection,
   YaraSettingsSection,
@@ -23,13 +24,23 @@ export function RuntimeSettingsSidebar() {
     busy,
     dirty,
     form,
+    mcpBusy,
+    mcpNotice,
+    mcpStatus,
     notice,
     probeTransportError,
     setForm,
     speechIssues,
     speechSummary,
+    authToken,
+    tokenAvailable,
+    tokenBusy,
     unknownMessage,
     unknownStateText,
+    copyEndpoint,
+    copyToken,
+    refreshMCP,
+    saveMCP,
   } = useRuntimeSettingsSidebarModel();
 
   return (
@@ -53,7 +64,21 @@ export function RuntimeSettingsSidebar() {
           onSave={() => void save()}
         />
 
-        <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.18),rgba(255,255,255,0.34))] px-5 py-5">
+        <div className="flex-1 space-y-3 overflow-auto bg-white px-5 py-5">
+          <MCPSettingsSection
+            backendConnected={backendConnected}
+            busy={busy}
+            mcpBusy={mcpBusy}
+            mcpStatus={mcpStatus}
+            mcpNotice={mcpNotice}
+            authToken={authToken}
+            tokenAvailable={tokenAvailable}
+            tokenBusy={tokenBusy}
+            onRefresh={() => void refreshMCP()}
+            onToggleEnabled={(enabled) => void saveMCP(enabled)}
+            onCopyEndpoint={() => void copyEndpoint()}
+            onCopyToken={() => void copyToken()}
+          />
           <CaptureSettingsSection
             form={form}
             snapshot={toolRuntimeSnapshot}

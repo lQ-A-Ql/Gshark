@@ -11,6 +11,22 @@ export interface ToolRuntimeConfig {
   yaraTimeoutMs: number;
 }
 
+export interface MCPConfig {
+  enabled: boolean;
+}
+
+export interface MCPStatus {
+  config: MCPConfig;
+  enabled: boolean;
+  endpoint: string;
+  transport: string;
+  authRequired: boolean;
+  readOnly: boolean;
+  remoteSupported: boolean;
+  stdioSupported: boolean;
+  lastError?: string;
+}
+
 export type ToolRuntimeProbeMode = "fast" | "full";
 export type ToolRuntimeProbeState =
   | "fast_ready"

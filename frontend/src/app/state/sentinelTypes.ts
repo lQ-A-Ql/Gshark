@@ -4,6 +4,8 @@ import type {
   DecryptionConfig,
   ExtractedObject,
   HttpStream,
+  MCPConfig,
+  MCPStatus,
   Packet,
   RecentCapture,
   StreamSwitchMetrics,
@@ -110,4 +112,9 @@ export interface SentinelContextValue {
     patch: Partial<ToolRuntimeConfig>,
     explicitFields?: ToolRuntimeConfigExplicitFields,
   ) => Promise<ToolRuntimeSnapshot>;
+  backendAuthToken: string;
+  isBackendAuthTokenLoading: boolean;
+  mcpStatus: MCPStatus | null;
+  refreshMCPStatus: () => Promise<MCPStatus | null>;
+  saveMCPConfig: (config: MCPConfig) => Promise<MCPStatus>;
 }

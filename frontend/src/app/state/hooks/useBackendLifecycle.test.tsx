@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DecryptionConfig, Packet, ToolRuntimeSnapshot } from "../../core/types";
+import type { DecryptionConfig, MCPStatus, Packet, ToolRuntimeSnapshot } from "../../core/types";
 import type { EventHandlers } from "../../integrations/clients/eventClient";
 import {
   EMPTY_MEDIA_ANALYSIS_PROGRESS,
@@ -25,6 +25,8 @@ const bridgeMocks = vi.hoisted(() => {
     isAvailable: vi.fn(),
     getDesktopBackendStatus: vi.fn(),
     updateToolRuntimeConfig: vi.fn(),
+    getMCPStatus: vi.fn(),
+    updateMCPConfig: vi.fn(),
     getTLSConfig: vi.fn(),
     updateTLSConfig: vi.fn(),
     subscribeEvents: vi.fn((nextHandlers: EventHandlers) => {
@@ -42,6 +44,8 @@ vi.mock("../../integrations/backendClients", () => ({
       isAvailable: bridgeMocks.isAvailable,
       getDesktopBackendStatus: bridgeMocks.getDesktopBackendStatus,
       updateToolRuntimeConfig: bridgeMocks.updateToolRuntimeConfig,
+      getMCPStatus: bridgeMocks.getMCPStatus,
+      updateMCPConfig: bridgeMocks.updateMCPConfig,
       setTSharkPath: bridgeMocks.setTSharkPath,
       getToolRuntimeSnapshot: bridgeMocks.getToolRuntimeSnapshot,
       subscribeEvents: bridgeMocks.subscribeEvents,
@@ -155,6 +159,19 @@ function createPacket(id: number): Packet {
   };
 }
 
+function createMCPStatus(enabled = false): MCPStatus {
+  return {
+    config: { enabled },
+    enabled,
+    endpoint: "http://127.0.0.1:17891/api/mcp",
+    transport: "streamable-http",
+    authRequired: true,
+    readOnly: true,
+    remoteSupported: false,
+    stdioSupported: false,
+  };
+}
+
 interface HarnessOptions {
   activeCapturePath?: string;
   preloading?: boolean;
@@ -240,6 +257,8 @@ describe("useBackendLifecycle", () => {
     bridgeMocks.isAvailable.mockResolvedValue(true);
     bridgeMocks.getDesktopBackendStatus.mockResolvedValue("");
     bridgeMocks.updateToolRuntimeConfig.mockResolvedValue(createToolRuntimeSnapshot());
+    bridgeMocks.getMCPStatus.mockResolvedValue(createMCPStatus(false));
+    bridgeMocks.updateMCPConfig.mockResolvedValue(createMCPStatus(false));
     bridgeMocks.getTLSConfig.mockResolvedValue({
       sslKeyLogPath: "C:/logs/ssl.log",
       privateKeyPath: "C:/keys/server.pem",
@@ -269,6 +288,7 @@ describe("useBackendLifecycle", () => {
     });
     expect(result.current.toolRuntimeProbeState).toBe("ready");
     expect(result.current.lastToolRuntimeProbeError).toBe("");
+    expect(result.current.mcpStatus).toEqual(createMCPStatus(false));
     expect(result.current.decryptionConfig).toEqual({
       sslKeyLogPath: "C:/logs/ssl.log",
       privateKeyPath: "C:/keys/server.pem",
@@ -276,6 +296,7 @@ describe("useBackendLifecycle", () => {
     });
     expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "fast");
     expect(bridgeMocks.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "full");
+    expect(bridgeMocks.getMCPStatus).toHaveBeenCalledTimes(1);
     expect(bridgeMocks.updateToolRuntimeConfig).not.toHaveBeenCalled();
     expect(bridgeMocks.subscribeEvents).toHaveBeenCalledTimes(1);
 
@@ -754,6 +775,24 @@ describe("useBackendLifecycle", () => {
       });
     });
     expect(result.current.decryptionConfig.sslKeyLogPath).toBe("D:/next/ssl.log");
+
+    unmount();
+  });
+
+  it("keeps backend MCP status authoritative when stale local storage differs", async () => {
+    installRuntimeLocalStorage();
+    window.localStorage.setItem("gshark.mcp-config.v1", JSON.stringify({ enabled: true }));
+    bridgeMocks.getMCPStatus.mockResolvedValue(createMCPStatus(false));
+    bridgeMocks.updateMCPConfig.mockResolvedValue(createMCPStatus(true));
+
+    const { result, unmount } = await renderConnectedLifecycle();
+
+    await waitFor(() => {
+      expect(bridgeMocks.getMCPStatus).toHaveBeenCalledTimes(1);
+    });
+    expect(bridgeMocks.updateMCPConfig).not.toHaveBeenCalled();
+    expect(result.current.mcpStatus).toEqual(createMCPStatus(false));
+    expect(window.localStorage.getItem("gshark.mcp-config.v1")).toBe(JSON.stringify({ enabled: true }));
 
     unmount();
   });

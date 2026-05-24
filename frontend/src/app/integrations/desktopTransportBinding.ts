@@ -19,6 +19,8 @@ export interface DesktopTransportBinding {
   UpdateToolRuntimeConfig?: (config: unknown) => Promise<unknown>;
   UpdateToolRuntimeConfigFast?: (config: unknown) => Promise<unknown>;
   UpdateToolRuntimeConfigFull?: (config: unknown) => Promise<unknown>;
+  GetMCPStatus?: () => Promise<unknown>;
+  UpdateMCPConfig?: (config: unknown) => Promise<unknown>;
   SetTSharkPath?: (path: string) => Promise<unknown>;
   StartCapture?: (filePath: string, filter: string) => Promise<void>;
   StopCapture?: () => Promise<void>;

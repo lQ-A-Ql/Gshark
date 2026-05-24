@@ -10,6 +10,7 @@ interface UseBackendLifecycleStartupEffectOptions extends Omit<BackendLifecycleE
   readonly backendRetryTimerRef: MutableRefObject<number | null>;
   readonly captureWaitersRef: MutableRefObject<Set<() => void>>;
   readonly setBackendConnected: (connected: boolean) => void;
+  readonly setMCPStatus: (status: Awaited<ReturnType<typeof backendClients.runtime.getMCPStatus>> | null) => void;
   readonly startupToolRuntimeOptions: Omit<Parameters<typeof loadStartupToolRuntime>[0], "isCancelled">;
   readonly loadStartupTLSConfig: () => Promise<void>;
 }
@@ -27,6 +28,7 @@ export function useBackendLifecycleStartupEffect({
   scheduleLoadMoreRef,
   setBackendConnected,
   setBackendStatus,
+  setMCPStatus,
   setIsThreatAnalysisLoading,
   setMediaAnalysisProgress,
   setSelectedPacketId,
@@ -50,6 +52,7 @@ export function useBackendLifecycleStartupEffect({
       if (cancelled) return;
       if (!available) {
         setBackendConnected(false);
+        setMCPStatus(null);
         setBackendStatus(await getBackendUnavailableStatus());
         startupToolRuntimeOptions.setToolRuntimeProbeState("idle");
         startupToolRuntimeOptions.setToolRuntimeProbeTransport("unknown");
@@ -62,6 +65,16 @@ export function useBackendLifecycleStartupEffect({
       setBackendConnected(true);
       setBackendStatus("后端已连接，等待打开文件");
       await loadStartupToolRuntime({ ...startupToolRuntimeOptions, isCancelled: () => cancelled });
+      try {
+        const mcpStatus = await backendClients.runtime.getMCPStatus();
+        if (!cancelled) {
+          setMCPStatus(mcpStatus);
+        }
+      } catch {
+        if (!cancelled) {
+          setMCPStatus(null);
+        }
+      }
       await loadTLSConfig();
       dispose = backendClients.runtime.subscribeEvents(
         createBackendLifecycleEventHandlers({
@@ -104,6 +117,7 @@ export function useBackendLifecycleStartupEffect({
     scheduleLoadMoreRef,
     setBackendConnected,
     setBackendStatus,
+    setMCPStatus,
     setIsThreatAnalysisLoading,
     setMediaAnalysisProgress,
     setSelectedPacketId,

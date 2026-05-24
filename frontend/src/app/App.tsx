@@ -233,7 +233,7 @@ export function StartupGate() {
 
           <div className="mx-5 mb-5 h-1.5 overflow-hidden bg-slate-200/45">
             <div
-              className={`h-full bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500 ${backendConnected ? "w-full" : "w-2/3 animate-pulse"}`}
+              className={`h-full bg-white transition-all duration-500 ${backendConnected ? "w-full" : "w-2/3 animate-pulse"}`}
             />
           </div>
         </div>

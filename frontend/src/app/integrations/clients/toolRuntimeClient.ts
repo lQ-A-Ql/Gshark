@@ -1,13 +1,21 @@
-import type { SpeechToTextStatus, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
+import type {
+  MCPConfig,
+  MCPStatus,
+  SpeechToTextStatus,
+  ToolRuntimeConfig,
+  ToolRuntimeSnapshot,
+} from "../../core/types";
 import { asToolRuntimeSnapshot } from "../mappers/runtimeMapper";
 import { withToolRuntimeSnapshotMeta } from "../toolRuntimeSnapshotMeta";
 import { asTSharkStatus } from "../mappers/tsharkStatusMapper";
+import { asMCPStatus } from "../mappers/mcpStatusMapper";
 import type {
   FFmpegStatusWireDTO,
   SpeechStatusWireDTO,
   ToolRuntimeSnapshotWireDTO,
   TSharkStatusWireDTO,
 } from "../wire/runtimeWireDtos";
+import type { MCPStatusWireDTO } from "../wire/mcpWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -43,6 +51,8 @@ export interface ToolRuntimeClient {
     mode?: "fast" | "full",
   ): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
+  getMCPStatus(signal?: AbortSignal): Promise<MCPStatus>;
+  updateMCPConfig(config: MCPConfig, signal?: AbortSignal): Promise<MCPStatus>;
 }
 
 export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient {
@@ -109,6 +119,20 @@ export function createToolRuntimeClient(request: JsonRequest): ToolRuntimeClient
         body: JSON.stringify({ path }),
       });
       return asTSharkStatus(payload);
+    },
+
+    async getMCPStatus(signal?: AbortSignal) {
+      const payload = await request<MCPStatusWireDTO>("/api/mcp/config", signal ? { signal } : undefined);
+      return asMCPStatus(payload);
+    },
+
+    async updateMCPConfig(config: MCPConfig, signal?: AbortSignal) {
+      const payload = await request<MCPStatusWireDTO>("/api/mcp/config", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({ enabled: config.enabled }),
+      });
+      return asMCPStatus(payload);
     },
   };
 }

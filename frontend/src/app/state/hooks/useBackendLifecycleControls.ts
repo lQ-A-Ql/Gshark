@@ -30,18 +30,15 @@ export function useBackendLifecycleControls({
   saveToolRuntimeConfigImpl,
 }: UseBackendLifecycleControlsOptions) {
   const setBackendStatusText = useCallback((status: string) => setBackendStatus(status), [setBackendStatus]);
-
   const setTSharkPath = useCallback(
     async (path: string) => {
       await setTSharkPathImpl(path, backendConnected, setBackendStatusText);
     },
     [backendConnected, setBackendStatusText, setTSharkPathImpl],
   );
-
   const refreshToolRuntimeSnapshot = useCallback(async () => {
     return await refreshToolRuntimeSnapshotImpl(backendConnected);
   }, [backendConnected, refreshToolRuntimeSnapshotImpl]);
-
   const saveToolRuntimeConfig = useCallback(
     async (patch: Partial<ToolRuntimeConfig>, explicitFields?: ToolRuntimeConfigExplicitFields) => {
       return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatusText, explicitFields);
@@ -62,5 +59,10 @@ export function useBackendLifecycleControls({
     [backendConnected, setBackendStatus, setDecryptionConfig],
   );
 
-  return { setTSharkPath, refreshToolRuntimeSnapshot, saveToolRuntimeConfig, updateDecryptionConfig };
+  return {
+    setTSharkPath,
+    refreshToolRuntimeSnapshot,
+    saveToolRuntimeConfig,
+    updateDecryptionConfig,
+  };
 }

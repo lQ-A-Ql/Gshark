@@ -82,7 +82,7 @@ export default function HttpStream() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.26),transparent_34%),linear-gradient(180deg,#fbfaff_0%,#f6f7ff_42%,#f8fafc_100%)] text-sm text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-white text-sm text-foreground">
       <HttpStreamTitleBar
         client={httpStream.client}
         hasNext={hasNext}

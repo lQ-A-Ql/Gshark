@@ -208,6 +208,11 @@ export const sourceSizeBudgets = [
     reason: "runtime wire DTOs should only describe raw tool status and capability payload fields",
   },
   {
+    path: "src/app/integrations/wire/mcpWireDtos.ts",
+    maxLines: 20,
+    reason: "MCP wire DTOs should only describe raw local MCP config and status payload fields",
+  },
+  {
     path: "src/app/integrations/wire/trafficWireDtos.ts",
     maxLines: 20,
     reason: "traffic wire DTOs should only describe raw global traffic stats payload fields",
@@ -371,6 +376,11 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/runtimeComponentMapper.ts",
     maxLines: 65,
     reason: "runtime component mapper should isolate FFmpeg, speech, YARA, and config field conversion",
+  },
+  {
+    path: "src/app/integrations/mappers/mcpStatusMapper.ts",
+    maxLines: 25,
+    reason: "MCP status mapper should keep local MCP config and status normalization isolated",
   },
   {
     path: "src/app/integrations/mappers/runtimeDiagnosticsMapper.ts",

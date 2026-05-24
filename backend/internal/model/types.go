@@ -107,6 +107,22 @@ type ToolRuntimeConfig struct {
 	YaraTimeoutMS int    `json:"yara_timeout_ms"`
 }
 
+type MCPConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
+type MCPStatus struct {
+	Config          MCPConfig `json:"config"`
+	Enabled         bool      `json:"enabled"`
+	Endpoint        string    `json:"endpoint"`
+	Transport       string    `json:"transport"`
+	AuthRequired    bool      `json:"auth_required"`
+	ReadOnly        bool      `json:"read_only"`
+	RemoteSupported bool      `json:"remote_supported"`
+	StdioSupported  bool      `json:"stdio_supported"`
+	LastError       string    `json:"last_error,omitempty"`
+}
+
 type ToolRuntimeProbeOptions struct {
 	Mode string
 }

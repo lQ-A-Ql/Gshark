@@ -88,9 +88,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     isToolRuntimeLoading,
     refreshToolRuntimeSnapshot,
     saveToolRuntimeConfig,
+    backendAuthToken,
+    isBackendAuthTokenLoading,
     toolRuntimeProbeState,
     toolRuntimeProbeTransport,
     lastToolRuntimeProbeError,
+    mcpStatus,
+    refreshMCPStatus,
+    saveMCPConfig,
   } = useBackendLifecycle({
     activeCapturePathRef,
     captureWaitersRef,
@@ -388,7 +393,6 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     cancelMediaBatchTranscription: backendClients.media.cancelMediaBatchTranscription,
     closeCapture: backendClients.capture.closeCapture,
   });
-
   const value = useMemo<SentinelContextValue>(
     () => ({
       packets,
@@ -455,6 +459,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isToolRuntimeLoading,
       refreshToolRuntimeSnapshot,
       saveToolRuntimeConfig,
+      backendAuthToken,
+      isBackendAuthTokenLoading,
+      mcpStatus,
+      refreshMCPStatus,
+      saveMCPConfig,
     }),
     [
       packets,
@@ -520,6 +529,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       isToolRuntimeLoading,
       refreshToolRuntimeSnapshot,
       saveToolRuntimeConfig,
+      backendAuthToken,
+      isBackendAuthTokenLoading,
+      mcpStatus,
+      refreshMCPStatus,
+      saveMCPConfig,
     ],
   );
 

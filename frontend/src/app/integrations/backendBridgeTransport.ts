@@ -50,6 +50,8 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     getToolRuntimeSnapshot: toolRuntimeClient.getToolRuntimeSnapshot,
     updateToolRuntimeConfig: toolRuntimeClient.updateToolRuntimeConfig,
     setTSharkPath: toolRuntimeClient.setTSharkPath,
+    getMCPStatus: toolRuntimeClient.getMCPStatus,
+    updateMCPConfig: toolRuntimeClient.updateMCPConfig,
 
     openPcapFile: captureClient.openPcapFile,
     startStreamingPackets: captureClient.startStreamingPackets,

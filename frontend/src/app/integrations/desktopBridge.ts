@@ -1,4 +1,4 @@
-import type { DecryptionConfig, ToolRuntimeConfig } from "../core/types";
+import type { DecryptionConfig, MCPConfig, MCPStatus, ToolRuntimeConfig } from "../core/types";
 import {
   asCaptureStatus,
   asPacketsPageResult,
@@ -7,6 +7,7 @@ import {
 } from "./clients/captureClient";
 import type { TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
+import { asMCPStatus } from "./mappers/mcpStatusMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
 import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
@@ -116,6 +117,24 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         usingCustomPath: Boolean((payload as any)?.using_custom_path),
       };
     },
+    async getMCPStatus(signal?: AbortSignal) {
+      return await resolveMCPThroughDesktopIPC({
+        signal,
+        desktopMethod: desktopApp.GetMCPStatus,
+        desktopMethodName: "DesktopApp.GetMCPStatus",
+        fallback: () => dataBridge.getMCPStatus(signal),
+      });
+    },
+    async updateMCPConfig(config: MCPConfig, signal?: AbortSignal) {
+      return await resolveMCPThroughDesktopIPC({
+        signal,
+        desktopMethod: desktopApp.UpdateMCPConfig
+          ? () => desktopApp.UpdateMCPConfig!({ enabled: config.enabled })
+          : undefined,
+        desktopMethodName: "DesktopApp.UpdateMCPConfig",
+        fallback: () => dataBridge.updateMCPConfig(config, signal),
+      });
+    },
     async startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal) {
       if (!desktopApp.StartCapture) {
         return signal
@@ -221,6 +240,33 @@ function desktopIpcErrorMessage(error: unknown, fallback: string): string {
     return error.trim();
   }
   return fallback;
+}
+
+async function resolveMCPThroughDesktopIPC({
+  signal,
+  desktopMethod,
+  desktopMethodName,
+  fallback,
+}: {
+  signal?: AbortSignal;
+  desktopMethod?: () => Promise<unknown>;
+  desktopMethodName: string;
+  fallback: () => Promise<MCPStatus>;
+}): Promise<MCPStatus> {
+  if (!desktopMethod) {
+    return await fallback();
+  }
+  try {
+    const payload = await withDesktopIpcControls(desktopMethod, {
+      endpoint: desktopMethodName,
+      responseKind: "typed-ipc",
+      signal,
+      timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+    });
+    return asMCPStatus(payload as Record<string, unknown>);
+  } catch {
+    return await fallback();
+  }
 }
 
 function runtimeSnapshotMethod(

@@ -622,4 +622,121 @@ describe("createDesktopBridge", () => {
     expect(snapshot.transport).toBe("http-fallback");
     expect(snapshot.transportError).toContain("runtime config ipc unavailable");
   });
+
+  it("uses typed Wails IPC for MCP status and config when available", async () => {
+    const fallbackBridge = createFallbackBridge({
+      getMCPStatus: vi.fn(async () => ({
+        config: { enabled: false },
+        enabled: false,
+        endpoint: "fallback",
+        transport: "http-fallback",
+        authRequired: false,
+        readOnly: true,
+        remoteSupported: false,
+        stdioSupported: false,
+      })),
+      updateMCPConfig: vi.fn(async () => ({
+        config: { enabled: false },
+        enabled: false,
+        endpoint: "fallback",
+        transport: "http-fallback",
+        authRequired: false,
+        readOnly: true,
+        remoteSupported: false,
+        stdioSupported: false,
+      })),
+    });
+    const desktopApp: DesktopTransportBinding = {
+      GetMCPStatus: vi.fn(async () => ({
+        config: { enabled: true },
+        enabled: true,
+        endpoint: "http://127.0.0.1:17891/api/mcp",
+        transport: "streamable-http",
+        auth_required: true,
+        read_only: true,
+        remote_supported: false,
+        stdio_supported: false,
+      })),
+      UpdateMCPConfig: vi.fn(async () => ({
+        config: { enabled: false },
+        enabled: false,
+        endpoint: "http://127.0.0.1:17891/api/mcp",
+        transport: "streamable-http",
+        auth_required: true,
+        read_only: true,
+        remote_supported: false,
+        stdio_supported: false,
+      })),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    await expect(bridge.getMCPStatus()).resolves.toMatchObject({
+      enabled: true,
+      config: { enabled: true },
+      transport: "streamable-http",
+    });
+    await expect(bridge.updateMCPConfig({ enabled: false })).resolves.toMatchObject({
+      enabled: false,
+      config: { enabled: false },
+    });
+
+    expect(desktopApp.GetMCPStatus).toHaveBeenCalledTimes(1);
+    expect(desktopApp.UpdateMCPConfig).toHaveBeenCalledWith({ enabled: false });
+    expect(fallbackBridge.getMCPStatus).not.toHaveBeenCalled();
+    expect(fallbackBridge.updateMCPConfig).not.toHaveBeenCalled();
+  });
+
+  it("normalizes MCP status consistently across HTTP fallback and Wails IPC", async () => {
+    const expectedStatus = {
+      config: { enabled: true },
+      enabled: true,
+      endpoint: "http://127.0.0.1:17891/api/mcp",
+      transport: "streamable-http",
+      authRequired: true,
+      readOnly: true,
+      remoteSupported: false,
+      stdioSupported: false,
+    };
+    const fallbackBridge = createFallbackBridge({
+      getMCPStatus: vi.fn(async () => expectedStatus),
+      updateMCPConfig: vi.fn(async () => ({ ...expectedStatus, config: { enabled: false }, enabled: false })),
+    });
+    const desktopApp: DesktopTransportBinding = {
+      GetMCPStatus: vi.fn(async () => ({
+        config: { enabled: true },
+        enabled: true,
+        endpoint: "http://127.0.0.1:17891/api/mcp",
+        transport: "streamable-http",
+        auth_required: true,
+        read_only: true,
+        remote_supported: false,
+        stdio_supported: false,
+      })),
+      UpdateMCPConfig: vi.fn(async () => ({
+        config: { enabled: false },
+        enabled: false,
+        endpoint: "http://127.0.0.1:17891/api/mcp",
+        transport: "streamable-http",
+        auth_required: true,
+        read_only: true,
+        remote_supported: false,
+        stdio_supported: false,
+      })),
+    };
+    const ipcBridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const httpBridge = createDesktopBridge({ desktopApp: {}, fallbackBridge });
+
+    await expect(ipcBridge.getMCPStatus()).resolves.toEqual(expectedStatus);
+    await expect(httpBridge.getMCPStatus()).resolves.toEqual(expectedStatus);
+    await expect(ipcBridge.updateMCPConfig({ enabled: false })).resolves.toEqual({
+      ...expectedStatus,
+      config: { enabled: false },
+      enabled: false,
+    });
+    await expect(httpBridge.updateMCPConfig({ enabled: false })).resolves.toEqual({
+      ...expectedStatus,
+      config: { enabled: false },
+      enabled: false,
+    });
+  });
 });

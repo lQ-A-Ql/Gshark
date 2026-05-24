@@ -118,4 +118,48 @@ describe("toolRuntimeClient", () => {
     expect(snapshot.probeState).toBe("fast_ready");
     expect(snapshot.probeTimings).toEqual({ tshark: 1 });
   });
+
+  it("maps MCP status payloads and update requests", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/mcp/config" && !init) {
+        return {
+          config: { enabled: true },
+          enabled: true,
+          endpoint: "http://127.0.0.1:17891/api/mcp",
+          transport: "streamable-http",
+          auth_required: true,
+          read_only: true,
+          remote_supported: false,
+          stdio_supported: false,
+        };
+      }
+      expect(path).toBe("/api/mcp/config");
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBe(JSON.stringify({ enabled: false }));
+      return {
+        config: { enabled: false },
+        enabled: false,
+        endpoint: "http://127.0.0.1:17891/api/mcp",
+        transport: "streamable-http",
+        auth_required: true,
+        read_only: true,
+        remote_supported: false,
+        stdio_supported: false,
+        last_error: "disabled by user",
+      };
+    }) as unknown as JsonRequest;
+
+    const client = createToolRuntimeClient(request);
+    await expect(client.getMCPStatus()).resolves.toMatchObject({
+      enabled: true,
+      config: { enabled: true },
+      transport: "streamable-http",
+      readOnly: true,
+    });
+    await expect(client.updateMCPConfig({ enabled: false })).resolves.toMatchObject({
+      enabled: false,
+      config: { enabled: false },
+      lastError: "disabled by user",
+    });
+  });
 });

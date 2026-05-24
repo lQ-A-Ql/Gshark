@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
+	"github.com/gshark/sentinel/backend/internal/mcp"
 	"github.com/gshark/sentinel/backend/internal/miscpkg"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -66,6 +67,8 @@ type Server struct {
 	uploadMu           sync.Mutex
 	uploadedFiles      map[string]struct{}
 	activeUploadedPCAP string
+
+	mcpServer *mcp.Server
 }
 
 func NewServer(svc *engine.Service, hub *Hub) *Server {
@@ -93,6 +96,27 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 		s.toolAnalysis = svc
 		s.plugins = svc
 	}
+	s.mcpServer = mcp.NewServer(mcp.Dependencies{
+		Capture:      s.capture,
+		Detection:    s.detection,
+		Analysis:     s.analysis,
+		Media:        s.media,
+		ToolRuntime:  s.toolRuntime,
+		ToolAnalysis: s.toolAnalysis,
+		Plugins:      s.plugins,
+		Evidence: func(ctx context.Context, modules []string) (any, error) {
+			var filter model.EvidenceFilter
+			filter.Modules = append(filter.Modules, modules...)
+			return s.analysis.GatherEvidence(ctx, filter)
+		},
+		MiscModules:  s.miscModuleManifests,
+		AuditLogs:    s.recentAuditEntries,
+		AuthEnabled: func() bool {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			return strings.TrimSpace(s.authToken) != ""
+		},
+	})
 	hub.OnPacket(func(packet model.Packet) {
 		s.broadcast(event{Type: "packet", Data: packet})
 	})
@@ -130,6 +154,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/runtime/identity", s.handleRuntimeIdentity)
 	mux.HandleFunc("/api/tools/tshark", s.handleTsharkConfig)
 	mux.HandleFunc("/api/tools/runtime-config", s.handleToolRuntimeConfig)
+	mux.HandleFunc("/api/mcp/config", s.handleMCPConfig)
+	mux.HandleFunc("/api/mcp", s.handleMCP)
 	mux.HandleFunc("/api/tools/ffmpeg", s.handleFFmpegStatus)
 	mux.HandleFunc("/api/tools/speech-to-text", s.handleSpeechToTextStatus)
 	s.registerMiscModuleRoutes(mux)
@@ -265,6 +291,40 @@ func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.currentMCPStatus())
+	case http.MethodPost:
+		var cfg model.MCPConfig
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid payload")
+			return
+		}
+		s.toolRuntime.SetMCPConfig(cfg)
+		writeJSON(w, http.StatusOK, s.currentMCPStatus())
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	status := s.currentMCPStatus()
+	if !status.Enabled {
+		writeError(w, http.StatusNotFound, "mcp endpoint is disabled")
+		return
+	}
+	if s.mcpServer == nil {
+		writeError(w, http.StatusServiceUnavailable, "mcp server is unavailable")
+		return
+	}
+	s.mcpServer.ServeHTTP(w, r)
 }
 
 func toolRuntimeProbeOptionsFromRequest(r *http.Request) model.ToolRuntimeProbeOptions {
@@ -850,6 +910,21 @@ func (s *Server) handleAuditLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, logs)
 }
 
+func (s *Server) recentAuditEntries(limit int) []model.AuditEntry {
+	if limit <= 0 {
+		limit = 10
+	}
+	s.auditMu.Lock()
+	defer s.auditMu.Unlock()
+	if limit > len(s.auditLogs) {
+		limit = len(s.auditLogs)
+	}
+	start := len(s.auditLogs) - limit
+	logs := make([]model.AuditEntry, limit)
+	copy(logs, s.auditLogs[start:])
+	return logs
+}
+
 func (s *Server) handlePlugins(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.plugins.ListPlugins())
 }
@@ -1104,6 +1179,29 @@ func parseInt64(s string, fallback int64) int64 {
 	return v
 }
 
+func (s *Server) currentMCPStatus() model.MCPStatus {
+	if s.toolRuntime == nil {
+		return model.MCPStatus{
+			Config:          model.MCPConfig{},
+			Enabled:         false,
+			Endpoint:        "http://127.0.0.1:17891/api/mcp",
+			Transport:       "streamable-http",
+			AuthRequired:    false,
+			ReadOnly:        true,
+			RemoteSupported: false,
+			StdioSupported:  false,
+			LastError:       "tool runtime service unavailable",
+		}
+	}
+	return s.toolRuntime.MCPStatus(s.authRequired())
+}
+
+func (s *Server) authRequired() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return strings.TrimSpace(s.authToken) != ""
+}
+
 func isAllowedOrigin(origin string) bool {
 	if origin == "" {
 		return true
@@ -1142,6 +1240,13 @@ func classifyAuditAction(path, method string) string {
 			return "tools.runtime.configure"
 		}
 		return "tools.runtime.inspect"
+	case "/api/mcp/config":
+		if method == http.MethodPost {
+			return "mcp.configure"
+		}
+		return "mcp.inspect"
+	case "/api/mcp":
+		return "mcp.request"
 	case "/api/hunting/config":
 		if method == http.MethodPost {
 			return "hunting.configure"
@@ -1198,11 +1303,13 @@ func classifyAuditRisk(path, method string) string {
 	switch path {
 	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls", "/api/tools/misc/import":
 		return "high"
-	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/hunting/config":
+	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/mcp/config", "/api/hunting/config":
 		if method == http.MethodGet {
 			return "low"
 		}
 		return "medium"
+	case "/api/mcp":
+		return "low"
 	default:
 		if strings.HasPrefix(path, "/api/tools/misc/packages/") {
 			if method == http.MethodDelete {

@@ -5,14 +5,19 @@ import { useSentinel } from "../state/SentinelContext";
 import { toolRuntimeProbeStateText } from "../state/toolRuntimeProbeState";
 import { TOOL_RUNTIME_CONFIG_FIELDS } from "../state/toolRuntimeStorageConfig";
 import type { ToolRuntimeConfigExplicitFields } from "../state/toolRuntimeStorageConfig";
+import { copyTextToClipboard } from "../utils/browserFile";
 import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
 import { normalizeConfig } from "./RuntimeSettingsSidebarParts";
+
+const DEFAULT_MCP_ENDPOINT = "http://127.0.0.1:17891/api/mcp";
 
 export function useRuntimeSettingsSidebarModel() {
   const runtime = useSentinel();
   const [form, setForm] = useState<ToolRuntimeConfig>(() => normalizeConfig(runtime.toolRuntimeSnapshot?.config));
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [mcpBusy, setMCPBusy] = useState(false);
+  const [mcpNotice, setMCPNotice] = useState("");
 
   useEffect(() => {
     setForm(normalizeConfig(runtime.toolRuntimeSnapshot?.config));
@@ -50,6 +55,8 @@ export function useRuntimeSettingsSidebarModel() {
     if (!runtime.toolRuntimeSnapshot) return unknownMessage;
     return runtime.toolRuntimeSnapshot.speech.message || "等待检测";
   }, [runtime.backendConnected, runtime.toolRuntimeSnapshot, speechIssues, unknownMessage]);
+  const tokenAvailable = runtime.backendAuthToken.trim().length > 0;
+  const mcpEndpoint = runtime.mcpStatus?.endpoint || DEFAULT_MCP_ENDPOINT;
 
   const save = async () => {
     setBusy(true);
@@ -79,20 +86,95 @@ export function useRuntimeSettingsSidebarModel() {
     }
   };
 
+  const runMCPTask = async <T,>(
+    task: () => Promise<T>,
+    options: {
+      successMessage: (result: T) => string;
+      failureMessage: string;
+    },
+  ): Promise<T | null> => {
+    setMCPBusy(true);
+    setMCPNotice("");
+    try {
+      const result = await task();
+      setMCPNotice(options.successMessage(result));
+      return result;
+    } catch (error) {
+      setMCPNotice(error instanceof Error ? error.message : options.failureMessage);
+      return null;
+    } finally {
+      setMCPBusy(false);
+    }
+  };
+
+  const refreshMCP = async () => {
+    await runMCPTask(() => runtime.refreshMCPStatus(), {
+      successMessage: (status) => (status ? "MCP 状态已刷新。" : "后端未连接，暂时无法读取 MCP 状态。"),
+      failureMessage: "MCP 状态刷新失败。",
+    });
+  };
+
+  const saveMCP = async (enabled: boolean) => {
+    return await runMCPTask(() => runtime.saveMCPConfig({ enabled }), {
+      successMessage: () => (enabled ? "本地 MCP 已启用。" : "本地 MCP 已关闭。"),
+      failureMessage: "MCP 配置保存失败。",
+    });
+  };
+
+  const copyMCPValue = async (
+    value: string,
+    options: {
+      successMessage: string;
+      failureMessage: string;
+      emptyMessage?: string;
+    },
+  ) => {
+    if (!value.trim()) {
+      setMCPNotice(options.emptyMessage ?? options.failureMessage);
+      return;
+    }
+    const ok = await copyTextToClipboard(value);
+    setMCPNotice(ok ? options.successMessage : options.failureMessage);
+  };
+
+  const copyEndpoint = async () => {
+    await copyMCPValue(mcpEndpoint, {
+      successMessage: "MCP 端点已复制。",
+      failureMessage: "复制端点失败。",
+    });
+  };
+
+  const copyToken = async () => {
+    await copyMCPValue(runtime.backendAuthToken, {
+      successMessage: "Bearer token 已复制。",
+      failureMessage: "复制 token 失败。",
+      emptyMessage: "桌面 token 暂不可用，请等待后端完成启动。",
+    });
+  };
+
   return {
     ...runtime,
     busy,
     dirty,
     form,
+    mcpBusy,
+    mcpNotice,
     notice,
     probeTransportError: runtime.toolRuntimeSnapshot?.transportError ?? "",
     setForm,
     speechIssues,
     speechSummary,
+    authToken: runtime.backendAuthToken,
+    tokenAvailable,
+    tokenBusy: runtime.isBackendAuthTokenLoading,
     unknownMessage,
     unknownStateText: toolRuntimeProbeStateText(runtime.toolRuntimeProbeState),
+    copyEndpoint,
+    copyToken,
     refresh,
+    refreshMCP,
     save,
+    saveMCP,
   };
 }
 

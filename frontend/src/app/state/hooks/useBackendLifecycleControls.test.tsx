@@ -9,7 +9,9 @@ const bridgeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../integrations/backendClients", () => ({
-  backendClients: { securityMaterial: { updateTLSConfig: bridgeMocks.updateTLSConfig } },
+  backendClients: {
+    securityMaterial: { updateTLSConfig: bridgeMocks.updateTLSConfig },
+  },
 }));
 
 function renderControls(backendConnected: boolean) {

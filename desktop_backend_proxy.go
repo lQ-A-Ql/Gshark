@@ -61,6 +61,10 @@ type desktopToolRuntimeConfig struct {
 	YaraTimeoutMS int    `json:"yara_timeout_ms"`
 }
 
+type desktopMCPConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
 type desktopTLSConfig struct {
 	SSLKeyLogFile string `json:"ssl_key_log_file"`
 	RSAPrivateKey string `json:"rsa_private_key"`
@@ -551,6 +555,26 @@ func (a *DesktopApp) SetTSharkPath(path string) (map[string]any, error) {
 	defer cancel()
 	var payload map[string]any
 	if err := a.backendProxy().postJSON(ctx, "/api/tools/tshark", map[string]string{"path": strings.TrimSpace(path)}, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) GetMCPStatus() (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	if err := a.backendProxy().getJSON(ctx, "/api/mcp/config", &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) UpdateMCPConfig(cfg desktopMCPConfig) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	if err := a.backendProxy().postJSON(ctx, "/api/mcp/config", cfg, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil

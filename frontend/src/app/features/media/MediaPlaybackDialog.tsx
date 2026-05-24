@@ -27,9 +27,7 @@ export function MediaPlaybackDialog({ playbackSession, playbackUrl, onClose }: M
         </DialogHeader>
         <div
           className={`overflow-hidden rounded-lg border border-border ${
-            playbackSession?.mediaType === "audio"
-              ? "bg-gradient-to-br from-slate-50 via-rose-50 to-orange-50 p-6"
-              : "bg-black"
+            playbackSession?.mediaType === "audio" ? "bg-white p-6" : "bg-black"
           }`}
         >
           {playbackUrl ? (

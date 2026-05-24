@@ -1275,6 +1275,140 @@
     --gshark-route-x: -10px;
     --gshark-route-y: 6px;
   }
+
+  /* Keep the product shell white; protocol/status colors remain semantic elsewhere. */
+  .gshark-page-bg,
+  .gshark-glass-shell,
+  .gshark-theme-main,
+  .gshark-soft-fill,
+  .gshark-diffuse-edge,
+  .gshark-diffuse-chip,
+  .gshark-aurora-surface,
+  .gshark-aurora-surface :where(.gshark-aurora-surface),
+  .gshark-inset-halo,
+  .gshark-chrome-bar,
+  .gshark-chrome-action,
+  .gshark-chrome-action:hover,
+  .gshark-chrome-action:where(:focus-visible, [data-state="open"]),
+  .gshark-chrome-menu,
+  .gshark-chrome-menu-item:hover,
+  .gshark-chrome-menu-item:focus-visible,
+  .gshark-chrome-menu-item-danger:hover,
+  .gshark-chrome-menu-item-danger:focus-visible,
+  .gshark-nav-rail,
+  .gshark-nav-rail-item:hover,
+  .gshark-nav-rail-item:focus-visible,
+  .gshark-nav-rail-active,
+  .gshark-workbench-panel,
+  .gshark-control,
+  .gshark-control:hover,
+  .gshark-control-primary,
+  .gshark-control-primary:hover,
+  .gshark-control-ghost:hover,
+  .gshark-control-ghost:where(:focus-visible, [data-state="open"]),
+  .gshark-stream-control-cluster,
+  .gshark-stream-segment,
+  .gshark-stream-value,
+  .gshark-field,
+  .gshark-field:hover,
+  .gshark-form-surface,
+  .gshark-tile-grid,
+  .gshark-grid-cell,
+  .gshark-grid-section,
+  .gshark-tile,
+  .gshark-tile-toolbar,
+  .gshark-tile-table,
+  .gshark-packet-header,
+  .gshark-packet-header-toolbar,
+  .gshark-packet-column-panel,
+  .gshark-packet-column-row {
+    background: #ffffff;
+    background-color: #ffffff;
+    background-image: none;
+  }
+
+  .gshark-glass-shell::before,
+  .gshark-theme-main::before,
+  .gshark-soft-fill::before,
+  .gshark-aurora-surface::before,
+  .gshark-aurora-surface :where(.gshark-aurora-surface)::before,
+  .gshark-inset-halo::before,
+  .gshark-chrome-bar::after,
+  .gshark-chrome-menu::before,
+  .gshark-forensic-scan::after,
+  .gshark-form-surface::before {
+    background: none;
+    background-image: none;
+    box-shadow: none;
+  }
+
+  .gshark-chrome-menu-divider,
+  .gshark-packet-resize-handle {
+    background: rgba(148, 163, 184, 0.28);
+    background-image: none;
+  }
+
+  .gshark-page-bg
+    :where(div, section, article, aside, header, footer, button, span):where(
+      .bg-white,
+      .bg-white\/80,
+      .bg-white\/85,
+      .bg-white\/86,
+      .bg-white\/88,
+      .bg-white\/90,
+      .bg-slate-50,
+      .bg-slate-50\/20,
+      .bg-slate-50\/40,
+      .bg-slate-50\/50,
+      .bg-slate-50\/60,
+      .bg-slate-50\/70,
+      .bg-slate-50\/75,
+      .bg-slate-50\/80,
+      .bg-blue-50,
+      .bg-blue-50\/20,
+      .bg-blue-50\/35,
+      .bg-blue-50\/45,
+      .bg-blue-50\/50,
+      .bg-blue-50\/70,
+      .bg-blue-50\/80,
+      .bg-cyan-50,
+      .bg-cyan-50\/18,
+      .bg-cyan-50\/20,
+      .bg-cyan-50\/40,
+      .bg-cyan-50\/50,
+      .bg-cyan-50\/60,
+      .bg-cyan-50\/70,
+      .bg-emerald-50,
+      .bg-emerald-50\/40,
+      .bg-emerald-50\/50,
+      .bg-emerald-50\/60,
+      .bg-emerald-50\/70,
+      .bg-emerald-50\/80,
+      .bg-amber-50,
+      .bg-amber-50\/35,
+      .bg-amber-50\/40,
+      .bg-amber-50\/50,
+      .bg-amber-50\/60,
+      .bg-amber-50\/70,
+      .bg-amber-50\/80,
+      .bg-rose-50,
+      .bg-rose-50\/35,
+      .bg-rose-50\/40,
+      .bg-rose-50\/50,
+      .bg-rose-50\/60,
+      .bg-rose-50\/70,
+      .bg-rose-50\/80,
+      .bg-rose-50\/90,
+      .bg-indigo-50,
+      .bg-indigo-50\/30,
+      .bg-indigo-50\/40,
+      .bg-indigo-50\/50,
+      .bg-violet-50,
+      .bg-violet-50\/40
+    ) {
+    background-color: #ffffff;
+    background-image: none;
+  }
 }
 
 @keyframes gshark-bg-fade-out {

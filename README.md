@@ -73,6 +73,7 @@ MISC 模块特性：
 
 相关文档：
 
+- [本地 MCP 接入文档](./docs/mcp-interface.md)
 - [MISC 模块接口文档](./docs/misc-module-interface.md)
 
 ## 扩展方式

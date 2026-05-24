@@ -1,62 +1,19 @@
 import {
-  type Dispatch,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type MutableRefObject,
-  type SetStateAction,
 } from "react";
-import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
-import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
-import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
-import type { ToolRuntimeConfigExplicitFields } from "../toolRuntimeStorageConfig";
-import { type MediaAnalysisProgress, type ThreatAnalysisProgress } from "./useAnalysisProgress";
+import type { DecryptionConfig, MCPStatus } from "../../core/types";
 import { useToolRuntime } from "./useToolRuntime";
 import { loadStartupTLSConfig } from "./backendLifecycleTLSStartup";
 import { clearWindowTimer } from "./backendLifecycleTimers";
+import { useBackendAuthToken } from "./useBackendAuthToken";
+import type { BackendLifecycleState, UseBackendLifecycleOptions } from "./backendLifecycleTypes";
 import { useBackendLifecycleControls } from "./useBackendLifecycleControls";
+import { useBackendLifecycleMCPControls } from "./useBackendLifecycleMCPControls";
 import { useBackendLifecycleStartupEffect } from "./useBackendLifecycleStartupEffect";
-
-interface UseBackendLifecycleOptions {
-  readonly activeCapturePathRef: MutableRefObject<string>;
-  readonly captureWaitersRef: MutableRefObject<Set<() => void>>;
-  readonly parseFinishedRef: MutableRefObject<boolean>;
-  readonly parseErrorRef: MutableRefObject<string>;
-  readonly preloadingRef: MutableRefObject<boolean>;
-  readonly scheduleLoadMoreRef: MutableRefObject<() => void>;
-  readonly refreshAnalysisResultRef: MutableRefObject<
-    (options?: { capturePath?: string; quietSuccess?: boolean }) => Promise<void>
-  >;
-  readonly updateProgressFromStatusRef: MutableRefObject<(message: string) => boolean>;
-  readonly setSelectedPacketId: Dispatch<SetStateAction<number | null>>;
-  readonly setMediaAnalysisProgress: Dispatch<SetStateAction<MediaAnalysisProgress>>;
-  readonly setThreatAnalysisProgress: Dispatch<SetStateAction<ThreatAnalysisProgress>>;
-  readonly setIsThreatAnalysisLoading: Dispatch<SetStateAction<boolean>>;
-}
-
-export interface BackendLifecycleState {
-  backendConnected: boolean;
-  backendStatus: string;
-  setBackendStatus: Dispatch<SetStateAction<string>>;
-  decryptionConfig: DecryptionConfig;
-  updateDecryptionConfig: (patch: Partial<DecryptionConfig>) => void;
-  tsharkStatus: TSharkStatus;
-  isTSharkChecking: boolean;
-  toolRuntimeCheckDegraded: boolean;
-  toolRuntimeProbeState: ToolRuntimeProbeState;
-  toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
-  lastToolRuntimeProbeError: string;
-  setTSharkPath: (path: string) => Promise<void>;
-  toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
-  isToolRuntimeLoading: boolean;
-  refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;
-  saveToolRuntimeConfig: (
-    patch: Partial<ToolRuntimeConfig>,
-    explicitFields?: ToolRuntimeConfigExplicitFields,
-  ) => Promise<ToolRuntimeSnapshot>;
-}
 
 export function useBackendLifecycle({
   activeCapturePathRef,
@@ -95,6 +52,7 @@ export function useBackendLifecycle({
   } = useToolRuntime();
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendStatus, setBackendStatus] = useState("等待后端连接");
+  const [mcpStatus, setMCPStatus] = useState<MCPStatus | null>(null);
   const [decryptionConfig, setDecryptionConfig] = useState<DecryptionConfig>({
     sslKeyLogPath: "",
     privateKeyPath: "",
@@ -103,6 +61,7 @@ export function useBackendLifecycle({
 
   const refreshTimerRef = useRef<number | null>(null);
   const backendRetryTimerRef = useRef<number | null>(null);
+  const { backendAuthToken, isBackendAuthTokenLoading } = useBackendAuthToken(backendConnected);
 
   const { setTSharkPath, refreshToolRuntimeSnapshot, saveToolRuntimeConfig, updateDecryptionConfig } =
     useBackendLifecycleControls({
@@ -113,6 +72,10 @@ export function useBackendLifecycle({
       refreshToolRuntimeSnapshotImpl,
       saveToolRuntimeConfigImpl,
     });
+  const { refreshMCPStatus, saveMCPConfig } = useBackendLifecycleMCPControls({
+    backendConnected,
+    setMCPStatus,
+  });
   const loadTLSConfig = useCallback(async () => {
     await loadStartupTLSConfig(setDecryptionConfig, setBackendStatus);
   }, []);
@@ -162,6 +125,7 @@ export function useBackendLifecycle({
     scheduleLoadMoreRef,
     setBackendConnected,
     setBackendStatus,
+    setMCPStatus,
     setIsThreatAnalysisLoading,
     setMediaAnalysisProgress,
     setSelectedPacketId,
@@ -187,5 +151,10 @@ export function useBackendLifecycle({
     isToolRuntimeLoading,
     refreshToolRuntimeSnapshot,
     saveToolRuntimeConfig,
+    backendAuthToken,
+    isBackendAuthTokenLoading,
+    mcpStatus,
+    refreshMCPStatus,
+    saveMCPConfig,
   };
 }

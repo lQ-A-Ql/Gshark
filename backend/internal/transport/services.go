@@ -95,6 +95,9 @@ type ToolRuntimeService interface {
 	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig
 	SetTLSConfig(cfg model.TLSConfig)
+	MCPConfig() model.MCPConfig
+	SetMCPConfig(cfg model.MCPConfig) model.MCPConfig
+	MCPStatus(authRequired bool) model.MCPStatus
 }
 
 // ToolAnalysisService groups per-tool analysis methods (NTLM / HTTP-login /

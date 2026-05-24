@@ -2,12 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
-import {
-  CaptureSettingsSection,
-  MediaSettingsSection,
-  SpeechSettingsSection,
-  YaraSettingsSection,
-} from "./RuntimeSettingsSections";
+import { CaptureSettingsSection, MediaSettingsSection, SpeechSettingsSection, YaraSettingsSection } from "./RuntimeSettingsSections";
 
 const form: ToolRuntimeConfig = {
   tsharkPath: "tshark.exe",

@@ -83,6 +83,9 @@ type Service struct {
 	yaraConf        model.YaraConfig
 
 	cancel context.CancelFunc
+
+	mcpMu     sync.RWMutex
+	mcpConfig model.MCPConfig
 }
 
 const defaultStreamCacheLimit = 256

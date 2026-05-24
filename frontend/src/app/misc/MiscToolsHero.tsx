@@ -30,7 +30,7 @@ export function MiscToolsHero({
 
   return (
     <section className="gshark-tile-header overflow-hidden">
-      <div className="pointer-events-none h-px w-full bg-gradient-to-r from-cyan-400/20 via-sky-400/10 to-transparent" />
+      <div className="pointer-events-none h-px w-full bg-slate-200" />
       <div className="flex flex-col gap-4 px-5 py-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-3">

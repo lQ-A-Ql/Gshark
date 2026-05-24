@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/engine"
+	"github.com/gshark/sentinel/backend/internal/mcp"
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
@@ -166,6 +167,250 @@ func TestToolRuntimeConfigHandlerPreservesGetAndAcceptsEmptyPostContract(t *test
 	postConfig := requireJSONNestedObject(t, postPayload, "config")
 	if postConfig["ffmpeg_path"] != "" || postConfig["python_path"] != "" || postConfig["vosk_model_path"] != "" {
 		t.Fatalf("POST response config did not reflect empty env-backed paths: %#v", postConfig)
+	}
+}
+
+func TestMCPConfigContract(t *testing.T) {
+	server := &Server{toolRuntime: &recordingToolRuntimeService{}}
+	getRec := httptest.NewRecorder()
+	server.handleMCPConfig(getRec, httptest.NewRequest(http.MethodGet, "/api/mcp/config", nil))
+
+	requireStatus(t, getRec, http.StatusOK)
+	getPayload := decodeJSONMap(t, getRec)
+	requireJSONKeys(t, getPayload, "config", "enabled", "endpoint", "transport", "auth_required", "read_only", "remote_supported", "stdio_supported")
+	if getPayload["endpoint"] != "http://127.0.0.1:17891/api/mcp" {
+		t.Fatalf("endpoint = %#v, want fixed local MCP endpoint", getPayload["endpoint"])
+	}
+	if getPayload["transport"] != "streamable-http" {
+		t.Fatalf("transport = %#v, want streamable-http", getPayload["transport"])
+	}
+	if getPayload["read_only"] != true || getPayload["remote_supported"] != false || getPayload["stdio_supported"] != false {
+		t.Fatalf("unexpected MCP capability flags: %#v", getPayload)
+	}
+	getConfig := requireJSONNestedObject(t, getPayload, "config")
+	if getPayload["enabled"] != false || getConfig["enabled"] != false {
+		t.Fatalf("default MCP status = %#v config=%#v, want disabled", getPayload["enabled"], getConfig)
+	}
+
+	postRec := httptest.NewRecorder()
+	server.handleMCPConfig(postRec, httptest.NewRequest(http.MethodPost, "/api/mcp/config", strings.NewReader(`{"enabled":true}`)))
+
+	requireStatus(t, postRec, http.StatusOK)
+	postPayload := decodeJSONMap(t, postRec)
+	requireJSONKeys(t, postPayload, "config", "enabled")
+	postConfig := requireJSONNestedObject(t, postPayload, "config")
+	if postPayload["enabled"] != true || postConfig["enabled"] != true {
+		t.Fatalf("POST MCP status = %#v config=%#v, want enabled", postPayload["enabled"], postConfig)
+	}
+}
+
+func TestMCPConfigContractAuthRequired(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server.SetAuthToken("secret-token")
+
+	healthRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(healthRec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	requireStatus(t, healthRec, http.StatusOK)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/mcp/config", nil)
+	server.Handler().ServeHTTP(rec, req)
+	requireStatus(t, rec, http.StatusUnauthorized)
+
+	authedGetRec := httptest.NewRecorder()
+	authedGetReq := httptest.NewRequest(http.MethodGet, "/api/mcp/config", nil)
+	authedGetReq.Header.Set("Authorization", "Bearer secret-token")
+	server.Handler().ServeHTTP(authedGetRec, authedGetReq)
+	requireStatus(t, authedGetRec, http.StatusOK)
+	payload := decodeJSONMap(t, authedGetRec)
+	if payload["auth_required"] != true {
+		t.Fatalf("auth_required = %#v, want true", payload["auth_required"])
+	}
+
+	authedPostRec := httptest.NewRecorder()
+	authedPostReq := httptest.NewRequest(http.MethodPost, "/api/mcp/config", strings.NewReader(`{"enabled":true}`))
+	authedPostReq.Header.Set("Authorization", "Bearer secret-token")
+	server.Handler().ServeHTTP(authedPostRec, authedPostReq)
+	requireStatus(t, authedPostRec, http.StatusOK)
+	postPayload := decodeJSONMap(t, authedPostRec)
+	if postPayload["enabled"] != true {
+		t.Fatalf("enabled = %#v, want true", postPayload["enabled"])
+	}
+}
+
+func TestMCPRouteContractDisabled(t *testing.T) {
+	runtime := &recordingToolRuntimeService{
+		config: model.ToolRuntimeConfig{},
+		mcp:    model.MCPConfig{Enabled: false},
+	}
+	server := NewServerWithOptions(nil, NewHub(), ServerOptions{})
+	server.toolRuntime = runtime
+	server.mcpServer = nil
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	server.handleMCP(rec, req)
+
+	requireStatus(t, rec, http.StatusNotFound)
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "error")
+}
+
+func TestMCPRouteContractInitializeAndTools(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
+
+	server.Handler().ServeHTTP(rec, req)
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "jsonrpc", "id", "result")
+	result := requireJSONNestedObject(t, payload, "result")
+	requireJSONKeys(t, result, "protocolVersion", "capabilities", "serverInfo", "instructions")
+
+	toolsRec := httptest.NewRecorder()
+	toolsReq := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`))
+	server.Handler().ServeHTTP(toolsRec, toolsReq)
+	requireStatus(t, toolsRec, http.StatusOK)
+	toolsPayload := decodeJSONMap(t, toolsRec)
+	toolsResult := requireJSONNestedObject(t, toolsPayload, "result")
+	tools := requireJSONArray(t, toolsResult, "tools")
+	if len(tools) == 0 {
+		t.Fatalf("tools = %#v, want non-empty", tools)
+	}
+}
+
+func TestMCPRouteContractResourcesPromptsAndToolCall(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
+
+	resourcesRec := httptest.NewRecorder()
+	resourcesReq := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"resources/list"}`))
+	server.Handler().ServeHTTP(resourcesRec, resourcesReq)
+	requireStatus(t, resourcesRec, http.StatusOK)
+	resourcesPayload := decodeJSONMap(t, resourcesRec)
+	resourcesResult := requireJSONNestedObject(t, resourcesPayload, "result")
+	if len(requireJSONArray(t, resourcesResult, "resources")) == 0 {
+		t.Fatalf("resources = empty")
+	}
+
+	promptsRec := httptest.NewRecorder()
+	promptsReq := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":4,"method":"prompts/list"}`))
+	server.Handler().ServeHTTP(promptsRec, promptsReq)
+	requireStatus(t, promptsRec, http.StatusOK)
+	promptsPayload := decodeJSONMap(t, promptsRec)
+	promptsResult := requireJSONNestedObject(t, promptsPayload, "result")
+	if len(requireJSONArray(t, promptsResult, "prompts")) == 0 {
+		t.Fatalf("prompts = empty")
+	}
+
+	callRec := httptest.NewRecorder()
+	callReq := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"capture.status","arguments":{}}}`))
+	server.Handler().ServeHTTP(callRec, callReq)
+	requireStatus(t, callRec, http.StatusOK)
+	callPayload := decodeJSONMap(t, callRec)
+	callResult := requireJSONNestedObject(t, callPayload, "result")
+	requireJSONKeys(t, callResult, "content", "structuredContent", "isError")
+}
+
+func TestMCPRouteContractAuthRequired(t *testing.T) {
+	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
+	server.SetAuthToken("secret-token")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"ping"}`))
+	server.Handler().ServeHTTP(rec, req)
+	requireStatus(t, rec, http.StatusUnauthorized)
+
+	authedRec := httptest.NewRecorder()
+	authedReq := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"ping"}`))
+	authedReq.Header.Set("Authorization", "Bearer secret-token")
+	server.Handler().ServeHTTP(authedRec, authedReq)
+	requireStatus(t, authedRec, http.StatusOK)
+}
+
+func TestMCPRouteContractTruncatesLongPayload(t *testing.T) {
+	server := NewServer(nil, NewHub())
+	server.capture = contractCaptureService{}
+	server.analysis = contractAnalysisService{}
+	server.toolRuntime = &recordingToolRuntimeService{mcp: model.MCPConfig{Enabled: true}}
+	server.toolAnalysis = mcpContractToolAnalysisService{}
+	server.plugins = mcpContractPluginService{}
+	server.mcpServer = mcp.NewServer(mcp.Dependencies{
+		Capture:      server.capture,
+		Analysis:     server.analysis,
+		ToolRuntime:  server.toolRuntime,
+		ToolAnalysis: server.toolAnalysis,
+		Plugins:      server.plugins,
+		Evidence: func(ctx context.Context, modules []string) (any, error) {
+			return map[string]any{"blob": strings.Repeat("x", 210500), "modules": modules}, nil
+		},
+		MiscModules: server.miscModuleManifests,
+		AuditLogs:   server.recentAuditEntries,
+		AuthEnabled: func() bool { return false },
+	})
+	callRec := httptest.NewRecorder()
+	callReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/mcp",
+		strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"analysis.evidence","arguments":{"modules":["c2"]}}}`),
+	)
+	server.Handler().ServeHTTP(callRec, callReq)
+	requireStatus(t, callRec, http.StatusOK)
+	callPayload := decodeJSONMap(t, callRec)
+	callResult := requireJSONNestedObject(t, callPayload, "result")
+	content := requireJSONArray(t, callResult, "content")
+	if len(content) == 0 {
+		t.Fatalf("content = %#v, want text content", content)
+	}
+	textNode, ok := content[0].(map[string]any)
+	if !ok {
+		t.Fatalf("content[0] = %#v, want object", content[0])
+	}
+	text, ok := textNode["text"].(string)
+	if !ok {
+		t.Fatalf("text = %#v, want string", textNode["text"])
+	}
+	if !strings.Contains(text, "...<truncated>") {
+		t.Fatalf("text not truncated: len=%d", len(text))
+	}
+}
+
+func TestMCPRouteContractCancellationPropagates(t *testing.T) {
+	server := NewServer(nil, NewHub())
+	server.capture = contractCaptureService{}
+	server.analysis = contractAnalysisService{}
+	server.toolRuntime = &recordingToolRuntimeService{mcp: model.MCPConfig{Enabled: true}}
+	server.toolAnalysis = mcpContractToolAnalysisService{}
+	server.plugins = mcpContractPluginService{}
+	server.mcpServer = mcp.NewServer(mcp.Dependencies{
+		Capture:      server.capture,
+		Analysis:     server.analysis,
+		ToolRuntime:  server.toolRuntime,
+		ToolAnalysis: server.toolAnalysis,
+		Plugins:      server.plugins,
+		Evidence: func(ctx context.Context, modules []string) (any, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+		MiscModules: server.miscModuleManifests,
+		AuditLogs:   server.recentAuditEntries,
+		AuthEnabled: func() bool { return false },
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"analysis.evidence","arguments":{"modules":["c2"]}}}`)).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	errPayload := requireJSONNestedObject(t, payload, "error")
+	requireJSONKeys(t, errPayload, "code", "message")
+	if !strings.Contains(strings.ToLower(errPayload["message"].(string)), "canceled") {
+		t.Fatalf("message = %#v, want canceled error", errPayload["message"])
 	}
 }
 
@@ -540,6 +785,82 @@ func (contractAnalysisService) GatherEvidence(context.Context, model.EvidenceFil
 	return model.EvidenceResponse{Records: []model.EvidenceRecord{}, Total: 0}, nil
 }
 
+type mcpContractToolAnalysisService struct{}
+
+func (mcpContractToolAnalysisService) ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error) {
+	return nil, nil
+}
+
+func (mcpContractToolAnalysisService) ListNTLMSessionMaterialsWithContext(context.Context) ([]model.NTLMSessionMaterial, error) {
+	return nil, nil
+}
+
+func (mcpContractToolAnalysisService) HTTPLoginAnalysis(context.Context) (model.HTTPLoginAnalysis, error) {
+	return model.HTTPLoginAnalysis{}, nil
+}
+
+func (mcpContractToolAnalysisService) SMTPAnalysis(context.Context) (model.SMTPAnalysis, error) {
+	return model.SMTPAnalysis{}, nil
+}
+
+func (mcpContractToolAnalysisService) MySQLAnalysis(context.Context) (model.MySQLAnalysis, error) {
+	return model.MySQLAnalysis{}, nil
+}
+
+func (mcpContractToolAnalysisService) ShiroRememberMeAnalysis(context.Context, model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error) {
+	return model.ShiroRememberMeAnalysis{}, nil
+}
+
+func (mcpContractToolAnalysisService) ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, error) {
+	return nil, nil
+}
+
+func (mcpContractToolAnalysisService) ListSMB3SessionCandidatesWithContext(context.Context) ([]model.SMB3SessionCandidate, error) {
+	return nil, nil
+}
+
+func (mcpContractToolAnalysisService) GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest) (model.SMB3RandomSessionKeyResult, error) {
+	return model.SMB3RandomSessionKeyResult{}, nil
+}
+
+func (mcpContractToolAnalysisService) RunWinRMDecrypt(model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	return model.WinRMDecryptResult{}, nil
+}
+
+func (mcpContractToolAnalysisService) RunWinRMDecryptWithContext(context.Context, model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
+	return model.WinRMDecryptResult{}, nil
+}
+
+func (mcpContractToolAnalysisService) WinRMExportFile(string) (string, string, error) {
+	return "", "", nil
+}
+
+type mcpContractPluginService struct{}
+
+func (mcpContractPluginService) ListPlugins() []model.Plugin { return nil }
+
+func (mcpContractPluginService) AddPlugin(model.Plugin) (model.Plugin, error) {
+	return model.Plugin{}, nil
+}
+
+func (mcpContractPluginService) DeletePlugin(string) error { return nil }
+
+func (mcpContractPluginService) PluginSource(string) (model.PluginSource, error) {
+	return model.PluginSource{}, nil
+}
+
+func (mcpContractPluginService) UpdatePluginSource(source model.PluginSource) (model.PluginSource, error) {
+	return source, nil
+}
+
+func (mcpContractPluginService) TogglePlugin(string) (model.Plugin, error) {
+	return model.Plugin{}, nil
+}
+
+func (mcpContractPluginService) SetPluginsEnabled([]string, bool) ([]model.Plugin, error) {
+	return nil, nil
+}
+
 type contractEvidenceAnalysisService struct {
 	contractAnalysisService
 	modules []string
@@ -618,6 +939,7 @@ func (contractToolRuntimeService) SetToolRuntimeConfig(model.ToolRuntimeConfig) 
 type recordingToolRuntimeService struct {
 	contractToolRuntimeService
 	config model.ToolRuntimeConfig
+	mcp    model.MCPConfig
 }
 
 func (s *recordingToolRuntimeService) ToolRuntimeSnapshot() model.ToolRuntimeSnapshot {
@@ -642,6 +964,28 @@ func (s *recordingToolRuntimeService) SetToolRuntimeConfig(cfg model.ToolRuntime
 	return cfg
 }
 
+func (s *recordingToolRuntimeService) MCPConfig() model.MCPConfig {
+	return s.mcp
+}
+
+func (s *recordingToolRuntimeService) SetMCPConfig(cfg model.MCPConfig) model.MCPConfig {
+	s.mcp = cfg
+	return s.mcp
+}
+
+func (s *recordingToolRuntimeService) MCPStatus(authRequired bool) model.MCPStatus {
+	return model.MCPStatus{
+		Config:          s.mcp,
+		Enabled:         s.mcp.Enabled,
+		Endpoint:        "http://127.0.0.1:17891/api/mcp",
+		Transport:       "streamable-http",
+		AuthRequired:    authRequired,
+		ReadOnly:        true,
+		RemoteSupported: false,
+		StdioSupported:  false,
+	}
+}
+
 func (contractToolRuntimeService) FFmpegStatus() model.FFmpegToolStatus {
 	return model.FFmpegToolStatus{Available: true, Path: "ffmpeg", Message: "ok"}
 }
@@ -649,6 +993,23 @@ func (contractToolRuntimeService) FFmpegStatus() model.FFmpegToolStatus {
 func (contractToolRuntimeService) TLSConfig() model.TLSConfig { return model.TLSConfig{} }
 
 func (contractToolRuntimeService) SetTLSConfig(model.TLSConfig) {}
+
+func (contractToolRuntimeService) MCPConfig() model.MCPConfig { return model.MCPConfig{} }
+
+func (contractToolRuntimeService) SetMCPConfig(cfg model.MCPConfig) model.MCPConfig { return cfg }
+
+func (contractToolRuntimeService) MCPStatus(authRequired bool) model.MCPStatus {
+	return model.MCPStatus{
+		Config:          model.MCPConfig{},
+		Enabled:         false,
+		Endpoint:        "http://127.0.0.1:17891/api/mcp",
+		Transport:       "streamable-http",
+		AuthRequired:    authRequired,
+		ReadOnly:        true,
+		RemoteSupported: false,
+		StdioSupported:  false,
+	}
+}
 
 func contractReport() model.InvestigationReport {
 	return model.InvestigationReport{

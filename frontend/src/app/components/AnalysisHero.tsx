@@ -25,7 +25,6 @@ const themeClasses: Record<
     iconWrap: string;
     iconText: string;
     badgeStyle: string;
-    accent: string;
     action: string;
   }
 > = {
@@ -33,21 +32,18 @@ const themeClasses: Record<
     iconWrap: "border-blue-200/24 bg-blue-50/16",
     iconText: "text-blue-600",
     badgeStyle: "border-blue-200/22 bg-blue-50/14 text-blue-700",
-    accent: "from-blue-400/18 via-indigo-400/10 to-transparent",
     action: "border-blue-200/24 bg-blue-50/12 text-blue-700 hover:border-blue-300/40 hover:bg-blue-500/10",
   },
   indigo: {
     iconWrap: "border-indigo-200/24 bg-indigo-50/16",
     iconText: "text-indigo-600",
     badgeStyle: "border-indigo-200/22 bg-indigo-50/14 text-indigo-700",
-    accent: "from-indigo-400/18 via-violet-400/10 to-transparent",
     action: "border-indigo-200/24 bg-indigo-50/12 text-indigo-700 hover:border-indigo-300/40 hover:bg-indigo-500/10",
   },
   emerald: {
     iconWrap: "border-emerald-200/24 bg-emerald-50/16",
     iconText: "text-emerald-600",
     badgeStyle: "border-emerald-200/22 bg-emerald-50/14 text-emerald-700",
-    accent: "from-emerald-400/18 via-teal-400/10 to-transparent",
     action:
       "border-emerald-200/24 bg-emerald-50/12 text-emerald-700 hover:border-emerald-300/40 hover:bg-emerald-500/10",
   },
@@ -55,21 +51,18 @@ const themeClasses: Record<
     iconWrap: "border-rose-200/24 bg-rose-50/16",
     iconText: "text-rose-600",
     badgeStyle: "border-rose-200/22 bg-rose-50/14 text-rose-700",
-    accent: "from-rose-400/18 via-pink-400/10 to-transparent",
     action: "border-rose-200/24 bg-rose-50/12 text-rose-700 hover:border-rose-300/40 hover:bg-rose-500/10",
   },
   cyan: {
     iconWrap: "border-cyan-200/24 bg-cyan-50/16",
     iconText: "text-cyan-600",
     badgeStyle: "border-cyan-200/22 bg-cyan-50/14 text-cyan-700",
-    accent: "from-cyan-400/18 via-sky-400/10 to-transparent",
     action: "border-cyan-200/24 bg-cyan-50/12 text-cyan-700 hover:border-cyan-300/40 hover:bg-cyan-500/10",
   },
   amber: {
     iconWrap: "border-amber-200/24 bg-amber-50/16",
     iconText: "text-amber-600",
     badgeStyle: "border-amber-200/22 bg-amber-50/14 text-amber-700",
-    accent: "from-amber-400/18 via-orange-400/10 to-transparent",
     action: "border-amber-200/24 bg-amber-50/12 text-amber-700 hover:border-amber-300/40 hover:bg-amber-500/10",
   },
 };
@@ -95,7 +88,7 @@ export function AnalysisHero({
     <section
       className={cn("gshark-forensic-scan overflow-hidden", isTile ? "gshark-tile gshark-tile-strong" : "gshark-tile")}
     >
-      <div className={cn("pointer-events-none h-px w-full bg-gradient-to-r", themeConfig.accent)} />
+      <div className="pointer-events-none h-px w-full bg-slate-200" />
       <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
