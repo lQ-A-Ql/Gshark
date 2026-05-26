@@ -12,6 +12,8 @@ export type DesktopIpcErrorCode =
   | "ipc_unavailable"
   | "ipc_timeout"
   | "invalid_request"
+  | "generic_ipc_disabled"
+  | "typed_binding_required"
   | "backend_proxy_failed"
   | "backend_error"
   | "blob_too_large";
@@ -79,6 +81,7 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
+      assertGenericIpcAllowed(desktopApp, request, "json", startedAt);
       const payload = await invokeWithLocalControls(
         () => desktopApp.InvokeBackendJSON?.(request),
         path,
@@ -96,6 +99,7 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
+      assertGenericIpcAllowed(desktopApp, request, "blob", startedAt);
       const payload = (await invokeWithLocalControls(
         () => desktopApp.InvokeBackendBlob?.(request),
         path,
@@ -120,6 +124,7 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
       }
       const startedAt = performanceNow();
       const request = await toDesktopBackendRequest(path, init);
+      assertGenericIpcAllowed(desktopApp, request, "text", startedAt);
       const text = await invokeWithLocalControls(
         () => desktopApp.InvokeBackendText?.(request),
         path,
@@ -135,6 +140,158 @@ export function createIpcBackendTransport(desktopApp: DesktopTransportBinding): 
       return subscribeDesktopEvents(handlers);
     },
   };
+}
+
+export function createDisabledGenericIpcBackendTransport(): IpcBackendTransport {
+  return {
+    async requestJSON(path: string, init?: RequestInit): Promise<never> {
+      return throwGenericIpcDisabled(path, init);
+    },
+    async requestBlob(path: string, init?: RequestInit) {
+      return throwGenericIpcDisabled(path, init);
+    },
+    async requestText(path: string, init?: RequestInit) {
+      return throwGenericIpcDisabled(path, init);
+    },
+    subscribeEvents(handlers: EventHandlers) {
+      return subscribeDesktopEvents(handlers);
+    },
+  };
+}
+
+function throwGenericIpcDisabled(path: string, init?: RequestInit): never {
+  if (init?.signal?.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
+  throw new DesktopIpcRequestError(
+    "generic_ipc_disabled",
+    `桌面 generic IPC adapter 已被策略禁用，缺少 typed IPC 覆盖：${path}。如需回滚兼容路径，设置 VITE_DESKTOP_GENERIC_IPC_POLICY=compat。`,
+    path,
+    0,
+  );
+}
+
+function assertGenericIpcAllowed(
+  desktopApp: DesktopTransportBinding,
+  request: DesktopBackendRequest,
+  responseKind: DesktopIpcResponseKind,
+  startedAt: number,
+): void {
+  const binding = migratedTypedBindingForRequest(request, responseKind);
+  if (!binding || !desktopApp[binding]) {
+    return;
+  }
+  throw new DesktopIpcRequestError(
+    "typed_binding_required",
+    `桌面 typed IPC 已覆盖 ${String(binding)}，禁止继续通过 generic IPC 代理：${request.path}`,
+    request.path,
+    elapsedMs(startedAt),
+  );
+}
+
+function migratedTypedBindingForRequest(
+  request: DesktopBackendRequest,
+  responseKind: DesktopIpcResponseKind,
+): keyof DesktopTransportBinding | undefined {
+  const { pathname, searchParams } = parseDesktopRequestPath(request.path);
+  const normalizedMethod = request.method;
+
+  if (pathname === "/api/tools/runtime-config") {
+    if (normalizedMethod === "GET") {
+      return searchParams.get("probe") === "fast" ? "GetToolRuntimeSnapshotFast" : "GetToolRuntimeSnapshotFull";
+    }
+    if (normalizedMethod === "POST") {
+      return searchParams.get("probe") === "fast" ? "UpdateToolRuntimeConfigFast" : "UpdateToolRuntimeConfigFull";
+    }
+  }
+  if (pathname === "/api/mcp/config") return normalizedMethod === "POST" ? "UpdateMCPConfig" : "GetMCPStatus";
+  if (pathname === "/api/capture/start") return "StartCapture";
+  if (pathname === "/api/capture/stop") return "StopCapture";
+  if (pathname === "/api/capture/prepare-replacement") return "PrepareCaptureReplacement";
+  if (pathname === "/api/capture/close") return "CloseCapture";
+  if (pathname === "/api/capture/status") return "GetCaptureStatus";
+  if (pathname === "/api/packets/page") return "ListPacketsPage";
+  if (pathname === "/api/packets/locate") return "LocatePacketPage";
+  if (pathname === "/api/packet") return "GetPacket";
+  if (pathname === "/api/hunting") return "ListThreatHits";
+  if (pathname === "/api/hunting/config") {
+    return normalizedMethod === "POST" ? "UpdateHuntingRuntimeConfig" : "GetHuntingRuntimeConfig";
+  }
+  if (pathname === "/api/analysis/vehicle/dbc") {
+    if (normalizedMethod === "POST") return "AddVehicleDBC";
+    if (normalizedMethod === "DELETE") return "RemoveVehicleDBC";
+    return "ListVehicleDBCProfiles";
+  }
+  if (pathname === "/api/plugins") return "ListPlugins";
+  if (pathname === "/api/plugins/source") return normalizedMethod === "POST" ? "SavePluginSource" : "GetPluginSource";
+  if (pathname === "/api/plugins/add") return "AddPlugin";
+  if (pathname === "/api/plugins/delete") return "DeletePlugin";
+  if (pathname === "/api/plugins/toggle") return "TogglePlugin";
+  if (pathname === "/api/plugins/bulk") return "SetPluginsEnabled";
+  if (pathname === "/api/tools/misc/modules") return "ListMiscModules";
+  if (pathname === "/api/tools/misc/import") return "ImportMiscModulePackageFromPath";
+  if (normalizedMethod === "DELETE" && /^\/api\/tools\/misc\/packages\/[^/]+$/.test(pathname)) {
+    return "DeleteMiscModulePackage";
+  }
+  if (normalizedMethod === "POST" && /^\/api\/tools\/misc\/packages\/[^/]+\/invoke$/.test(pathname)) {
+    return "RunMiscModulePackage";
+  }
+  if (pathname === "/api/tls") return normalizedMethod === "POST" ? "UpdateTLSConfig" : "GetTLSConfig";
+
+  if (pathname === "/api/streams/http") return "GetHttpStream";
+  if (pathname === "/api/streams/raw") return "GetRawStream";
+  if (pathname === "/api/streams/raw/page") return "GetRawStreamPage";
+  if (pathname === "/api/streams/decode") return "DecodeStreamPayload";
+  if (pathname === "/api/streams/inspect") return "InspectStreamPayload";
+  if (pathname === "/api/streams/payload-sources") return "ListStreamPayloadSources";
+  if (pathname === "/api/streams/index") return "ListStreamIDs";
+  if (pathname === "/api/streams/payloads") return "UpdateStreamPayloads";
+  if (pathname === "/api/packet/raw") return "GetPacketRawHex";
+  if (pathname === "/api/packet/layers") return "GetPacketLayers";
+
+  if (pathname === "/api/objects") return "ListObjects";
+  if (pathname === "/api/objects/download") return "DownloadObjectsZip";
+
+  if (pathname === "/api/tools/winrm-decrypt") return "RunWinRMDecrypt";
+  if (pathname === "/api/tools/winrm-decrypt/export") {
+    return responseKind === "text" ? "GetWinRMDecryptResultText" : "ExportWinRMDecryptResult";
+  }
+  if (pathname === "/api/tools/smb3-session-candidates") return "ListSMB3SessionCandidates";
+  if (pathname === "/api/tools/smb3-random-session-key") return "GenerateSMB3RandomSessionKey";
+  if (pathname === "/api/tools/ntlm-sessions") return "ListNTLMSessionMaterials";
+  if (pathname === "/api/tools/http-login-analysis") return "GetHTTPLoginAnalysis";
+  if (pathname === "/api/tools/smtp-analysis") return "GetSMTPAnalysis";
+  if (pathname === "/api/tools/mysql-analysis") return "GetMySQLAnalysis";
+  if (pathname === "/api/tools/shiro-rememberme") return "GetShiroRememberMeAnalysis";
+
+  if (pathname === "/api/stats/traffic/global") return "GetGlobalTrafficStats";
+  if (pathname === "/api/analysis/industrial") return "GetIndustrialAnalysis";
+  if (pathname === "/api/analysis/vehicle") return "GetVehicleAnalysis";
+  if (pathname === "/api/analysis/media") return "GetMediaAnalysis";
+  if (pathname === "/api/analysis/media/transcribe") return "TranscribeMediaArtifact";
+  if (pathname === "/api/analysis/media/transcribe/batch") {
+    return normalizedMethod === "POST" ? "StartMediaBatchTranscription" : "GetMediaBatchTranscriptionStatus";
+  }
+  if (pathname === "/api/analysis/media/transcribe/batch/cancel") return "CancelMediaBatchTranscription";
+  if (pathname === "/api/analysis/media/transcribe/batch/export") return "ExportMediaBatchTranscription";
+  if (pathname === "/api/analysis/media/export") return "DownloadMediaArtifact";
+  if (pathname === "/api/analysis/media/play") return "GetMediaPlaybackBlob";
+  if (pathname === "/api/analysis/usb") return "GetUSBAnalysis";
+  if (pathname === "/api/c2-analysis") return "GetC2SampleAnalysis";
+  if (pathname === "/api/c2-analysis/decrypt") return "DecryptC2Traffic";
+  if (pathname === "/api/apt-analysis") return "GetAPTAnalysis";
+  if (pathname === "/api/evidence") return searchParams.has("modules") ? "GetEvidenceWithFilter" : "GetEvidence";
+  return undefined;
+}
+
+function parseDesktopRequestPath(path: string): { pathname: string; searchParams: URLSearchParams } {
+  try {
+    const parsed = new URL(path, "http://desktop-ipc.local");
+    return { pathname: parsed.pathname, searchParams: parsed.searchParams };
+  } catch {
+    const [pathname, query = ""] = path.split("?", 2);
+    return { pathname, searchParams: new URLSearchParams(query) };
+  }
 }
 
 async function toDesktopBackendRequest(path: string, init?: RequestInit): Promise<DesktopBackendRequest> {
@@ -274,7 +431,7 @@ export async function withDesktopIpcControls<T>(
   });
 
   try {
-    return await Promise.race([Promise.resolve().then(operation), controls]);
+    return await Promise.race([Promise.resolve().then(() => operation()), controls]);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;

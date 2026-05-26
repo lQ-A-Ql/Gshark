@@ -1312,6 +1312,25 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	yc := s.yaraConf
 	s.huntMu.RUnlock()
 
+	if !yc.Enabled {
+		s.yaraHits = nil
+		s.yaraLastError = ""
+		s.yaraLoaded = true
+		return nil
+	}
+	if err := preflightYaraScanConfig(yc); err != nil {
+		log.Printf("engine: yara scan unavailable: %v", err)
+		s.emitStatus("YARA 扫描异常: " + err.Error())
+		hits := []model.ThreatHit{newYaraWarningHit(err.Error())}
+		s.yaraHits = make([]model.ThreatHit, len(hits))
+		copy(s.yaraHits, hits)
+		s.yaraLastError = err.Error()
+		s.yaraLoaded = true
+		out := make([]model.ThreatHit, len(s.yaraHits))
+		copy(out, s.yaraHits)
+		return out
+	}
+
 	targets, cleanup, err := s.buildYaraScanTargetsWithContext(ctx, objects)
 	if cleanup != nil {
 		defer cleanup()

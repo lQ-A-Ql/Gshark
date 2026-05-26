@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -39,6 +40,13 @@ type openCaptureDialogResult struct {
 	FileName string `json:"fileName"`
 }
 
+type desktopWebviewSmokeConfig struct {
+	Enabled                     bool   `json:"enabled"`
+	CapturePath                 string `json:"capture_path,omitempty"`
+	MiscPackageDir              string `json:"misc_package_dir,omitempty"`
+	GenericIPCDisableExperiment bool   `json:"generic_ipc_disable_experiment,omitempty"`
+}
+
 func NewDesktopApp() *DesktopApp {
 	return &DesktopApp{
 		backendStatus:  "not-started",
@@ -69,6 +77,51 @@ func (a *DesktopApp) Shutdown(_ context.Context) {
 	a.setBackendStatus("stopped")
 	a.stopBackendEventBridge()
 	a.stopBackend()
+}
+
+func (a *DesktopApp) GetDesktopWebviewSmokeConfig() desktopWebviewSmokeConfig {
+	resultPath := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
+	if resultPath == "" {
+		return desktopWebviewSmokeConfig{}
+	}
+	miscPackageDir := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR"))
+	if miscPackageDir == "" {
+		miscPackageDir = strings.TrimSpace(os.Getenv("GSHARK_MISC_PACKAGE_DIR"))
+	}
+	return desktopWebviewSmokeConfig{
+		Enabled:                     true,
+		CapturePath:                 strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH")),
+		MiscPackageDir:              miscPackageDir,
+		GenericIPCDisableExperiment: isTruthyEnv("GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT"),
+	}
+}
+
+func isTruthyEnv(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *DesktopApp) WriteDesktopWebviewSmokeResult(payload map[string]any) error {
+	resultPath := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
+	if resultPath == "" {
+		return fmt.Errorf("desktop webview smoke result path is not configured")
+	}
+	if err := os.MkdirAll(filepath.Dir(resultPath), 0o755); err != nil {
+		return fmt.Errorf("create desktop webview smoke result dir: %w", err)
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal desktop webview smoke result: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(resultPath, data, 0o644); err != nil {
+		return fmt.Errorf("write desktop webview smoke result: %w", err)
+	}
+	return nil
 }
 
 func (a *DesktopApp) BackendStatus() string {
@@ -178,6 +231,52 @@ func (a *DesktopApp) OpenDBCDialog() (openCaptureDialogResult, error) {
 		FileName: filepath.Base(selected),
 	}
 	fmt.Fprintf(os.Stdout, "desktop dialog: selected dbc file %q (%d bytes)\n", result.FilePath, result.FileSize)
+	return result, nil
+}
+
+func (a *DesktopApp) SelectMiscModulePackage() (openCaptureDialogResult, error) {
+	if a.ctx == nil {
+		return openCaptureDialogResult{}, fmt.Errorf("desktop context is not ready")
+	}
+
+	selected, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
+		Title: "选择 MISC 模块 ZIP 包",
+		Filters: []wruntime.FileFilter{
+			{
+				DisplayName: "MISC Module Package (*.zip)",
+				Pattern:     "*.zip",
+			},
+			{
+				DisplayName: "All Files (*.*)",
+				Pattern:     "*.*",
+			},
+		},
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "desktop dialog: open misc module package dialog failed: %v\n", err)
+		return openCaptureDialogResult{}, err
+	}
+
+	selected = strings.TrimSpace(selected)
+	if selected == "" {
+		fmt.Fprintln(os.Stdout, "desktop dialog: misc module package selection canceled")
+		return openCaptureDialogResult{}, nil
+	}
+
+	info, err := os.Stat(selected)
+	if err != nil {
+		return openCaptureDialogResult{}, fmt.Errorf("read selected misc module package: %w", err)
+	}
+	if info.IsDir() {
+		return openCaptureDialogResult{}, fmt.Errorf("selected path is a directory: %s", selected)
+	}
+
+	result := openCaptureDialogResult{
+		FilePath: selected,
+		FileSize: info.Size(),
+		FileName: filepath.Base(selected),
+	}
+	fmt.Fprintf(os.Stdout, "desktop dialog: selected misc module package %q (%d bytes)\n", result.FilePath, result.FileSize)
 	return result, nil
 }
 

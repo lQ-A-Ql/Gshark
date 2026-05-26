@@ -96,6 +96,10 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
+	svc.huntMu.Lock()
+	// Keep this evidence-mapping test independent from host YARA availability.
+	svc.yaraConf.Enabled = false
+	svc.huntMu.Unlock()
 
 	if err := svc.packetStore.Append([]model.Packet{
 		{

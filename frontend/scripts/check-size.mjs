@@ -37,8 +37,64 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/desktopTransportBinding.ts",
+    maxLines: 80,
+    reason: "desktop transport binding should stay as the Wails typed IPC method surface contract",
+  },
+  {
+    path: "src/app/integrations/desktopTransportBindingShell.ts",
+    maxLines: 50,
+    reason: "desktop shell binding should only cover Wails shell, auth, dialog, and generic IPC adapter methods",
+  },
+  {
+    path: "src/app/integrations/desktopTransportBindingControl.ts",
+    maxLines: 45,
+    reason: "desktop control-plane binding should only cover runtime, MCP, capture, and TLS methods",
+  },
+  {
+    path: "src/app/integrations/desktopTransportBindingStream.ts",
+    maxLines: 45,
+    reason: "desktop stream binding should only cover packet and stream typed method contracts",
+  },
+  {
+    path: "src/app/integrations/desktopTransportBindingTooling.ts",
+    maxLines: 55,
+    reason:
+      "desktop tooling binding should only cover object, security tooling, plugin, hunting, vehicle, and MISC contracts",
+  },
+  {
+    path: "src/app/integrations/desktopTransportBindingAnalysis.ts",
+    maxLines: 45,
+    reason: "desktop analysis binding should only cover analysis, media, C2, APT, USB, and evidence contracts",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridge.ts",
     maxLines: 35,
-    reason: "desktop transport binding should stay as a Wails method surface contract",
+    reason: "desktop typed bridge should only compose domain-specific typed IPC overrides",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgeCore.ts",
+    maxLines: 85,
+    reason: "desktop typed bridge core should only hold binding requirements and shared IPC controls",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgeRequirements.ts",
+    maxLines: 75,
+    reason: "desktop typed bridge requirements should only map bridge methods to required Wails bindings",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgeStream.ts",
+    maxLines: 210,
+    reason: "desktop stream typed bridge should only map stream and packet-detail typed IPC methods",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgeTooling.ts",
+    maxLines: 145,
+    reason: "desktop tooling typed bridge should only map object, WinRM, session-material, and protocol-tool methods",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgeAnalysis.ts",
+    maxLines: 145,
+    reason: "desktop analysis typed bridge should only map analysis, C2 decrypt, APT, and evidence methods",
   },
   {
     path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",

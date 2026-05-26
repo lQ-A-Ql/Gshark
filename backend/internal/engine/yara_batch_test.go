@@ -125,6 +125,33 @@ rule DUMMY_RULE {
 	}
 }
 
+func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
+	svc := NewService(NopEmitter{}, nil)
+	defer svc.packetStore.Close()
+
+	svc.huntMu.Lock()
+	svc.yaraConf = model.YaraConfig{
+		Enabled:   true,
+		Bin:       filepath.Join(t.TempDir(), "missing-yara.exe"),
+		TimeoutMS: 25000,
+	}
+	svc.huntMu.Unlock()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{ID: 41, Protocol: "HTTP", StreamID: 3, SourceIP: "10.0.0.1", SourcePort: 50123, DestIP: "10.0.0.2", DestPort: 80, Info: "GET /payload HTTP/1.1", Payload: "GET /payload HTTP/1.1\r\nHost: demo\r\n\r\n"},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	hits := svc.cachedYaraHitsWithContext(context.Background(), nil)
+	if len(hits) != 1 {
+		t.Fatalf("expected one warning hit without stream target build, got %+v", hits)
+	}
+	if hits[0].Rule != "YARA 扫描异常" || !strings.Contains(hits[0].Preview, "yara executable not found") {
+		t.Fatalf("unexpected preflight warning hit: %+v", hits[0])
+	}
+}
+
 func TestThreatHuntYaraScansHTTPReassembledStream(t *testing.T) {
 	oldRun := runYaraCommand
 	t.Cleanup(func() {

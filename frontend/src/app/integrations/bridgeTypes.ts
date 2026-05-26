@@ -16,9 +16,6 @@ import type {
   MCPStatus,
   MediaAnalysis,
   MediaTranscription,
-  MiscModuleManifest,
-  MiscModuleImportResult,
-  MiscModuleRunResult,
   MySQLAnalysis,
   Packet,
   PluginItem,
@@ -47,6 +44,7 @@ import type { CaptureStatus, OpenFileResult, PacketLocateResult, PacketsPageResu
 import type { EventHandlers } from "./clients/eventClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
+import type { MiscModuleClient } from "./miscModuleClientTypes";
 import type { PluginSource } from "./mappers/pluginSourceMapper";
 
 export type { DesktopTransportBinding } from "./desktopTransportBinding";
@@ -54,6 +52,7 @@ export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
 export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
+export type { MiscModuleClient } from "./miscModuleClientTypes";
 export type { EventHandlers, EventType } from "./clients/eventClient";
 export interface RuntimeClient {
   isAvailable(): Promise<boolean>;
@@ -187,13 +186,6 @@ export interface SecurityMaterialClient {
   listSMB3SessionCandidates(): Promise<SMB3SessionCandidate[]>;
   generateSMB3RandomSessionKey(req: SMB3RandomSessionKeyRequest): Promise<SMB3RandomSessionKeyResult>;
   listNTLMSessionMaterials(): Promise<NTLMSessionMaterial[]>;
-}
-
-export interface MiscModuleClient {
-  listMiscModules(): Promise<MiscModuleManifest[]>;
-  importMiscModulePackage(file: File): Promise<MiscModuleImportResult>;
-  deleteMiscModule(id: string): Promise<void>;
-  runMiscModule(id: string, values: Record<string, string>): Promise<MiscModuleRunResult>;
 }
 
 export interface BackendBridge

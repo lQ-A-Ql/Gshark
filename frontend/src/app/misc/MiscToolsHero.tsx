@@ -1,7 +1,6 @@
-import { useRef, type ChangeEvent } from "react";
-import { Upload, Wrench } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { Wrench } from "lucide-react";
 import { cn } from "../components/ui/utils";
+import { MiscImportButtons } from "./MiscImportButtons";
 import type { MiscCategory } from "./MiscToolsShell";
 import { miscCategoryOptions } from "./miscModuleRules";
 
@@ -11,6 +10,7 @@ interface MiscToolsHeroProps {
   importing: boolean;
   onCategoryChange: (category: MiscCategory) => void;
   onImportModule: (file: File) => void | Promise<void>;
+  onImportModuleFromNativeDialog?: () => void | Promise<void>;
 }
 
 export function MiscToolsHero({
@@ -19,15 +19,8 @@ export function MiscToolsHero({
   importing,
   onCategoryChange,
   onImportModule,
+  onImportModuleFromNativeDialog,
 }: MiscToolsHeroProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  function handleImportModule(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (file) void onImportModule(file);
-  }
-
   return (
     <section className="gshark-tile-header overflow-hidden">
       <div className="pointer-events-none h-px w-full bg-slate-200" />
@@ -92,16 +85,11 @@ export function MiscToolsHero({
           <div className="max-w-[340px] text-xs leading-6 text-slate-500 lg:text-right">
             将低频但高价值的协议辅助能力按模块编排，内置 WinRM 与 SMB3，同时为自定义模块提供稳定接入位。
           </div>
-          <input ref={fileInputRef} type="file" accept=".zip" className="hidden" onChange={handleImportModule} />
-          <Button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="h-9 rounded-sm bg-cyan-600 px-4 text-xs font-semibold text-white hover:bg-cyan-700"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {importing ? "导入中..." : "导入模块 ZIP"}
-          </Button>
+          <MiscImportButtons
+            importing={importing}
+            onImportModule={onImportModule}
+            onImportModuleFromNativeDialog={onImportModuleFromNativeDialog}
+          />
         </div>
       </div>
     </section>

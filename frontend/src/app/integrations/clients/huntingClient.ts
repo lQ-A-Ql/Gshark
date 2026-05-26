@@ -19,7 +19,7 @@ export interface HuntingClient {
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
 }
 
-function asHuntingRuntimeConfig(input: unknown): HuntingRuntimeConfig {
+export function asHuntingRuntimeConfig(input: unknown): HuntingRuntimeConfig {
   const payload: HuntingRuntimeConfigWireDTO | undefined = asPlainObject(input);
   const prefixes = Array.isArray(payload?.prefixes)
     ? payload.prefixes.map((p: unknown) => String(p ?? "").trim()).filter(Boolean)

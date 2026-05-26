@@ -26,6 +26,19 @@ export interface PluginClient {
   updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
 }
 
+export function toPluginItemRequest(plugin: PluginItem) {
+  return {
+    id: String(plugin.id),
+    name: plugin.name,
+    version: plugin.version,
+    tag: plugin.tag,
+    author: plugin.author,
+    enabled: plugin.enabled,
+    entry: plugin.entry || "",
+    capabilities: Array.isArray(plugin.capabilities) ? plugin.capabilities : [],
+  };
+}
+
 export function createPluginClient(request: JsonRequest): PluginClient {
   return {
     async listVehicleDBCProfiles() {
@@ -69,16 +82,7 @@ export function createPluginClient(request: JsonRequest): PluginClient {
     async addPlugin(plugin: PluginItem) {
       const item = await request<PluginItemWireDTO>(`/api/plugins/add`, {
         method: "POST",
-        body: JSON.stringify({
-          id: String(plugin.id),
-          name: plugin.name,
-          version: plugin.version,
-          tag: plugin.tag,
-          author: plugin.author,
-          enabled: plugin.enabled,
-          entry: plugin.entry || "",
-          capabilities: Array.isArray(plugin.capabilities) ? plugin.capabilities : [],
-        }),
+        body: JSON.stringify(toPluginItemRequest(plugin)),
       });
       return asPluginItem(item);
     },

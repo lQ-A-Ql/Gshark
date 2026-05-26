@@ -183,7 +183,8 @@ func TestWithAuthRequiresTokenForTrustedDesktopOrigin(t *testing.T) {
 
 func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	t.Setenv("GSHARK_BACKEND_BUILD_ID", "test-build-id")
-	server := &Server{}
+	miscPackageDir := t.TempDir()
+	server := NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: miscPackageDir})
 	server.SetAuthToken("secret-token")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runtime/identity", nil)
@@ -212,6 +213,9 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	}
 	if got := strings.TrimSpace(payload["working_dir"].(string)); got == "" {
 		t.Fatalf("expected working_dir to be populated")
+	}
+	if got := filepath.Clean(strings.TrimSpace(payload["misc_package_dir"].(string))); got != filepath.Clean(miscPackageDir) {
+		t.Fatalf("unexpected misc_package_dir value: %q, want %q", got, miscPackageDir)
 	}
 	if got := strings.TrimSpace(payload["started_at"].(string)); got == "" {
 		t.Fatalf("expected started_at to be populated")

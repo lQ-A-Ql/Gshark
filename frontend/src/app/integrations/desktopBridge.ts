@@ -12,7 +12,18 @@ import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapp
 import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
-import { createIpcBackendTransport, withDesktopIpcControls } from "./ipcBackendTransport";
+import { createTypedDesktopOverrides } from "./desktopTypedBridge";
+import {
+  createDisabledGenericIpcBackendTransport,
+  createIpcBackendTransport,
+  withDesktopIpcControls,
+} from "./ipcBackendTransport";
+import {
+  isDesktopGenericIpcDisabled,
+  isLegacyDesktopGenericIpcDisableExperimentEnabled,
+} from "./desktopGenericIpcPolicy";
+
+export { resolveDesktopGenericIpcPolicy } from "./desktopGenericIpcPolicy";
 
 interface DesktopBridgeContext {
   desktopApp: DesktopTransportBinding;
@@ -24,7 +35,12 @@ const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
 const START_CAPTURE_IPC_TIMEOUT_MS = 15000;
 
 export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridgeContext): BackendBridge {
-  const ipcTransport = desktopApp.InvokeBackendJSON ? createIpcBackendTransport(desktopApp) : null;
+  const disableGenericIpc = isDesktopGenericIpcDisabled();
+  const ipcTransport = disableGenericIpc
+    ? createDisabledGenericIpcBackendTransport()
+    : desktopApp.InvokeBackendJSON
+      ? createIpcBackendTransport(desktopApp)
+      : null;
   const dataBridge = ipcTransport
     ? createBackendBridgeFromTransport({
         requestJSON: ipcTransport.requestJSON,
@@ -37,6 +53,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
 
   return {
     ...dataBridge,
+    ...createTypedDesktopOverrides(desktopApp),
     async isAvailable() {
       if (desktopApp.IsBackendReady) {
         const backendReady = await desktopApp.IsBackendReady();
@@ -202,10 +219,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         signal,
         timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
       });
-      return withPacketsPageMeta(
-        asPacketsPageResult(payload),
-        "desktop-ipc",
-      );
+      return withPacketsPageMeta(asPacketsPageResult(payload), "desktop-ipc");
     },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {
@@ -230,6 +244,12 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       });
     },
   };
+}
+
+export function isDesktopGenericIpcDisableExperimentEnabled(): boolean {
+  // VITE_DESKTOP_DISABLE_GENERIC_IPC remains the legacy Round 20 experiment alias.
+  // VITE_DESKTOP_GENERIC_IPC_POLICY is the Round 24 default-disabled policy and compat rollback switch.
+  return isLegacyDesktopGenericIpcDisableExperimentEnabled();
 }
 
 function desktopIpcErrorMessage(error: unknown, fallback: string): string {

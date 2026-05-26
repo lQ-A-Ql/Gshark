@@ -74,12 +74,7 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 		parent = context.Background()
 	}
 
-	yaraExe, err := resolveYaraExecutable(yc.Bin)
-	if err != nil {
-		return nil, err
-	}
-
-	bundle, err := resolveYaraRuleBundle(yc.Rules)
+	yaraExe, bundle, err := resolveYaraScanConfig(yc)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +168,23 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 	})
 
 	return hits, firstErr
+}
+
+func preflightYaraScanConfig(yc model.YaraConfig) error {
+	_, _, err := resolveYaraScanConfig(yc)
+	return err
+}
+
+func resolveYaraScanConfig(yc model.YaraConfig) (string, yaraRuleBundle, error) {
+	yaraExe, err := resolveYaraExecutable(yc.Bin)
+	if err != nil {
+		return "", yaraRuleBundle{}, err
+	}
+	bundle, err := resolveYaraRuleBundle(yc.Rules)
+	if err != nil {
+		return "", yaraRuleBundle{}, err
+	}
+	return yaraExe, bundle, nil
 }
 
 func parseYaraOutputLine(line string) (ruleID, matchedFile string, ok bool) {

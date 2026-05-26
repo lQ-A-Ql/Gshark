@@ -6,6 +6,8 @@ import type { MiscCategory } from "./MiscToolsShell";
 interface MiscToolsCatalogClient {
   listMiscModules(): Promise<MiscModuleManifest[]>;
   importMiscModulePackage(file: File): Promise<unknown>;
+  selectMiscModulePackage?(): Promise<{ filePath: string; fileName: string; fileSize: number }>;
+  importMiscModulePackageFromPath?(path: string): Promise<unknown>;
 }
 
 export interface UseMiscToolsCatalogOptions {
@@ -87,6 +89,25 @@ export function useMiscToolsCatalog({
     [loadModules, miscModuleClient],
   );
 
+  const importModuleFromNativeDialog = useCallback(async () => {
+    if (!miscModuleClient.selectMiscModulePackage || !miscModuleClient.importMiscModulePackageFromPath) {
+      setError("当前环境不支持桌面原生模块导入");
+      return;
+    }
+    setImporting(true);
+    setError("");
+    try {
+      const selected = await miscModuleClient.selectMiscModulePackage();
+      await miscModuleClient.importMiscModulePackageFromPath(selected.filePath);
+      await loadModules();
+      setActiveCategory("Misc");
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "导入模块包失败");
+    } finally {
+      setImporting(false);
+    }
+  }, [loadModules, miscModuleClient]);
+
   const moduleDeleted = useCallback(async () => {
     await loadModules();
   }, [loadModules]);
@@ -112,6 +133,10 @@ export function useMiscToolsCatalog({
     mountedModules,
     setActiveCategory,
     importModule,
+    importModuleFromNativeDialog:
+      miscModuleClient.selectMiscModulePackage && miscModuleClient.importMiscModulePackageFromPath
+        ? importModuleFromNativeDialog
+        : undefined,
     moduleDeleted,
     toggleModule,
   };

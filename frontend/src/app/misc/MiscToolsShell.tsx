@@ -19,6 +19,7 @@ interface MiscToolsShellProps {
   mountedModules: Record<string, boolean>;
   onCategoryChange: (category: MiscCategory) => void;
   onImportModule: (file: File) => void | Promise<void>;
+  onImportModuleFromNativeDialog?: () => void | Promise<void>;
   onModuleDeleted: (moduleId: string) => void | Promise<void>;
   onToggleModule: (moduleId: string) => void;
 }
@@ -33,6 +34,7 @@ export function MiscToolsShell({
   mountedModules,
   onCategoryChange,
   onImportModule,
+  onImportModuleFromNativeDialog,
   onModuleDeleted,
   onToggleModule,
 }: MiscToolsShellProps) {
@@ -54,6 +56,7 @@ export function MiscToolsShell({
         importing={importing}
         onCategoryChange={onCategoryChange}
         onImportModule={onImportModule}
+        onImportModuleFromNativeDialog={onImportModuleFromNativeDialog}
       />
 
       {error && <ErrorBlock message={error} />}

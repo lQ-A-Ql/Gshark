@@ -8,13 +8,16 @@
 
 1. [项目根 README](../README.md)：了解产品定位、核心功能、启动方式和当前边界。
 2. [治理缺陷登记表](./governance-defect-register.json)：查看版本化 Architecture_Defect 状态源和当前 open task。
-3. [MISC 模块接口文档](./misc-module-interface.md)：查看内建与 zip 自定义 MISC 模块接口。
-4. [插件接口文档](./plugin-interface.md)：查看威胁狩猎插件接口。
-5. [车机流量分析方案](./automotive-analysis-plan.md)：查看车机方向能力规划。
+3. [Desktop IPC typed migration plan](./desktop-ipc-migration-plan.md)：查看桌面 typed IPC 迁移策略、自主迭代评分与 phase 状态。
+4. [Desktop IPC iteration status](./desktop-ipc-iteration-status.json)：查看机器可读的当前 IPC 迁移进度、评分与下一轮建议。
+5. [MISC 模块接口文档](./misc-module-interface.md)：查看内建与 zip 自定义 MISC 模块接口。
+6. [插件接口文档](./plugin-interface.md)：查看威胁狩猎插件接口。
+7. [车机流量分析方案](./automotive-analysis-plan.md)：查看车机方向能力规划。
 
 ## 当前方向摘要
 
 - [治理缺陷登记表](./governance-defect-register.json)：机器可读的 Architecture_Defect 状态源，记录缺陷优先级、关闭提交、验证命令、证据测试和报告路径。
+- [Desktop IPC typed migration plan](./desktop-ipc-migration-plan.md) 与 [Desktop IPC iteration status](./desktop-ipc-iteration-status.json)：桌面 typed IPC 迁移的版本化计划、评分规则、当前 phase 与下一轮建议；不混入全局 Architecture_Defect register。
 - 本地开发报告：`docs/audit-development-report-archive-*` 仅用于本机逐轮记录，受 `.gitignore` 管理，不纳入远端；版本化当前事实以本 README、接口文档和 `governance-defect-register.json` 为准。
 
 ## 当前方向校准
@@ -24,6 +27,7 @@
 ## 接口与开发文档
 
 - [本地 MCP 接入文档](./mcp-interface.md)：本地只读 MCP 的启用方式、鉴权、tools/resources/prompts 清单与客户端接入示例。
+- [Desktop IPC typed migration plan](./desktop-ipc-migration-plan.md)：Wails typed IPC 迁移、自主迭代评分和桌面/dev transport policy。
 - [MISC 模块接口文档](./misc-module-interface.md)：内建与 zip 自定义 MISC 模块的 manifest、API、表单和运行时说明。
 - [插件接口文档](./plugin-interface.md)：威胁狩猎插件的输入、输出和运行方式。
 - [车机流量分析方案](./automotive-analysis-plan.md)：车机方向能力规划。

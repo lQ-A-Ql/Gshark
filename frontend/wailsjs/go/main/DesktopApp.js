@@ -14,12 +14,128 @@ export function CloseCapture() {
   return window['go']['main']['DesktopApp']['CloseCapture']();
 }
 
+export function CancelMediaBatchTranscription() {
+  return window['go']['main']['DesktopApp']['CancelMediaBatchTranscription']();
+}
+
+export function DecodeStreamPayload(req) {
+  return window['go']['main']['DesktopApp']['DecodeStreamPayload'](req);
+}
+
+export function DecryptC2Traffic(req) {
+  return window['go']['main']['DesktopApp']['DecryptC2Traffic'](req);
+}
+
+export function DownloadMediaArtifact(token) {
+  return window['go']['main']['DesktopApp']['DownloadMediaArtifact'](token);
+}
+
+export function DownloadObjectsZip(ids) {
+  return window['go']['main']['DesktopApp']['DownloadObjectsZip'](ids);
+}
+
+export function ExportMediaBatchTranscription(format) {
+  return window['go']['main']['DesktopApp']['ExportMediaBatchTranscription'](format);
+}
+
+export function ExportWinRMDecryptResult(resultID) {
+  return window['go']['main']['DesktopApp']['ExportWinRMDecryptResult'](resultID);
+}
+
+export function GenerateSMB3RandomSessionKey(req) {
+  return window['go']['main']['DesktopApp']['GenerateSMB3RandomSessionKey'](req);
+}
+
+export function GetAPTAnalysis() {
+  return window['go']['main']['DesktopApp']['GetAPTAnalysis']();
+}
+
 export function GetBackendAuthToken() {
   return window['go']['main']['DesktopApp']['GetBackendAuthToken']();
 }
 
 export function GetCaptureStatus() {
   return window['go']['main']['DesktopApp']['GetCaptureStatus']();
+}
+
+export function GetC2SampleAnalysis() {
+  return window['go']['main']['DesktopApp']['GetC2SampleAnalysis']();
+}
+
+export function GetDesktopWebviewSmokeConfig() {
+  return window['go']['main']['DesktopApp']['GetDesktopWebviewSmokeConfig']();
+}
+
+export function GetEvidence() {
+  return window['go']['main']['DesktopApp']['GetEvidence']();
+}
+
+export function GetEvidenceWithFilter(modules) {
+  return window['go']['main']['DesktopApp']['GetEvidenceWithFilter'](modules);
+}
+
+export function GetGlobalTrafficStats() {
+  return window['go']['main']['DesktopApp']['GetGlobalTrafficStats']();
+}
+
+export function GetHTTPLoginAnalysis() {
+  return window['go']['main']['DesktopApp']['GetHTTPLoginAnalysis']();
+}
+
+export function GetHttpStream(streamID) {
+  return window['go']['main']['DesktopApp']['GetHttpStream'](streamID);
+}
+
+export function GetIndustrialAnalysis() {
+  return window['go']['main']['DesktopApp']['GetIndustrialAnalysis']();
+}
+
+export function GetMCPStatus() {
+  return window['go']['main']['DesktopApp']['GetMCPStatus']();
+}
+
+export function GetMediaAnalysis(forceRefresh) {
+  return window['go']['main']['DesktopApp']['GetMediaAnalysis'](forceRefresh);
+}
+
+export function GetMediaBatchTranscriptionStatus() {
+  return window['go']['main']['DesktopApp']['GetMediaBatchTranscriptionStatus']();
+}
+
+export function GetMediaPlaybackBlob(token) {
+  return window['go']['main']['DesktopApp']['GetMediaPlaybackBlob'](token);
+}
+
+export function GetMySQLAnalysis() {
+  return window['go']['main']['DesktopApp']['GetMySQLAnalysis']();
+}
+
+export function GetPacketLayers(packetID) {
+  return window['go']['main']['DesktopApp']['GetPacketLayers'](packetID);
+}
+
+export function GetPacketRawHex(packetID) {
+  return window['go']['main']['DesktopApp']['GetPacketRawHex'](packetID);
+}
+
+export function GetPacket(packetID) {
+  return window['go']['main']['DesktopApp']['GetPacket'](packetID);
+}
+
+export function GetRawStream(protocol, streamID) {
+  return window['go']['main']['DesktopApp']['GetRawStream'](protocol, streamID);
+}
+
+export function GetRawStreamPage(protocol, streamID, cursor, limit) {
+  return window['go']['main']['DesktopApp']['GetRawStreamPage'](protocol, streamID, cursor, limit);
+}
+
+export function GetSMTPAnalysis() {
+  return window['go']['main']['DesktopApp']['GetSMTPAnalysis']();
+}
+
+export function GetShiroRememberMeAnalysis(candidateKeys) {
+  return window['go']['main']['DesktopApp']['GetShiroRememberMeAnalysis'](candidateKeys);
 }
 
 export function InvokeBackendBlob(req) {
@@ -34,8 +150,76 @@ export function InvokeBackendText(req) {
   return window['go']['main']['DesktopApp']['InvokeBackendText'](req);
 }
 
+export function InspectStreamPayload(payload) {
+  return window['go']['main']['DesktopApp']['InspectStreamPayload'](payload);
+}
+
+export function AddPlugin(plugin) {
+  return window['go']['main']['DesktopApp']['AddPlugin'](plugin);
+}
+
+export function AddVehicleDBC(path) {
+  return window['go']['main']['DesktopApp']['AddVehicleDBC'](path);
+}
+
+export function DeletePlugin(id) {
+  return window['go']['main']['DesktopApp']['DeletePlugin'](id);
+}
+
+export function DeleteMiscModulePackage(id) {
+  return window['go']['main']['DesktopApp']['DeleteMiscModulePackage'](id);
+}
+
+export function GetPluginSource(id) {
+  return window['go']['main']['DesktopApp']['GetPluginSource'](id);
+}
+
+export function ImportMiscModulePackageFromPath(path) {
+  return window['go']['main']['DesktopApp']['ImportMiscModulePackageFromPath'](path);
+}
+
+export function ListThreatHits(prefixes) {
+  return window['go']['main']['DesktopApp']['ListThreatHits'](prefixes);
+}
+
+export function ListVehicleDBCProfiles() {
+  return window['go']['main']['DesktopApp']['ListVehicleDBCProfiles']();
+}
+
+export function ListPlugins() {
+  return window['go']['main']['DesktopApp']['ListPlugins']();
+}
+
+export function ListMiscModules() {
+  return window['go']['main']['DesktopApp']['ListMiscModules']();
+}
+
+export function ListNTLMSessionMaterials() {
+  return window['go']['main']['DesktopApp']['ListNTLMSessionMaterials']();
+}
+
+export function ListObjects() {
+  return window['go']['main']['DesktopApp']['ListObjects']();
+}
+
 export function ListPacketsPage(cursor, limit, filter) {
   return window['go']['main']['DesktopApp']['ListPacketsPage'](cursor, limit, filter);
+}
+
+export function LocatePacketPage(packetID, limit, filter) {
+  return window['go']['main']['DesktopApp']['LocatePacketPage'](packetID, limit, filter);
+}
+
+export function ListSMB3SessionCandidates() {
+  return window['go']['main']['DesktopApp']['ListSMB3SessionCandidates']();
+}
+
+export function ListStreamIDs(protocol) {
+  return window['go']['main']['DesktopApp']['ListStreamIDs'](protocol);
+}
+
+export function ListStreamPayloadSources(limit) {
+  return window['go']['main']['DesktopApp']['ListStreamPayloadSources'](limit);
 }
 
 export function PingBackendDataPlane() {
@@ -44,6 +228,10 @@ export function PingBackendDataPlane() {
 
 export function GetTLSConfig() {
   return window['go']['main']['DesktopApp']['GetTLSConfig']();
+}
+
+export function GetHuntingRuntimeConfig() {
+  return window['go']['main']['DesktopApp']['GetHuntingRuntimeConfig']();
 }
 
 export function GetToolRuntimeSnapshot() {
@@ -56,6 +244,18 @@ export function GetToolRuntimeSnapshotFast() {
 
 export function GetToolRuntimeSnapshotFull() {
   return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshotFull']();
+}
+
+export function GetUSBAnalysis(hidSource, hidEventLimit) {
+  return window['go']['main']['DesktopApp']['GetUSBAnalysis'](hidSource, hidEventLimit);
+}
+
+export function GetVehicleAnalysis() {
+  return window['go']['main']['DesktopApp']['GetVehicleAnalysis']();
+}
+
+export function GetWinRMDecryptResultText(resultID) {
+  return window['go']['main']['DesktopApp']['GetWinRMDecryptResultText'](resultID);
 }
 
 export function InstallAppUpdate() {
@@ -78,8 +278,36 @@ export function PrepareCaptureReplacement() {
   return window['go']['main']['DesktopApp']['PrepareCaptureReplacement']();
 }
 
+export function RunMiscModulePackage(id, values) {
+  return window['go']['main']['DesktopApp']['RunMiscModulePackage'](id, values);
+}
+
+export function RunWinRMDecrypt(req) {
+  return window['go']['main']['DesktopApp']['RunWinRMDecrypt'](req);
+}
+
+export function SelectMiscModulePackage() {
+  return window['go']['main']['DesktopApp']['SelectMiscModulePackage']();
+}
+
+export function RemoveVehicleDBC(path) {
+  return window['go']['main']['DesktopApp']['RemoveVehicleDBC'](path);
+}
+
+export function SavePluginSource(source) {
+  return window['go']['main']['DesktopApp']['SavePluginSource'](source);
+}
+
 export function SetTSharkPath(path) {
   return window['go']['main']['DesktopApp']['SetTSharkPath'](path);
+}
+
+export function SetPluginsEnabled(ids, enabled) {
+  return window['go']['main']['DesktopApp']['SetPluginsEnabled'](ids, enabled);
+}
+
+export function StartMediaBatchTranscription(force) {
+  return window['go']['main']['DesktopApp']['StartMediaBatchTranscription'](force);
 }
 
 export function StartCapture(filePath, filter) {
@@ -88,6 +316,22 @@ export function StartCapture(filePath, filter) {
 
 export function StopCapture() {
   return window['go']['main']['DesktopApp']['StopCapture']();
+}
+
+export function TranscribeMediaArtifact(token, force) {
+  return window['go']['main']['DesktopApp']['TranscribeMediaArtifact'](token, force);
+}
+
+export function UpdateMCPConfig(cfg) {
+  return window['go']['main']['DesktopApp']['UpdateMCPConfig'](cfg);
+}
+
+export function UpdateHuntingRuntimeConfig(config) {
+  return window['go']['main']['DesktopApp']['UpdateHuntingRuntimeConfig'](config);
+}
+
+export function UpdateStreamPayloads(protocol, streamID, patches) {
+  return window['go']['main']['DesktopApp']['UpdateStreamPayloads'](protocol, streamID, patches);
 }
 
 export function UpdateTLSConfig(cfg) {
@@ -104,4 +348,12 @@ export function UpdateToolRuntimeConfigFast(cfg) {
 
 export function UpdateToolRuntimeConfigFull(cfg) {
   return window['go']['main']['DesktopApp']['UpdateToolRuntimeConfigFull'](cfg);
+}
+
+export function TogglePlugin(id) {
+  return window['go']['main']['DesktopApp']['TogglePlugin'](id);
+}
+
+export function WriteDesktopWebviewSmokeResult(payload) {
+  return window['go']['main']['DesktopApp']['WriteDesktopWebviewSmokeResult'](payload);
 }

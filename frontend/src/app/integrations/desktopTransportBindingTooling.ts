@@ -1,0 +1,31 @@
+export interface DesktopToolingBinding {
+  ListObjects?: () => Promise<unknown>;
+  DownloadObjectsZip?: (ids: number[]) => Promise<unknown>;
+  RunWinRMDecrypt?: (request: unknown) => Promise<unknown>;
+  GetWinRMDecryptResultText?: (resultId: string) => Promise<string>;
+  ExportWinRMDecryptResult?: (resultId: string) => Promise<unknown>;
+  ListSMB3SessionCandidates?: () => Promise<unknown>;
+  GenerateSMB3RandomSessionKey?: (request: unknown) => Promise<unknown>;
+  ListNTLMSessionMaterials?: () => Promise<unknown>;
+  GetHTTPLoginAnalysis?: () => Promise<unknown>;
+  GetSMTPAnalysis?: () => Promise<unknown>;
+  GetMySQLAnalysis?: () => Promise<unknown>;
+  GetShiroRememberMeAnalysis?: (candidateKeys: string[]) => Promise<unknown>;
+  ListThreatHits?: (prefixes: string[]) => Promise<unknown>;
+  GetHuntingRuntimeConfig?: () => Promise<unknown>;
+  UpdateHuntingRuntimeConfig?: (config: unknown) => Promise<unknown>;
+  ListVehicleDBCProfiles?: () => Promise<unknown>;
+  AddVehicleDBC?: (path: string) => Promise<unknown>;
+  RemoveVehicleDBC?: (path: string) => Promise<unknown>;
+  ListPlugins?: () => Promise<unknown>;
+  GetPluginSource?: (id: string) => Promise<unknown>;
+  SavePluginSource?: (source: unknown) => Promise<unknown>;
+  AddPlugin?: (plugin: unknown) => Promise<unknown>;
+  DeletePlugin?: (id: string) => Promise<unknown>;
+  TogglePlugin?: (id: string) => Promise<unknown>;
+  SetPluginsEnabled?: (ids: string[], enabled: boolean) => Promise<unknown>;
+  ListMiscModules?: () => Promise<unknown>;
+  ImportMiscModulePackageFromPath?: (path: string) => Promise<unknown>;
+  DeleteMiscModulePackage?: (id: string) => Promise<unknown>;
+  RunMiscModulePackage?: (id: string, values: Record<string, string>) => Promise<unknown>;
+}

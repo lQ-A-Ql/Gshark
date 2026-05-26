@@ -1,33 +1,14 @@
-import type { AppUpdateStatus } from "../core/types";
-import type { OpenFileResult } from "./clients/captureClient";
+import type { DesktopAnalysisBinding } from "./desktopTransportBindingAnalysis";
+import type { DesktopControlPlaneBinding } from "./desktopTransportBindingControl";
+import type { DesktopPacketBinding, DesktopStreamBinding } from "./desktopTransportBindingStream";
+import type { DesktopShellBinding } from "./desktopTransportBindingShell";
+import type { DesktopToolingBinding } from "./desktopTransportBindingTooling";
 
-export interface DesktopTransportBinding {
-  BackendStatus?: () => Promise<string>;
-  GetBackendAuthToken?: () => Promise<string | null | undefined>;
-  CheckAppUpdate?: () => Promise<AppUpdateStatus | null | undefined>;
-  InstallAppUpdate?: () => Promise<void>;
-  OpenDBCDialog?: () => Promise<OpenFileResult | null | undefined>;
-  OpenCaptureDialog?: () => Promise<OpenFileResult | null | undefined>;
-  IsBackendReady?: () => Promise<boolean>;
-  PingBackendDataPlane?: () => Promise<unknown>;
-  InvokeBackendJSON?: (request: unknown) => Promise<unknown>;
-  InvokeBackendBlob?: (request: unknown) => Promise<unknown>;
-  InvokeBackendText?: (request: unknown) => Promise<string>;
-  GetToolRuntimeSnapshot?: () => Promise<unknown>;
-  GetToolRuntimeSnapshotFast?: () => Promise<unknown>;
-  GetToolRuntimeSnapshotFull?: () => Promise<unknown>;
-  UpdateToolRuntimeConfig?: (config: unknown) => Promise<unknown>;
-  UpdateToolRuntimeConfigFast?: (config: unknown) => Promise<unknown>;
-  UpdateToolRuntimeConfigFull?: (config: unknown) => Promise<unknown>;
-  GetMCPStatus?: () => Promise<unknown>;
-  UpdateMCPConfig?: (config: unknown) => Promise<unknown>;
-  SetTSharkPath?: (path: string) => Promise<unknown>;
-  StartCapture?: (filePath: string, filter: string) => Promise<void>;
-  StopCapture?: () => Promise<void>;
-  PrepareCaptureReplacement?: () => Promise<void>;
-  CloseCapture?: () => Promise<void>;
-  GetCaptureStatus?: () => Promise<unknown>;
-  ListPacketsPage?: (cursor: number, limit: number, filter: string) => Promise<unknown>;
-  GetTLSConfig?: () => Promise<unknown>;
-  UpdateTLSConfig?: (cfg: unknown) => Promise<void>;
-}
+export interface DesktopTransportBinding
+  extends
+    DesktopShellBinding,
+    DesktopControlPlaneBinding,
+    DesktopPacketBinding,
+    DesktopStreamBinding,
+    DesktopToolingBinding,
+    DesktopAnalysisBinding {}

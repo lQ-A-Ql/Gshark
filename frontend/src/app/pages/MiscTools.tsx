@@ -15,6 +15,7 @@ export default function MiscTools() {
       mountedModules={catalog.mountedModules}
       onCategoryChange={catalog.setActiveCategory}
       onImportModule={catalog.importModule}
+      onImportModuleFromNativeDialog={catalog.importModuleFromNativeDialog}
       onModuleDeleted={catalog.moduleDeleted}
       onToggleModule={catalog.toggleModule}
     />

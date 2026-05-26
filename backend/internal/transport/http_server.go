@@ -55,11 +55,12 @@ type Server struct {
 
 	hub *Hub
 
-	mu          sync.Mutex
-	clients     map[chan event]struct{}
-	authToken   string
-	miscModules []MiscModule
-	miscPkgMgr  *miscpkg.Manager
+	mu             sync.Mutex
+	clients        map[chan event]struct{}
+	authToken      string
+	miscModules    []MiscModule
+	miscPkgMgr     *miscpkg.Manager
+	miscPackageDir string
 
 	auditMu   sync.Mutex
 	auditLogs []model.AuditEntry
@@ -77,15 +78,17 @@ func NewServer(svc *engine.Service, hub *Hub) *Server {
 
 func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Server {
 	pkgMgr := miscpkg.NewManager()
-	if err := pkgMgr.LoadFromDir(resolveMiscPackageDir(opts.MiscPackageDir)); err != nil {
+	miscPackageDir := resolveMiscPackageDir(opts.MiscPackageDir)
+	if err := pkgMgr.LoadFromDir(miscPackageDir); err != nil {
 		log.Printf("misc package manager: %v", err)
 	}
 	s := &Server{
-		hub:           hub,
-		clients:       map[chan event]struct{}{},
-		miscModules:   defaultMiscModules(),
-		miscPkgMgr:    pkgMgr,
-		uploadedFiles: map[string]struct{}{},
+		hub:            hub,
+		clients:        map[chan event]struct{}{},
+		miscModules:    defaultMiscModules(),
+		miscPkgMgr:     pkgMgr,
+		miscPackageDir: miscPackageDir,
+		uploadedFiles:  map[string]struct{}{},
 	}
 	if svc != nil {
 		s.capture = svc
@@ -109,8 +112,8 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 			filter.Modules = append(filter.Modules, modules...)
 			return s.analysis.GatherEvidence(ctx, filter)
 		},
-		MiscModules:  s.miscModuleManifests,
-		AuditLogs:    s.recentAuditEntries,
+		MiscModules: s.miscModuleManifests,
+		AuditLogs:   s.recentAuditEntries,
 		AuthEnabled: func() bool {
 			s.mu.Lock()
 			defer s.mu.Unlock()
@@ -242,19 +245,24 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 	executablePath, _ := os.Executable()
 	workingDir, _ := os.Getwd()
+	miscPackageDir := strings.TrimSpace(s.miscPackageDir)
+	if miscPackageDir == "" {
+		miscPackageDir = resolveMiscPackageDir("")
+	}
 	buildID := strings.TrimSpace(os.Getenv("GSHARK_BACKEND_BUILD_ID"))
 	if buildID == "" {
 		buildID = "dev"
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"service":         "gshark-sentinel",
-		"version":         "dev",
-		"build_commit":    "",
-		"auth_enabled":    authEnabled,
-		"build_id":        buildID,
-		"executable_path": executablePath,
-		"working_dir":     workingDir,
-		"started_at":      runtimeIdentityStartedAt,
+		"service":          "gshark-sentinel",
+		"version":          "dev",
+		"build_commit":     "",
+		"auth_enabled":     authEnabled,
+		"build_id":         buildID,
+		"executable_path":  executablePath,
+		"working_dir":      workingDir,
+		"misc_package_dir": miscPackageDir,
+		"started_at":       runtimeIdentityStartedAt,
 	})
 }
 
