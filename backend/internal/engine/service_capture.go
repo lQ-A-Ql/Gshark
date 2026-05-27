@@ -45,6 +45,50 @@ func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOption
 	return s.loadPCAPLocked(runCtx, opts, currentRunID)
 }
 
+type streamParseState struct {
+	processed      int
+	accepted       int
+	pending        []model.Packet
+	rawStreamIndex map[string]*model.ReassembledStream
+}
+
+func (s *Service) makeStreamCallbacks(
+	currentRunID int64,
+	total int,
+	nextStore *packetStore,
+	opts model.ParseOptions,
+	state *streamParseState,
+	flushPending func(),
+) (func(model.Packet) error, func(int)) {
+	onPacket := func(packet model.Packet) error {
+		if atomic.LoadInt64(&s.runID) != currentRunID {
+			return nil
+		}
+		state.accepted++
+		appendPacketToRawStreamIndex(state.rawStreamIndex, packet)
+		state.pending = append(state.pending, packet)
+		if len(state.pending) >= 1024 {
+			flushPending()
+		}
+		if opts.EmitPackets {
+			s.emitter.EmitPacket(packet)
+		}
+		return nil
+	}
+	onProgress := func(frameProcessed int) {
+		state.processed = frameProcessed
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Processed = frameProcessed
+			status.Accepted = state.accepted
+			status.StagedCount = nextStore.Count()
+		})
+		if total > 0 {
+			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+		}
+	}
+	return onPacket, onProgress
+}
+
 func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
 	s.mu.RLock()
 	oldPCAP := s.pcap
@@ -102,9 +146,6 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	}
 	s.setCaptureLoadPhase(currentRunID, model.CaptureLoadParsing, "")
 
-	processed := 0
-	accepted := 0
-	rawStreamIndex := make(map[string]*model.ReassembledStream)
 	profile := normalizeCaptureListProfile(opts)
 	streamFn := streamPacketsFn
 	switch profile {
@@ -118,57 +159,37 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		streamFn = streamPacketsFn
 	}
 
-	pending := make([]model.Packet, 0, 1024)
+	state := &streamParseState{
+		pending:        make([]model.Packet, 0, 1024),
+		rawStreamIndex: make(map[string]*model.ReassembledStream),
+	}
 	flushPending := func() {
-		if len(pending) == 0 {
+		if len(state.pending) == 0 {
 			return
 		}
-		if appendErr := nextStore.Append(pending); appendErr != nil {
+		if appendErr := nextStore.Append(state.pending); appendErr != nil {
 			s.emitStatus("写入数据包存储失败: " + appendErr.Error())
 			if err == nil {
 				err = appendErr
 			}
 		}
-		pending = pending[:0]
+		state.pending = state.pending[:0]
 		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
-			status.Processed = processed
-			status.Accepted = accepted
+			status.Processed = state.processed
+			status.Accepted = state.accepted
 			status.StagedCount = nextStore.Count()
 		})
 	}
 
-	err = streamFn(runCtx, opts, func(packet model.Packet) error {
-		if atomic.LoadInt64(&s.runID) != currentRunID {
-			return nil
-		}
-		accepted++
-		appendPacketToRawStreamIndex(rawStreamIndex, packet)
-		pending = append(pending, packet)
-		if len(pending) >= 1024 {
-			flushPending()
-		}
-		if opts.EmitPackets {
-			s.emitter.EmitPacket(packet)
-		}
-		return nil
-	}, func(frameProcessed int) {
-		processed = frameProcessed
-		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
-			status.Processed = frameProcessed
-			status.Accepted = accepted
-			status.StagedCount = nextStore.Count()
-		})
-		if total > 0 {
-			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
-		}
-	})
+	onPacket, onProgress := s.makeStreamCallbacks(currentRunID, total, nextStore, opts, state, flushPending)
+	err = streamFn(runCtx, opts, onPacket, onProgress)
 	flushPending()
 	log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", func() string {
 		return profile
-	}(), processed, accepted, err)
+	}(), state.processed, state.accepted, err)
 	if profile == "full_fast" && !errors.Is(err, context.Canceled) {
 		needsFallback := err != nil
-		if !needsFallback && total > 0 && accepted == 0 {
+		if !needsFallback && total > 0 && state.accepted == 0 {
 			needsFallback = true
 		}
 		if needsFallback {
@@ -182,43 +203,20 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			if resetErr := nextStore.Reset(); resetErr != nil {
 				return resetErr
 			}
-			processed = 0
-			accepted = 0
-			rawStreamIndex = make(map[string]*model.ReassembledStream)
+			state.processed = 0
+			state.accepted = 0
+			state.rawStreamIndex = make(map[string]*model.ReassembledStream)
+			state.pending = make([]model.Packet, 0, 1024)
 			streamFn = streamPacketsFn
-			pending = make([]model.Packet, 0, 1024)
-			err = streamFn(runCtx, opts, func(packet model.Packet) error {
-				if atomic.LoadInt64(&s.runID) != currentRunID {
-					return nil
-				}
-				accepted++
-				appendPacketToRawStreamIndex(rawStreamIndex, packet)
-				pending = append(pending, packet)
-				if len(pending) >= 1024 {
-					flushPending()
-				}
-				if opts.EmitPackets {
-					s.emitter.EmitPacket(packet)
-				}
-				return nil
-			}, func(frameProcessed int) {
-				processed = frameProcessed
-				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
-					status.Processed = frameProcessed
-					status.Accepted = accepted
-					status.StagedCount = nextStore.Count()
-				})
-				if total > 0 {
-					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
-				}
-			})
+			onPacket, onProgress = s.makeStreamCallbacks(currentRunID, total, nextStore, opts, state, flushPending)
+			err = streamFn(runCtx, opts, onPacket, onProgress)
 			flushPending()
-			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "ek_fallback", processed, accepted, err)
+			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "ek_fallback", state.processed, state.accepted, err)
 		}
 	}
 	if !errors.Is(err, context.Canceled) {
 		needsCompatFallback := err != nil
-		if !needsCompatFallback && total > 0 && accepted == 0 {
+		if !needsCompatFallback && total > 0 && state.accepted == 0 {
 			needsCompatFallback = true
 		}
 		if needsCompatFallback {
@@ -233,52 +231,29 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			if resetErr := nextStore.Reset(); resetErr != nil {
 				return resetErr
 			}
-			processed = 0
-			accepted = 0
-			rawStreamIndex = make(map[string]*model.ReassembledStream)
-			pending = make([]model.Packet, 0, 1024)
-			err = streamPacketsCompatFn(runCtx, opts, func(packet model.Packet) error {
-				if atomic.LoadInt64(&s.runID) != currentRunID {
-					return nil
-				}
-				accepted++
-				appendPacketToRawStreamIndex(rawStreamIndex, packet)
-				pending = append(pending, packet)
-				if len(pending) >= 1024 {
-					flushPending()
-				}
-				if opts.EmitPackets {
-					s.emitter.EmitPacket(packet)
-				}
-				return nil
-			}, func(frameProcessed int) {
-				processed = frameProcessed
-				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
-					status.Processed = frameProcessed
-					status.Accepted = accepted
-					status.StagedCount = nextStore.Count()
-				})
-				if total > 0 {
-					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
-				}
-			})
+			state.processed = 0
+			state.accepted = 0
+			state.rawStreamIndex = make(map[string]*model.ReassembledStream)
+			state.pending = make([]model.Packet, 0, 1024)
+			onPacket, onProgress = s.makeStreamCallbacks(currentRunID, total, nextStore, opts, state, flushPending)
+			err = streamPacketsCompatFn(runCtx, opts, onPacket, onProgress)
 			flushPending()
-			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "compat_fields_fallback", processed, accepted, err)
+			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "compat_fields_fallback", state.processed, state.accepted, err)
 		}
 	}
 	if total > 0 {
-		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", processed, total))
+		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", state.processed, total))
 	}
 	if err == nil && atomic.LoadInt64(&s.runID) != currentRunID {
 		err = context.Canceled
 	}
 
-	dropped := processed - accepted
+	dropped := state.processed - state.accepted
 	if dropped < 0 {
 		dropped = 0
 	}
-	if processed > 0 {
-		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
+	if state.processed > 0 {
+		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", state.processed, state.accepted, dropped))
 	}
 	log.Printf("engine: packet store path=%q rows=%d", nextStore.Path(), nextStore.Count())
 	s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", nextStore.Count()))
@@ -287,7 +262,7 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	}
 
 	if err == nil {
-		log.Printf("engine: capture parse completed file=%q accepted=%d processed=%d", opts.FilePath, accepted, processed)
+		log.Printf("engine: capture parse completed file=%q accepted=%d processed=%d", opts.FilePath, state.accepted, state.processed)
 	} else if errors.Is(err, context.Canceled) {
 		log.Printf("engine: capture parse canceled file=%q", opts.FilePath)
 	} else {
@@ -296,7 +271,7 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 
 	switch err {
 	case nil:
-		if accepted == 0 {
+		if state.accepted == 0 {
 			s.emitStatus("解析失败: 未读取到有效数据包")
 			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, "capture parse completed but produced no packets")
 			return errors.New("capture parse completed but produced no packets")
@@ -307,15 +282,15 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			return context.Canceled
 		}
 		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCommitting, "")
-		if err := s.commitLoadedCapture(opts.FilePath, nextStore, rawStreamIndex); err != nil {
+		if err := s.commitLoadedCapture(opts.FilePath, nextStore, state.rawStreamIndex); err != nil {
 			s.emitStatus("解析失败: " + err.Error())
 			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, err.Error())
 			return err
 		}
 		commitPending = true
 		s.mu.Lock()
-		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(rawStreamIndex))
-		for key, stream := range rawStreamIndex {
+		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(state.rawStreamIndex))
+		for key, stream := range state.rawStreamIndex {
 			if stream == nil {
 				continue
 			}
@@ -325,8 +300,8 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 		s.emitStatus("解析完成")
 		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
 			status.Phase = string(model.CaptureLoadReady)
-			status.Processed = processed
-			status.Accepted = accepted
+			status.Processed = state.processed
+			status.Accepted = state.accepted
 			if s.packetStore != nil {
 				status.StagedCount = s.packetStore.Count()
 			}
@@ -382,21 +357,8 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 	s.pcap = filePath
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
-	s.globalTrafficStats = nil
-	s.industrialAnalysis = nil
-	s.vehicleAnalysis = nil
-	s.mediaAnalysis = nil
-	s.usbAnalysis = nil
-	s.usbAnalysisBySource = nil
-	s.c2Analysis = nil
-	s.aptAnalysis = nil
-	s.mediaArtifacts = map[string]string{}
-	s.mediaPlayback = map[string]string{}
-	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.resetAnalysisCachesLocked()
 	s.cancelSpeechBatchLocked()
-	s.speechBatch = nil
-	s.streamCache = map[string]model.ReassembledStream{}
-	s.streamCacheOrder = s.streamCacheOrder[:0]
 	s.rawStreamIndex = make(map[string]model.ReassembledStream, len(nextRawStreamIndex))
 	for key, stream := range nextRawStreamIndex {
 		if stream == nil {
@@ -806,6 +768,13 @@ func (s *Service) resetCaptureAnalysisStateLocked() {
 	s.pcap = ""
 	s.displayFilterCache = map[string]*filteredPacketIndex{}
 	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.resetAnalysisCachesLocked()
+	s.cancelSpeechBatchLocked()
+	s.rawStreamIndex = map[string]model.ReassembledStream{}
+	s.streamOverrides = map[string]map[int]string{}
+}
+
+func (s *Service) resetAnalysisCachesLocked() {
 	s.globalTrafficStats = nil
 	s.industrialAnalysis = nil
 	s.vehicleAnalysis = nil
@@ -820,8 +789,6 @@ func (s *Service) resetCaptureAnalysisStateLocked() {
 	s.speechBatch = nil
 	s.streamCache = map[string]model.ReassembledStream{}
 	s.streamCacheOrder = s.streamCacheOrder[:0]
-	s.rawStreamIndex = map[string]model.ReassembledStream{}
-	s.streamOverrides = map[string]map[int]string{}
 }
 
 func (s *Service) clearUSBAnalysisCacheLocked() {

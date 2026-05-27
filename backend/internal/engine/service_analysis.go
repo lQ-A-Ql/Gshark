@@ -10,49 +10,66 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
+
+type analysisCacheInput[T any] struct {
+	getCached func() *T
+	setCached func(*T)
+	builder   func(pcap string) (T, error)
+}
+
+func cachedAnalysis[T any](ctx context.Context, mu *sync.RWMutex, pcap string, input analysisCacheInput[T]) (T, error) {
+	var zero T
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+
+	mu.RLock()
+	cached := input.getCached()
+	currentPCAP := pcap
+	mu.RUnlock()
+
+	if cached != nil {
+		return *cached, nil
+	}
+	if strings.TrimSpace(currentPCAP) == "" {
+		return zero, errors.New("no capture loaded")
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+
+	result, err := input.builder(currentPCAP)
+	if err != nil {
+		return zero, err
+	}
+
+	mu.Lock()
+	if input.getCached() == nil {
+		input.setCached(&result)
+	}
+	out := *input.getCached()
+	mu.Unlock()
+	return out, nil
+}
 
 func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
 	return s.GlobalTrafficStatsWithContext(context.Background())
 }
 
 func (s *Service) GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return model.GlobalTrafficStats{}, err
-	}
-	s.mu.RLock()
-	pcap := s.pcap
-	cached := s.globalTrafficStats
-	s.mu.RUnlock()
-
-	if cached != nil {
-		return *cached, nil
-	}
-	if strings.TrimSpace(pcap) == "" {
-		return model.GlobalTrafficStats{}, errors.New("no capture loaded")
-	}
-	if err := ctx.Err(); err != nil {
-		return model.GlobalTrafficStats{}, err
-	}
-
-	stats, err := tshark.BuildGlobalTrafficStatsFromFile(pcap)
-	if err != nil {
-		return model.GlobalTrafficStats{}, err
-	}
-
-	s.mu.Lock()
-	if s.globalTrafficStats == nil {
-		s.globalTrafficStats = &stats
-	}
-	out := *s.globalTrafficStats
-	s.mu.Unlock()
-	return out, nil
+	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.GlobalTrafficStats]{
+		getCached: func() *model.GlobalTrafficStats { return s.globalTrafficStats },
+		setCached: func(v *model.GlobalTrafficStats) { s.globalTrafficStats = v },
+		builder:   tshark.BuildGlobalTrafficStatsFromFile,
+	})
 }
 
 func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
@@ -60,46 +77,21 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 }
 
 func (s *Service) IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return model.IndustrialAnalysis{}, err
-	}
-	s.mu.RLock()
-	pcap := s.pcap
-	cached := s.industrialAnalysis
-	s.mu.RUnlock()
-
-	if cached != nil {
-		return *cached, nil
-	}
-	if strings.TrimSpace(pcap) == "" {
-		return model.IndustrialAnalysis{}, errors.New("no capture loaded")
-	}
-	if err := ctx.Err(); err != nil {
-		return model.IndustrialAnalysis{}, err
-	}
-	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
-		log.Printf("engine: specialized field cache warm failed for industrial analysis: %v", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return model.IndustrialAnalysis{}, err
-	}
-
-	analysis, err := tshark.BuildIndustrialAnalysisFromFile(pcap)
-	if err != nil {
-		return model.IndustrialAnalysis{}, err
-	}
-	analysis.Report = buildIndustrialInvestigationReport(analysis)
-
-	s.mu.Lock()
-	if s.industrialAnalysis == nil {
-		s.industrialAnalysis = &analysis
-	}
-	out := *s.industrialAnalysis
-	s.mu.Unlock()
-	return out, nil
+	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.IndustrialAnalysis]{
+		getCached: func() *model.IndustrialAnalysis { return s.industrialAnalysis },
+		setCached: func(v *model.IndustrialAnalysis) { s.industrialAnalysis = v },
+		builder: func(pcap string) (model.IndustrialAnalysis, error) {
+			if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+				log.Printf("engine: specialized field cache warm failed for industrial analysis: %v", err)
+			}
+			analysis, err := tshark.BuildIndustrialAnalysisFromFile(pcap)
+			if err != nil {
+				return analysis, err
+			}
+			analysis.Report = buildIndustrialInvestigationReport(analysis)
+			return analysis, nil
+		},
+	})
 }
 
 func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
@@ -107,50 +99,25 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 }
 
 func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return model.VehicleAnalysis{}, err
-	}
-	s.mu.RLock()
-	pcap := s.pcap
-	cached := s.vehicleAnalysis
-	s.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.VehicleAnalysis]{
+		getCached: func() *model.VehicleAnalysis { return s.vehicleAnalysis },
+		setCached: func(v *model.VehicleAnalysis) { s.vehicleAnalysis = v },
+		builder: func(pcap string) (model.VehicleAnalysis, error) {
+			if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+				log.Printf("engine: specialized field cache warm failed for vehicle analysis: %v", err)
+			}
+			s.mu.RLock()
+			dbcDefs := append([]*tshark.DBCDatabase(nil), s.vehicleDBCDefs...)
+			s.mu.RUnlock()
 
-	if cached != nil {
-		return *cached, nil
-	}
-	if strings.TrimSpace(pcap) == "" {
-		return model.VehicleAnalysis{}, errors.New("no capture loaded")
-	}
-	if err := ctx.Err(); err != nil {
-		return model.VehicleAnalysis{}, err
-	}
-	if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
-		log.Printf("engine: specialized field cache warm failed for vehicle analysis: %v", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return model.VehicleAnalysis{}, err
-	}
-
-	s.mu.RLock()
-	dbcDefs := append([]*tshark.DBCDatabase(nil), s.vehicleDBCDefs...)
-	s.mu.RUnlock()
-
-	analysis, err := tshark.BuildVehicleAnalysisFromFile(pcap, dbcDefs...)
-	if err != nil {
-		return model.VehicleAnalysis{}, err
-	}
-	analysis.Report = buildVehicleInvestigationReport(analysis)
-
-	s.mu.Lock()
-	if s.vehicleAnalysis == nil {
-		s.vehicleAnalysis = &analysis
-	}
-	out := *s.vehicleAnalysis
-	s.mu.Unlock()
-	return out, nil
+			analysis, err := tshark.BuildVehicleAnalysisFromFile(pcap, dbcDefs...)
+			if err != nil {
+				return analysis, err
+			}
+			analysis.Report = buildVehicleInvestigationReport(analysis)
+			return analysis, nil
+		},
+	})
 }
 
 func (s *Service) MediaAnalysis() (model.MediaAnalysis, error) {
