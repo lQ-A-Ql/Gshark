@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,7 +18,7 @@ func (s *Server) handleWinRMDecrypt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req model.WinRMDecryptRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -67,7 +66,7 @@ func (s *Server) handleSMB3RandomSessionKey(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req model.SMB3RandomSessionKeyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -159,7 +158,7 @@ func (s *Server) handleShiroRememberMeAnalysis(w http.ResponseWriter, r *http.Re
 	}
 	var req model.ShiroRememberMeRequest
 	if r.Method == http.MethodPost {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		if err := decodeJSONBody(w, r, &req); err != nil && err != io.EOF {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}

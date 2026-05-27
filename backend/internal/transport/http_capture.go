@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -32,7 +31,7 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var options model.ParseOptions
-	if err := json.NewDecoder(r.Body).Decode(&options); err != nil {
+	if err := decodeJSONBody(w, r, &options); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}

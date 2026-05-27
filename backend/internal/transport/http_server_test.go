@@ -117,7 +117,8 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 	server.SetAuthToken("secret-token")
 	handler := server.Handler()
 
-	badReq := httptest.NewRequest(http.MethodGet, "/api/events?access_token=wrong-token", nil)
+	badReq := httptest.NewRequest(http.MethodGet, "/api/events", nil)
+	badReq.Header.Set("Authorization", "Bearer wrong-token")
 	badRec := httptest.NewRecorder()
 	handler.ServeHTTP(badRec, badReq)
 	if badRec.Code != http.StatusUnauthorized {
@@ -125,7 +126,8 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	goodReq := httptest.NewRequest(http.MethodGet, "/api/events?access_token=secret-token", nil).WithContext(ctx)
+	goodReq := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(ctx)
+	goodReq.Header.Set("Authorization", "Bearer secret-token")
 	goodRec := httptest.NewRecorder()
 	done := make(chan struct{})
 	go func() {
@@ -207,12 +209,6 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	}
 	if got := payload["build_id"]; got != "test-build-id" {
 		t.Fatalf("unexpected build_id value: %#v", got)
-	}
-	if got := strings.TrimSpace(payload["executable_path"].(string)); got == "" {
-		t.Fatalf("expected executable_path to be populated")
-	}
-	if got := strings.TrimSpace(payload["working_dir"].(string)); got == "" {
-		t.Fatalf("expected working_dir to be populated")
 	}
 	if got := filepath.Clean(strings.TrimSpace(payload["misc_package_dir"].(string))); got != filepath.Clean(miscPackageDir) {
 		t.Fatalf("unexpected misc_package_dir value: %q, want %q", got, miscPackageDir)

@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -66,7 +65,7 @@ func (s *Server) handlePackagedMiscModuleRoute(w http.ResponseWriter, r *http.Re
 	}
 
 	var req model.MiscModuleRunRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}

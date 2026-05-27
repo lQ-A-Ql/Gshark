@@ -88,10 +88,10 @@ type requestEnvelope struct {
 }
 
 type responseEnvelope struct {
-	JSONRPC string      `json:"jsonrpc"`
-	ID      any         `json:"id,omitempty"`
-	Result  any         `json:"result,omitempty"`
-	Error   *mcpError   `json:"error,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id,omitempty"`
+	Result  any       `json:"result,omitempty"`
+	Error   *mcpError `json:"error,omitempty"`
 }
 
 type mcpError struct {
@@ -516,7 +516,7 @@ func (s *Server) newTool(name, description string, inputSchema map[string]any, r
 		"description": description,
 		"inputSchema": inputSchema,
 		"annotations": map[string]any{
-			"readOnlyHint":  readOnly,
+			"readOnlyHint":   readOnly,
 			"idempotentHint": idempotent,
 		},
 	}

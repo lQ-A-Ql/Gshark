@@ -261,7 +261,7 @@ func (s *Server) handleStreamPayloads(w http.ResponseWriter, r *http.Request) {
 		StreamID int64                    `json:"stream_id"`
 		Patches  []model.StreamChunkPatch `json:"patches"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := decodeJSONBody(w, r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}

@@ -1,0 +1,830 @@
+package engine
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tshark"
+)
+
+func (s *Service) LoadPCAP(ctx context.Context, opts model.ParseOptions) error {
+	if opts.FilePath == "" {
+		return errors.New("empty file path")
+	}
+
+	currentRunID, runCtx := s.BeginCaptureLoad(ctx)
+	return s.LoadPCAPWithRun(runCtx, opts, currentRunID)
+}
+
+func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
+	if opts.FilePath == "" {
+		s.finishActiveCaptureLoad(currentRunID)
+		return errors.New("empty file path")
+	}
+	s.startCaptureLoadStatus(currentRunID, opts)
+	defer s.finishActiveCaptureLoad(currentRunID)
+
+	if err := s.lockLoad(runCtx); err != nil {
+		log.Printf("engine: capture parse canceled before acquiring load lock file=%q err=%v", opts.FilePath, err)
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, err.Error())
+		s.emitStatus("解析被取消")
+		return err
+	}
+	defer s.loadMu.Unlock()
+	if atomic.LoadInt64(&s.runID) != currentRunID {
+		return context.Canceled
+	}
+
+	return s.loadPCAPLocked(runCtx, opts, currentRunID)
+}
+
+func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
+	s.mu.RLock()
+	oldPCAP := s.pcap
+	currentTLS := s.tlsConf
+	s.mu.RUnlock()
+	if oldPCAP != "" {
+		tshark.ClearFieldScanCache(oldPCAP)
+	}
+	tshark.ClearFieldScanCache(opts.FilePath)
+
+	nextStore, err := newPacketStore()
+	if err != nil {
+		return err
+	}
+	commitPending := false
+	defer func() {
+		if !commitPending {
+			_ = nextStore.Close()
+		}
+	}()
+
+	// Inject current TLS config into parse options
+	opts.TLS = currentTLS
+
+	tsharkStatus := tshark.CurrentStatus()
+	log.Printf(
+		"engine: load capture file=%q filter=%q fast_list=%t list_profile=%q tshark=%q custom=%t",
+		opts.FilePath,
+		opts.DisplayFilter,
+		opts.FastList,
+		normalizeCaptureListProfile(opts),
+		tsharkStatus.Path,
+		tsharkStatus.UsingCustomPath,
+	)
+
+	s.emitStatus("开始解析 PCAP")
+	total := 0
+	if shouldSkipPacketEstimate(opts) {
+		s.emitStatus("大流量包已跳过总包数预估，直接开始入库解析。")
+		log.Printf("engine: skipping packet estimate for %q due to large file fast_list path", opts.FilePath)
+	} else {
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCounting, "")
+		estimatedTotal, countErr := estimatePacketsFn(runCtx, opts)
+		if countErr == nil && estimatedTotal > 0 {
+			total = estimatedTotal
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.EstimatedTotal = total
+			})
+			s.emitStatus(fmt.Sprintf("__progress__:counting:%d:%d", total, total))
+			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", 0, total))
+			log.Printf("engine: tshark estimated %d packets for %q", total, opts.FilePath)
+		} else if countErr != nil {
+			log.Printf("engine: tshark packet estimate failed for %q: %v", opts.FilePath, countErr)
+		}
+	}
+	s.setCaptureLoadPhase(currentRunID, model.CaptureLoadParsing, "")
+
+	processed := 0
+	accepted := 0
+	rawStreamIndex := make(map[string]*model.ReassembledStream)
+	profile := normalizeCaptureListProfile(opts)
+	streamFn := streamPacketsFn
+	switch profile {
+	case "first_screen":
+		streamFn = streamPacketsFirstFn
+	case "full_fast":
+		streamFn = streamPacketsFastFn
+	case "compat":
+		streamFn = streamPacketsCompatFn
+	case "ek":
+		streamFn = streamPacketsFn
+	}
+
+	pending := make([]model.Packet, 0, 1024)
+	flushPending := func() {
+		if len(pending) == 0 {
+			return
+		}
+		if appendErr := nextStore.Append(pending); appendErr != nil {
+			s.emitStatus("写入数据包存储失败: " + appendErr.Error())
+			if err == nil {
+				err = appendErr
+			}
+		}
+		pending = pending[:0]
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Processed = processed
+			status.Accepted = accepted
+			status.StagedCount = nextStore.Count()
+		})
+	}
+
+	err = streamFn(runCtx, opts, func(packet model.Packet) error {
+		if atomic.LoadInt64(&s.runID) != currentRunID {
+			return nil
+		}
+		accepted++
+		appendPacketToRawStreamIndex(rawStreamIndex, packet)
+		pending = append(pending, packet)
+		if len(pending) >= 1024 {
+			flushPending()
+		}
+		if opts.EmitPackets {
+			s.emitter.EmitPacket(packet)
+		}
+		return nil
+	}, func(frameProcessed int) {
+		processed = frameProcessed
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Processed = frameProcessed
+			status.Accepted = accepted
+			status.StagedCount = nextStore.Count()
+		})
+		if total > 0 {
+			s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+		}
+	})
+	flushPending()
+	log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", func() string {
+		return profile
+	}(), processed, accepted, err)
+	if profile == "full_fast" && !errors.Is(err, context.Canceled) {
+		needsFallback := err != nil
+		if !needsFallback && total > 0 && accepted == 0 {
+			needsFallback = true
+		}
+		if needsFallback {
+			s.emitStatus("fast_list compatibility fallback: retrying parse with EK mode")
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.ParserProfile = "ek_fallback"
+				status.Processed = 0
+				status.Accepted = 0
+				status.StagedCount = 0
+			})
+			if resetErr := nextStore.Reset(); resetErr != nil {
+				return resetErr
+			}
+			processed = 0
+			accepted = 0
+			rawStreamIndex = make(map[string]*model.ReassembledStream)
+			streamFn = streamPacketsFn
+			pending = make([]model.Packet, 0, 1024)
+			err = streamFn(runCtx, opts, func(packet model.Packet) error {
+				if atomic.LoadInt64(&s.runID) != currentRunID {
+					return nil
+				}
+				accepted++
+				appendPacketToRawStreamIndex(rawStreamIndex, packet)
+				pending = append(pending, packet)
+				if len(pending) >= 1024 {
+					flushPending()
+				}
+				if opts.EmitPackets {
+					s.emitter.EmitPacket(packet)
+				}
+				return nil
+			}, func(frameProcessed int) {
+				processed = frameProcessed
+				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+					status.Processed = frameProcessed
+					status.Accepted = accepted
+					status.StagedCount = nextStore.Count()
+				})
+				if total > 0 {
+					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+				}
+			})
+			flushPending()
+			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "ek_fallback", processed, accepted, err)
+		}
+	}
+	if !errors.Is(err, context.Canceled) {
+		needsCompatFallback := err != nil
+		if !needsCompatFallback && total > 0 && accepted == 0 {
+			needsCompatFallback = true
+		}
+		if needsCompatFallback {
+			s.emitStatus("compatibility fallback: retrying parse with minimal field mode")
+			log.Printf("engine: switching parser to compat_fields fallback for %q", opts.FilePath)
+			s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+				status.ParserProfile = "compat_fields_fallback"
+				status.Processed = 0
+				status.Accepted = 0
+				status.StagedCount = 0
+			})
+			if resetErr := nextStore.Reset(); resetErr != nil {
+				return resetErr
+			}
+			processed = 0
+			accepted = 0
+			rawStreamIndex = make(map[string]*model.ReassembledStream)
+			pending = make([]model.Packet, 0, 1024)
+			err = streamPacketsCompatFn(runCtx, opts, func(packet model.Packet) error {
+				if atomic.LoadInt64(&s.runID) != currentRunID {
+					return nil
+				}
+				accepted++
+				appendPacketToRawStreamIndex(rawStreamIndex, packet)
+				pending = append(pending, packet)
+				if len(pending) >= 1024 {
+					flushPending()
+				}
+				if opts.EmitPackets {
+					s.emitter.EmitPacket(packet)
+				}
+				return nil
+			}, func(frameProcessed int) {
+				processed = frameProcessed
+				s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+					status.Processed = frameProcessed
+					status.Accepted = accepted
+					status.StagedCount = nextStore.Count()
+				})
+				if total > 0 {
+					s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", frameProcessed, total))
+				}
+			})
+			flushPending()
+			log.Printf("engine: parse mode=%s processed=%d accepted=%d err=%v", "compat_fields_fallback", processed, accepted, err)
+		}
+	}
+	if total > 0 {
+		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", processed, total))
+	}
+	if err == nil && atomic.LoadInt64(&s.runID) != currentRunID {
+		err = context.Canceled
+	}
+
+	dropped := processed - accepted
+	if dropped < 0 {
+		dropped = 0
+	}
+	if processed > 0 {
+		s.emitStatus(fmt.Sprintf("解析统计: 已处理=%d, 入库=%d, 跳过=%d", processed, accepted, dropped))
+	}
+	log.Printf("engine: packet store path=%q rows=%d", nextStore.Path(), nextStore.Count())
+	s.emitStatus(fmt.Sprintf("临时数据库已缓存 %d 条数据包", nextStore.Count()))
+	if profile == "full_fast" && dropped > 0 {
+		s.emitStatus(fmt.Sprintf("fast_list 告警: 有 %d 条记录未入库，请检查字段映射/解析规则", dropped))
+	}
+
+	if err == nil {
+		log.Printf("engine: capture parse completed file=%q accepted=%d processed=%d", opts.FilePath, accepted, processed)
+	} else if errors.Is(err, context.Canceled) {
+		log.Printf("engine: capture parse canceled file=%q", opts.FilePath)
+	} else {
+		log.Printf("engine: capture parse failed file=%q err=%v", opts.FilePath, err)
+	}
+
+	switch err {
+	case nil:
+		if accepted == 0 {
+			s.emitStatus("解析失败: 未读取到有效数据包")
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, "capture parse completed but produced no packets")
+			return errors.New("capture parse completed but produced no packets")
+		}
+		if atomic.LoadInt64(&s.runID) != currentRunID {
+			s.emitStatus("解析被取消")
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, context.Canceled.Error())
+			return context.Canceled
+		}
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCommitting, "")
+		if err := s.commitLoadedCapture(opts.FilePath, nextStore, rawStreamIndex); err != nil {
+			s.emitStatus("解析失败: " + err.Error())
+			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, err.Error())
+			return err
+		}
+		commitPending = true
+		s.mu.Lock()
+		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(rawStreamIndex))
+		for key, stream := range rawStreamIndex {
+			if stream == nil {
+				continue
+			}
+			s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+		}
+		s.mu.Unlock()
+		s.emitStatus("解析完成")
+		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
+			status.Phase = string(model.CaptureLoadReady)
+			status.Processed = processed
+			status.Accepted = accepted
+			if s.packetStore != nil {
+				status.StagedCount = s.packetStore.Count()
+			}
+			status.CompletedAt = nowCaptureLoadTimestamp()
+		})
+		if opts.EnableEnrichment && profile == "first_screen" {
+			s.startCaptureEnrichment(opts, currentRunID)
+		}
+	case context.Canceled:
+		s.emitStatus("解析被取消")
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, context.Canceled.Error())
+	default:
+		s.emitStatus("解析失败: " + err.Error())
+		s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, err.Error())
+	}
+	return err
+}
+
+func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, nextRawStreamIndex map[string]*model.ReassembledStream) error {
+	if nextStore == nil {
+		return errors.New("replacement packet store is nil")
+	}
+	s.objMu.Lock()
+	if s.exportDir != "" {
+		_ = os.RemoveAll(s.exportDir)
+		s.exportDir = ""
+	}
+	s.objectsLoaded = false
+	s.objects = nil
+	s.objMu.Unlock()
+
+	s.yaraMu.Lock()
+	s.yaraLoaded = false
+	s.yaraHits = nil
+	s.yaraLastError = ""
+	s.yaraMu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaExportDir)
+		s.mediaExportDir = ""
+	}
+	if s.packetStore == nil {
+		return errors.New("active packet store is not initialized")
+	}
+	if err := s.packetStore.ReplaceWith(nextStore); err != nil {
+		return err
+	}
+	tshark.ClearUSBAnalysisRawScanCache()
+	s.cancelDisplayFilterCacheLocked()
+	s.pcap = filePath
+	s.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.globalTrafficStats = nil
+	s.industrialAnalysis = nil
+	s.vehicleAnalysis = nil
+	s.mediaAnalysis = nil
+	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
+	s.c2Analysis = nil
+	s.aptAnalysis = nil
+	s.mediaArtifacts = map[string]string{}
+	s.mediaPlayback = map[string]string{}
+	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.cancelSpeechBatchLocked()
+	s.speechBatch = nil
+	s.streamCache = map[string]model.ReassembledStream{}
+	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.rawStreamIndex = make(map[string]model.ReassembledStream, len(nextRawStreamIndex))
+	for key, stream := range nextRawStreamIndex {
+		if stream == nil {
+			continue
+		}
+		s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+	}
+	s.streamOverrides = map[string]map[int]string{}
+	return nil
+}
+
+func (s *Service) startCaptureEnrichment(opts model.ParseOptions, runID int64) {
+	if strings.TrimSpace(opts.FilePath) == "" {
+		return
+	}
+	s.setCaptureEnrichmentStatus(runID, "pending", 0, 0, "")
+	enrichOpts := opts
+	enrichOpts.ListProfile = "full_fast"
+	enrichOpts.FastList = true
+	enrichOpts.EnableEnrichment = false
+	taskCtx, finish := s.TrackCaptureTask(context.Background(), "capture-enrichment")
+	go func() {
+		defer finish()
+		s.setCaptureEnrichmentStatus(runID, "running", 0, 0, "")
+		processed := 0
+		updated := 0
+		enrichedRawStreamIndex := make(map[string]*model.ReassembledStream)
+		err := streamPacketsFastFn(taskCtx, enrichOpts, func(packet model.Packet) error {
+			if atomic.LoadInt64(&s.runID) != runID {
+				return context.Canceled
+			}
+			appendPacketToRawStreamIndex(enrichedRawStreamIndex, packet)
+			changed, updateErr := s.packetStore.UpdatePacketEnrichment(packet)
+			if updateErr != nil {
+				return updateErr
+			}
+			if changed {
+				updated++
+			}
+			if updated == 1 || updated%2000 == 0 {
+				s.setCaptureEnrichmentStatus(runID, "running", processed, updated, "")
+			}
+			return nil
+		}, func(frameProcessed int) {
+			processed = frameProcessed
+			if frameProcessed == 1 || frameProcessed%2000 == 0 {
+				s.setCaptureEnrichmentStatus(runID, "running", processed, updated, "")
+			}
+		})
+		if errors.Is(err, context.Canceled) {
+			s.setCaptureEnrichmentStatus(runID, "canceled", processed, updated, context.Canceled.Error())
+			return
+		}
+		if err != nil {
+			log.Printf("engine: capture enrichment failed file=%q err=%v", opts.FilePath, err)
+			s.setCaptureEnrichmentStatus(runID, "failed", processed, updated, err.Error())
+			return
+		}
+		if atomic.LoadInt64(&s.runID) != runID {
+			s.setCaptureEnrichmentStatus(runID, "canceled", processed, updated, context.Canceled.Error())
+			return
+		}
+		s.mu.Lock()
+		if s.pcap == opts.FilePath {
+			s.rawStreamIndex = make(map[string]model.ReassembledStream, len(enrichedRawStreamIndex))
+			for key, stream := range enrichedRawStreamIndex {
+				if stream == nil {
+					continue
+				}
+				s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+			}
+		}
+		s.mu.Unlock()
+		s.setCaptureEnrichmentStatus(runID, "ready", processed, updated, "")
+		log.Printf("engine: capture enrichment completed file=%q processed=%d updated=%d", opts.FilePath, processed, updated)
+	}()
+}
+
+func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
+	if !opts.FastList {
+		return false
+	}
+	filePath := strings.TrimSpace(opts.FilePath)
+	if filePath == "" {
+		return false
+	}
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Size() >= skipEstimateFileSizeThreshold
+}
+
+func (s *Service) cancelSpeechBatchLocked() {
+	if s.speechCancel != nil {
+		s.speechCancel()
+		s.speechCancel = nil
+	}
+}
+
+func (s *Service) lockLoad(ctx context.Context) error {
+	for {
+		if s.loadMu.TryLock() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
+}
+
+func (s *Service) registerActiveCaptureLoad(runID int64, cancel context.CancelFunc) {
+	s.activeLoadMu.Lock()
+	previous := s.activeLoadCancel
+	s.activeLoadID = runID
+	s.activeLoadCancel = cancel
+	s.activeLoadMu.Unlock()
+	if previous != nil {
+		previous()
+	}
+}
+
+func (s *Service) TrackCaptureTask(ctx context.Context, name string) (context.Context, func()) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	taskCtx, cancel := context.WithCancel(ctx)
+	s.captureTaskMu.Lock()
+	if s.captureTasks == nil {
+		s.captureTasks = map[int64]captureTaskCancel{}
+	}
+	s.captureTaskSeq++
+	id := s.captureTaskSeq
+	s.captureTasks[id] = captureTaskCancel{name: strings.TrimSpace(name), cancel: cancel}
+	s.captureTaskMu.Unlock()
+
+	var done atomic.Bool
+	finish := func() {
+		if !done.CompareAndSwap(false, true) {
+			return
+		}
+		s.captureTaskMu.Lock()
+		delete(s.captureTasks, id)
+		s.captureTaskMu.Unlock()
+		cancel()
+	}
+	return taskCtx, finish
+}
+
+func (s *Service) CancelCaptureTasks() int {
+	s.captureTaskMu.Lock()
+	tasks := make([]captureTaskCancel, 0, len(s.captureTasks))
+	for id, task := range s.captureTasks {
+		tasks = append(tasks, task)
+		delete(s.captureTasks, id)
+	}
+	s.captureTaskMu.Unlock()
+	for _, task := range tasks {
+		if task.cancel != nil {
+			task.cancel()
+		}
+	}
+	return len(tasks)
+}
+
+func (s *Service) ActiveCaptureTaskCount() int {
+	s.captureTaskMu.Lock()
+	defer s.captureTaskMu.Unlock()
+	return len(s.captureTasks)
+}
+
+func nowCaptureLoadTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func cloneCaptureLoadStatus(status *model.CaptureLoadStatus) *model.CaptureLoadStatus {
+	if status == nil {
+		return nil
+	}
+	clone := *status
+	if status.Enrichment != nil {
+		enrichment := *status.Enrichment
+		clone.Enrichment = &enrichment
+	}
+	return &clone
+}
+
+func normalizeCaptureListProfile(opts model.ParseOptions) string {
+	switch strings.ToLower(strings.TrimSpace(opts.ListProfile)) {
+	case "first_screen":
+		return "first_screen"
+	case "full_fast":
+		return "full_fast"
+	case "compat":
+		return "compat"
+	case "ek":
+		return "ek"
+	}
+	if opts.FastList {
+		return "full_fast"
+	}
+	return "ek"
+}
+
+func (s *Service) startCaptureLoadStatus(runID int64, opts model.ParseOptions) {
+	now := nowCaptureLoadTimestamp()
+	s.activeLoadMu.Lock()
+	s.activeLoadStatus = &model.CaptureLoadStatus{
+		RunID:         runID,
+		FilePath:      opts.FilePath,
+		Phase:         string(model.CaptureLoadStarting),
+		ParserProfile: normalizeCaptureListProfile(opts),
+		StartedAt:     now,
+		UpdatedAt:     now,
+	}
+	s.activeLoadMu.Unlock()
+}
+
+func (s *Service) updateCaptureLoadStatus(runID int64, fn func(*model.CaptureLoadStatus)) {
+	s.activeLoadMu.Lock()
+	defer s.activeLoadMu.Unlock()
+	if s.activeLoadStatus == nil || s.activeLoadStatus.RunID != runID {
+		return
+	}
+	fn(s.activeLoadStatus)
+	s.activeLoadStatus.UpdatedAt = nowCaptureLoadTimestamp()
+}
+
+func (s *Service) setCaptureLoadPhase(runID int64, phase model.CaptureLoadPhase, lastError string) {
+	s.updateCaptureLoadStatus(runID, func(status *model.CaptureLoadStatus) {
+		status.Phase = string(phase)
+		status.LastError = strings.TrimSpace(lastError)
+		switch phase {
+		case model.CaptureLoadReady, model.CaptureLoadFailed, model.CaptureLoadCanceled:
+			status.CompletedAt = nowCaptureLoadTimestamp()
+		}
+	})
+}
+
+func (s *Service) setCaptureEnrichmentStatus(runID int64, phase string, processed, updated int, lastError string) {
+	s.updateCaptureLoadStatus(runID, func(status *model.CaptureLoadStatus) {
+		if status.Enrichment == nil {
+			status.Enrichment = &model.CaptureEnrichmentStatus{}
+		}
+		status.Enrichment.Phase = strings.TrimSpace(phase)
+		status.Enrichment.Processed = processed
+		status.Enrichment.Updated = updated
+		status.Enrichment.LastError = strings.TrimSpace(lastError)
+		status.Enrichment.UpdatedAt = nowCaptureLoadTimestamp()
+	})
+}
+
+func (s *Service) BeginCaptureLoad(ctx context.Context) (int64, context.Context) {
+	currentRunID := atomic.AddInt64(&s.runID, 1)
+	s.CancelActiveCaptureLoad()
+	s.cancelLegacyStreaming()
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.mu.Unlock()
+
+	runCtx, cancel := context.WithCancel(ctx)
+	s.registerActiveCaptureLoad(currentRunID, cancel)
+	return currentRunID, runCtx
+}
+
+func (s *Service) finishActiveCaptureLoad(runID int64) {
+	s.activeLoadMu.Lock()
+	if s.activeLoadID == runID {
+		s.activeLoadID = 0
+		s.activeLoadCancel = nil
+	}
+	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == runID {
+		switch s.activeLoadStatus.Phase {
+		case string(model.CaptureLoadReady), string(model.CaptureLoadFailed), string(model.CaptureLoadCanceled):
+		default:
+			s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+			s.activeLoadStatus.CompletedAt = nowCaptureLoadTimestamp()
+			s.activeLoadStatus.UpdatedAt = s.activeLoadStatus.CompletedAt
+		}
+	}
+	s.activeLoadMu.Unlock()
+}
+
+func (s *Service) CancelActiveCaptureLoad() bool {
+	s.activeLoadMu.Lock()
+	cancel := s.activeLoadCancel
+	canceledRunID := s.activeLoadID
+	s.activeLoadCancel = nil
+	s.activeLoadID = 0
+	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == canceledRunID && canceledRunID != 0 {
+		now := nowCaptureLoadTimestamp()
+		s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+		s.activeLoadStatus.CompletedAt = now
+		s.activeLoadStatus.UpdatedAt = now
+	}
+	s.activeLoadMu.Unlock()
+	if cancel != nil {
+		cancel()
+		return true
+	}
+	return false
+}
+
+func (s *Service) cancelLegacyStreaming() bool {
+	s.mu.Lock()
+	cancel := s.cancel
+	s.cancel = nil
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		return true
+	}
+	return false
+}
+
+func (s *Service) StopStreaming() bool {
+	activeCanceled := s.CancelActiveCaptureLoad()
+	legacyCanceled := s.cancelLegacyStreaming()
+	return activeCanceled || legacyCanceled
+}
+
+func (s *Service) PrepareCaptureReplacement() {
+	atomic.AddInt64(&s.runID, 1)
+	if s.StopStreaming() {
+		s.emitStatus("正在终止旧抓包解析")
+	}
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.clearUSBAnalysisCacheLocked()
+	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
+}
+
+func (s *Service) ClearCapture() error {
+	atomic.AddInt64(&s.runID, 1)
+	if s.StopStreaming() {
+		s.emitStatus("正在终止当前抓包解析")
+	}
+	if canceled := s.CancelCaptureTasks(); canceled > 0 {
+		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
+	}
+
+	s.mu.Lock()
+	s.cancelDisplayFilterCacheLocked()
+	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.lockLoad(waitCtx); err != nil {
+		s.emitStatus("正在终止旧解析，请稍后重试关闭抓包。")
+		return err
+	}
+	defer s.loadMu.Unlock()
+
+	if s.packetStore != nil {
+		if err := s.packetStore.Reset(); err != nil {
+			return err
+		}
+		s.emitStatus("临时数据库已重置")
+	}
+
+	s.objMu.Lock()
+	if s.exportDir != "" {
+		_ = os.RemoveAll(s.exportDir)
+		s.exportDir = ""
+	}
+	s.objectsLoaded = false
+	s.objects = nil
+	s.objMu.Unlock()
+
+	s.mu.Lock()
+	if s.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaExportDir)
+		s.mediaExportDir = ""
+	}
+	if s.pcap != "" {
+		tshark.ClearFieldScanCache(s.pcap)
+	}
+	s.resetCaptureAnalysisStateLocked()
+	s.cancelSpeechBatchLocked()
+	s.mu.Unlock()
+	tshark.ClearUSBAnalysisRawScanCache()
+
+	s.yaraMu.Lock()
+	s.yaraLoaded = false
+	s.yaraHits = nil
+	s.yaraLastError = ""
+	s.yaraMu.Unlock()
+	s.activeLoadMu.Lock()
+	s.activeLoadStatus = nil
+	s.activeLoadMu.Unlock()
+	return nil
+}
+
+func (s *Service) resetCaptureAnalysisStateLocked() {
+	s.pcap = ""
+	s.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.globalTrafficStats = nil
+	s.industrialAnalysis = nil
+	s.vehicleAnalysis = nil
+	s.mediaAnalysis = nil
+	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
+	s.c2Analysis = nil
+	s.aptAnalysis = nil
+	s.mediaArtifacts = map[string]string{}
+	s.mediaPlayback = map[string]string{}
+	s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.speechBatch = nil
+	s.streamCache = map[string]model.ReassembledStream{}
+	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.rawStreamIndex = map[string]model.ReassembledStream{}
+	s.streamOverrides = map[string]map[int]string{}
+}
+
+func (s *Service) clearUSBAnalysisCacheLocked() {
+	s.usbAnalysis = nil
+	s.usbAnalysisBySource = nil
+}

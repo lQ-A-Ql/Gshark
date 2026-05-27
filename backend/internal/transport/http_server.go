@@ -243,8 +243,6 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	authEnabled := strings.TrimSpace(s.authToken) != ""
 	s.mu.Unlock()
-	executablePath, _ := os.Executable()
-	workingDir, _ := os.Getwd()
 	miscPackageDir := strings.TrimSpace(s.miscPackageDir)
 	if miscPackageDir == "" {
 		miscPackageDir = resolveMiscPackageDir("")
@@ -259,8 +257,6 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 		"build_commit":     "",
 		"auth_enabled":     authEnabled,
 		"build_id":         buildID,
-		"executable_path":  executablePath,
-		"working_dir":      workingDir,
 		"misc_package_dir": miscPackageDir,
 		"started_at":       runtimeIdentityStartedAt,
 	})
@@ -274,7 +270,7 @@ func (s *Server) handleTsharkConfig(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			Path string `json:"path"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := decodeJSONBody(w, r, &payload); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -290,7 +286,7 @@ func (s *Server) handleToolRuntimeConfig(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, s.toolRuntime.ToolRuntimeSnapshotWithOptions(r.Context(), toolRuntimeProbeOptionsFromRequest(r)))
 	case http.MethodPost:
 		var cfg model.ToolRuntimeConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := decodeJSONBody(w, r, &cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -307,7 +303,7 @@ func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.currentMCPStatus())
 	case http.MethodPost:
 		var cfg model.MCPConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := decodeJSONBody(w, r, &cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -363,7 +359,7 @@ func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		var cfg model.HuntingRuntimeConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := decodeJSONBody(w, r, &cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -477,7 +473,7 @@ func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var payload model.C2DecryptRequest
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := decodeJSONBody(w, r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -617,7 +613,7 @@ func (s *Server) handleMediaArtifactTranscription(w http.ResponseWriter, r *http
 		Token string `json:"token"`
 		Force bool   `json:"force"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := decodeJSONBody(w, r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -642,7 +638,7 @@ func (s *Server) handleMediaBatchTranscription(w http.ResponseWriter, r *http.Re
 			Force bool `json:"force"`
 		}
 		if r.Body != nil {
-			_ = json.NewDecoder(r.Body).Decode(&payload)
+			_ = decodeJSONBody(w, r, &payload)
 		}
 		status, err := s.media.StartMediaBatchTranscription(payload.Force)
 		if err != nil {
@@ -708,7 +704,7 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			Path string `json:"path"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := decodeJSONBody(w, r, &payload); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -744,7 +740,7 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			IDs []int64 `json:"ids"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+		if err := decodeJSONBody(w, r, &payload); err == nil {
 			reqIds = payload.IDs
 		}
 	} else if r.Method == http.MethodGet {
@@ -762,7 +758,13 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 	allObjects := s.detection.ObjectsWithContext(r.Context())
 	var toDownload []model.ObjectFile
 
+	const maxObjectsPerDownload = 100
+
 	if len(reqIds) == 0 {
+		if len(allObjects) > maxObjectsPerDownload {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("too many objects (%d); specify ids to download", len(allObjects)))
+			return
+		}
 		toDownload = allObjects
 	} else {
 		idMap := make(map[int64]bool)
@@ -795,7 +797,8 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 		}
 		zf, err := zw.Create(obj.Name)
 		if err == nil {
-			_, _ = io.Copy(zf, f)
+			const maxObjectFileSize = 256 << 20 // 256MB per file
+			_, _ = io.Copy(zf, io.LimitReader(f, maxObjectFileSize))
 		}
 		f.Close()
 	}
@@ -809,7 +812,7 @@ func (s *Server) handleAddPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload model.Plugin
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := decodeJSONBody(w, r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -837,7 +840,7 @@ func (s *Server) handleDeletePlugin(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			ID string `json:"id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+		if err := decodeJSONBody(w, r, &payload); err == nil {
 			id = strings.TrimSpace(payload.ID)
 		}
 	}
@@ -873,7 +876,7 @@ func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, source)
 	case http.MethodPost:
 		var payload model.PluginSource
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if err := decodeJSONBody(w, r, &payload); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -894,7 +897,7 @@ func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.toolRuntime.TLSConfig())
 	case http.MethodPost:
 		var cfg model.TLSConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := decodeJSONBody(w, r, &cfg); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
@@ -967,7 +970,7 @@ func (s *Server) handleBulkPlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req pluginBulkRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -1005,7 +1008,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		case ev := <-ch:
 			payload, _ := json.Marshal(ev.Data)
-			_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Type, string(payload))
+			safeType := strings.ReplaceAll(strings.ReplaceAll(ev.Type, "\n", ""), "\r", "")
+			_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", safeType, string(payload))
 			flusher.Flush()
 		}
 	}
@@ -1093,6 +1097,9 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-GShark-Auth")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -1118,9 +1125,6 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		}
 		if candidate == "" {
 			candidate = strings.TrimSpace(r.Header.Get("X-GShark-Auth"))
-		}
-		if candidate == "" {
-			candidate = strings.TrimSpace(r.URL.Query().Get("access_token"))
 		}
 		if candidate != token {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
@@ -1166,6 +1170,13 @@ func (r *statusRecorder) WriteHeader(status int) {
 	r.ResponseWriter.WriteHeader(status)
 }
 
+const maxJSONBody = 1 << 20 // 1MB
+
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
 func writeJSON(w http.ResponseWriter, code int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -1174,6 +1185,32 @@ func writeJSON(w http.ResponseWriter, code int, payload any) {
 
 func writeError(w http.ResponseWriter, code int, message string) {
 	writeJSON(w, code, apiError{Error: message})
+}
+
+var sensitivePathPrefixes = []string{
+	os.TempDir(),
+	filepath.Join("gshark-sentinel"),
+	"/tmp/",
+	"/var/",
+	"C:\\Users\\",
+	"C:\\Windows\\",
+}
+
+func sanitizeErrorMessage(err error) string {
+	if err == nil {
+		return "internal error"
+	}
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+	for _, prefix := range sensitivePathPrefixes {
+		if strings.Contains(lower, strings.ToLower(prefix)) {
+			return "internal error"
+		}
+	}
+	if len(msg) > 200 {
+		return msg[:200]
+	}
+	return msg
 }
 
 func parseInt64(s string, fallback int64) int64 {
