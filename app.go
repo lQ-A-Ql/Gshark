@@ -336,6 +336,7 @@ func buildBackendCommand() (*exec.Cmd, error) {
 	if bundledErr == nil {
 		cmd := exec.Command(bundledBinaryPath, "serve", "127.0.0.1:17891")
 		cmd.Dir = filepath.Dir(bundledBinaryPath)
+		hideChildProcessWindow(cmd)
 		fmt.Fprintf(os.Stdout, "desktop startup: using bundled backend binary %q\n", bundledBinaryPath)
 		return cmd, nil
 	}
@@ -352,6 +353,7 @@ func buildBackendCommand() (*exec.Cmd, error) {
 
 	cmd := exec.Command("go", "run", "./cmd/sentinel", "serve", "127.0.0.1:17891")
 	cmd.Dir = backendDir
+	hideChildProcessWindow(cmd)
 	fmt.Fprintf(os.Stdout, "desktop startup: bundled backend unavailable (%v); using go run backend from %q\n", bundledErr, backendDir)
 	return cmd, nil
 }
