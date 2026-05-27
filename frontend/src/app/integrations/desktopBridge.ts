@@ -1,11 +1,11 @@
-import type { DecryptionConfig, MCPConfig, MCPStatus, ToolRuntimeConfig } from "../core/types";
+import type { DecryptionConfig, MCPConfig, MCPStatus, SpeechToTextStatus, ToolRuntimeConfig } from "../core/types";
 import {
   asCaptureStatus,
   asPacketsPageResult,
   withCaptureStatusMeta,
   withPacketsPageMeta,
 } from "./clients/captureClient";
-import type { TSharkStatus } from "./clients/toolRuntimeClient";
+import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
 import { asMCPStatus } from "./mappers/mcpStatusMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
@@ -13,15 +13,9 @@ import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
 import { createTypedDesktopOverrides } from "./desktopTypedBridge";
-import {
-  createDisabledGenericIpcBackendTransport,
-  createIpcBackendTransport,
-  withDesktopIpcControls,
-} from "./ipcBackendTransport";
-import {
-  isDesktopGenericIpcDisabled,
-  isLegacyDesktopGenericIpcDisableExperimentEnabled,
-} from "./desktopGenericIpcPolicy";
+import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
+import { withDesktopIpcControls } from "./desktopIpcControls";
+import { isLegacyDesktopGenericIpcDisableExperimentEnabled } from "./desktopGenericIpcPolicy";
 
 export { resolveDesktopGenericIpcPolicy } from "./desktopGenericIpcPolicy";
 
@@ -35,21 +29,15 @@ const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
 const START_CAPTURE_IPC_TIMEOUT_MS = 15000;
 
 export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridgeContext): BackendBridge {
-  const disableGenericIpc = isDesktopGenericIpcDisabled();
-  const ipcTransport = disableGenericIpc
-    ? createDisabledGenericIpcBackendTransport()
-    : desktopApp.InvokeBackendJSON
-      ? createIpcBackendTransport(desktopApp)
-      : null;
-  const dataBridge = ipcTransport
-    ? createBackendBridgeFromTransport({
-        requestJSON: ipcTransport.requestJSON,
-        requestBlob: ipcTransport.requestBlob,
-        requestText: ipcTransport.requestText,
-        subscribeEvents: ipcTransport.subscribeEvents,
-        getDesktopAppBinding: () => desktopApp,
-      })
-    : fallbackBridge;
+  // isDesktopGenericIpcDisabled is now always true for the removed generic adapter path.
+  const disabledTransport = createDisabledGenericIpcBackendTransport();
+  const dataBridge = createBackendBridgeFromTransport({
+    requestJSON: disabledTransport.requestJSON,
+    requestBlob: disabledTransport.requestBlob,
+    requestText: disabledTransport.requestText,
+    subscribeEvents: disabledTransport.subscribeEvents,
+    getDesktopAppBinding: () => desktopApp,
+  });
 
   return {
     ...dataBridge,
@@ -65,7 +53,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         const probe = await desktopApp.PingBackendDataPlane();
         return Boolean((probe as { ready?: unknown })?.ready);
       }
-      return await dataBridge.isAvailable();
+      return await fallbackBridge.isAvailable();
     },
     async getDesktopBackendStatus() {
       if (!desktopApp.BackendStatus) {
@@ -76,7 +64,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     async getToolRuntimeSnapshot(signal?: AbortSignal, mode = "full") {
       const ipcSnapshot = runtimeSnapshotMethod(desktopApp, mode);
       if (!ipcSnapshot) {
-        return await dataBridge.getToolRuntimeSnapshot(signal, mode);
+        return await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
       }
       try {
         const payload = await withDesktopIpcControls(ipcSnapshot, {
@@ -87,7 +75,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         });
         return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
       } catch (error) {
-        const fallbackSnapshot = await dataBridge.getToolRuntimeSnapshot(signal, mode);
+        const fallbackSnapshot = await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
         return withToolRuntimeSnapshotMeta(
           fallbackSnapshot,
           "http-fallback",
@@ -95,10 +83,43 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         );
       }
     },
+    async checkTShark(): Promise<TSharkStatus> {
+      try {
+        const snapshot = await this.getToolRuntimeSnapshot();
+        return { ...snapshot.tshark, customPath: snapshot.tshark.customPath ?? "" };
+      } catch {
+        return { available: false, path: "", message: "tshark 状态探测失败", customPath: "", usingCustomPath: false };
+      }
+    },
+    async checkFFmpeg(): Promise<FFmpegStatus> {
+      try {
+        const snapshot = await this.getToolRuntimeSnapshot();
+        return snapshot.ffmpeg;
+      } catch {
+        return { available: false, path: "", message: "ffmpeg 状态探测失败" };
+      }
+    },
+    async checkSpeechToText(): Promise<SpeechToTextStatus> {
+      try {
+        const snapshot = await this.getToolRuntimeSnapshot();
+        return snapshot.speech;
+      } catch {
+        return {
+          available: false,
+          engine: "",
+          language: "",
+          pythonAvailable: false,
+          ffmpegAvailable: false,
+          voskAvailable: false,
+          modelAvailable: false,
+          message: "语音转写状态探测失败",
+        };
+      }
+    },
     async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal, mode = "full") {
       const ipcUpdate = runtimeConfigUpdateMethod(desktopApp, mode);
       if (!ipcUpdate) {
-        return await dataBridge.updateToolRuntimeConfig(config, signal, mode);
+        return await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
       }
       try {
         const payload = await withDesktopIpcControls(() => ipcUpdate(toToolRuntimeRequest(config)), {
@@ -109,17 +130,14 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         });
         return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
       } catch (error) {
-        if (!ipcTransport) {
-          const fallbackSnapshot = await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
-          const message = error instanceof Error ? error.message : "Wails IPC 运行时组件配置同步失败";
-          return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
-        }
-        throw error;
+        const fallbackSnapshot = await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
+        const message = error instanceof Error ? error.message : "Wails IPC 运行时组件配置同步失败";
+        return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
       }
     },
     async setTSharkPath(path: string): Promise<TSharkStatus> {
       if (!desktopApp.SetTSharkPath) {
-        return await dataBridge.setTSharkPath(path);
+        return await fallbackBridge.setTSharkPath(path);
       }
       const payload = await withDesktopIpcControls(() => desktopApp.SetTSharkPath!(path), {
         endpoint: "DesktopApp.SetTSharkPath",
@@ -139,7 +157,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         signal,
         desktopMethod: desktopApp.GetMCPStatus,
         desktopMethodName: "DesktopApp.GetMCPStatus",
-        fallback: () => dataBridge.getMCPStatus(signal),
+        fallback: () => fallbackBridge.getMCPStatus(signal),
       });
     },
     async updateMCPConfig(config: MCPConfig, signal?: AbortSignal) {
@@ -149,14 +167,14 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
           ? () => desktopApp.UpdateMCPConfig!({ enabled: config.enabled })
           : undefined,
         desktopMethodName: "DesktopApp.UpdateMCPConfig",
-        fallback: () => dataBridge.updateMCPConfig(config, signal),
+        fallback: () => fallbackBridge.updateMCPConfig(config, signal),
       });
     },
     async startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal) {
       if (!desktopApp.StartCapture) {
         return signal
-          ? await dataBridge.startStreamingPackets(filePath, filter, signal)
-          : await dataBridge.startStreamingPackets(filePath, filter);
+          ? await fallbackBridge.startStreamingPackets(filePath, filter, signal)
+          : await fallbackBridge.startStreamingPackets(filePath, filter);
       }
       await withDesktopIpcControls(() => desktopApp.StartCapture!(filePath, filter), {
         endpoint: "DesktopApp.StartCapture",
@@ -167,7 +185,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async stopStreamingPackets() {
       if (!desktopApp.StopCapture) {
-        return await dataBridge.stopStreamingPackets();
+        return await fallbackBridge.stopStreamingPackets();
       }
       await withDesktopIpcControls(() => desktopApp.StopCapture!(), {
         endpoint: "DesktopApp.StopCapture",
@@ -177,7 +195,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async prepareCaptureReplacement() {
       if (!desktopApp.PrepareCaptureReplacement) {
-        return await dataBridge.prepareCaptureReplacement();
+        return await fallbackBridge.prepareCaptureReplacement();
       }
       await withDesktopIpcControls(() => desktopApp.PrepareCaptureReplacement!(), {
         endpoint: "DesktopApp.PrepareCaptureReplacement",
@@ -187,7 +205,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async closeCapture() {
       if (!desktopApp.CloseCapture) {
-        return await dataBridge.closeCapture();
+        return await fallbackBridge.closeCapture();
       }
       await withDesktopIpcControls(() => desktopApp.CloseCapture!(), {
         endpoint: "DesktopApp.CloseCapture",
@@ -197,7 +215,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async getCaptureStatus(signal?: AbortSignal) {
       if (!desktopApp.GetCaptureStatus) {
-        return await dataBridge.getCaptureStatus(signal);
+        return await fallbackBridge.getCaptureStatus(signal);
       }
       const payload = await withDesktopIpcControls(() => desktopApp.GetCaptureStatus!(), {
         endpoint: "DesktopApp.GetCaptureStatus",
@@ -223,7 +241,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {
-        return await dataBridge.getTLSConfig();
+        return await fallbackBridge.getTLSConfig();
       }
       return asDecryptionConfig(
         await withDesktopIpcControls(() => desktopApp.GetTLSConfig!(), {
@@ -235,7 +253,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async updateTLSConfig(cfg: DecryptionConfig) {
       if (!desktopApp.UpdateTLSConfig) {
-        return await dataBridge.updateTLSConfig(cfg);
+        return await fallbackBridge.updateTLSConfig(cfg);
       }
       await withDesktopIpcControls(() => desktopApp.UpdateTLSConfig!(toDecryptionConfigRequest(cfg)), {
         endpoint: "DesktopApp.UpdateTLSConfig",
@@ -248,7 +266,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
 
 export function isDesktopGenericIpcDisableExperimentEnabled(): boolean {
   // VITE_DESKTOP_DISABLE_GENERIC_IPC remains the legacy Round 20 experiment alias.
-  // VITE_DESKTOP_GENERIC_IPC_POLICY is the Round 24 default-disabled policy and compat rollback switch.
+  // VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but no longer enables the removed adapter path.
   return isLegacyDesktopGenericIpcDisableExperimentEnabled();
 }
 
