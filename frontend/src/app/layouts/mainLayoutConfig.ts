@@ -7,7 +7,6 @@ import {
   Factory,
   FileDown,
   LayoutDashboard,
-  Puzzle,
   Radar,
   RefreshCw,
   Shield,
@@ -98,7 +97,6 @@ export const NAV_ITEMS: MainNavItem[] = [
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心", theme: "rose" },
   { path: "/objects", icon: FileDown, label: "附件提取", theme: "amber" },
   { path: "/misc", icon: Wrench, label: "MISC 工具箱", theme: "cyan" },
-  { path: "/plugin-manager", icon: Puzzle, label: "插件管理", theme: "indigo" },
   { path: "/updates", icon: RefreshCw, label: "检查更新", theme: "blue" },
 ];
 
