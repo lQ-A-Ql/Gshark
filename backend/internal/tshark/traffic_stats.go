@@ -12,6 +12,7 @@ import (
 var globalTrafficStatsFields = []string{
 	"frame.time_epoch",
 	"_ws.col.Protocol",
+	"frame.protocols",
 	"ip.src",
 	"ipv6.src",
 	"arp.src.proto_ipv4",
@@ -48,6 +49,7 @@ type globalTrafficStatsAccumulator struct {
 	computerNameMap map[string]int
 	destPortMap     map[string]int
 	srcPortMap      map[string]int
+	protocolTree    map[string]*protocolTreeNode
 }
 
 func BuildGlobalTrafficStatsFromFile(filePath string) (model.GlobalTrafficStats, error) {
@@ -70,11 +72,18 @@ func newGlobalTrafficStatsAccumulator() *globalTrafficStatsAccumulator {
 		computerNameMap: map[string]int{},
 		destPortMap:     map[string]int{},
 		srcPortMap:      map[string]int{},
+		protocolTree:    map[string]*protocolTreeNode{},
 	}
 }
 
+type protocolTreeNode struct {
+	name     string
+	count    int
+	children map[string]*protocolTreeNode
+}
+
 func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
-	if len(parts) < 2 {
+	if len(parts) < 3 {
 		return
 	}
 	a.stats.TotalPackets++
@@ -90,8 +99,13 @@ func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
 	}
 	a.protocolMap[protocol]++
 
-	src := FirstNonEmpty(safeTrim(parts, 2), safeTrim(parts, 3), safeTrim(parts, 4))
-	dst := FirstNonEmpty(safeTrim(parts, 5), safeTrim(parts, 6), safeTrim(parts, 7))
+	protoChain := strings.TrimSpace(parts[2])
+	if protoChain != "" {
+		a.addProtocolChain(protoChain)
+	}
+
+	src := FirstNonEmpty(safeTrim(parts, 3), safeTrim(parts, 4), safeTrim(parts, 5))
+	dst := FirstNonEmpty(safeTrim(parts, 6), safeTrim(parts, 7), safeTrim(parts, 8))
 	if src == "" && dst == "" {
 		a.talkerMap["unknown"]++
 	} else {
@@ -110,16 +124,15 @@ func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
 	}
 
 	domain := normalizeDomain(FirstNonEmpty(
-		safeTrim(parts, 8),
 		safeTrim(parts, 9),
 		safeTrim(parts, 10),
+		safeTrim(parts, 11),
 	))
 	if domain != "" {
 		a.domainMap[domain]++
 	}
 
 	computerName := normalizeComputerName(FirstNonEmpty(
-		safeTrim(parts, 11),
 		safeTrim(parts, 12),
 		safeTrim(parts, 13),
 		safeTrim(parts, 14),
@@ -129,19 +142,36 @@ func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
 		safeTrim(parts, 18),
 		safeTrim(parts, 19),
 		safeTrim(parts, 20),
+		safeTrim(parts, 21),
 	))
 	if computerName != "" {
 		a.computerNameMap[computerName]++
 	}
 
-	dstPort := FirstNonEmpty(safeTrim(parts, 21), safeTrim(parts, 22))
+	dstPort := FirstNonEmpty(safeTrim(parts, 22), safeTrim(parts, 23))
 	if dstPort != "" {
 		a.destPortMap[dstPort]++
 	}
 
-	srcPort := FirstNonEmpty(safeTrim(parts, 23), safeTrim(parts, 24))
+	srcPort := FirstNonEmpty(safeTrim(parts, 24), safeTrim(parts, 25))
 	if srcPort != "" {
 		a.srcPortMap[srcPort]++
+	}
+}
+
+func (a *globalTrafficStatsAccumulator) addProtocolChain(chain string) {
+	parts := strings.Split(strings.ToLower(chain), ":")
+	node := a.protocolTree
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if node[p] == nil {
+			node[p] = &protocolTreeNode{name: p, children: map[string]*protocolTreeNode{}}
+		}
+		node[p].count++
+		node = node[p].children
 	}
 }
 
@@ -158,7 +188,30 @@ func (a *globalTrafficStatsAccumulator) finish() model.GlobalTrafficStats {
 	stats.TopComputerNames = topBuckets(a.computerNameMap, 0)
 	stats.TopDestPorts = topBuckets(a.destPortMap, 0)
 	stats.TopSrcPorts = topBuckets(a.srcPortMap, 0)
+	stats.ProtocolHierarchy = buildProtocolTree(a.protocolTree)
 	return stats
+}
+
+func buildProtocolTree(nodes map[string]*protocolTreeNode) []model.ProtocolTreeNode {
+	if len(nodes) == 0 {
+		return nil
+	}
+	result := make([]model.ProtocolTreeNode, 0, len(nodes))
+	for _, n := range nodes {
+		child := model.ProtocolTreeNode{
+			Name:     n.name,
+			Count:    n.count,
+			Children: buildProtocolTree(n.children),
+		}
+		result = append(result, child)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Count != result[j].Count {
+			return result[i].Count > result[j].Count
+		}
+		return result[i].Name < result[j].Name
+	})
+	return result
 }
 
 func toSecondLabel(epochText string) string {

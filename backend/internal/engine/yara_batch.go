@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -176,7 +177,7 @@ func preflightYaraScanConfig(yc model.YaraConfig) error {
 }
 
 func resolveYaraScanConfig(yc model.YaraConfig) (string, yaraRuleBundle, error) {
-	yaraExe, err := resolveYaraExecutable(yc.Bin)
+	yaraExe, _, err := resolveYaraExecutable(yc.Bin)
 	if err != nil {
 		return "", yaraRuleBundle{}, err
 	}
@@ -281,17 +282,35 @@ func readableYaraTargetSource(source string) string {
 	}
 }
 
-func resolveYaraExecutable(customBin string) (string, error) {
+func resolveYaraExecutable(customBin string) (string, string, error) {
 	if custom := strings.TrimSpace(customBin); custom != "" {
 		if st, err := os.Stat(custom); err == nil && !st.IsDir() {
-			return custom, nil
+			return custom, "", nil
 		}
+		// Custom path doesn't exist; fall back but warn.
+		exeCandidates := []string{"yara", "yara64.exe", "yara.exe"}
+		for _, bin := range exeCandidates {
+			if path, err := exec.LookPath(bin); err == nil {
+				return path, fmt.Sprintf("yara 自定义路径 %q 不存在，已回退到 %s", custom, path), nil
+			}
+		}
+		exePath, err := os.Executable()
+		if err == nil {
+			exeDir := filepath.Dir(exePath)
+			for _, bin := range exeCandidates {
+				local := filepath.Join(exeDir, bin)
+				if st, statErr := os.Stat(local); statErr == nil && !st.IsDir() {
+					return local, fmt.Sprintf("yara 自定义路径 %q 不存在，已回退到 %s", custom, local), nil
+				}
+			}
+		}
+		return "", "", fmt.Errorf("yara 自定义路径 %q 不存在且无默认 yara 可用", custom)
 	}
 
 	exeCandidates := []string{"yara", "yara64.exe", "yara.exe"}
 	for _, bin := range exeCandidates {
 		if path, err := exec.LookPath(bin); err == nil {
-			return path, nil
+			return path, "", nil
 		}
 	}
 
@@ -301,12 +320,12 @@ func resolveYaraExecutable(customBin string) (string, error) {
 		for _, bin := range exeCandidates {
 			local := filepath.Join(exeDir, bin)
 			if st, statErr := os.Stat(local); statErr == nil && !st.IsDir() {
-				return local, nil
+				return local, "", nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("yara executable not found")
+	return "", "", fmt.Errorf("yara executable not found")
 }
 
 func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {
@@ -318,7 +337,10 @@ func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {
 		if info.IsDir() {
 			return buildYaraRuleBundleFromDir(custom)
 		}
-		meta, _ := readYaraRuleMetaFromFile(custom)
+		meta, metaErr := readYaraRuleMetaFromFile(custom)
+		if metaErr != nil {
+			log.Printf("engine: yara rule meta parse failed for %s: %v", custom, metaErr)
+		}
 		return yaraRuleBundle{path: custom, meta: meta}, nil
 	}
 
@@ -334,7 +356,10 @@ func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {
 	}
 	for _, candidate := range ruleCandidates {
 		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
-			meta, _ := readYaraRuleMetaFromFile(candidate)
+			meta, metaErr := readYaraRuleMetaFromFile(candidate)
+			if metaErr != nil {
+				log.Printf("engine: yara rule meta parse failed for %s: %v", candidate, metaErr)
+			}
 			return yaraRuleBundle{path: candidate, meta: meta}, nil
 		}
 	}
@@ -591,8 +616,8 @@ func summarizeYaraOutput(output []byte) string {
 	if trimmed == "" {
 		return ""
 	}
-	if len(trimmed) > 240 {
-		trimmed = trimmed[:240] + "..."
+	if len(trimmed) > 512 {
+		trimmed = trimmed[:512] + "..."
 	}
 	return ": " + trimmed
 }

@@ -641,7 +641,7 @@ func sanitizePluginEntry(entry string, fallback string) (string, error) {
 		return "", fmt.Errorf("plugin entry must stay inside plugins dir")
 	}
 	if !isLogicFile(cleaned) {
-		return "", fmt.Errorf("unsupported plugin entry %q", entry)
+		return "", fmt.Errorf("unsupported plugin entry %q: only .js, .mjs, .cjs and .py files are supported", entry)
 	}
 	return filepath.ToSlash(cleaned), nil
 }
@@ -699,7 +699,7 @@ func humanizePluginName(id string) string {
 
 func isLogicFile(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".js", ".mjs", ".cjs", ".ts", ".py", ".lua", ".go":
+	case ".js", ".mjs", ".cjs", ".py":
 		return true
 	default:
 		return false

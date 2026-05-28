@@ -104,6 +104,28 @@ func (s *Service) GatherEvidence(ctx context.Context, filter model.EvidenceFilte
 		}
 	}
 
+	if hasModule("media") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
+		if media, err := s.gatherMediaEvidence(ctx); err == nil {
+			records = append(records, media...)
+		} else {
+			notes = append(notes, fmt.Sprintf("媒体证据收集失败: %v", err))
+		}
+	}
+
+	if hasModule("misc") {
+		if err := ctx.Err(); err != nil {
+			return model.EvidenceResponse{}, err
+		}
+		if misc, err := s.gatherWebShellEvidence(); err == nil {
+			records = append(records, misc...)
+		} else {
+			notes = append(notes, fmt.Sprintf("WebShell 证据收集失败: %v", err))
+		}
+	}
+
 	return model.EvidenceResponse{
 		Records: records,
 		Total:   len(records),

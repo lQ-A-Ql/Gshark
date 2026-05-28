@@ -1,7 +1,14 @@
 import { confidenceLabel } from "../../core/types";
-import type { EvidenceModule, UnifiedEvidenceRecord } from "../../core/types";
+import type { EvidenceModule, EvidenceSeverity, UnifiedEvidenceRecord } from "../../core/types";
 import type { EvidenceListWireDTO, UnifiedEvidenceRecordWireDTO } from "../wire/evidenceWireDtos";
 import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
+
+const VALID_SEVERITIES = new Set<string>(["critical", "high", "medium", "low", "info"]);
+
+function asEvidenceSeverity(raw: unknown): EvidenceSeverity {
+  const s = String(raw ?? "info").toLowerCase();
+  return VALID_SEVERITIES.has(s) ? (s as EvidenceSeverity) : "info";
+}
 
 export function parseEvidenceRecords(input: unknown): UnifiedEvidenceRecord[] {
   const payload: EvidenceListWireDTO | undefined = asPlainObject(input);
@@ -25,7 +32,7 @@ function asEvidenceRecord(input: unknown): UnifiedEvidenceRecord {
     value: String(item?.value ?? "") || undefined,
     confidence,
     confidenceLabel: confidenceLabel(confidence),
-    severity: String(item?.severity ?? "info") as UnifiedEvidenceRecord["severity"],
+    severity: asEvidenceSeverity(item?.severity),
     source: String(item?.source ?? "") || undefined,
     destination: String(item?.destination ?? "") || undefined,
     host: String(item?.host ?? "") || undefined,

@@ -7,12 +7,13 @@ func TestGlobalTrafficStatsAccumulatorConsumesRows(t *testing.T) {
 	row := make([]string, len(globalTrafficStatsFields))
 	row[0] = "1700000000.123"
 	row[1] = "HTTP"
-	row[2] = "192.0.2.10"
-	row[5] = "198.51.100.5"
-	row[8] = "Example.COM."
-	row[13] = "workstation"
-	row[21] = "443"
-	row[23] = "51514"
+	row[2] = "eth:ip:tcp:http"
+	row[3] = "192.0.2.10"
+	row[6] = "198.51.100.5"
+	row[9] = "Example.COM."
+	row[14] = "workstation"
+	row[22] = "443"
+	row[24] = "51514"
 
 	acc.consumeRow(row)
 	stats := acc.finish()
@@ -31,5 +32,8 @@ func TestGlobalTrafficStatsAccumulatorConsumesRows(t *testing.T) {
 	}
 	if len(stats.TopDestPorts) != 1 || stats.TopDestPorts[0].Label != "443" {
 		t.Fatalf("unexpected destination ports: %+v", stats.TopDestPorts)
+	}
+	if len(stats.ProtocolHierarchy) == 0 {
+		t.Fatalf("expected protocol hierarchy, got empty")
 	}
 }

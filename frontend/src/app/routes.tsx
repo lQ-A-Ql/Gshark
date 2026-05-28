@@ -22,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "hunting", lazy: lazyPage(() => import("./pages/ThreatHunting")) },
       { path: "objects", lazy: lazyPage(() => import("./pages/ObjectExport")) },
       { path: "misc", lazy: lazyPage(() => import("./pages/MiscTools")) },
+      { path: "plugin-manager", lazy: lazyPage(() => import("./pages/PluginManager")) },
       { path: "updates", lazy: lazyPage(() => import("./pages/UpdateCenter")) },
       { path: "traffic-graph", lazy: lazyPage(() => import("./pages/TrafficGraph")) },
       { path: "c2-analysis", lazy: lazyPage(() => import("./pages/C2Analysis")) },

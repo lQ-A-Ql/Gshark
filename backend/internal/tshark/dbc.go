@@ -3,6 +3,7 @@ package tshark
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -72,8 +73,11 @@ func LoadDBCDatabase(path string) (*DBCDatabase, error) {
 		}
 
 		if matches := dbcMessagePattern.FindStringSubmatch(line); len(matches) == 5 {
-			id, _ := strconv.ParseUint(matches[1], 10, 32)
-			length, _ := strconv.Atoi(matches[3])
+			id, idErr := strconv.ParseUint(matches[1], 10, 32)
+			length, lenErr := strconv.Atoi(matches[3])
+			if idErr != nil || lenErr != nil {
+				log.Printf("tshark: dbc message parse error on line %q: id=%v length=%v", line, idErr, lenErr)
+			}
 			msg := DBCMessageDef{
 				ID:      uint32(id),
 				Name:    matches[2],
@@ -93,8 +97,11 @@ func LoadDBCDatabase(path string) (*DBCDatabase, error) {
 		if matches := dbcSignalPattern.FindStringSubmatch(line); len(matches) == 12 {
 			startBit, _ := strconv.Atoi(matches[2])
 			length, _ := strconv.Atoi(matches[3])
-			factor, _ := strconv.ParseFloat(strings.TrimSpace(matches[6]), 64)
-			offset, _ := strconv.ParseFloat(strings.TrimSpace(matches[7]), 64)
+			factor, factorErr := strconv.ParseFloat(strings.TrimSpace(matches[6]), 64)
+			offset, offsetErr := strconv.ParseFloat(strings.TrimSpace(matches[7]), 64)
+			if factorErr != nil || offsetErr != nil {
+				log.Printf("tshark: dbc signal parse error on line %q: factor=%v offset=%v", line, factorErr, offsetErr)
+			}
 			sig := DBCSignalDef{
 				Name:         matches[1],
 				StartBit:     startBit,

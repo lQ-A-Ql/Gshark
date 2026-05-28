@@ -37,6 +37,8 @@ export default function TrafficGraph() {
   );
   const topDestPorts = useMemo(() => stats.topDestPorts || [], [stats.topDestPorts]);
   const topSrcPorts = useMemo(() => stats.topSrcPorts || [], [stats.topSrcPorts]);
+  const topTalkers = useMemo(() => stats.topTalkers || [], [stats.topTalkers]);
+  const protocolHierarchy = useMemo(() => stats.protocolHierarchy || [], [stats.protocolHierarchy]);
 
   const jumpWithFilter = useCallback(
     (filter: string) => {
@@ -76,6 +78,8 @@ export default function TrafficGraph() {
         topDstIPs={topDstIPs}
         topSrcIPs={topSrcIPs}
         topSrcPorts={topSrcPorts}
+        topTalkers={topTalkers}
+        protocolHierarchy={protocolHierarchy}
         onJumpFilter={jumpWithFilter}
       />
     </PageShell>

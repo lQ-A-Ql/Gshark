@@ -82,6 +82,7 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
+	s.yaraScanning = false
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
@@ -251,7 +252,7 @@ func (s *Service) YaraStatus() model.YaraToolStatus {
 		LastScanMessage:  lastScanMessage,
 	}
 
-	yaraExe, err := resolveYaraExecutable(yc.Bin)
+	yaraExe, binWarning, err := resolveYaraExecutable(yc.Bin)
 	if err != nil {
 		status.Available = false
 		if !status.Enabled {
@@ -262,6 +263,9 @@ func (s *Service) YaraStatus() model.YaraToolStatus {
 		return status
 	}
 	status.Path = yaraExe
+	if binWarning != "" {
+		status.Message = binWarning
+	}
 
 	bundle, err := resolveYaraRuleBundle(yc.Rules)
 	if err != nil {

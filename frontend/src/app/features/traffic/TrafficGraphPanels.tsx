@@ -1,9 +1,12 @@
 import { Activity, BarChart3, Clock3 } from "lucide-react";
-import type { GlobalTrafficStats } from "../../core/types";
+import type { GlobalTrafficStats, TrafficProtocolTreeNode, TrafficBucket } from "../../core/types";
 import { StatusHint } from "../../components/DesignSystem";
-import { AnalysisPanel, type AnalysisBucket } from "../../components/analysis/AnalysisPrimitives";
+import { AnalysisPanel } from "../../components/analysis/AnalysisPrimitives";
 import { AnalysisStatCard } from "../../components/analysis/AnalysisPrimitives";
 import { SimpleBarChart } from "./TrafficSimpleBarChart";
+import { TrafficAreaChart } from "./TrafficAreaChart";
+import { TrafficTopologyGraph, type TopologyEdge } from "./TrafficTopologyGraph";
+import { TrafficProtocolTree } from "./TrafficProtocolTree";
 import {
   filterForDomainBucket,
   filterForIpBucket,
@@ -20,6 +23,8 @@ type TrafficGraphPanelsProps = {
   topDstIPs: AnalysisBucket[];
   topSrcIPs: AnalysisBucket[];
   topSrcPorts: AnalysisBucket[];
+  topTalkers: AnalysisBucket[];
+  protocolHierarchy?: TrafficProtocolTreeNode[];
   onJumpFilter: (filter: string) => void;
 };
 
@@ -30,6 +35,8 @@ type TrafficGraphOverviewProps = {
   timeline: AnalysisBucket[];
   onRetry: () => void;
 };
+
+type AnalysisBucket = TrafficBucket;
 
 export function TrafficGraphOverview({ error, loading, stats, timeline, onRetry }: TrafficGraphOverviewProps) {
   const timeWindow = timeline.length > 0 ? `${timeline[0].label} ~ ${timeline[timeline.length - 1].label}` : "--";
@@ -85,10 +92,17 @@ export function TrafficGraphPanels({
   topDstIPs,
   topSrcIPs,
   topSrcPorts,
+  topTalkers,
+  protocolHierarchy,
   onJumpFilter,
 }: TrafficGraphPanelsProps) {
+  const timelinePoints = timeline.map((t) => ({ label: t.label, count: t.count }));
+  const topologyEdges: TopologyEdge[] = topTalkers.map((t) => {
+    const parts = t.label.split(" → ");
+    return { src: parts[0] ?? t.label, dst: parts[1] ?? "", count: t.count };
+  }).filter((e) => e.src && e.dst);
+
   const chartPanels = [
-    { title: "每秒流量趋势", data: timeline, color: "bg-blue-500" },
     { title: "协议分布", data: protocolDist, color: "bg-emerald-500", onSelect: filterForProtocolBucket },
     {
       title: "源 IP",
@@ -109,16 +123,35 @@ export function TrafficGraphPanels({
   ];
 
   return (
-    <div className="mt-0 grid grid-cols-1 gap-0 xl:grid-cols-2">
-      {chartPanels.map((panel) => (
-        <AnalysisPanel key={panel.title} title={panel.title} tone="amber">
-          <SimpleBarChart
-            data={panel.data}
-            color={panel.color}
-            onSelect={panel.onSelect ? (row) => onJumpFilter(panel.onSelect?.(row.label) ?? "") : undefined}
-          />
+    <div className="mt-0 grid grid-cols-1 gap-0">
+      {/* Time series area chart — full width */}
+      <AnalysisPanel title="每秒流量趋势" tone="amber">
+        <TrafficAreaChart data={timelinePoints} height={180} color="#3b82f6" />
+      </AnalysisPanel>
+
+      {/* Topology + Protocol hierarchy side by side */}
+      <div className="grid grid-cols-1 gap-0 xl:grid-cols-2">
+        <AnalysisPanel title="会话拓扑 (源 → 目标)" tone="amber">
+          <TrafficTopologyGraph edges={topologyEdges} maxNodes={16} height={300} />
         </AnalysisPanel>
-      ))}
+
+        <AnalysisPanel title="协议层级树" tone="amber">
+          <TrafficProtocolTree data={protocolHierarchy ?? []} />
+        </AnalysisPanel>
+      </div>
+
+      {/* Bar charts */}
+      <div className="grid grid-cols-1 gap-0 xl:grid-cols-2">
+        {chartPanels.map((panel) => (
+          <AnalysisPanel key={panel.title} title={panel.title} tone="amber">
+            <SimpleBarChart
+              data={panel.data}
+              color={panel.color}
+              onSelect={panel.onSelect ? (row) => onJumpFilter(panel.onSelect?.(row.label) ?? "") : undefined}
+            />
+          </AnalysisPanel>
+        ))}
+      </div>
     </div>
   );
 }

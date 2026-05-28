@@ -52,7 +52,7 @@ func cachedAnalysis[T any](ctx context.Context, mu *sync.RWMutex, pcap string, i
 	}
 
 	mu.Lock()
-	if input.getCached() == nil {
+	if input.getCached() == nil && pcap == currentPCAP {
 		input.setCached(&result)
 	}
 	out := *input.getCached()

@@ -147,7 +147,7 @@ func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
 	if len(hits) != 1 {
 		t.Fatalf("expected one warning hit without stream target build, got %+v", hits)
 	}
-	if hits[0].Rule != "YARA 扫描异常" || !strings.Contains(hits[0].Preview, "yara executable not found") {
+	if hits[0].Rule != "YARA 扫描异常" || !strings.Contains(hits[0].Preview, "yara 自定义路径") {
 		t.Fatalf("unexpected preflight warning hit: %+v", hits[0])
 	}
 }

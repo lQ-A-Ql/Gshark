@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -67,6 +68,8 @@ func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (s
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	ctx, finishTask := s.TrackCaptureTask(ctx, "media-playback")
 	defer finishTask()
 	if err := ctx.Err(); err != nil {

@@ -11,4 +11,5 @@ export interface GlobalTrafficStatsWireDTO extends Record<string, unknown> {
   top_computer_names?: unknown;
   top_dest_ports?: unknown;
   top_src_ports?: unknown;
+  protocol_hierarchy?: unknown;
 }

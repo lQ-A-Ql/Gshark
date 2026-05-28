@@ -7,14 +7,14 @@ describe("runtimeMapper", () => {
       task_id: "task-1",
       total: 2,
       queued: 1,
-      items: [{ token: "a", session_id: "s1", media_label: "m1", title: "T1", status: "done", cached: true }],
+      items: [{ token: "a", session_id: "s1", media_label: "m1", title: "T1", status: "completed", cached: true }],
     });
 
     expect(result).toMatchObject({
       taskId: "task-1",
       total: 2,
       queued: 1,
-      items: [{ token: "a", sessionId: "s1", status: "done", cached: true }],
+      items: [{ token: "a", sessionId: "s1", status: "completed", cached: true }],
     });
   });
 

@@ -40,6 +40,10 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "missing capture file path")
 		return
 	}
+	if strings.Contains(options.FilePath, "..") {
+		writeError(w, http.StatusBadRequest, "path traversal not allowed")
+		return
+	}
 	info, err := os.Stat(options.FilePath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("capture file is not accessible: %v", err))
@@ -98,7 +102,11 @@ func (s *Server) handleCaptureClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.capture.ClearCapture(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		if strings.Contains(err.Error(), "no capture loaded") || strings.Contains(err.Error(), "请稍后重试") {
+			writeError(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "closed"})

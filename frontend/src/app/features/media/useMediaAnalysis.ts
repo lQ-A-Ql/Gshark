@@ -67,7 +67,7 @@ export function useMediaAnalysis({
     setLoading(true);
     setError("");
     return runAnalysisRequest({
-      request: (signal) => backendClients.media.getMediaAnalysis(false, signal),
+      request: (signal) => backendClients.media.getMediaAnalysis(force, signal),
       onSuccess: (payload) => {
         if (cacheKey) {
           mediaAnalysisCache.set(cacheKey, payload);

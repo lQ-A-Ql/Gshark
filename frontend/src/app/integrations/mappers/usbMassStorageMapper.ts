@@ -18,6 +18,9 @@ export function asUSBMassStorageOperation(input: unknown): USBMassStorageOperati
     responseFrame: item.response_frame == null ? undefined : Number(item.response_frame),
     latencyMs: item.latency_ms == null ? undefined : Number(item.latency_ms),
     dataResidue: item.data_residue == null ? undefined : Number(item.data_residue),
+    rawRequest: item.raw_request == null ? undefined : String(item.raw_request),
+    rawResponse: item.raw_response == null ? undefined : String(item.raw_response),
+    error: item.error == null ? undefined : String(item.error),
     summary: String(item.summary ?? ""),
   };
 }

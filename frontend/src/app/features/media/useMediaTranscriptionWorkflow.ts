@@ -62,8 +62,9 @@ export function useMediaTranscriptionWorkflow({
       if (status.items.length > 0) {
         setTranscriptions((prev) => mergeBatchTranscriptions(prev, status, speechStatus));
       }
-    } catch {
+    } catch (err) {
       setBatchStatus(EMPTY_BATCH_STATUS);
+      setError(err instanceof Error ? err.message : "批量转写状态加载失败");
     }
   }, [backendConnected, setBatchStatus, setTranscriptions, speechStatus]);
 

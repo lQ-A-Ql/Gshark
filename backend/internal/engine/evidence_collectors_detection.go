@@ -8,7 +8,13 @@ import (
 )
 
 func (s *Service) gatherThreatEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	hits := s.ThreatHuntWithContext(ctx, nil)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	records := make([]model.EvidenceRecord, 0, len(hits))
 	for _, hit := range hits {
 		severity := threatLevelToSeverity(hit.Level)

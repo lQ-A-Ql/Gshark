@@ -171,6 +171,7 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
+	s.yaraScanning = false
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
@@ -191,36 +192,67 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	if ctx.Err() != nil {
 		return nil
 	}
-	s.yaraMu.Lock()
-	defer s.yaraMu.Unlock()
 
+	// Fast path: return cached results under short lock.
+	s.yaraMu.Lock()
 	if s.yaraLoaded {
 		out := make([]model.ThreatHit, len(s.yaraHits))
 		copy(out, s.yaraHits)
+		s.yaraMu.Unlock()
 		return out
 	}
+	if s.yaraScanning {
+		// Another goroutine is already scanning; wait for it.
+		s.yaraMu.Unlock()
+		<-ctx.Done()
+		s.yaraMu.Lock()
+		out := make([]model.ThreatHit, len(s.yaraHits))
+		copy(out, s.yaraHits)
+		s.yaraMu.Unlock()
+		return out
+	}
+	s.yaraScanning = true
+	s.yaraMu.Unlock()
 
+	// Scan runs outside the lock.
 	s.huntMu.RLock()
 	yc := s.yaraConf
 	s.huntMu.RUnlock()
 
 	if !yc.Enabled {
-		s.yaraHits = nil
-		s.yaraLastError = ""
-		s.yaraLoaded = true
+		s.setYaraResult(nil, nil, true)
 		return nil
 	}
+
+	hits, scanErr := s.executeYaraScan(ctx, yc, objects)
+
+	s.setYaraResult(hits, scanErr, true)
+
+	s.yaraMu.Lock()
+	out := make([]model.ThreatHit, len(s.yaraHits))
+	copy(out, s.yaraHits)
+	s.yaraMu.Unlock()
+	return out
+}
+
+func (s *Service) setYaraResult(hits []model.ThreatHit, scanErr error, loaded bool) {
+	s.yaraMu.Lock()
+	s.yaraHits = hits
+	s.yaraLoaded = loaded
+	s.yaraScanning = false
+	if scanErr != nil {
+		s.yaraLastError = scanErr.Error()
+	} else {
+		s.yaraLastError = ""
+	}
+	s.yaraMu.Unlock()
+}
+
+func (s *Service) executeYaraScan(ctx context.Context, yc model.YaraConfig, objects []model.ObjectFile) ([]model.ThreatHit, error) {
 	if err := preflightYaraScanConfig(yc); err != nil {
 		log.Printf("engine: yara scan unavailable: %v", err)
 		s.emitStatus("YARA 扫描异常: " + err.Error())
-		hits := []model.ThreatHit{newYaraWarningHit(err.Error())}
-		s.yaraHits = make([]model.ThreatHit, len(hits))
-		copy(s.yaraHits, hits)
-		s.yaraLastError = err.Error()
-		s.yaraLoaded = true
-		out := make([]model.ThreatHit, len(s.yaraHits))
-		copy(out, s.yaraHits)
-		return out
+		return []model.ThreatHit{newYaraWarningHit(err.Error())}, err
 	}
 
 	targets, cleanup, err := s.buildYaraScanTargetsWithContext(ctx, objects)
@@ -229,39 +261,24 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil
+			return nil, err
 		}
 		log.Printf("engine: build yara scan targets failed: %v", err)
 		s.emitStatus("YARA 扫描目标构建失败: " + err.Error())
-		hits := []model.ThreatHit{newYaraWarningHit("YARA 扫描目标构建失败: " + err.Error())}
-		s.yaraHits = make([]model.ThreatHit, len(hits))
-		copy(s.yaraHits, hits)
-		s.yaraLastError = err.Error()
-		s.yaraLoaded = true
-		out := make([]model.ThreatHit, len(s.yaraHits))
-		copy(out, s.yaraHits)
-		return out
+		return []model.ThreatHit{newYaraWarningHit("YARA 扫描目标构建失败: " + err.Error())}, err
 	}
 
 	hits, scanErr := BatchScanTargetsWithYaraConfigContext(ctx, targets, yc)
 	if scanErr != nil {
 		if errors.Is(scanErr, context.Canceled) {
-			return nil
+			return nil, scanErr
 		}
 		log.Printf("engine: yara scan failed: %v", scanErr)
 		s.emitStatus("YARA 扫描异常: " + scanErr.Error())
 		hits = append(hits, newYaraWarningHit(scanErr.Error()))
-		s.yaraLastError = scanErr.Error()
-	} else {
-		s.yaraLastError = ""
+		return hits, scanErr
 	}
-	s.yaraHits = make([]model.ThreatHit, len(hits))
-	copy(s.yaraHits, hits)
-	s.yaraLoaded = true
-
-	out := make([]model.ThreatHit, len(s.yaraHits))
-	copy(out, s.yaraHits)
-	return out
+	return hits, nil
 }
 
 func (s *Service) Objects() []model.ObjectFile {

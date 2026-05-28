@@ -2,6 +2,15 @@ import type { Packet } from "../../core/types";
 import type { PacketColorFeaturesWireDTO, PacketWireDTO } from "../wire/captureWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
 
+const VALID_PROTOCOLS = new Set<string>([
+  "TCP", "UDP", "HTTP", "HTTPS", "DNS", "SSHv2", "TLS", "ARP", "ICMP", "ICMPV6", "USB",
+]);
+
+function asProtocol(raw: unknown): Packet["proto"] {
+  const s = String(raw ?? "OTHER").toUpperCase();
+  return VALID_PROTOCOLS.has(s) ? (s as Packet["proto"]) : "OTHER";
+}
+
 export function asPacket(input: unknown): Packet {
   const payload: PacketWireDTO = asPlainObject(input) ?? {};
   const color: PacketColorFeaturesWireDTO = asPlainObject(payload.color_features) ?? {};
@@ -12,7 +21,7 @@ export function asPacket(input: unknown): Packet {
     srcPort: Number(payload.source_port ?? 0),
     dst: String(payload.dest_ip ?? ""),
     dstPort: Number(payload.dest_port ?? 0),
-    proto: String(payload.protocol ?? "OTHER") as Packet["proto"],
+    proto: asProtocol(payload.protocol),
     displayProtocol: String(payload.display_protocol ?? "").trim() || undefined,
     length: Number(payload.length ?? 0),
     info: String(payload.info ?? ""),

@@ -1,5 +1,7 @@
 export interface EvidenceListWireDTO extends Record<string, unknown> {
   records?: unknown;
+  total?: unknown;
+  notes?: unknown;
 }
 
 export interface UnifiedEvidenceRecordWireDTO extends Record<string, unknown> {

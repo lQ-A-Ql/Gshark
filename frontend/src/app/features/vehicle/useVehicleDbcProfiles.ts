@@ -29,8 +29,14 @@ export function useVehicleDbcProfiles({
     }
     void vehicleDBCClient
       .listVehicleDBCProfiles()
-      .then((items) => setProfiles(items))
-      .catch(() => setProfiles([]));
+      .then((items) => {
+        setProfiles(items);
+        setError("");
+      })
+      .catch((err) => {
+        setProfiles([]);
+        setError(err instanceof Error ? err.message : "DBC 配置加载失败");
+      });
   }, [backendConnected, vehicleDBCClient]);
 
   const addPath = useCallback(

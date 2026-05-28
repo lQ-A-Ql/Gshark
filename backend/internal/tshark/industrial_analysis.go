@@ -2,6 +2,7 @@ package tshark
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"unicode"
@@ -103,7 +104,9 @@ func BuildIndustrialAnalysisFromFile(filePath string) (model.IndustrialAnalysis,
 	for _, scanner := range otherScanners {
 		detail, detailConversations, scanErr := scanner(filePath)
 		if scanErr != nil {
-			return stats, scanErr
+			log.Printf("tshark: industrial protocol scanner failed: %v", scanErr)
+			stats.Notes = append(stats.Notes, fmt.Sprintf("协议扫描异常: %v", scanErr))
+			continue
 		}
 		if detail.TotalFrames == 0 {
 			continue

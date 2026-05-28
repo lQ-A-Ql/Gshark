@@ -3,8 +3,10 @@ package tshark
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Field-scan subprocess execution.
@@ -152,7 +154,9 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		args = append(args, "-e", field)
 	}
 
-	cmd, err := Command(args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("resolve tshark: %w", err)
 	}

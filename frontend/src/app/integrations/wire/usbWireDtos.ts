@@ -20,4 +20,12 @@ export interface USBAnalysisWireDTO extends Record<string, unknown> {
   other?: unknown;
   notes?: unknown;
   report?: unknown;
+  hid_source_mode?: unknown;
+  hid_source_candidates?: unknown;
+  hid_selected_source?: unknown;
+  hid_source_notes?: unknown;
+  hid_event_limit?: unknown;
+  hid_events_truncated?: unknown;
+  hid_mouse_events_total?: unknown;
+  hid_keyboard_events_total?: unknown;
 }

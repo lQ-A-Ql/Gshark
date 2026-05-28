@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -217,7 +218,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tools/mysql-analysis", s.handleMySQLAnalysis)
 	mux.HandleFunc("/api/tools/shiro-rememberme", s.handleShiroRememberMeAnalysis)
 
-	return withCORS(s.withAuth(s.withAudit(mux)))
+	return withRecovery(withCORS(s.withAuth(s.withAudit(mux))))
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
@@ -339,15 +340,24 @@ func toolRuntimeProbeOptionsFromRequest(r *http.Request) model.ToolRuntimeProbeO
 	return model.ToolRuntimeProbeOptions{Mode: mode}
 }
 
-func (s *Server) handleFFmpegStatus(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleFFmpegStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	writeJSON(w, http.StatusOK, s.toolRuntime.FFmpegStatus())
 }
 
-func (s *Server) handleSpeechToTextStatus(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleSpeechToTextStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	writeJSON(w, http.StatusOK, s.media.SpeechToTextStatus())
 }
 
 func (s *Server) handleHunting(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	prefixes := r.URL.Query()["prefix"]
 	writeJSON(w, http.StatusOK, s.detection.ThreatHuntWithContext(r.Context(), prefixes))
 }
@@ -372,10 +382,16 @@ func (s *Server) handleHuntingConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	writeJSON(w, http.StatusOK, s.detection.ObjectsWithContext(r.Context()))
 }
 
 func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	stats, err := s.analysis.GlobalTrafficStatsWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -385,6 +401,9 @@ func (s *Server) handleGlobalTrafficStats(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	analysis, err := s.analysis.IndustrialAnalysisWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -394,6 +413,9 @@ func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	analysis, err := s.analysis.VehicleAnalysisWithContext(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -403,6 +425,9 @@ func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	refreshParam := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("refresh")))
 	forceRefresh := refreshParam == "1" || refreshParam == "true" || refreshParam == "yes"
 
@@ -423,6 +448,9 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUSBAnalysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	hidSource := strings.TrimSpace(r.URL.Query().Get("hid_source"))
 	mode, ok := model.NormalizeUSBHIDSourceMode(hidSource)
 	if !ok {
@@ -436,7 +464,11 @@ func (s *Server) handleUSBAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 	analysis, err := s.analysis.USBAnalysisWithOptions(r.Context(), model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		if strings.Contains(err.Error(), "no capture loaded") {
+			writeError(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, analysis)
@@ -455,6 +487,9 @@ func parseUSBHIDEventLimit(r *http.Request) (int, bool) {
 }
 
 func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	analysis, err := s.analysis.C2SampleAnalysis(r.Context())
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -490,6 +525,9 @@ func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPTAnalysis(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	analysis, err := s.analysis.APTAnalysis(r.Context())
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -503,6 +541,9 @@ func (s *Server) handleAPTAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	var filter model.EvidenceFilter
 	if modulesParam := r.URL.Query().Get("modules"); modulesParam != "" {
 		for _, m := range strings.Split(modulesParam, ",") {
@@ -518,7 +559,11 @@ func (s *Server) handleEvidence(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		if strings.Contains(err.Error(), "no capture loaded") {
+			writeError(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -638,7 +683,10 @@ func (s *Server) handleMediaBatchTranscription(w http.ResponseWriter, r *http.Re
 			Force bool `json:"force"`
 		}
 		if r.Body != nil {
-			_ = decodeJSONBody(w, r, &payload)
+			if err := decodeJSONBody(w, r, &payload); err != nil && !errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 		status, err := s.media.StartMediaBatchTranscription(payload.Force)
 		if err != nil {
@@ -708,6 +756,10 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
+		if strings.Contains(payload.Path, "..") {
+			writeError(w, http.StatusBadRequest, "path traversal not allowed")
+			return
+		}
 		profiles, err := s.analysis.AddVehicleDBC(payload.Path)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -718,6 +770,10 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimSpace(r.URL.Query().Get("path"))
 		if path == "" {
 			writeError(w, http.StatusBadRequest, "missing dbc path")
+			return
+		}
+		if strings.Contains(path, "..") {
+			writeError(w, http.StatusBadRequest, "path traversal not allowed")
 			return
 		}
 		writeJSON(w, http.StatusOK, s.analysis.RemoveVehicleDBC(path))
@@ -740,9 +796,11 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			IDs []int64 `json:"ids"`
 		}
-		if err := decodeJSONBody(w, r, &payload); err == nil {
-			reqIds = payload.IDs
+		if err := decodeJSONBody(w, r, &payload); err != nil && !errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
 		}
+		reqIds = payload.IDs
 	} else if r.Method == http.MethodGet {
 		q := r.URL.Query().Get("ids")
 		if q != "" {
@@ -936,7 +994,10 @@ func (s *Server) recentAuditEntries(limit int) []model.AuditEntry {
 	return logs
 }
 
-func (s *Server) handlePlugins(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	writeJSON(w, http.StatusOK, s.plugins.ListPlugins())
 }
 
@@ -977,7 +1038,11 @@ func (s *Server) handleBulkPlugins(w http.ResponseWriter, r *http.Request) {
 
 	plugins, err := s.plugins.SetPluginsEnabled(req.IDs, req.Enabled)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "invalid") {
+			writeError(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
@@ -985,6 +1050,9 @@ func (s *Server) handleBulkPlugins(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "streaming unsupported")
@@ -1082,6 +1150,26 @@ func trySendEvent(ch chan event, ev event) bool {
 	default:
 		return false
 	}
+}
+
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return false
+	}
+	return true
+}
+
+func withRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("transport: panic recovered: %v\n%s", rec, debug.Stack())
+				writeError(w, http.StatusInternalServerError, "internal server error")
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 func withCORS(next http.Handler) http.Handler {

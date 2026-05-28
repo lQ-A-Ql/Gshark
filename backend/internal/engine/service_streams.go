@@ -37,6 +37,7 @@ func (s *Service) Packets() []model.Packet {
 	}
 	out, err := s.packetStore.All(nil)
 	if err != nil {
+		log.Printf("engine: packetStore.All failed: %v", err)
 		return nil
 	}
 	return out
@@ -219,9 +220,9 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		return stream
 	}
 	if indexed, ok := s.rawStreamIndex[key]; ok {
+		s.mu.RUnlock()
 		stream := s.streamWithOverrides(key, indexed)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
-		s.mu.RUnlock()
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		s.cacheStream(key, stream)
 		log.Printf("engine: raw stream protocol=%s stream=%d source=index chunks=%d", normalized, streamID, len(stream.Chunks))
@@ -262,9 +263,9 @@ func (s *Service) RawStreamPage(ctx context.Context, protocol string, streamID i
 
 	s.mu.RLock()
 	if indexed, ok := s.rawStreamIndex[key]; ok {
+		s.mu.RUnlock()
 		stream, next, total := cloneRawStreamWindow(s.streamWithOverrides(key, indexed), cursor, limit)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
-		s.mu.RUnlock()
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: raw stream page protocol=%s stream=%d source=index returned=%d total=%d next=%d", normalized, streamID, len(stream.Chunks), total, next)
 		return stream, next, total

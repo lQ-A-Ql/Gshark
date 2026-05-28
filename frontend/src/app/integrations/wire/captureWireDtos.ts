@@ -24,6 +24,7 @@ export interface PacketWireDTO extends Record<string, unknown> {
   ip_header_len?: unknown;
   l4_header_len?: unknown;
   color_features?: unknown;
+  udp_payload_hex?: unknown;
 }
 
 export interface PacketColorFeaturesWireDTO extends Record<string, unknown> {
@@ -62,6 +63,7 @@ export interface PacketColorFeaturesWireDTO extends Record<string, unknown> {
   has_ismp?: unknown;
   has_rip?: unknown;
   has_glbp?: unknown;
+  has_pim?: unknown;
 }
 
 export interface PacketsPageWireDTO extends Record<string, unknown> {

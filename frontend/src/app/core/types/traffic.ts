@@ -97,6 +97,12 @@ export interface TrafficBucket {
   count: number;
 }
 
+export interface TrafficProtocolTreeNode {
+  name: string;
+  count: number;
+  children?: TrafficProtocolTreeNode[];
+}
+
 export interface GlobalTrafficStats {
   totalPackets: number;
   protocolKinds: number;
@@ -110,6 +116,7 @@ export interface GlobalTrafficStats {
   topComputerNames: TrafficBucket[];
   topDestPorts: TrafficBucket[];
   topSrcPorts: TrafficBucket[];
+  protocolHierarchy?: TrafficProtocolTreeNode[];
 }
 
 export interface AnalysisConversation {

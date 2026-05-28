@@ -16,6 +16,7 @@ export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   topComputerNames: [],
   topDestPorts: [],
   topSrcPorts: [],
+  protocolHierarchy: [],
 };
 
 const trafficStatsCache = new Map<string, GlobalTrafficStats>();
@@ -190,5 +191,6 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
     topComputerNames: toBuckets(computerNameCounts),
     topDestPorts: toBuckets(dstPortCounts),
     topSrcPorts: toBuckets(srcPortCounts),
+    protocolHierarchy: [],
   };
 }

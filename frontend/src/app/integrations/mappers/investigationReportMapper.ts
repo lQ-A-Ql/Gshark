@@ -1,12 +1,21 @@
-import type { InvestigationReport, InvestigationReportItem } from "../../core/types";
+import type { InvestigationReport, InvestigationReportItem, InvestigationSeverity } from "../../core/types";
 import type { InvestigationReportItemWireDTO, InvestigationReportWireDTO } from "../wire/reportWireDtos";
 import { asPlainObject, asStringList, optionalNumber, optionalString } from "./mapperPrimitives";
+
+const VALID_SEVERITIES = new Set<string>(["critical", "high", "medium", "low", "info"]);
+
+function asInvestigationSeverity(raw: unknown): InvestigationSeverity | undefined {
+  const s = optionalString(raw)?.toLowerCase();
+  if (!s) return undefined;
+  return VALID_SEVERITIES.has(s) ? (s as InvestigationSeverity) : undefined;
+}
+
 function asInvestigationReportItem(input: unknown): InvestigationReportItem {
   const raw: InvestigationReportItemWireDTO = asPlainObject(input) ?? {};
   return {
     title: String(raw.title ?? ""),
     summary: optionalString(raw.summary),
-    severity: optionalString(raw.severity) as InvestigationReportItem["severity"],
+    severity: asInvestigationSeverity(raw.severity),
     packetId: optionalNumber(raw.packet_id),
     streamId: optionalNumber(raw.stream_id),
     ruleId: optionalString(raw.rule_id),

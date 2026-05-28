@@ -1,6 +1,13 @@
 import type { SpeechBatchTaskStatus } from "../../core/types";
 import { asArray, asPlainObject } from "./mapperPrimitives";
 
+const VALID_BATCH_STATUSES = new Set<string>(["queued", "running", "completed", "failed", "skipped"]);
+
+function asBatchItemStatus(raw: unknown): SpeechBatchTaskStatus["items"][number]["status"] {
+  const s = String(raw ?? "queued").toLowerCase();
+  return VALID_BATCH_STATUSES.has(s) ? (s as SpeechBatchTaskStatus["items"][number]["status"]) : "queued";
+}
+
 export function asSpeechBatchTaskStatus(input: unknown): SpeechBatchTaskStatus {
   const payload = asPlainObject(input);
   return {
@@ -26,7 +33,7 @@ function asSpeechBatchItem(input: unknown): SpeechBatchTaskStatus["items"][numbe
     sessionId: String(item?.session_id ?? ""),
     mediaLabel: String(item?.media_label ?? ""),
     title: String(item?.title ?? ""),
-    status: String(item?.status ?? "queued") as SpeechBatchTaskStatus["items"][number]["status"],
+    status: asBatchItemStatus(item?.status),
     error: String(item?.error ?? "") || undefined,
     cached: Boolean(item?.cached),
     text: String(item?.text ?? "") || undefined,

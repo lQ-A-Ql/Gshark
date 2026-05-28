@@ -68,7 +68,7 @@ function asIndustrialDetailRecord(input: unknown): IndustrialProtocolDetail["rec
 }
 
 function asIndustrialLevel(value: string): IndustrialRuleHit["level"] {
-  if (value === "critical" || value === "high" || value === "medium" || value === "low") {
+  if (value === "critical" || value === "high" || value === "warning" || value === "info" || value === "medium" || value === "low") {
     return value;
   }
   return "low";

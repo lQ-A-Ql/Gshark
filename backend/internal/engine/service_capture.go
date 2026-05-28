@@ -335,6 +335,7 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
+	s.yaraScanning = false
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()
@@ -755,6 +756,7 @@ func (s *Service) ClearCapture() error {
 
 	s.yaraMu.Lock()
 	s.yaraLoaded = false
+	s.yaraScanning = false
 	s.yaraHits = nil
 	s.yaraLastError = ""
 	s.yaraMu.Unlock()

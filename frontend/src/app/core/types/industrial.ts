@@ -106,7 +106,7 @@ export interface IndustrialControlCommand {
 
 export interface IndustrialRuleHit {
   rule: string;
-  level: "critical" | "high" | "medium" | "low";
+  level: "critical" | "high" | "warning" | "info" | "medium" | "low";
   packetId?: number;
   time?: string;
   source?: string;

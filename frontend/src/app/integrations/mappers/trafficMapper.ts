@@ -1,6 +1,15 @@
-import type { GlobalTrafficStats } from "../../core/types";
+import type { GlobalTrafficStats, TrafficProtocolTreeNode } from "../../core/types";
 import type { GlobalTrafficStatsWireDTO } from "../wire/trafficWireDtos";
 import { asArray, asBucket, asPlainObject } from "./mapperPrimitives";
+
+function asTrafficProtocolTreeNode(input: unknown): TrafficProtocolTreeNode {
+  const obj = asPlainObject(input) ?? {};
+  return {
+    name: String(obj.name ?? ""),
+    count: Number(obj.count ?? 0),
+    children: asArray(obj.children).map(asTrafficProtocolTreeNode),
+  };
+}
 
 export function asGlobalTrafficStats(input: unknown): GlobalTrafficStats {
   const payload: GlobalTrafficStatsWireDTO = asPlainObject(input) ?? {};
@@ -17,5 +26,6 @@ export function asGlobalTrafficStats(input: unknown): GlobalTrafficStats {
     topComputerNames: asArray(payload.top_computer_names).map(asBucket),
     topDestPorts: asArray(payload.top_dest_ports).map(asBucket),
     topSrcPorts: asArray(payload.top_src_ports).map(asBucket),
+    protocolHierarchy: asArray(payload.protocol_hierarchy).map(asTrafficProtocolTreeNode),
   };
 }

@@ -60,6 +60,7 @@ type Service struct {
 	speechCancel   context.CancelFunc
 	objMu          sync.Mutex
 	yaraLoaded     bool
+	yaraScanning   bool
 	yaraHits       []model.ThreatHit
 	yaraLastError  string
 	yaraMu         sync.Mutex

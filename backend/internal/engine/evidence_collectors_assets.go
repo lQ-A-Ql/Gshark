@@ -41,7 +41,13 @@ func (s *Service) gatherWebShellEvidence() ([]model.EvidenceRecord, error) {
 }
 
 func (s *Service) gatherObjectEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	objects := s.ObjectsWithContext(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	records := make([]model.EvidenceRecord, 0, len(objects))
 	for _, obj := range objects {
 		confidence, kind, severity := objectEvidenceProfile(obj)
@@ -66,6 +72,101 @@ func (s *Service) gatherObjectEvidence(ctx context.Context) ([]model.EvidenceRec
 		})
 	}
 	return records, nil
+}
+
+func (s *Service) gatherMediaEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {
+	analysis, err := s.MediaAnalysis()
+	if err != nil {
+		return nil, err
+	}
+	var records []model.EvidenceRecord
+	for _, session := range analysis.Sessions {
+		confidence := 30
+		if session.PacketCount > 10 {
+			confidence = 45
+		}
+		if session.PacketCount > 100 {
+			confidence = 55
+		}
+		mediaType := strings.TrimSpace(session.MediaType)
+		if mediaType == "video" {
+			confidence += 5
+		}
+		confidence = clampConfidence(confidence)
+
+		summary := fmt.Sprintf("媒体会话: %s/%s %s:%d -> %s:%d",
+			firstNonEmpty(session.Application, "RTP"),
+			firstNonEmpty(session.Codec, "unknown"),
+			firstNonEmpty(session.Source, "src"), session.SourcePort,
+			firstNonEmpty(session.Destination, "dst"), session.DestinationPort,
+		)
+		value := fmt.Sprintf("%d packets, %s", session.PacketCount, mediaType)
+		if session.StartTime != "" && session.EndTime != "" {
+			value += fmt.Sprintf(", %s ~ %s", session.StartTime, session.EndTime)
+		}
+
+		caveats := []string{
+			"媒体会话提取依赖 RTP/RTSP 协议识别与 ffmpeg 解码能力，非标准端口或加密流可能遗漏。",
+		}
+		if confidence < 50 {
+			caveats = append(caveats, "低包数会话可能是探测噪声而非真实媒体流。")
+		}
+
+		tags := compactStrings([]string{"media", mediaType, session.Codec, session.Application})
+		records = append(records, model.EvidenceRecord{
+			ID:           fmt.Sprintf("media:%s:%d:%d", session.ID, session.SourcePort, session.DestinationPort),
+			Module:       "media",
+			SourceModule: "media-analysis",
+			SourceType:   "media-session",
+			Summary:      summary,
+			Value:        value,
+			Confidence:   confidence,
+			Severity:     confidenceToSeverity(confidence),
+			Source:       session.Source,
+			Destination:  session.Destination,
+			Tags:         dedupeStrings(tags),
+			Caveats:      dedupeStrings(caveats),
+		})
+	}
+
+	s.mu.RLock()
+	transcriptions := make(map[string]model.MediaTranscription, len(s.mediaSpeech))
+	for k, v := range s.mediaSpeech {
+		transcriptions[k] = v
+	}
+	s.mu.RUnlock()
+	for _, tr := range transcriptions {
+		if strings.TrimSpace(tr.Text) == "" {
+			continue
+		}
+		confidence := 50
+		if len(tr.Segments) > 5 {
+			confidence = 60
+		}
+		confidence = clampConfidence(confidence)
+		records = append(records, model.EvidenceRecord{
+			ID:           fmt.Sprintf("media:transcription:%s", tr.Token),
+			Module:       "media",
+			SourceModule: "speech-to-text",
+			SourceType:   "media-transcription",
+			Summary:      fmt.Sprintf("语音转写: %s", tr.Title),
+			Value:        truncateString(tr.Text, 200),
+			Confidence:   confidence,
+			Severity:     confidenceToSeverity(confidence),
+			Tags:         dedupeStrings([]string{"media", "transcription", tr.Engine, tr.Language}),
+			Caveats: []string{
+				"语音转写依赖外部 Vosk 运行时和声学模型，转写质量受音频编码、比特率和背景噪声影响，结果应作为辅助参考。",
+			},
+		})
+	}
+	return records, nil
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func (s *Service) gatherVehicleEvidence(ctx context.Context) ([]model.EvidenceRecord, error) {

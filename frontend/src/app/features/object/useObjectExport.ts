@@ -19,6 +19,7 @@ export function useObjectExport({
   objectClient = backendClients.object,
 }: UseObjectExportOptions) {
   const [fallbackObjects, setFallbackObjects] = useState<ExtractedObject[] | null>(null);
+  const [error, setError] = useState("");
 
   const refreshObjects = useCallback(() => {
     if (!backendConnected) {
@@ -36,11 +37,13 @@ export function useObjectExport({
       .then((rows) => {
         if (!cancelled) {
           setFallbackObjects(rows.length > 0 ? rows : null);
+          setError("");
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setFallbackObjects(null);
+          setError(err instanceof Error ? err.message : "对象列表加载失败");
         }
       });
 
@@ -69,5 +72,5 @@ export function useObjectExport({
 
   const sourceObjects = extractedObjects.length > 0 ? extractedObjects : (fallbackObjects ?? []);
 
-  return { objects: sourceObjects, refreshObjects, downloadZip };
+  return { objects: sourceObjects, error, refreshObjects, downloadZip };
 }

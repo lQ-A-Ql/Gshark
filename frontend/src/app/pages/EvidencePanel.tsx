@@ -22,7 +22,7 @@ export default function EvidencePanel() {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<EvidenceSeverity | "all">("all");
 
-  const { evidence, loading, error } = useEvidence({
+  const { evidence, loading, error, refreshEvidence } = useEvidence({
     backendConnected,
     isPreloadingCapture,
     filePath: fileMeta.path,
@@ -66,7 +66,7 @@ export default function EvidencePanel() {
           onQueryChange={setQuery}
           onToggleModule={toggleModule}
         />
-        <EvidenceStatusMessage error={error} loading={loading} />
+        <EvidenceStatusMessage error={error} loading={loading} onRetry={() => refreshEvidence(true)} />
       </AnalysisPanel>
       <InvestigationReportPanel preferredProtocol="TCP" report={report} title="统一证据调查报告" />
       <AnalysisPanel title={`证据记录 (${sorted.length})`} tone="violet">

@@ -1,4 +1,4 @@
-import { CheckCircle2, Crosshair } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Crosshair } from "lucide-react";
 import { AnalysisBadge, AnalysisDataTable, type AnalysisTone } from "../../components/analysis/AnalysisPrimitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import type { ThreatHit } from "../../core/types";
@@ -36,7 +36,14 @@ export function ThreatHuntingHitsTable({
             widthClassName: "w-28",
             headerClassName: "border-r border-[var(--gshark-tile-divider)]",
             cellClassName: "border-r border-[var(--gshark-tile-divider)]",
-            render: (hit) => hit.category,
+            render: (hit) =>
+              hit.match === "yara:error" ? (
+                <span className="flex items-center gap-1 text-amber-600">
+                  <AlertTriangle className="h-3 w-3" /> {hit.category}
+                </span>
+              ) : (
+                hit.category
+              ),
           },
           {
             key: "rule",
@@ -63,11 +70,16 @@ export function ThreatHuntingHitsTable({
         ]}
         data={hits}
         rowKey={(hit) => hit.id}
-        rowClassName={(hit) =>
-          selectedHit === hit.id
+        rowClassName={(hit) => {
+          if (hit.match === "yara:error") {
+            return selectedHit === hit.id
+              ? "border-l-2 border-l-amber-500 bg-amber-50/80 text-amber-700 hover:bg-amber-50"
+              : "border-l-2 border-l-amber-300 bg-amber-50/40 text-amber-700";
+          }
+          return selectedHit === hit.id
             ? "border-l-2 border-l-rose-500 bg-rose-50/80 text-rose-700 hover:bg-rose-50"
-            : "text-foreground"
-        }
+            : "text-foreground";
+        }}
         onRowClick={(hit) => onSelectHit(hit.id)}
         emptyText="暂无威胁命中"
         maxHeightClassName="max-h-none"

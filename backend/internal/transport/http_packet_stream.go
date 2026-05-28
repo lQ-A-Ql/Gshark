@@ -10,7 +10,22 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
-func (s *Server) handlePackets(w http.ResponseWriter, _ *http.Request) {
+func packetServiceErrorStatus(err error) int {
+	msg := err.Error()
+	if strings.Contains(msg, "not found") {
+		return http.StatusNotFound
+	}
+	if strings.Contains(msg, "no capture loaded") || strings.Contains(msg, "invalid packet id") {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
+}
+
+func (s *Server) handlePackets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
 	writeJSON(w, http.StatusOK, s.capture.Packets())
 }
 
@@ -23,9 +38,23 @@ type packetsPageResponse struct {
 }
 
 func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	cursor, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("cursor")))
 	limit, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("limit")))
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
+
+	if cursor < 0 {
+		cursor = 0
+	}
+	if limit <= 0 {
+		limit = 200
+	}
+	const maxLimit = 10000
+	if limit > maxLimit {
+		limit = maxLimit
+	}
 
 	items, next, total, filtering, err := s.capture.PacketsPageWithState(cursor, limit, filter)
 	if err != nil {
@@ -46,6 +75,9 @@ func (s *Server) handlePacketsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePacketLocate(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	packetID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("id")), 10, 64)
 	if err != nil || packetID <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid packet id")
@@ -73,6 +105,9 @@ func (s *Server) handlePacketLocate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	packetID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("id")), 10, 64)
 	if err != nil || packetID <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid packet id")
@@ -81,13 +116,16 @@ func (s *Server) handlePacket(w http.ResponseWriter, r *http.Request) {
 
 	packet, err := s.capture.Packet(packetID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, packetServiceErrorStatus(err), err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, packet)
 }
 
 func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	packetID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("id")), 10, 64)
 	if err != nil || packetID <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid packet id")
@@ -96,7 +134,7 @@ func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
 
 	rawHex, err := s.capture.PacketRawHex(packetID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, packetServiceErrorStatus(err), err.Error())
 		return
 	}
 
@@ -107,6 +145,9 @@ func (s *Server) handlePacketRaw(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePacketLayers(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	packetID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("id")), 10, 64)
 	if err != nil || packetID <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid packet id")
@@ -115,7 +156,7 @@ func (s *Server) handlePacketLayers(w http.ResponseWriter, r *http.Request) {
 
 	layers, err := s.capture.PacketLayers(packetID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, packetServiceErrorStatus(err), err.Error())
 		return
 	}
 
@@ -126,6 +167,9 @@ func (s *Server) handlePacketLayers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStreamIndex(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	protocol := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("protocol")))
 	if protocol != "HTTP" && protocol != "TCP" && protocol != "UDP" {
 		writeError(w, http.StatusBadRequest, "invalid protocol")
@@ -141,11 +185,19 @@ func (s *Server) handleStreamIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHTTPStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
 	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
 	writeJSON(w, http.StatusOK, s.capture.HTTPStream(r.Context(), streamID))
 }
 
 func (s *Server) handleRawStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
 	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
 	protocol := r.URL.Query().Get("protocol")
 	if protocol == "" {
@@ -167,6 +219,10 @@ type streamPageResponse struct {
 }
 
 func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
 	streamID := parseInt64(r.URL.Query().Get("streamId"), 1)
 	protocol := r.URL.Query().Get("protocol")
 	if protocol == "" {
@@ -190,6 +246,9 @@ func (s *Server) handleRawStreamPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStreamPayloadSources(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return

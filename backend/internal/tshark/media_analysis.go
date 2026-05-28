@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1265,6 +1266,7 @@ func buildMediaArtifact(exportDir string, builder *mediaSessionBuilder, mediaTyp
 	token := shortMediaToken(builder.ID)
 	targetPath := filepath.Join(exportDir, name)
 	if writeErr := os.WriteFile(targetPath, payload, 0o644); writeErr != nil {
+		log.Printf("tshark: media artifact write failed for %s: %v", name, writeErr)
 		return nil, "", ""
 	}
 	info, _ := os.Stat(targetPath)
