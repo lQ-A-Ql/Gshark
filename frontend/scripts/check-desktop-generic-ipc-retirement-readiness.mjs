@@ -11,7 +11,6 @@ const requiredSourceTokens = {
     "isDesktopGenericIpcDisabled",
     "isDesktopGenericIpcDisableExperimentEnabled",
     "createDisabledGenericIpcBackendTransport",
-    "createIpcBackendTransport",
   ],
   "frontend/src/app/integrations/desktopGenericIpcPolicy.ts": [
     "resolveDesktopGenericIpcPolicy",
@@ -22,13 +21,11 @@ const requiredSourceTokens = {
     'explicitPolicy === "compat"',
     'return "compat"',
     'return "disabled"',
+    "return true",
   ],
-  "frontend/src/app/integrations/ipcBackendTransport.ts": [
+  "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts": [
     "generic_ipc_disabled",
     "createDisabledGenericIpcBackendTransport",
-    "InvokeBackendJSON",
-    "InvokeBackendBlob",
-    "InvokeBackendText",
     "subscribeDesktopEvents",
   ],
   "scripts/check-desktop-ipc-smoke.ps1": [
@@ -101,7 +98,17 @@ function validateDefaultDisabledReleaseCandidate(rootDir, violations) {
   }
   if (!/explicitPolicy\s*===\s*["']compat["'][\s\S]*?return\s+["']compat["']\s*;/.test(policyBody)) {
     violations.push(
-      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat rollback must remain available",
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat policy value must remain recognizable",
+    );
+  }
+  if (!/isDesktopGenericIpcDisabled[\s\S]*?return\s+true\s*;/.test(policyBody)) {
+    violations.push(
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: after adapter removal candidate, compat must remain a documented no-op and generic IPC must stay disabled",
+    );
+  }
+  if (/\bcreateIpcBackendTransport\s*\(/.test(bridgeBody)) {
+    violations.push(
+      "frontend/src/app/integrations/desktopBridge.ts: generic IPC adapter construction must stay removed after the removal candidate",
     );
   }
 }
@@ -160,12 +167,7 @@ function validateTracker(trackerPath, violations) {
   const rollback = releaseCandidate?.rollbackPolicy;
   if (rollback !== "VITE_DESKTOP_GENERIC_IPC_POLICY=compat") {
     violations.push(
-      "docs/desktop-ipc-iteration-status.json: genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy must be VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
-    );
-  }
-  if (releaseCandidate?.adapterRemoved !== false) {
-    violations.push(
-      "docs/desktop-ipc-iteration-status.json: genericIpcAdapterDefaultDisabledReleaseCandidate.adapterRemoved must remain false during observation",
+      "docs/desktop-ipc-iteration-status.json: genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy must preserve the VITE_DESKTOP_GENERIC_IPC_POLICY=compat policy value",
     );
   }
   const observation = releaseCandidate?.observation;
@@ -197,24 +199,35 @@ function validateTracker(trackerPath, violations) {
       "docs/desktop-ipc-iteration-status.json: observation.rounds must contain evidence for each counted green observation round",
     );
   }
-  const latestRound = rounds.at(-1) ?? {};
-  if (latestRound.genericIpcPolicy !== "disabled") {
+  const countedRounds = rounds.slice(-currentRounds);
+  for (const [index, round] of countedRounds.entries()) {
+    const fallbackIndex = rounds.length - countedRounds.length + index + 1;
+    const label = typeof round?.id === "string" && round.id.trim() ? round.id : `#${fallbackIndex}`;
+    validateObservationRoundEvidence(round ?? {}, label, violations);
+  }
+}
+
+function validateObservationRoundEvidence(round, label, violations) {
+  if (round.genericIpcPolicy !== "disabled") {
     violations.push(
-      "docs/desktop-ipc-iteration-status.json: latest observation round must record genericIpcPolicy disabled",
+      `docs/desktop-ipc-iteration-status.json: observation round ${label} must record genericIpcPolicy disabled`,
     );
   }
-  if (latestRound.compatRollbackPolicy !== "compat") {
+  if (round.compatRollbackPolicy !== "compat") {
     violations.push(
-      "docs/desktop-ipc-iteration-status.json: latest observation round must record compat rollback smoke",
+      `docs/desktop-ipc-iteration-status.json: observation round ${label} must record compat rollback smoke`,
     );
   }
-  if (latestRound.directBackendApiRequestCount !== 0) {
+  if (round.directBackendApiRequestCount !== 0) {
     violations.push(
-      "docs/desktop-ipc-iteration-status.json: latest observation round directBackendApiRequestCount must remain 0",
+      `docs/desktop-ipc-iteration-status.json: observation round ${label} directBackendApiRequestCount must remain 0`,
     );
   }
-  if (latestRound.browserDevOk !== true) {
-    violations.push("docs/desktop-ipc-iteration-status.json: latest observation round browserDevOk must be true");
+  if (round.browserDevOk !== true) {
+    violations.push(`docs/desktop-ipc-iteration-status.json: observation round ${label} browserDevOk must be true`);
+  }
+  if (round.adapterRemoved !== false) {
+    violations.push(`docs/desktop-ipc-iteration-status.json: observation round ${label} adapterRemoved must be false`);
   }
 }
 

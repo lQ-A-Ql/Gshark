@@ -29,25 +29,30 @@ function validPolicy() {
   return `
     export function resolveDesktopGenericIpcPolicy(env = import.meta.env) {
       const explicitPolicy = String(env.VITE_DESKTOP_GENERIC_IPC_POLICY ?? "").trim().toLowerCase();
-      if (explicitPolicy === "disabled") return "disabled";
       if (explicitPolicy === "compat") return "compat";
-      return String(env.VITE_DESKTOP_DISABLE_GENERIC_IPC ?? "").trim() === "1" ? "disabled" : "compat";
+      String(env.VITE_DESKTOP_DISABLE_GENERIC_IPC ?? "").trim() === "1";
+      return "disabled";
+    }
+    export function isDesktopGenericIpcDisabled(env = import.meta.env) {
+      resolveDesktopGenericIpcPolicy(env);
+      return true;
     }
   `;
 }
 
 function validPolicyTest() {
   return `
-    it("lets an explicit compat policy override the legacy disable alias", () => {
+    it("keeps explicit compat recognizable but still disables the removed adapter", () => {
       const env = { VITE_DESKTOP_GENERIC_IPC_POLICY: "compat", VITE_DESKTOP_DISABLE_GENERIC_IPC: "1" };
       expect(resolveDesktopGenericIpcPolicy(env)).toBe("compat");
+      expect(isDesktopGenericIpcDisabled(env)).toBe(true);
     });
   `;
 }
 
 function validBridgeTest() {
   return `
-    it("keeps explicit compat policy adapter-enabled even when the legacy disable alias is set", () => {
+    it("keeps explicit compat policy as a documented no-op after adapter removal", () => {
       vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
       vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
     });
@@ -79,13 +84,13 @@ describe("check-desktop-generic-ipc-rollback-guard script", () => {
     expect(findDesktopGenericIpcRollbackGuardViolations({ rootDir })).toEqual([]);
   });
 
-  it("requires a policy test for explicit compat overriding the legacy disable alias", () => {
+  it("requires a policy test for explicit compat as a documented no-op", () => {
     const rootDir = createFixture({
       policyTest: `it("does not cover rollback", () => {});`,
     });
 
     expect(findDesktopGenericIpcRollbackGuardViolations({ rootDir })).toContain(
-      "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts: missing rollback guard token lets an explicit compat policy override the legacy disable alias",
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts: missing rollback guard token keeps explicit compat recognizable but still disables the removed adapter",
     );
   });
 

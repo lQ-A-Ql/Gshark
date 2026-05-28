@@ -37,7 +37,7 @@ func TestC2DecryptVShellAESGCMWithSaltAndVKey(t *testing.T) {
 	binary.LittleEndian.PutUint32(prefixed[:4], uint32(len(frame)))
 	copy(prefixed[4:], frame)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        1,
@@ -85,7 +85,7 @@ func TestC2DecryptVShellAESGCMBigEndianFrame(t *testing.T) {
 	binary.BigEndian.PutUint32(prefixed[:4], uint32(len(frame)))
 	copy(prefixed[4:], frame)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        10,
@@ -122,7 +122,7 @@ func TestC2DecryptVShellRealTrafficSaltOnlyFrame(t *testing.T) {
 		t.Fatalf("hex.DecodeString() error = %v", err)
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        100,
@@ -159,7 +159,7 @@ func TestC2DecryptVShellUsesRawStreamCandidateForSplitFrame(t *testing.T) {
 	prefixed := encryptVShellGCMFrameForTest(t, salt, []byte(`{"VerifyKey":"fallsnow","cmd":"stream-split"}`), binary.LittleEndian)
 	splitAt := 10
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	packets := []model.Packet{
 		{
@@ -224,7 +224,7 @@ func TestC2DecryptVShellRawStreamCandidateSurvivesPacketCandidateCap(t *testing.
 	prefixed := encryptVShellGCMFrameForTest(t, salt, []byte(`{"VerifyKey":"fallsnow","cmd":"stream-cap"}`), binary.LittleEndian)
 	splitAt := 4
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	packets := make([]model.Packet, 0, c2DecryptMaxRecords+100)
 	for i := 0; i < c2DecryptMaxRecords+100; i++ {
@@ -288,7 +288,7 @@ func TestC2DecryptVShellKeepsHighValueServerFramePastRecordCap(t *testing.T) {
 	targetPlaintext := "hacked_by_fallsnow&paperplane(QAQ)\r\n"
 	serverStream = append(serverStream, encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)...)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{
 		{
@@ -365,7 +365,7 @@ func TestC2DecryptVShellDeprioritizesTimestampANSIAndShortNoisePastRecordCap(t *
 	targetPlaintext := "hacked_by_fallsnow&paperplane(QAQ)\r\n"
 	serverStream := encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{
 		{
@@ -454,7 +454,7 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 	targetPlaintext := "hacked_by_fallsnow&paperplane(QAQ)\r\n"
 	targetFrame := encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	streamIDs := make([]int64, 0, c2DecryptMaxRecords+25)
@@ -544,7 +544,7 @@ func TestC2DecryptVShellAESCBCFallback(t *testing.T) {
 	plaintext := []byte(`{"cmd":"ipconfig"}`)
 	ciphertext := encryptC2AESCBCForTest(t, sum[:], sum[:], plaintext)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        2,
@@ -575,7 +575,7 @@ func TestC2DecryptCSAESDirectKey(t *testing.T) {
 	ciphertext := encryptC2AESCBCForTest(t, aesKey, iv, []byte(`{"command":"sleep","seconds":60}`))
 	blob := append(append([]byte{}, iv...), ciphertext...)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        3,
@@ -610,7 +610,7 @@ func TestC2DecryptCSAesRandHMACVerifiedHTTPResponse(t *testing.T) {
 	mac.Write(ciphertext)
 	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        30,
@@ -655,7 +655,7 @@ func TestC2DecryptCSLengthPrefixedTruncatedHMAC(t *testing.T) {
 	mac.Write(body)
 	blob := append(append([]byte{}, body...), mac.Sum(nil)[:16]...)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        33,
@@ -692,7 +692,7 @@ func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
 	mac.Write(ciphertext)
 	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        31,
@@ -722,7 +722,7 @@ func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
 }
 
 func TestC2DecryptCSMetadataExplainsRawKeyRequirement(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{
 		ID:        32,
@@ -796,7 +796,7 @@ func TestAppendCSHTTPFieldCandidatesUsesPlannedProjection(t *testing.T) {
 }
 
 func TestC2DecryptHonorsCanceledContext(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

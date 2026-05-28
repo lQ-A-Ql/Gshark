@@ -177,9 +177,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 - `tshark capability degraded ... optional fields missing ... (tshark remains available)` 只表示可选字段降级，不表示 TShark 不可用。
 - 抓包首屏加载默认使用轻量 `first_screen` 字段集快速生成包列表；颜色特征、UDP payload、checksum 和专项协议辅助字段会通过后台 enrichment 补齐，不阻塞进入工作区。
 - 预加载诊断中的 `page=0/0 status=-` 表示前端读到的 committed capture 仍为空。若后端正在解析，`/api/capture/status` 会同时返回 `load.phase`、`parser_profile`、`processed`、`accepted`、`staged_count` 等 active load 信息，前端会显示“后端正在解析，尚未提交首屏数据”，而不是误报首屏数据失败。
-- Wails 桌面环境下页面数据面已迁移为全 IPC：React WebView 通过 `InvokeBackendJSON` / `InvokeBackendBlob` / `InvokeBackendText` / Wails runtime events 调用桌面壳，再由桌面壳带 token 代理到本地后端 HTTP。C2、工控、车机、USB、APT、证据、对象、流、媒体、插件、狩猎、MISC 上传和导出等长尾页面不再直接从 WebView `fetch` 后端 `/api/...`。
-- Wails 桌面环境中，generic IPC binding 存在时 IPC/backend proxy 失败会直接显示 IPC 端点和原因，不再静默回退浏览器 HTTP。只有旧 generated binding 缺少 generic IPC 方法时，才允许使用 HTTP fallback 维持兼容。普通浏览器开发模式继续使用 `httpBridge`、HTTP token、统一超时和错误分类。
-- Wails 桌面事件不再由 WebView 直连 `/api/events`；桌面壳内部读取后端 SSE 并转发 `gshark:backend:*` runtime events。DevTools Network 中页面数据 API 不应再出现对 `127.0.0.1:17891/api/...` 的直接请求，静态资源和 Vite 开发请求除外。
+- Wails 桌面环境下页面数据面已迁移为 typed IPC 优先：React WebView 通过 `desktopBridge` 调用明确的 Wails typed binding，缺少已迁移数据面的 typed binding 时会以 `generic_ipc_disabled` 失败，不再恢复 generic IPC 后端代理，也不静默回退浏览器 HTTP。C2、工控、车机、USB、APT、证据、对象、流、媒体、插件、狩猎、MISC 上传和导出等长尾页面不再直接从 WebView `fetch` 后端 `/api/...`。
+- Wails 桌面环境中，已迁移 typed IPC 调用失败会直接显示 IPC 端点和原因，不再静默回退浏览器 HTTP。旧 generic IPC backend/generated binding 已移除；`VITE_DESKTOP_GENERIC_IPC_POLICY=compat` 仅保留为可识别的 no-op 策略值。普通 browser-dev HTTP/SSE 调试模式继续使用 `httpBridge`、HTTP token、统一超时和错误分类。
+- Wails 桌面事件不再由 WebView 直连 `/api/events`；桌面壳内部读取后端 SSE 并转发 `gshark:backend:*` Wails runtime events。DevTools Network 中页面数据 API 不应再出现对 `127.0.0.1:17891/api/...` 的直接请求，静态资源和 Vite 开发请求除外。
 - Wails typed IPC 控制面也带本地 timeout / abort 保护：capture status、packet page、start/stop、TLS 和运行时探测不会因为 binding promise 悬挂而让页面无限 loading。调用方取消 `AbortSignal` 时会保留 `AbortError` 语义。
 - 桌面 IPC blob 响应默认限制为 50MB。超过上限时会显示“桌面 IPC blob 响应过大”，避免 base64 放大导致 WebView 内存尖峰；大文件导出后续应改原生保存或流式传输。
 - 桌面事件桥使用独立 HTTP client：连接阶段有 dial/header timeout，正常 SSE 长连接没有总超时；收到 `ready/status/packet/error` 后会重置重连 backoff。

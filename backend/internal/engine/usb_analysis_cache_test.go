@@ -24,7 +24,7 @@ func TestUSBAnalysisWithOptionsReusesRawScanAcrossSourceAndLimitChanges(t *testi
 		return tshark.USBAnalysisRawScan{Rows: [][]string{make([]string, 0)}}, nil
 	})
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "capture.pcapng"
 
@@ -57,7 +57,7 @@ func TestUSBAnalysisCacheInvalidatedByCaptureReplacement(t *testing.T) {
 		return tshark.USBAnalysisRawScan{Rows: [][]string{make([]string, 0)}}, nil
 	})
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "capture.pcapng"
 
@@ -91,7 +91,7 @@ func TestUSBAnalysisRawScanCacheInvalidatedByCaptureCommit(t *testing.T) {
 		return tshark.USBAnalysisRawScan{Rows: [][]string{make([]string, 0)}}, nil
 	})
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "capture.pcapng"
 
@@ -135,7 +135,7 @@ func TestUSBAnalysisDoesNotCacheResultAfterCaptureChanges(t *testing.T) {
 		return tshark.USBAnalysisRawScan{Rows: [][]string{make([]string, 0)}}, nil
 	})
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "old.pcapng"
 
@@ -192,7 +192,7 @@ func TestUSBAnalysisConcurrentRequestsShareOneRawScan(t *testing.T) {
 		return tshark.USBAnalysisRawScan{Rows: [][]string{make([]string, 0)}}, nil
 	})
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "capture.pcapng"
 

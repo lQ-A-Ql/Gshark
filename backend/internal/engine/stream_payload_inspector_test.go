@@ -246,7 +246,7 @@ func TestInspectStreamPayloadHintsGodzillaRandomParam(t *testing.T) {
 }
 
 func TestListStreamPayloadSourcesScansHTTPQueryFormJSONAndMultipart(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	queryEncoded := base64.StdEncoding.EncodeToString([]byte("assert($_POST['cmd']);"))
@@ -311,7 +311,7 @@ func TestListStreamPayloadSourcesScansHTTPQueryFormJSONAndMultipart(t *testing.T
 }
 
 func TestListStreamPayloadSourcesKeepsWebshellSourceUnderNoiseLimit(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	packets := make([]model.Packet, 0, 61)
@@ -365,7 +365,7 @@ func TestListStreamPayloadSourcesKeepsWebshellSourceUnderNoiseLimit(t *testing.T
 }
 
 func TestListStreamPayloadSourcesDoesNotPromoteBenignHTTP(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{
 		{
@@ -392,7 +392,7 @@ func TestListStreamPayloadSourcesDoesNotPromoteBenignHTTP(t *testing.T) {
 }
 
 func TestListStreamPayloadSourcesPromotesRepeatBurst(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	packets := make([]model.Packet, 0, 3)
 	for i := 0; i < 3; i++ {
@@ -434,7 +434,7 @@ func TestListStreamPayloadSourcesPromotesRepeatBurst(t *testing.T) {
 }
 
 func TestListStreamPayloadSourcesDetectsDecodedCommandExecFunction(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	encoded := base64.StdEncoding.EncodeToString([]byte("Runtime.getRuntime().exec(\"whoami\")"))
 	if err := svc.packetStore.Append([]model.Packet{{

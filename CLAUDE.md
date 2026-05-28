@@ -140,7 +140,7 @@ python .\scripts\build_release_package.py v0.0.5 --skip-build
 Wails Desktop Shell (app.go)
   └─ manages backend process + auth token
      └─ Backend HTTP/SSE server (127.0.0.1:17891)
-Frontend (React) ── HTTP + SSE ──> Backend
+Frontend (React) ── typed Wails IPC (desktop) / HTTP + SSE (browser) ──> Backend
 ```
 
 Desktop responsibilities:
@@ -194,14 +194,16 @@ Frontend data flow:
 
 - Built-in modules (frontend): HTTPLoginAnalysis, SMTPSession, MySQLSession, ShiroRememberMe, NTLMSessionMaterials, WinRMDecrypt, SMB3SessionKey, PayloadWebShellDecoder.
 - Custom zip modules: `manifest.json + api.json + form.json + backend.js/.py`, managed via `internal/miscpkg/manager.go`.
-- Scaffold new modules: `./scripts/new-misc-module.ps1`.
+- Scaffold new modules: `./scripts/new-misc-module.ps1` (e.g. `powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id echo-demo -Title "Echo Demo" -Runtime javascript -Zip`).
 - Spec: `docs/misc-module-interface.md`.
+- Example: `examples/misc-modules/echo-demo`.
 
 ## CI
 
 - GitHub Actions (`.github/workflows/ci.yml`): triggers on push (any branch) and PRs.
-- Backend job: `gofmt -l .` check + `go test ./...` on ubuntu-latest.
-- Frontend job: `corepack enable` + `pnpm install --frozen-lockfile` + `pnpm run ci` on ubuntu-latest (`package-manager:check` + typecheck + ESLint + scoped-format + size + Vitest + build).
+- Backend job (ubuntu-latest): `gofmt -l .` + architecture boundary tests + focused contract tests + governance register tests + `go test ./...`.
+- Frontend job (ubuntu-latest): `corepack enable` + `pnpm install --frozen-lockfile` + `pnpm run ci` (package-manager:check + typecheck + ESLint + scoped-format + size + boundary + desktop IPC migration checks + Vitest + build).
+- Desktop job (windows-latest): `pnpm run build:wails` + `check-desktop-assets.ps1` + root Go tests with both `-tags dev` and `-tags production`.
 - Full local check: `./scripts/check-all.ps1` (desktop tests + backend fmt/tests + frontend package-manager/tests/typecheck/lint/scoped-format/size/build).
 
 ## Operational knobs that affect behavior
@@ -210,3 +212,17 @@ Frontend data flow:
 - `GSHARK_ALLOW_EXISTING_BACKEND=1`: allows desktop app to reuse an already-running backend on `127.0.0.1:17891`.
 - `VITE_BACKEND_URL`: frontend API base override (defaults to `http://127.0.0.1:17891`).
 - `GSHARK_UPDATE_MANIFEST_REF`: override update manifest branch/ref used by updater flow.
+- `GSHARK_FFMPEG`: explicit FFmpeg path for backend media processing.
+- `GSHARK_PYTHON`: explicit Python interpreter path for plugin/module runtime.
+- `GSHARK_VOSK_MODEL`: explicit Vosk model directory for speech transcription.
+
+## Desktop IPC architecture
+
+Wails desktop data plane uses **typed IPC bindings** (not generic `InvokeBackend`). Frontend React WebView calls specific Wails typed bindings via `desktopBridge`; missing typed bindings fail with `generic_ipc_disabled` and do **not** fall back to browser HTTP or generic IPC.
+
+Key points:
+- Control-plane calls (capture status, packet page, start/stop, TLS, runtime probe) carry local timeout/abort protection.
+- Desktop SSE events are forwarded as `gshark:backend:*` Wails runtime events; WebView does not directly connect to `/api/events`.
+- Blob responses over desktop IPC are capped at 50MB.
+- Browser-dev mode (non-Wails) continues using HTTP/SSE via `httpBridge`.
+- See `frontend/src/app/integrations/desktopBridge.ts` and `frontend/src/app/integrations/desktopTypedBridgeCore.ts`.

@@ -37,7 +37,7 @@ func TestToolRuntimeSnapshotFastSkipsTSharkCapabilityProbe(t *testing.T) {
 		return []string{"python"}, nil
 	}
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	start := time.Now()
 	got := svc.ToolRuntimeSnapshotWithOptions(context.Background(), model.ToolRuntimeProbeOptions{Mode: ToolRuntimeProbeModeFast})
 	if time.Since(start) > 2*time.Second {
@@ -65,7 +65,7 @@ func TestSpeechToTextStatusWithContextHonorsCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	ffmpegAvailable := true
-	status := NewService(nil, nil).SpeechToTextStatusWithContext(ctx, SpeechStatusOptions{FFmpegAvailable: &ffmpegAvailable})
+	status := NewService(nil).SpeechToTextStatusWithContext(ctx, SpeechStatusOptions{FFmpegAvailable: &ffmpegAvailable})
 	if status.PythonAvailable {
 		t.Fatalf("expected cancelled Python probe to be unavailable, got %+v", status)
 	}
@@ -129,7 +129,7 @@ func TestToolRuntimeConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv(pythonEnvVar, " C:/Env/python.exe ")
 	t.Setenv(voskModelEnvVar, " C:/Env/vosk-model ")
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	got := svc.ToolRuntimeConfig()
 
 	if got.FFmpegPath != "C:/Env/ffmpeg.exe" {
@@ -148,7 +148,7 @@ func TestSetToolRuntimeConfigEmptyValuesUnsetEnvironmentOverrides(t *testing.T) 
 	t.Setenv(pythonEnvVar, "C:/Env/python.exe")
 	t.Setenv(voskModelEnvVar, "C:/Env/vosk-model")
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	got := svc.SetToolRuntimeConfig(model.ToolRuntimeConfig{
 		YaraEnabled:   true,
 		YaraTimeoutMS: 25000,
@@ -169,7 +169,7 @@ func TestSetToolRuntimeConfigRoundTripsEnvironmentOverrides(t *testing.T) {
 	t.Setenv(pythonEnvVar, "")
 	t.Setenv(voskModelEnvVar, "")
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	got := svc.SetToolRuntimeConfig(model.ToolRuntimeConfig{
 		FFmpegPath:    " C:/Saved/ffmpeg.exe ",
 		PythonPath:    " C:/Saved/python.exe ",

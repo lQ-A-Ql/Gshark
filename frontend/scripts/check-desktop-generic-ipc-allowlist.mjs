@@ -18,8 +18,6 @@ const migratedTypedRoutePatterns = [
   /^\/api\/hunting(?:\?|$)/,
   /^\/api\/hunting\/config(?:\?|$)/,
   /^\/api\/analysis\/vehicle\/dbc(?:\?|$)/,
-  /^\/api\/plugins(?:\?|$)/,
-  /^\/api\/plugins\/(?:source|add|delete|toggle|bulk)(?:\?|$)/,
   /^\/api\/tools\/misc\/modules(?:\?|$)/,
   /^\/api\/tools\/misc\/import(?:\?|$)/,
   /^\/api\/tools\/misc\/packages\/[^/]+(?:\?|$)/,

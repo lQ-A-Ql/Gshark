@@ -15,7 +15,6 @@ describe("createBackendClients", () => {
     expect(clients.analysis).toBe(bridge);
     expect(clients.evidence).toBe(bridge);
     expect(clients.media).toBe(bridge);
-    expect(clients.plugin).toBe(bridge);
     expect(clients.securityMaterial).toBe(bridge);
     expect(clients.miscModule).toBe(bridge);
   });

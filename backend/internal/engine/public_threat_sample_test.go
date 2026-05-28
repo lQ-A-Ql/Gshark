@@ -163,7 +163,7 @@ func loadThreatSampleService(t *testing.T, relPath string) *Service {
 	if info.IsDir() {
 		t.Fatalf("sample path is directory, want file: %q", path)
 	}
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})

@@ -37,18 +37,6 @@ export interface StreamSwitchMetrics {
   byProtocol: Record<StreamProtocol, StreamSwitchStat>;
 }
 
-export interface PluginItem {
-  id: number | string;
-  name: string;
-  tag: string;
-  author: string;
-  version: string;
-  enabled: boolean;
-  entry?: string;
-  runtime?: string;
-  capabilities?: string[];
-}
-
 export interface DecryptionConfig {
   sslKeyLogPath: string;
   privateKeyPath: string;

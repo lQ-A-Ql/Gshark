@@ -16,7 +16,6 @@ export const typedDesktopBridgeFiles = [
   "src/app/integrations/desktopTypedBridgePacket.ts",
   "src/app/integrations/desktopTypedBridgeHunting.ts",
   "src/app/integrations/desktopTypedBridgeVehicleDbc.ts",
-  "src/app/integrations/desktopTypedBridgePlugin.ts",
 ];
 
 export const migratedBridgeRequirements = {
@@ -67,13 +66,6 @@ export const migratedBridgeRequirements = {
   listVehicleDBCProfiles: "ListVehicleDBCProfiles",
   addVehicleDBC: "AddVehicleDBC",
   removeVehicleDBC: "RemoveVehicleDBC",
-  listPlugins: "ListPlugins",
-  getPluginSource: "GetPluginSource",
-  savePluginSource: "SavePluginSource",
-  addPlugin: "AddPlugin",
-  deletePlugin: "DeletePlugin",
-  togglePlugin: "TogglePlugin",
-  setPluginsEnabled: "SetPluginsEnabled",
   listMiscModules: "ListMiscModules",
   selectMiscModulePackage: "SelectMiscModulePackage",
   importMiscModulePackageFromPath: "ImportMiscModulePackageFromPath",

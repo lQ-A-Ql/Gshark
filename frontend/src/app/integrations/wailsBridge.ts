@@ -13,7 +13,6 @@ export type {
   EvidenceClient,
   MediaClient,
   VehicleDBCClient,
-  PluginClient,
   SecurityMaterialClient,
   MiscModuleClient,
   DesktopTransportBinding,
@@ -22,6 +21,5 @@ export type {
   FFmpegStatus,
   HuntingRuntimeConfig,
   OpenFileResult,
-  PluginSource,
   TSharkStatus,
 } from "./bridgeTypes";

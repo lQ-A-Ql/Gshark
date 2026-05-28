@@ -12,7 +12,6 @@ export function createBackendClients(bridge: BackendBridge): BackendClients {
     evidence: bridge,
     media: bridge,
     vehicleDBC: bridge,
-    plugin: bridge,
     securityMaterial: bridge,
     miscModule: bridge,
   };

@@ -26,13 +26,13 @@ describe("desktop generic IPC policy", () => {
     expect(resolveDesktopGenericIpcPolicy(env)).toBe("disabled");
   });
 
-  it("lets an explicit compat policy override the legacy disable alias", () => {
+  it("keeps explicit compat recognizable but still disables the removed adapter", () => {
     const env = {
       VITE_DESKTOP_GENERIC_IPC_POLICY: "compat",
       VITE_DESKTOP_DISABLE_GENERIC_IPC: "1",
     };
 
     expect(resolveDesktopGenericIpcPolicy(env)).toBe("compat");
-    expect(isDesktopGenericIpcDisabled(env)).toBe(false);
+    expect(isDesktopGenericIpcDisabled(env)).toBe(true);
   });
 });

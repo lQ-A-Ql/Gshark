@@ -22,7 +22,6 @@ type Dependencies struct {
 	Media        MediaService
 	ToolRuntime  ToolRuntimeService
 	ToolAnalysis ToolAnalysisService
-	Plugins      PluginService
 	Evidence     func(ctx context.Context, modules []string) (any, error)
 	MiscModules  func() []model.MiscModuleManifest
 	AuditLogs    func(limit int) []model.AuditEntry
@@ -66,10 +65,6 @@ type ToolAnalysisService interface {
 	MySQLAnalysis(ctx context.Context) (model.MySQLAnalysis, error)
 	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
 	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
-}
-
-type PluginService interface {
-	ListPlugins() []model.Plugin
 }
 
 type Server struct {
@@ -237,7 +232,6 @@ func (s *Server) resources() []map[string]any {
 		{"uri": "meow://capture/status", "name": "Capture Status", "description": "Current capture status.", "mimeType": "application/json"},
 		{"uri": "meow://analysis/evidence", "name": "Evidence Summary", "description": "Current evidence response summary.", "mimeType": "application/json"},
 		{"uri": "meow://catalog/misc-modules", "name": "MISC Modules", "description": "Available builtin/custom MISC modules.", "mimeType": "application/json"},
-		{"uri": "meow://catalog/plugins", "name": "Plugins", "description": "Current plugin catalog.", "mimeType": "application/json"},
 		{"uri": "meow://audit/recent", "name": "Recent Audit", "description": "Recent backend audit entries.", "mimeType": "application/json"},
 	}
 }
@@ -345,8 +339,6 @@ func (s *Server) resourceContent(ctx context.Context, uri string) (any, error) {
 		return s.deps.Evidence(ctx, nil)
 	case "meow://catalog/misc-modules":
 		return s.deps.MiscModules(), nil
-	case "meow://catalog/plugins":
-		return s.deps.Plugins.ListPlugins(), nil
 	case "meow://audit/recent":
 		return s.deps.AuditLogs(20), nil
 	}

@@ -9,9 +9,6 @@ export function resolveDesktopGenericIpcPolicy(env: DesktopGenericIpcEnv = impor
   const explicitPolicy = String(env[DESKTOP_GENERIC_IPC_POLICY_ENV] ?? "")
     .trim()
     .toLowerCase();
-  if (explicitPolicy === "disabled") {
-    return "disabled";
-  }
   if (explicitPolicy === "compat") {
     return "compat";
   }
@@ -19,7 +16,8 @@ export function resolveDesktopGenericIpcPolicy(env: DesktopGenericIpcEnv = impor
 }
 
 export function isDesktopGenericIpcDisabled(env: DesktopGenericIpcEnv = import.meta.env): boolean {
-  return resolveDesktopGenericIpcPolicy(env) === "disabled";
+  resolveDesktopGenericIpcPolicy(env);
+  return true;
 }
 
 export function isLegacyDesktopGenericIpcDisableExperimentEnabled(

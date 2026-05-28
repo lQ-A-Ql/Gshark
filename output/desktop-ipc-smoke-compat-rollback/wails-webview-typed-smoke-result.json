@@ -1,8 +1,8 @@
 {
-  "backendMiscPackageDir": "C:\\Users\\QAQ\\Desktop\\gshark\\output\\desktop-ipc-smoke-compat-rollback\\misc-packages\\desktop-webview-9e1a7da7644945509a004ce1a7812d91",
+  "backendMiscPackageDir": "C:\\Users\\QAQ\\Desktop\\gshark\\output\\desktop-ipc-smoke-compat-rollback\\misc-packages\\desktop-webview-01b40b8c41a64faba8b5662b634000a5",
   "capturePackets": 7074,
   "capturePath": "C:\\Users\\QAQ\\Desktop\\gshark\\http.pcap",
-  "durationMs": 21799,
+  "durationMs": 22499,
   "genericIpcDisableExperimentBuildFlag": false,
   "genericIpcDisableExperimentRequested": false,
   "genericIpcPolicy": "compat",
@@ -36,7 +36,7 @@
   "miscDeleteBindingAvailable": true,
   "miscImportBindingAvailable": true,
   "miscModuleCount": 8,
-  "miscPackageIsolationDir": "C:\\Users\\QAQ\\Desktop\\gshark\\output\\desktop-ipc-smoke-compat-rollback\\misc-packages\\desktop-webview-9e1a7da7644945509a004ce1a7812d91",
+  "miscPackageIsolationDir": "C:\\Users\\QAQ\\Desktop\\gshark\\output\\desktop-ipc-smoke-compat-rollback\\misc-packages\\desktop-webview-01b40b8c41a64faba8b5662b634000a5",
   "miscRunBindingAvailable": true,
   "network": {
     "allRequests": [],
@@ -60,6 +60,6 @@
   "threatHitCount": 721,
   "tlsConfigured": null,
   "udpStreams": 54,
-  "updatedAt": "2026-05-26T12:18:26.826Z",
+  "updatedAt": "2026-05-26T13:07:43.926Z",
   "vehicleDBCProfileCount": 0
 }

@@ -1,6 +1,6 @@
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { typedCall } from "./desktopTypedBridgeCore";
-import { asDBCProfiles } from "./mappers/pluginMapper";
+import { asDBCProfiles } from "./mappers/dbcMapper";
 
 export function createVehicleDbcTypedOverrides(desktopApp: DesktopTransportBinding): Partial<BackendBridge> {
   return {

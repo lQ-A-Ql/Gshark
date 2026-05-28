@@ -17,13 +17,6 @@ export interface DesktopToolingBinding {
   ListVehicleDBCProfiles?: () => Promise<unknown>;
   AddVehicleDBC?: (path: string) => Promise<unknown>;
   RemoveVehicleDBC?: (path: string) => Promise<unknown>;
-  ListPlugins?: () => Promise<unknown>;
-  GetPluginSource?: (id: string) => Promise<unknown>;
-  SavePluginSource?: (source: unknown) => Promise<unknown>;
-  AddPlugin?: (plugin: unknown) => Promise<unknown>;
-  DeletePlugin?: (id: string) => Promise<unknown>;
-  TogglePlugin?: (id: string) => Promise<unknown>;
-  SetPluginsEnabled?: (ids: string[], enabled: boolean) => Promise<unknown>;
   ListMiscModules?: () => Promise<unknown>;
   ImportMiscModulePackageFromPath?: (path: string) => Promise<unknown>;
   DeleteMiscModulePackage?: (id: string) => Promise<unknown>;

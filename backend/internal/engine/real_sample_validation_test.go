@@ -277,7 +277,7 @@ func realSamplePath(t *testing.T, envName, fallback string) string {
 func loadRealSample(t *testing.T, envName, fallback string) *Service {
 	t.Helper()
 	path := realSamplePath(t, envName, fallback)
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})

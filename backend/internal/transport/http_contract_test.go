@@ -14,7 +14,7 @@ import (
 )
 
 func TestCaptureStatusContract(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	rec := httptest.NewRecorder()
 
 	server.handleCaptureStatus(rec, httptest.NewRequest(http.MethodGet, "/api/capture/status", nil))
@@ -28,7 +28,7 @@ func TestCaptureStatusContract(t *testing.T) {
 }
 
 func TestPacketsPageContract(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	rec := httptest.NewRecorder()
 
 	server.handlePacketsPage(rec, httptest.NewRequest(http.MethodGet, "/api/packets/page?cursor=0&limit=50", nil))
@@ -44,7 +44,7 @@ func TestPacketsPageContract(t *testing.T) {
 }
 
 func TestStreamIndexContract(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	rec := httptest.NewRecorder()
 
 	server.handleStreamIndex(rec, httptest.NewRequest(http.MethodGet, "/api/streams/index?protocol=tcp", nil))
@@ -60,7 +60,7 @@ func TestStreamIndexContract(t *testing.T) {
 }
 
 func TestEvidenceContractEmptyCapture(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	rec := httptest.NewRecorder()
 
 	server.handleEvidence(rec, httptest.NewRequest(http.MethodGet, "/api/evidence", nil))
@@ -205,7 +205,7 @@ func TestMCPConfigContract(t *testing.T) {
 }
 
 func TestMCPConfigContractAuthRequired(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	server.SetAuthToken("secret-token")
 
 	healthRec := httptest.NewRecorder()
@@ -257,7 +257,7 @@ func TestMCPRouteContractDisabled(t *testing.T) {
 }
 
 func TestMCPRouteContractInitializeAndTools(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
@@ -282,7 +282,7 @@ func TestMCPRouteContractInitializeAndTools(t *testing.T) {
 }
 
 func TestMCPRouteContractResourcesPromptsAndToolCall(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
 
 	resourcesRec := httptest.NewRecorder()
@@ -315,7 +315,7 @@ func TestMCPRouteContractResourcesPromptsAndToolCall(t *testing.T) {
 }
 
 func TestMCPRouteContractAuthRequired(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
 	server.SetAuthToken("secret-token")
 
@@ -337,13 +337,11 @@ func TestMCPRouteContractTruncatesLongPayload(t *testing.T) {
 	server.analysis = contractAnalysisService{}
 	server.toolRuntime = &recordingToolRuntimeService{mcp: model.MCPConfig{Enabled: true}}
 	server.toolAnalysis = mcpContractToolAnalysisService{}
-	server.plugins = mcpContractPluginService{}
 	server.mcpServer = mcp.NewServer(mcp.Dependencies{
 		Capture:      server.capture,
 		Analysis:     server.analysis,
 		ToolRuntime:  server.toolRuntime,
 		ToolAnalysis: server.toolAnalysis,
-		Plugins:      server.plugins,
 		Evidence: func(ctx context.Context, modules []string) (any, error) {
 			return map[string]any{"blob": strings.Repeat("x", 210500), "modules": modules}, nil
 		},
@@ -384,13 +382,11 @@ func TestMCPRouteContractCancellationPropagates(t *testing.T) {
 	server.analysis = contractAnalysisService{}
 	server.toolRuntime = &recordingToolRuntimeService{mcp: model.MCPConfig{Enabled: true}}
 	server.toolAnalysis = mcpContractToolAnalysisService{}
-	server.plugins = mcpContractPluginService{}
 	server.mcpServer = mcp.NewServer(mcp.Dependencies{
 		Capture:      server.capture,
 		Analysis:     server.analysis,
 		ToolRuntime:  server.toolRuntime,
 		ToolAnalysis: server.toolAnalysis,
-		Plugins:      server.plugins,
 		Evidence: func(ctx context.Context, modules []string) (any, error) {
 			<-ctx.Done()
 			return nil, ctx.Err()
@@ -431,7 +427,7 @@ func TestGlobalTrafficStatsContract(t *testing.T) {
 }
 
 func TestPacketInlineContractRejectsInvalidID(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	tests := []struct {
 		name   string
 		path   string
@@ -833,32 +829,6 @@ func (mcpContractToolAnalysisService) RunWinRMDecryptWithContext(context.Context
 
 func (mcpContractToolAnalysisService) WinRMExportFile(string) (string, string, error) {
 	return "", "", nil
-}
-
-type mcpContractPluginService struct{}
-
-func (mcpContractPluginService) ListPlugins() []model.Plugin { return nil }
-
-func (mcpContractPluginService) AddPlugin(model.Plugin) (model.Plugin, error) {
-	return model.Plugin{}, nil
-}
-
-func (mcpContractPluginService) DeletePlugin(string) error { return nil }
-
-func (mcpContractPluginService) PluginSource(string) (model.PluginSource, error) {
-	return model.PluginSource{}, nil
-}
-
-func (mcpContractPluginService) UpdatePluginSource(source model.PluginSource) (model.PluginSource, error) {
-	return source, nil
-}
-
-func (mcpContractPluginService) TogglePlugin(string) (model.Plugin, error) {
-	return model.Plugin{}, nil
-}
-
-func (mcpContractPluginService) SetPluginsEnabled([]string, bool) ([]model.Plugin, error) {
-	return nil, nil
 }
 
 type contractEvidenceAnalysisService struct {

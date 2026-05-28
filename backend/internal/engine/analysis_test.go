@@ -190,7 +190,7 @@ func TestServiceRawStreamUsesFollowStreamSource(t *testing.T) {
 		rawStreamFromFileFn = previous
 	})
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	svc.pcap = "capture.pcapng"
 
 	called := 0
@@ -239,7 +239,7 @@ func TestExtractPacketTransportPayloadFromRawIPv4TCP(t *testing.T) {
 }
 
 func TestRawStreamPageSlicesIndexedStream(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	svc.rawStreamIndex = map[string]model.ReassembledStream{
 		"TCP:7": {
 			StreamID: 7,

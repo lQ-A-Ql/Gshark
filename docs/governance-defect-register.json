@@ -86,35 +86,6 @@
       }
     },
     {
-      "id": "P0-4",
-      "priority": "P0",
-      "title": "plugin local execution permission boundary",
-      "description": "Plugins must declare explicit exec.local permission before any local code execution path runs.",
-      "keyFiles": [
-        "backend/internal/plugin/manager.go",
-        "backend/internal/plugin/runtime.go"
-      ],
-      "status": "resolved",
-      "resolvedIn": 1,
-      "evidence": {
-        "closedByCommit": "c2cb8d2eab1f9b7840640013c4bd06cc7f181319",
-        "closedAt": "2026-05-13T03:20:24+08:00",
-        "modifiedFiles": [
-          "backend/internal/plugin/manager.go",
-          "backend/internal/plugin/manager_test.go",
-          "backend/internal/plugin/runtime.go"
-        ],
-        "validationCommands": [
-          "cd backend && go test ./internal/plugin/... -count=1",
-          "cd backend && go test ./..."
-        ],
-        "evidenceTests": [
-          "backend/internal/plugin/manager_test.go"
-        ],
-        "reportPath": "docs/audit-development-report-archive-2026-05-13/dev-governance-report-2026-05-13.md"
-      }
-    },
-    {
       "id": "P1-1",
       "priority": "P1",
       "title": "backend transport service interface split",

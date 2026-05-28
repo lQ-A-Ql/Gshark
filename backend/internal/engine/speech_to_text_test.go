@@ -39,7 +39,7 @@ func TestStartMediaBatchTranscriptionSkipsCachedAudioArtifacts(t *testing.T) {
 		return rawTranscriptionPayload{}, nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	svc.mediaAnalysis = &model.MediaAnalysis{
@@ -107,7 +107,7 @@ func TestStartMediaBatchTranscriptionRunsSequentially(t *testing.T) {
 	_ = os.WriteFile(audioFile1, []byte("a"), 0o644)
 	_ = os.WriteFile(audioFile2, []byte("b"), 0o644)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.mediaAnalysis = &model.MediaAnalysis{
 		Sessions: []model.MediaSession{
@@ -184,7 +184,7 @@ func TestPrepareCaptureReplacementCancelsSpeechBatchTask(t *testing.T) {
 	_ = os.WriteFile(audioFile1, []byte("a"), 0o644)
 	_ = os.WriteFile(audioFile2, []byte("b"), 0o644)
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.mediaAnalysis = &model.MediaAnalysis{
 		Sessions: []model.MediaSession{

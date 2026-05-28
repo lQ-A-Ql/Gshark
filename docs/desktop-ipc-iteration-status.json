@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-26T20:20:14+08:00",
+  "updatedAt": "2026-05-27T01:35:42+08:00",
   "currentPhase": "post-phase-5",
-  "currentRound": 26,
+  "currentRound": 36,
   "desktopPolicy": {
-    "desktopRelease": "typed-ipc-first; generic-ipc-adapter-default-disabled; VITE_DESKTOP_GENERIC_IPC_POLICY=compat is the rollback path; no silent browser-http fallback after typed IPC failure",
-    "desktopDev": "typed-ipc-first with explicit generic IPC compatibility for unmigrated domains",
+    "desktopRelease": "typed-ipc-first; frontend generic IPC adapter construction removed; backend/generated InvokeBackendJSON/Blob/Text bindings removed; no silent browser-http fallback after typed data-plane IPC failure",
+    "desktopDev": "typed-ipc-first; explicit control-plane HTTP fallback remains available through fallbackBridge; generic IPC adapter construction and backend/generated InvokeBackend* bindings are removed",
     "browserDev": "http-and-eventsource-fallback-retained",
-    "oldBindings": "compatibility-only; not a path for new desktop features"
+    "oldBindings": "shell/bootstrap compatibility only; not a path for desktop data-plane features"
   },
   "domains": {
     "transportPolicy": {
@@ -172,8 +172,7 @@
       "status": "completed",
       "allowedUses": [
         "capture upload, events, runtime identity, health, ffmpeg, and speech-to-text compatibility routes",
-        "browser-dev HTTP/SSE debugging compatibility",
-        "old generated binding compatibility"
+        "browser-dev HTTP/SSE debugging compatibility"
       ],
       "guardrails": [
         "frontend/scripts/check-desktop-transport-policy.mjs",
@@ -185,7 +184,7 @@
         "typed desktop override files must not wire direct /api paths or generic InvokeBackend* calls",
         "createIpcBackendTransport rejects generic IPC when a matching migrated typed binding exists",
         "client backend route literals must be classified as migrated typed routes or explicit compatibility routes",
-        "desktop release now defaults to disabled generic IPC adapter routing while keeping VITE_DESKTOP_GENERIC_IPC_POLICY=compat as the rollback path",
+        "desktop release no longer constructs the frontend generic IPC adapter; VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but does not re-enable it",
         "VITE_DESKTOP_DISABLE_GENERIC_IPC=1 remains a legacy alias that disables the adapter while preserving Wails runtime events",
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the release-candidate default-disabled policy and smoke evidence before adapter removal"
       ]
@@ -197,7 +196,7 @@
       "flag": "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
       "smokeSwitch": "scripts/check-desktop-ipc-smoke.ps1 -DisableGenericIpcAdapterExperiment",
       "failureCode": "generic_ipc_disabled",
-      "policy": "Desktop release now defaults to not creating createIpcBackendTransport unless VITE_DESKTOP_GENERIC_IPC_POLICY=compat is explicitly set. Missing typed data-plane routes fail fast with generic_ipc_disabled instead of falling back to generic IPC or browser HTTP. Typed overrides and Wails runtime event subscription remain active.",
+      "policy": "Desktop release no longer constructs createIpcBackendTransport from desktopBridge. VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains a recognizable policy value but does not re-enable adapter construction. Missing typed data-plane routes fail fast with generic_ipc_disabled instead of falling back to generic IPC or browser HTTP. Typed overrides, explicit control-plane HTTP fallback through fallbackBridge, and Wails runtime event subscription remain active.",
       "lastExperimentSmoke": {
         "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
         "genericIpcDisableExperiment": false,
@@ -212,57 +211,64 @@
       },
       "guardrails": [
         "frontend/src/app/integrations/desktopBridge.test.ts covers fail-fast missing-typed behavior, typed override success, and Wails runtime event subscription under the flag",
-        "frontend/src/app/integrations/ipcBackendTransport.test.ts covers createDisabledGenericIpcBackendTransport",
+        "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.test.ts covers createDisabledGenericIpcBackendTransport",
         "docs/desktop-ipc-old-binding-exit-plan.md records the flag and smoke switch",
         "frontend/scripts/check-desktop-old-binding-compat.mjs validates the exit-plan tokens",
-        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the default-disabled release candidate and compat rollback evidence"
+        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the default-disabled release candidate and compat no-op evidence"
       ]
     },
     "genericIpcAdapterRetirementReadiness": {
       "phase": "post-phase-5",
-      "status": "guarded; release-candidate-default-disabled",
-      "scope": "Do not remove the generic IPC adapter yet. Production/default assets are now default-disabled for generic IPC routing, while VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains the rollback path.",
+      "status": "post-removal-audit-completed",
+      "scope": "desktopBridge does not construct the generic IPC adapter; backend/generated InvokeBackendJSON/Blob/Text bindings and frontend legacy adapter inventory are removed; desktopDisabledGenericIpcTransport and desktopIpcControls own the post-removal fail-fast/control path.",
       "policySwitch": "VITE_DESKTOP_GENERIC_IPC_POLICY=disabled",
       "guardrails": [
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs",
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.test.mjs",
         "frontend package ci runs desktop-generic-ipc-retirement:check",
-        "frontend/src/app/integrations/desktopGenericIpcPolicy.ts resolves disabled by default and keeps explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat rollback",
-        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts covers default disabled, explicit disabled policy, legacy alias, and explicit compat override",
+        "frontend/src/app/integrations/desktopGenericIpcPolicy.ts resolves disabled by default and keeps explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat as a no-op policy value",
+        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts covers default disabled, explicit disabled policy, legacy alias, and explicit compat no-op behavior",
         "the readiness check rejects promoting the legacy VITE_DESKTOP_DISABLE_GENERIC_IPC alias to the default",
-        "the readiness check requires release-candidate default disabled policy and explicit compat rollback",
-        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs requires VITE_DESKTOP_GENERIC_IPC_POLICY=compat rollback coverage",
+        "the readiness check requires release-candidate default disabled policy and explicit compat no-op behavior after adapter removal candidate",
+        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs requires VITE_DESKTOP_GENERIC_IPC_POLICY=compat no-op coverage",
         "the readiness check requires tracker smoke evidence with genericIpcDisableExperimentBuildFlag = true, directBackendApiRequestCount = 0, and browserDevOk = true"
       ],
       "lastReadinessAudit": {
-        "focusedFrontendVitest": "passed: 4 files / 42 tests",
-        "frontendCi": "passed: 234 files / 753 tests",
-        "defaultBuildWails": "passed with default-disabled release-candidate assets",
-        "defaultDisabledDesktopSmoke": "passed; genericIpcPolicy=disabled, genericIpcDisableExperiment=false, genericIpcDisableExperimentBuildFlag=true, directBackendApiRequestCount=0, browser-dev green",
-        "compatRollbackDesktopSmoke": "passed with VITE_DESKTOP_GENERIC_IPC_POLICY=compat; genericIpcPolicy=compat, genericIpcDisableExperimentBuildFlag=false, directBackendApiRequestCount=0, browser-dev green",
-        "rollbackGuard": "passed; VITE_DESKTOP_GENERIC_IPC_POLICY=compat is documented and tested as an adapter-enabled override even if the legacy disable alias is set",
+        "focusedFrontendVitest": "passed: 7 files / 63 tests for desktopBridge, disabled transport, desktopIpcControls, post-removal monitor, removal preflight, binding cleanup preflight, and old-binding compatibility",
+        "frontendCi": "passed: 238 files / 766 tests",
+        "rootGoDev": "passed",
+        "rootGoProduction": "passed",
+        "backendGo": "passed",
+        "buildWails": "passed during final closure audit",
+        "desktopAssets": "passed through build:wails",
+        "wailsBindingCheck": "passed; removed InvokeBackend* bindings are forbidden",
+        "oldBindingCompat": "passed; shell/bootstrap compatibility only",
+        "bindingCleanupPreflight": "passed; deletionReady=true",
+        "removalPreflight": "passed; adapterRemoved=true after backend/generated cleanup",
+        "postRemovalMonitor": "passed; frontend CI runs desktop-generic-ipc-post-removal:check and production source/README reject removed generic IPC tokens",
+        "defaultDisabledDesktopSmoke": "passed in Round 36 final closure audit; genericIpcPolicy=disabled, genericIpcDisableExperimentBuildFlag=true, directBackendApiRequestCount=0, totalInstrumentedNetworkRequests=0, browser-dev green",
         "finalDefaultDisabledAssetsBuilt": true,
-        "adapterRemoved": false
+        "adapterRemoved": true
       }
     },
     "genericIpcAdapterDefaultDisabledReleaseCandidate": {
       "phase": "post-phase-5",
-      "status": "observation-round-1-completed",
+      "status": "observation-round-3-completed",
       "defaultPolicy": "disabled",
       "rollbackPolicy": "VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
       "adapterRemoved": false,
-      "policy": "Desktop release defaults to disabled generic IPC adapter routing. Explicit compat policy restores adapter-enabled behavior for rollback while browser-dev HTTP/SSE remains available.",
+      "policy": "Desktop release defaults to disabled generic IPC adapter routing. After Round 29, explicit compat policy remains recognizable but does not restore adapter-enabled behavior; browser-dev HTTP/SSE remains available through the HTTP bridge.",
       "guardrails": [
-        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts verifies default disabled and explicit compat rollback",
-        "frontend/src/app/integrations/desktopBridge.test.ts marks compatibility-only generic fallback tests with VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
-        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs requires default disabled and compat rollback tracker evidence",
-        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs keeps the rollback path machine-enforced",
+        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts verifies default disabled and explicit compat no-op behavior",
+        "frontend/src/app/integrations/desktopBridge.test.ts verifies VITE_DESKTOP_GENERIC_IPC_POLICY=compat does not restore generic IPC adapter construction",
+        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs requires default disabled and compat no-op source evidence",
+        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs keeps the compat no-op contract machine-enforced",
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs blocks adapter removal before three consecutive green default-disabled observation rounds"
       ],
       "observation": {
         "requiredConsecutiveGreenRoundsBeforeRemoval": 3,
-        "currentConsecutiveGreenRounds": 1,
-        "removalAllowed": false,
+        "currentConsecutiveGreenRounds": 3,
+        "removalAllowed": true,
         "rounds": [
           {
             "id": "desktop-ipc-default-disabled-observation-round-25",
@@ -274,6 +280,32 @@
             "defaultDisabledSummaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
             "compatRollbackSummaryPath": "output/desktop-ipc-smoke-compat-rollback/desktop-ipc-smoke-summary.json",
             "frontendCi": "passed: 234 files / 753 tests",
+            "buildWails": "passed: default-disabled, compat rollback, and final default-disabled rebuild",
+            "adapterRemoved": false
+          },
+          {
+            "id": "desktop-ipc-default-disabled-observation-round-26",
+            "updatedAt": "2026-05-26T20:27:55+08:00",
+            "genericIpcPolicy": "disabled",
+            "compatRollbackPolicy": "compat",
+            "directBackendApiRequestCount": 0,
+            "browserDevOk": true,
+            "defaultDisabledSummaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
+            "compatRollbackSummaryPath": "output/desktop-ipc-smoke-compat-rollback/desktop-ipc-smoke-summary.json",
+            "frontendCi": "passed: 234 files / 756 tests",
+            "buildWails": "passed: default-disabled, compat rollback, and final default-disabled rebuild",
+            "adapterRemoved": false
+          },
+          {
+            "id": "desktop-ipc-default-disabled-observation-round-27",
+            "updatedAt": "2026-05-26T20:41:49+08:00",
+            "genericIpcPolicy": "disabled",
+            "compatRollbackPolicy": "compat",
+            "directBackendApiRequestCount": 0,
+            "browserDevOk": true,
+            "defaultDisabledSummaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
+            "compatRollbackSummaryPath": "output/desktop-ipc-smoke-compat-rollback/desktop-ipc-smoke-summary.json",
+            "frontendCi": "passed: 234 files / 756 tests",
             "buildWails": "passed: default-disabled, compat rollback, and final default-disabled rebuild",
             "adapterRemoved": false
           }
@@ -300,13 +332,147 @@
         "objectCount": 205
       }
     },
+    "genericIpcAdapterRemovalPreflight": {
+      "phase": "post-phase-5",
+      "status": "deletion-completed",
+      "adapterRemoved": true,
+      "frontendAdapterConstructionRemoved": true,
+      "backendGeneratedBindingsRemoved": true,
+      "policy": "Round 34 removed backend DesktopApp.InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText, removed generated Wails InvokeBackendJSON/Blob/Text bindings, removed the frontend shell binding fields, and deleted the unreachable ipcBackendTransport adapter implementation. desktopDisabledGenericIpcTransport.ts remains the active fail-fast data-plane base transport, and browser-dev HTTP/SSE remains independent.",
+      "inventory": {
+        "productionSource": [
+          "frontend/src/app/integrations/desktopBridge.ts no longer imports or constructs createIpcBackendTransport",
+          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts contains the active generic_ipc_disabled fail-fast transport",
+          "frontend/src/app/integrations/desktopIpcControls.ts owns shared DesktopIpcRequestError, IpcBackendTransport, withDesktopIpcControls, and blob limit checks",
+          "frontend/src/app/integrations/ipcBackendTransport.ts is removed"
+        ],
+        "generatedBindings": [
+          "frontend/wailsjs/go/main/DesktopApp.d.ts no longer exports InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText",
+          "frontend/wailsjs/go/main/DesktopApp.js no longer exports InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText"
+        ],
+        "guardrail": "frontend/scripts/check-desktop-generic-ipc-removal-preflight.mjs rejects any new InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText/createIpcBackendTransport token outside test fixtures and requires adapterRemoved after backend/generated cleanup deletion"
+      },
+      "rollbackRequirements": [
+        "VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains documented and tested as a recognizable no-op policy value after adapter removal",
+        "browser-dev HTTP/SSE remains independent of desktop generic IPC adapter removal",
+        "restoring generic IPC would require an explicit source rollback that reintroduces backend methods, generated bindings, shell fields, and adapter construction together"
+      ],
+      "reversibleDeletionPlan": [
+        "restore createIpcBackendTransport construction only with an explicit rollback branch if Wails smoke or full gates reveal a regression",
+        "restore backend InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText and regenerate Wails bindings only as a coordinated rollback",
+        "keep desktopDisabledGenericIpcTransport.ts and desktopIpcControls.ts as the supported post-removal data-plane failure/control modules"
+      ],
+      "preflightChecks": [
+        "three consecutive default-disabled observation rounds are recorded",
+        "adapterRemoved is true after backend/generated cleanup deletion",
+        "production adapter references are absent from desktopBridge, desktopTransportBindingShell, generated bindings, and integration source",
+        "frontend CI runs desktop-generic-ipc-removal-preflight:check",
+        "frontend CI runs desktop-generic-ipc-post-removal:check"
+      ],
+      "candidateChecks": [
+        "desktopBridge does not import createIpcBackendTransport",
+        "desktopBridge does not call desktopApp.InvokeBackendJSON",
+        "desktopGenericIpcPolicy keeps compat recognizable while isDesktopGenericIpcDisabled always returns true",
+        "focused Vitest passed for desktopBridge, desktopIpcControls, disabled transport, rollback guard, retirement readiness, old binding compat, binding cleanup, and removal preflight"
+      ]
+    },
+    "genericIpcBackendGeneratedBindingCleanupPreflight": {
+      "phase": "post-phase-5",
+      "status": "deletion-completed",
+      "deletionReady": true,
+      "backendGeneratedBindingsRemoved": true,
+      "frontendAdapterConstructionRemoved": true,
+      "policy": "Round 34 removed backend DesktopApp.InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText, removed generated Wails InvokeBackendJSON/Blob/Text bindings, removed DesktopShellBinding InvokeBackendJSON/Blob/Text fields, deleted the unreachable ipcBackendTransport legacy adapter file, and moved shared IPC controls into desktopIpcControls.ts. check-wails-bindings now forbids removed InvokeBackend* bindings, and old-binding compatibility no longer allows ipcBackendTransport InvokeBackend* inventory.",
+      "inventory": {
+        "backendExportedMethods": [],
+        "typedHelperReuse": [],
+        "generatedBindings": [],
+        "frontendBindingSurfaces": [
+          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts exports createDisabledGenericIpcBackendTransport",
+          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts reports generic_ipc_disabled",
+          "frontend/src/app/integrations/desktopIpcControls.ts exports DesktopIpcRequestError, IpcBackendTransport, withDesktopIpcControls, and blob limit checks"
+        ],
+        "guardrailDependencies": [
+          "frontend/scripts/check-wails-bindings.mjs forbids removed InvokeBackend* bindings",
+          "frontend/scripts/check-desktop-old-binding-compat.mjs rejects unapproved InvokeBackend* inventory"
+        ]
+      },
+      "blockers": [],
+      "nextDeletionPrerequisites": [],
+      "preflightChecks": [
+        "frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs validates backend/exported, generated, frontend shell, adapter implementation, and guardrail dependency facts",
+        "frontend CI runs desktop-generic-ipc-binding-cleanup-preflight:check",
+        "typed helper reuse remains zero after Round 31",
+        "desktopDisabledGenericIpcTransport.ts owns active generic_ipc_disabled fail-fast behavior after Round 32",
+        "desktop_backend_proxy_test.go no longer directly calls exported InvokeBackendJSON after Round 33",
+        "deletionReady = true because backend/generated InvokeBackend* bindings and frontend legacy adapter inventory are removed"
+      ],
+      "postRemovalAudit": {
+        "status": "completed",
+        "fullGatesRun": true,
+        "desktopWebviewSmokeRun": true,
+        "browserDevSmokeRun": true,
+        "evidence": {
+          "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
+          "directBackendApiRequestCount": 0,
+          "totalInstrumentedNetworkRequests": 0,
+          "genericIpcPolicy": "disabled",
+          "genericIpcDisableExperimentBuildFlag": true,
+          "browserDevOk": true,
+          "capturePackets": 7074,
+          "httpStreams": 119,
+          "tcpStreams": 177,
+          "udpStreams": 54,
+          "objectCount": 205,
+          "objectEvidenceCount": 205
+        }
+      }
+    },
+    "genericIpcPostRemovalMonitoring": {
+      "phase": "post-phase-5",
+      "status": "completed",
+      "scope": "continuous guardrail after backend/generated InvokeBackend* deletion and legacy adapter removal",
+      "guardrails": [
+        "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.test.mjs",
+        "frontend package ci runs desktop-generic-ipc-post-removal:check",
+        "README.md must describe typed IPC, generic_ipc_disabled, browser-dev HTTP/SSE, and Wails runtime events without stale InvokeBackendJSON/Blob/Text wording",
+        "production desktop source must not reintroduce InvokeBackendJSON, InvokeBackendBlob, InvokeBackendText, createIpcBackendTransport, or frontend/src/app/integrations/ipcBackendTransport.ts"
+      ],
+      "lastMonitorAudit": {
+        "focusedFrontendVitest": "passed: 7 files / 63 tests in final closure audit",
+        "rootGoDev": "passed",
+        "rootGoProduction": "passed",
+        "backendGo": "passed",
+        "frontendCi": "passed: 238 files / 766 tests",
+        "buildWails": "passed",
+        "postRemovalMonitor": "passed",
+        "removalPreflight": "passed",
+        "bindingCleanupPreflight": "passed",
+        "wailsBindingCheck": "passed",
+        "productionTokenScan": "post-removal monitor passed; no README/production source matches for InvokeBackendJSON, InvokeBackendBlob, InvokeBackendText, createIpcBackendTransport, or ipcBackendTransport outside guardrail/test/docs history",
+        "readmeDriftFix": "README desktop IPC section now states typed IPC first, generic_ipc_disabled fail-fast, browser-dev HTTP/SSE, and Wails runtime events",
+        "gitDiffCheck": "passed"
+      },
+      "lastSmokeEvidence": {
+        "source": "Round 36 final closure Wails smoke",
+        "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
+        "directBackendApiRequestCount": 0,
+        "totalInstrumentedNetworkRequests": 0,
+        "genericIpcPolicy": "disabled",
+        "genericIpcDisableExperimentBuildFlag": true,
+        "browserDevOk": true,
+        "capturePackets": 7074,
+        "httpStreams": 119,
+        "objectCount": 205
+      }
+    },
     "oldGeneratedBindings": {
       "phase": "post-phase-5",
-      "status": "guarded",
+      "status": "shell-compat-only; backend/generated InvokeBackend* removed",
       "allowedUses": [
         "backendClients.ts may read window.go.main.DesktopApp",
         "httpBridge.ts may read GetBackendAuthToken for browser HTTP compatibility auth",
-        "ipcBackendTransport.ts may call InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText as the single generic IPC adapter",
         "captureClient.ts may call OpenCaptureDialog for native PCAP selection",
         "desktopClient.ts may call BackendStatus, CheckAppUpdate, InstallAppUpdate, and OpenDBCDialog for shell/update/dialog features",
         "desktopBridge.ts and desktopTypedBridge*.ts own typed DesktopApp routing"
@@ -320,13 +486,10 @@
         "production integration clients cannot add direct old generated DesktopApp data-plane bindings"
       ],
       "exitCriteria": [
+        "backend/generated InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText are removed",
         "old generated binding exit plan exists and is validated by frontend/scripts/check-desktop-old-binding-compat.mjs",
         "three consecutive green rounds have desktopWebviewTyped.directBackendApiRequestCount = 0",
         "MISC desktop runtime routes remain typed; browser-dev multipart upload remains explicit HTTP debugging compatibility rather than a desktop generic IPC exception",
-        "generic IPC adapter has zero non-MISC business expansion for multiple rounds",
-        "flag-gated generic IPC adapter disablement experiment passes with genericIpcDisableExperimentBuildFlag = true and desktopWebviewTyped.directBackendApiRequestCount = 0",
-        "generic IPC adapter retirement readiness check passes in frontend CI and confirms the release-candidate default-disabled policy plus compat rollback path",
-        "generic IPC rollback guard passes in frontend CI and documents VITE_DESKTOP_GENERIC_IPC_POLICY=compat as the release-candidate rollback path",
         "desktop smoke keeps directBackendApiRequestCount at 0",
         "browser-dev HTTP/SSE compatibility remains green"
       ]
@@ -373,16 +536,16 @@
     }
   },
   "phaseAudit": {
-    "id": "desktop-ipc-phase-audit-round-3",
-    "status": "completed",
+    "id": "desktop-ipc-final-closure-audit-round-36",
+    "status": "final-closure-completed",
     "score": {
-      "total": 96,
-      "contractCorrectness": 24,
+      "total": 99,
+      "contractCorrectness": 25,
       "desktopPolicyCompliance": 20,
       "regressionSafety": 20,
-      "diagnosticsAndFailureShape": 14,
+      "diagnosticsAndFailureShape": 15,
       "docsAndTraceability": 10,
-      "devBrowserCompatibility": 8
+      "devBrowserCompatibility": 9
     },
     "hardBlockers": [],
     "fullGatesRun": true,
@@ -397,13 +560,19 @@
       "udpStreams": 54,
       "objectCount": 205,
       "objectEvidenceCount": 205,
-      "directBackendApiRequestCount": 0
+      "directBackendApiRequestCount": 0,
+      "totalInstrumentedNetworkRequests": 0,
+      "genericIpcPolicy": "disabled",
+      "genericIpcDisableExperimentBuildFlag": true,
+      "browserDevOk": true,
+      "desktopReleaseOk": true,
+      "desktopWebviewTypedOk": true
     }
   },
   "lastRound": {
-    "id": "desktop-ipc-default-disabled-observation-round-25",
+    "id": "desktop-ipc-final-closure-audit-round-36",
     "phase": "post-phase-5",
-    "primaryDomain": "Default-disabled observation guard",
+    "primaryDomain": "final closure audit",
     "score": {
       "total": 99,
       "contractCorrectness": 25,
@@ -417,38 +586,24 @@
     "fullGatesRun": true,
     "focusedTestsRun": true,
     "manualSmokeRun": true,
-    "decision": "advance-to-default-disabled-observation-round-2",
+    "decision": "closure-completed; desktop IPC migration is final-closure green with full gates, build:wails, guardrails, desktop release smoke, WebView typed smoke, and browser-dev smoke passing. Future rounds should be maintenance-only unless a new typed IPC domain is explicitly introduced.",
     "evidence": {
-      "observationGuard": "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs now requires tracker observation state and blocks adapter removal before three consecutive green default-disabled observation rounds",
-      "rollbackContract": "VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains documented, tested, and smoke-validated as the adapter-enabled rollback path",
-      "adapterPolicy": "adapter code was not removed; InvokeBackendJSON/Blob/Text and createIpcBackendTransport remain available for explicit compat rollback",
-      "focusedFrontendVitest": "generic IPC retirement readiness, rollback guard, desktopGenericIpcPolicy, and desktopBridge focused tests passed: 4 files / 44 tests",
-      "rootDevGo": "go test -tags dev ./... passed",
-      "rootProductionGo": "go test -tags production ./... passed",
+      "focusedFrontendVitest": "passed: desktopBridge, desktopDisabledGenericIpcTransport, desktopIpcControls, post-removal monitor, removal preflight, binding cleanup preflight, old-binding compat: 7 files / 63 tests",
+      "rootGoDev": "go test -tags dev ./... passed",
+      "rootGoProduction": "go test -tags production ./... passed",
       "backendGo": "cd backend && go test ./... passed",
-      "frontendCi": "cd frontend && pnpm run ci passed: 234 files / 755 tests",
-      "defaultBuildWails": "cd frontend && pnpm run build:wails passed with default-disabled assets",
-      "desktopAssetsCheck": "passed",
-      "wailsBindingCheck": "passed",
-      "desktopTransportPolicyCheck": "passed",
-      "genericIpcAllowlistCheck": "passed",
-      "genericIpcRetirementReadinessCheck": "passed",
-      "genericIpcRollbackGuardCheck": "passed",
-      "oldBindingCompatCheck": "passed",
-      "miscTransportInventoryCheck": "passed",
-      "defaultDisabledDesktopSmoke": "passed; output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json; updatedAt=2026-05-26T20:16:11+08:00; genericIpcPolicy=disabled, genericIpcDisableExperimentBuildFlag=true, directBackendApiRequestCount=0, browser-dev green",
-      "compatRollbackDesktopSmoke": "passed; output/desktop-ipc-smoke-compat-rollback/desktop-ipc-smoke-summary.json; updatedAt=2026-05-26T20:17:58+08:00; genericIpcPolicy=compat, genericIpcDisableExperimentBuildFlag=false, directBackendApiRequestCount=0, browser-dev green",
-      "finalDefaultDisabledAssetsBuilt": true,
-      "desktopWebviewSmokeDirectBackendApiRequests": 0,
-      "genericIpcPolicy": "disabled",
-      "capturePackets": 7074,
-      "httpStreams": 119,
-      "objectCount": 205,
-      "browserDevOk": true,
-      "observationRounds": "1 of 3 required default-disabled observation rounds is green",
-      "auditConclusion": "default-disabled observation round 1 is complete with explicit compat rollback; next round should repeat observation without removing adapter code"
+      "frontendCi": "cd frontend && pnpm run ci passed: 238 files / 766 tests",
+      "buildWails": "cd frontend && pnpm run build:wails passed",
+      "wailsBindingCheck": "node frontend/scripts/check-wails-bindings.mjs passed",
+      "postRemovalMonitorCheck": "node frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs passed",
+      "bindingCleanupPreflight": "node frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs passed; deletionReady=true",
+      "removalPreflight": "node frontend/scripts/check-desktop-generic-ipc-removal-preflight.mjs passed; adapterRemoved=true",
+      "oldBindingCompat": "node frontend/scripts/check-desktop-old-binding-compat.mjs passed; shell/bootstrap compatibility only",
+      "desktopSmoke": "scripts/check-desktop-ipc-smoke.ps1 passed; desktopRelease.ok=true, desktopWebviewTyped.ok=true, browserDev.ok=true, directBackendApiRequestCount=0, totalInstrumentedNetworkRequests=0, genericIpcPolicy=disabled, capturePackets=7074, httpStreams=119, objectCount=205",
+      "smokeSummary": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json updatedAt=2026-05-27T01:33:26.3887959+08:00",
+      "gitDiffCheck": "git diff --check passed after final doc refresh"
     }
   },
   "openBlockers": [],
-  "recommendedNextSlice": "Default-disabled observation round 2: keep adapter code and VITE_DESKTOP_GENERIC_IPC_POLICY=compat rollback path; rerun CI, default-disabled Wails smoke, compat rollback smoke, directBackendApiRequestCount = 0, browser-dev green, rollback guard green, and unchanged shell/auth/dialog old-binding uses. Do not remove the generic IPC adapter until three consecutive green observation rounds are recorded."
+  "recommendedNextSlice": "Maintenance-only unless explicitly scoped: keep browser-dev HTTP/SSE, keep GetBackendAuthToken/OpenCaptureDialog/BackendStatus/update/native dialogs as shell/control-plane compatibility, run post-removal monitor in CI, and do not restore generic IPC data-plane without a deliberate rollback plan."
 }

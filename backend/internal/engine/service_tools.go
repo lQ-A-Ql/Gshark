@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
-	"github.com/gshark/sentinel/backend/internal/plugin"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
@@ -31,21 +30,6 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 	}
 	s.emitStatus("__progress__:threat:0:5:准备威胁分析")
 	hunter := newThreatHunter(prefixes, 1)
-	var pluginRunner *plugin.PacketPluginRunner
-	if s.pluginManager != nil {
-		pluginRunner = s.pluginManager.NewPacketPluginRunner(ctx)
-	}
-
-	const pluginBatchSize = 1024
-	batch := make([]model.Packet, 0, pluginBatchSize)
-	flushPluginBatch := func() {
-		if len(batch) == 0 || pluginRunner == nil {
-			batch = batch[:0]
-			return
-		}
-		pluginRunner.ProcessBatch(batch)
-		batch = batch[:0]
-	}
 
 	if s.packetStore != nil {
 		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
@@ -53,15 +37,8 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 				return ctx.Err()
 			}
 			hunter.Observe(packet)
-			if pluginRunner != nil {
-				batch = append(batch, packet)
-				if len(batch) >= pluginBatchSize {
-					flushPluginBatch()
-				}
-			}
 			return nil
 		})
-		flushPluginBatch()
 	}
 	if ctx.Err() != nil {
 		s.emitStatus("威胁分析已取消")
@@ -70,12 +47,6 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 	s.emitStatus("__progress__:threat:1:5:扫描数据包基础特征")
 
 	hits := hunter.Results()
-	if pluginRunner != nil {
-		hits = append(hits, pluginRunner.Close(int64(len(hits)+1))...)
-		for _, warning := range pluginRunner.Warnings() {
-			s.emitStatus("plugin warning: " + warning)
-		}
-	}
 	if ctx.Err() != nil {
 		s.emitStatus("威胁分析已取消")
 		return nil
@@ -454,64 +425,6 @@ func (s *Service) PacketLayers(packetID int64) (map[string]any, error) {
 		return nil, errors.New("no capture loaded")
 	}
 	return tshark.ReadPacketLayersFromFile(pcap, packetID)
-}
-
-func (s *Service) ListPlugins() []model.Plugin {
-	if s.pluginManager == nil {
-		return nil
-	}
-	return s.pluginManager.List()
-}
-
-func (s *Service) TogglePlugin(id string) (model.Plugin, error) {
-	if s.pluginManager == nil {
-		return model.Plugin{}, errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.Toggle(id)
-}
-
-func (s *Service) SetPluginsEnabled(ids []string, enabled bool) ([]model.Plugin, error) {
-	if s.pluginManager == nil {
-		return nil, errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.SetEnabled(ids, enabled)
-}
-
-func (s *Service) AddPlugin(p model.Plugin) (model.Plugin, error) {
-	if s.pluginManager == nil {
-		return model.Plugin{}, errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.Add(plugin.RulePlugin{
-		ID:           p.ID,
-		Name:         p.Name,
-		Version:      p.Version,
-		Tag:          p.Tag,
-		Author:       p.Author,
-		Enabled:      p.Enabled,
-		Entry:        p.Entry,
-		Capabilities: p.Capabilities,
-	})
-}
-
-func (s *Service) DeletePlugin(id string) error {
-	if s.pluginManager == nil {
-		return errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.Delete(id)
-}
-
-func (s *Service) PluginSource(id string) (model.PluginSource, error) {
-	if s.pluginManager == nil {
-		return model.PluginSource{}, errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.Source(id)
-}
-
-func (s *Service) UpdatePluginSource(source model.PluginSource) (model.PluginSource, error) {
-	if s.pluginManager == nil {
-		return model.PluginSource{}, errors.New("plugin manager is nil")
-	}
-	return s.pluginManager.UpdateSource(source)
 }
 
 func (s *Service) StreamIDs(protocol string) []int64 {

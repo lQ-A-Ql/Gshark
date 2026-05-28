@@ -12,13 +12,11 @@ import (
 	"os"
 
 	"github.com/gshark/sentinel/backend/internal/model"
-	"github.com/gshark/sentinel/backend/internal/plugin"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
 type Service struct {
-	emitter       EventEmitter
-	pluginManager *plugin.Manager
+	emitter EventEmitter
 
 	mu                      sync.RWMutex
 	loadMu                  sync.Mutex
@@ -139,7 +137,7 @@ var (
 	rawStreamFromFileFn   = tshark.ReassembleRawStreamFromFileContext
 )
 
-func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
+func NewService(emitter EventEmitter) *Service {
 	if emitter == nil {
 		emitter = NopEmitter{}
 	}
@@ -149,7 +147,6 @@ func NewService(emitter EventEmitter, pm *plugin.Manager) *Service {
 	}
 	return &Service{
 		emitter:            emitter,
-		pluginManager:      pm,
 		packetStore:        store,
 		captureTasks:       map[int64]captureTaskCancel{},
 		displayFilterCache: map[string]*filteredPacketIndex{},

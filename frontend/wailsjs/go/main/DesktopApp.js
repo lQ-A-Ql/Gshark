@@ -138,18 +138,6 @@ export function GetShiroRememberMeAnalysis(candidateKeys) {
   return window['go']['main']['DesktopApp']['GetShiroRememberMeAnalysis'](candidateKeys);
 }
 
-export function InvokeBackendBlob(req) {
-  return window['go']['main']['DesktopApp']['InvokeBackendBlob'](req);
-}
-
-export function InvokeBackendJSON(req) {
-  return window['go']['main']['DesktopApp']['InvokeBackendJSON'](req);
-}
-
-export function InvokeBackendText(req) {
-  return window['go']['main']['DesktopApp']['InvokeBackendText'](req);
-}
-
 export function InspectStreamPayload(payload) {
   return window['go']['main']['DesktopApp']['InspectStreamPayload'](payload);
 }

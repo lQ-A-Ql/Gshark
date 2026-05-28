@@ -116,15 +116,3 @@ type ToolAnalysisService interface {
 	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	WinRMExportFile(resultID string) (string, string, error)
 }
-
-// PluginService groups the plugin registry methods consumed by the transport
-// layer.
-type PluginService interface {
-	ListPlugins() []model.Plugin
-	AddPlugin(p model.Plugin) (model.Plugin, error)
-	DeletePlugin(id string) error
-	PluginSource(id string) (model.PluginSource, error)
-	UpdatePluginSource(source model.PluginSource) (model.PluginSource, error)
-	TogglePlugin(id string) (model.Plugin, error)
-	SetPluginsEnabled(ids []string, enabled bool) ([]model.Plugin, error)
-}

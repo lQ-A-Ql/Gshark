@@ -1,4 +1,6 @@
 import type {
+  DBCProfile,
+  DecryptionConfig,
   HTTPLoginAnalysis,
   MiscModuleImportResult,
   MiscModuleManifest,
@@ -14,12 +16,14 @@ import type {
   WinRMDecryptResult,
 } from "../../core/types";
 import { downloadBlob } from "../../utils/browserFile";
+import { asDBCProfiles } from "../mappers/dbcMapper";
 import {
   asHTTPLoginAnalysis,
   asMySQLAnalysis,
   asShiroRememberMeAnalysis,
   asSMTPAnalysis,
 } from "../mappers/protocolToolMapper";
+import { asDecryptionConfig, toDecryptionConfigRequest } from "../mappers/tlsMapper";
 import {
   asMiscModuleImportResult,
   asMiscModuleManifests,
@@ -45,6 +49,10 @@ import type {
   SMB3RandomSessionKeyResultWireDTO,
   SMB3SessionCandidateWireDTO,
 } from "../wire/sessionMaterialWireDtos";
+import type {
+  DBCProfileWireDTO,
+  DecryptionConfigWireDTO,
+} from "../wire/vehicleWireDtos";
 import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -66,6 +74,11 @@ export interface ToolClient {
   getSMTPAnalysis(signal?: AbortSignal): Promise<SMTPAnalysis>;
   getMySQLAnalysis(signal?: AbortSignal): Promise<MySQLAnalysis>;
   getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal): Promise<ShiroRememberMeAnalysis>;
+  listVehicleDBCProfiles(): Promise<DBCProfile[]>;
+  addVehicleDBC(path: string): Promise<DBCProfile[]>;
+  removeVehicleDBC(path: string): Promise<DBCProfile[]>;
+  getTLSConfig(): Promise<DecryptionConfig | null>;
+  updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
 }
 
 export function createToolClient(request: JsonRequest, requestText: TextRequest, requestBlob: BlobRequest): ToolClient {
@@ -176,6 +189,40 @@ export function createToolClient(request: JsonRequest, requestText: TextRequest,
         }),
       });
       return asShiroRememberMeAnalysis(payload);
+    },
+
+    async listVehicleDBCProfiles() {
+      const rows = await request<DBCProfileWireDTO[]>("/api/vehicle/dbc/profiles");
+      return asDBCProfiles(rows);
+    },
+
+    async addVehicleDBC(path: string) {
+      const rows = await request<DBCProfileWireDTO[]>("/api/vehicle/dbc/add", {
+        method: "POST",
+        body: JSON.stringify({ path }),
+      });
+      return asDBCProfiles(rows);
+    },
+
+    async removeVehicleDBC(path: string) {
+      const rows = await request<DBCProfileWireDTO[]>("/api/vehicle/dbc/remove", {
+        method: "POST",
+        body: JSON.stringify({ path }),
+      });
+      return asDBCProfiles(rows);
+    },
+
+    async getTLSConfig() {
+      const payload = await request<DecryptionConfigWireDTO | null>("/api/security/tls-config");
+      if (!payload) return null;
+      return asDecryptionConfig(payload);
+    },
+
+    async updateTLSConfig(cfg: DecryptionConfig) {
+      await request<unknown>("/api/security/tls-config", {
+        method: "POST",
+        body: JSON.stringify(toDecryptionConfigRequest(cfg)),
+      });
     },
   };
 }

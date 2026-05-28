@@ -6,7 +6,6 @@ import type { EventHandlers } from "./clients/eventClient";
 import { createHuntingClient } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
 import { createObjectClient } from "./clients/objectClient";
-import { createPluginClient } from "./clients/pluginClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
 import { createToolRuntimeClient } from "./clients/toolRuntimeClient";
@@ -28,7 +27,6 @@ export interface BackendBridgeTransport {
 export function createBackendBridgeFromTransport(transport: BackendBridgeTransport): BackendBridge {
   const mediaClient = createMediaClient(transport.requestJSON, transport.requestBlob);
   const analysisClient = createAnalysisClient(transport.requestJSON);
-  const pluginClient = createPluginClient(transport.requestJSON);
   const streamClient = createStreamClient(transport.requestJSON);
   const toolClient = createToolClient(transport.requestJSON, transport.requestText, transport.requestBlob);
   const captureClient = createCaptureClient(transport.requestJSON, transport.getDesktopAppBinding);
@@ -108,18 +106,13 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     downloadMediaArtifact: mediaClient.downloadMediaArtifact,
     getMediaPlaybackBlob: mediaClient.getMediaPlaybackBlob,
 
-    listVehicleDBCProfiles: pluginClient.listVehicleDBCProfiles,
-    addVehicleDBC: pluginClient.addVehicleDBC,
-    removeVehicleDBC: pluginClient.removeVehicleDBC,
-    listPlugins: pluginClient.listPlugins,
-    getPluginSource: pluginClient.getPluginSource,
-    savePluginSource: pluginClient.savePluginSource,
-    addPlugin: pluginClient.addPlugin,
-    deletePlugin: pluginClient.deletePlugin,
-    togglePlugin: pluginClient.togglePlugin,
-    setPluginsEnabled: pluginClient.setPluginsEnabled,
-    getTLSConfig: pluginClient.getTLSConfig,
-    updateTLSConfig: pluginClient.updateTLSConfig,
+    listVehicleDBCProfiles: toolClient.listVehicleDBCProfiles,
+    addVehicleDBC: toolClient.addVehicleDBC,
+    removeVehicleDBC: toolClient.removeVehicleDBC,
+    getTLSConfig: toolClient.getTLSConfig,
+    updateTLSConfig: toolClient.updateTLSConfig,
+
+
 
     runWinRMDecrypt: toolClient.runWinRMDecrypt,
     getWinRMDecryptResultText: toolClient.getWinRMDecryptResultText,

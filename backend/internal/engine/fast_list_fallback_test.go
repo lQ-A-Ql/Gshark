@@ -45,7 +45,7 @@ func TestLoadPCAPFallsBackWhenFastListFails(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
@@ -103,7 +103,7 @@ func TestLoadPCAPFallsBackToCompatWhenEKStillFails(t *testing.T) {
 		return onPacket(model.Packet{ID: 7, Protocol: "UDP", Info: "compat packet"})
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
@@ -170,7 +170,7 @@ func TestLoadPCAPSkipsEstimateForLargeFastListCapture(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
@@ -218,7 +218,7 @@ func TestLoadPCAPFirstScreenProfileUsesLightweightParser(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{

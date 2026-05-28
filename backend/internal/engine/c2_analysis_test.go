@@ -8,7 +8,7 @@ import (
 )
 
 func TestServiceC2SampleAnalysisReturnsInitializedEmptyState(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	svc.pcap = "fixture.pcapng"
 
 	analysis, err := svc.C2SampleAnalysis(context.Background())
@@ -27,7 +27,7 @@ func TestServiceC2SampleAnalysisReturnsInitializedEmptyState(t *testing.T) {
 }
 
 func TestServiceC2SampleAnalysisHonorsContextCancel(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -37,7 +37,7 @@ func TestServiceC2SampleAnalysisHonorsContextCancel(t *testing.T) {
 }
 
 func TestServiceAPTAnalysisReturnsInitializedBaseline(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 
 	analysis, err := svc.APTAnalysis(context.Background())
 	if err != nil {
@@ -58,7 +58,7 @@ func TestServiceAPTAnalysisReturnsInitializedBaseline(t *testing.T) {
 }
 
 func TestServiceAPTAnalysisHonorsContextCancel(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

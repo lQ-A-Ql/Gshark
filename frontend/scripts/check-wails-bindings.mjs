@@ -19,7 +19,6 @@ const methodGroups = {
     "CheckAppUpdate",
     "InstallAppUpdate",
   ],
-  "generic-ipc": ["InvokeBackendJSON", "InvokeBackendBlob", "InvokeBackendText"],
   "typed-control-plane": [
     "GetToolRuntimeSnapshot",
     "GetToolRuntimeSnapshotFast",
@@ -90,15 +89,6 @@ const methodGroups = {
   ],
   "typed-hunting": ["ListThreatHits", "GetHuntingRuntimeConfig", "UpdateHuntingRuntimeConfig"],
   "typed-vehicle-dbc": ["ListVehicleDBCProfiles", "AddVehicleDBC", "RemoveVehicleDBC"],
-  "typed-plugin": [
-    "ListPlugins",
-    "GetPluginSource",
-    "SavePluginSource",
-    "AddPlugin",
-    "DeletePlugin",
-    "TogglePlugin",
-    "SetPluginsEnabled",
-  ],
   "typed-misc": [
     "ListMiscModules",
     "ImportMiscModulePackageFromPath",
@@ -122,6 +112,19 @@ const bridgeTypes = bridgeTypeFiles
   .join("\n");
 
 const failures = [];
+const forbiddenGeneratedBindings = ["InvokeBackendJSON", "InvokeBackendBlob", "InvokeBackendText"];
+
+for (const method of forbiddenGeneratedBindings) {
+  if (new RegExp(`export function ${method}\\b`).test(generatedDts)) {
+    failures.push(`removed generic IPC binding still exists in generated d.ts: ${method}`);
+  }
+  if (new RegExp(`export function ${method}\\b`).test(generatedJs)) {
+    failures.push(`removed generic IPC binding still exists in generated js: ${method}`);
+  }
+  if (new RegExp(`${method}\\?\\s*:`).test(bridgeTypes)) {
+    failures.push(`removed generic IPC binding still exists in DesktopTransportBinding declaration: ${method}`);
+  }
+}
 
 for (const [group, methods] of Object.entries(methodGroups)) {
   const missing = [];

@@ -74,7 +74,7 @@ func TestCachedYaraHitsIncludesWarningWhenYaraFails(t *testing.T) {
 		return []byte("boom"), errors.New("runner failed")
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	tempDir := t.TempDir()
@@ -126,7 +126,7 @@ rule DUMMY_RULE {
 }
 
 func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	svc.huntMu.Lock()
@@ -169,7 +169,7 @@ func TestThreatHuntYaraScansHTTPReassembledStream(t *testing.T) {
 		return []byte("TRAFFIC_HTTP_STREAM_SETUP " + target + "\n"), nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	tempDir := t.TempDir()
@@ -228,7 +228,7 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 }
 
 func TestBuildYaraScanTargetsRespectsCanceledContext(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.packetStore.Append([]model.Packet{

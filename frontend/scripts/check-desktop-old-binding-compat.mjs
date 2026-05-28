@@ -17,7 +17,6 @@ const ignoredSourcePatterns = [
 const allowedOldBindingMethodsByFile = {
   "src/app/integrations/backendClients.ts": ["DesktopApp"],
   "src/app/integrations/httpBridge.ts": ["GetBackendAuthToken"],
-  "src/app/integrations/ipcBackendTransport.ts": ["InvokeBackendJSON", "InvokeBackendBlob", "InvokeBackendText"],
   "src/app/integrations/clients/captureClient.ts": ["OpenCaptureDialog"],
   "src/app/integrations/clients/desktopClient.ts": [
     "BackendStatus",
@@ -28,18 +27,19 @@ const allowedOldBindingMethodsByFile = {
 };
 
 const exitPlanTokens = [
-  "status: guarded",
-  "InvokeBackendJSON",
-  "InvokeBackendBlob",
-  "InvokeBackendText",
-  "typed_binding_required",
+  "removed InvokeBackendJSON",
+  "removed InvokeBackendBlob",
+  "removed InvokeBackendText",
+  "generic_ipc_disabled",
   "Three consecutive green rounds",
   "desktopWebviewTyped.directBackendApiRequestCount = 0",
   "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
+  "VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
   "DisableGenericIpcAdapterExperiment",
   "genericIpcDisableExperimentBuildFlag = true",
   "Browser-dev HTTP/SSE remains green",
   "Do not remove browser-dev HTTP/SSE debugging",
+  "documented no-op",
 ];
 
 export function findDesktopOldBindingCompatViolations({
@@ -72,6 +72,15 @@ function validateExitPlan(exitPlanPath, violations) {
     return;
   }
   const plan = readFileSync(exitPlanPath, "utf8");
+  if (
+    !/status:\s*(guarded|frontend adapter construction removed; backend\/generated binding cleanup pending|shell-compat-only; backend\/generated InvokeBackend\* removed)/.test(
+      plan,
+    )
+  ) {
+    violations.push(
+      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan status guarded or frontend adapter construction removed",
+    );
+  }
   for (const token of exitPlanTokens) {
     if (!plan.includes(token)) {
       violations.push(`docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token ${token}`);

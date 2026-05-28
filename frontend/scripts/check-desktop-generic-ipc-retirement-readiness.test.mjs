@@ -5,11 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import { findDesktopGenericIpcRetirementReadinessViolations } from "./check-desktop-generic-ipc-retirement-readiness.mjs";
 
-function createFixture({ bridge, transport, smoke, exitPlan, tracker, packageJson }) {
+function createFixture({ bridge, smoke, exitPlan, tracker, packageJson }) {
   const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-retirement-"));
   writeFixture(rootDir, "frontend/src/app/integrations/desktopBridge.ts", bridge ?? validBridge());
   writeFixture(rootDir, "frontend/src/app/integrations/desktopGenericIpcPolicy.ts", validPolicy());
-  writeFixture(rootDir, "frontend/src/app/integrations/ipcBackendTransport.ts", transport ?? validTransport());
+  writeFixture(
+    rootDir,
+    "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts",
+    validDisabledTransport(),
+  );
   writeFixture(rootDir, "scripts/check-desktop-ipc-smoke.ps1", smoke ?? validSmokeScript());
   writeFixture(rootDir, "docs/desktop-ipc-old-binding-exit-plan.md", exitPlan ?? validExitPlan());
   writeFixture(rootDir, "docs/desktop-ipc-iteration-status.json", JSON.stringify(tracker ?? validTracker()));
@@ -26,7 +30,7 @@ function writeFixture(rootDir, relativePath, content) {
 function validBridge() {
   return `
     import { isDesktopGenericIpcDisabled } from "./desktopGenericIpcPolicy";
-    import { createDisabledGenericIpcBackendTransport, createIpcBackendTransport } from "./ipcBackendTransport";
+    import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
     export function isDesktopGenericIpcDisableExperimentEnabled() {
       return String(import.meta.env.VITE_DESKTOP_DISABLE_GENERIC_IPC ?? "").trim() === "1";
     }
@@ -38,28 +42,23 @@ function validPolicy() {
   return `
     export function resolveDesktopGenericIpcPolicy(env = import.meta.env) {
       const policy = String(env.VITE_DESKTOP_GENERIC_IPC_POLICY ?? "").trim().toLowerCase();
-      if (policy === "disabled") return "disabled";
       const explicitPolicy = policy;
       if (explicitPolicy === "compat") return "compat";
       String(env.VITE_DESKTOP_DISABLE_GENERIC_IPC ?? "").trim() === "1";
       return "disabled";
     }
     export function isDesktopGenericIpcDisabled(env = import.meta.env) {
-      return resolveDesktopGenericIpcPolicy(env) === "disabled";
+      resolveDesktopGenericIpcPolicy(env);
+      return true;
     }
   `;
 }
 
-function validTransport() {
+function validDisabledTransport() {
   return `
     export const code = "generic_ipc_disabled";
+    import { subscribeDesktopEvents } from "./desktopEventTransport";
     export function createDisabledGenericIpcBackendTransport() { return { subscribeEvents: subscribeDesktopEvents }; }
-    export function createIpcBackendTransport(desktopApp) {
-      desktopApp.InvokeBackendJSON;
-      desktopApp.InvokeBackendBlob;
-      desktopApp.InvokeBackendText;
-    }
-    function subscribeDesktopEvents() {}
   `;
 }
 
@@ -111,6 +110,7 @@ function validTracker() {
               compatRollbackPolicy: "compat",
               directBackendApiRequestCount: 0,
               browserDevOk: true,
+              adapterRemoved: false,
             },
           ],
         },
@@ -129,7 +129,7 @@ function validPackageJson() {
 }
 
 describe("check-desktop-generic-ipc-retirement-readiness script", () => {
-  it("accepts the default-disabled release-candidate contract with compat rollback", () => {
+  it("accepts the default-disabled release-candidate contract with compat policy value", () => {
     const rootDir = createFixture({});
 
     expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toEqual([]);
@@ -148,7 +148,7 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
   it("rejects promoting the legacy desktop bridge disablement alias to the default", () => {
     const rootDir = createFixture({
       bridge: `
-        import { createDisabledGenericIpcBackendTransport, createIpcBackendTransport } from "./ipcBackendTransport";
+        import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
         export function isDesktopGenericIpcDisableExperimentEnabled() {
           return String(import.meta.env.VITE_DESKTOP_DISABLE_GENERIC_IPC ?? "1").trim() === "1";
         }
@@ -168,12 +168,12 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
       `
         export function resolveDesktopGenericIpcPolicy(env = import.meta.env) {
           const explicitPolicy = String(env.VITE_DESKTOP_GENERIC_IPC_POLICY ?? "").trim().toLowerCase();
-          if (explicitPolicy === "disabled") return "disabled";
           if (explicitPolicy === "compat") return "compat";
           return "compat";
         }
         export function isDesktopGenericIpcDisabled(env = import.meta.env) {
-          return resolveDesktopGenericIpcPolicy(env) === "disabled";
+          resolveDesktopGenericIpcPolicy(env);
+          return true;
         }
       `,
     );
@@ -183,7 +183,7 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
     );
   });
 
-  it("requires the explicit compat rollback policy to remain available", () => {
+  it("requires the explicit compat policy value to remain available", () => {
     const rootDir = createFixture({});
     writeFixture(
       rootDir,
@@ -191,7 +191,39 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
       `
         export function resolveDesktopGenericIpcPolicy(env = import.meta.env) {
           const explicitPolicy = String(env.VITE_DESKTOP_GENERIC_IPC_POLICY ?? "").trim().toLowerCase();
-          if (explicitPolicy === "disabled") return "disabled";
+          return "disabled";
+        }
+        export function isDesktopGenericIpcDisabled(env = import.meta.env) {
+          resolveDesktopGenericIpcPolicy(env);
+          return true;
+        }
+      `,
+    );
+
+    expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat policy value must remain recognizable",
+    );
+  });
+
+  it("requires tracker to record the explicit compat policy value", () => {
+    const tracker = validTracker();
+    tracker.domains.genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy = "missing";
+    const rootDir = createFixture({ tracker });
+
+    expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
+      "docs/desktop-ipc-iteration-status.json: genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy must preserve the VITE_DESKTOP_GENERIC_IPC_POLICY=compat policy value",
+    );
+  });
+
+  it("requires compat to remain a documented no-op after adapter removal candidate", () => {
+    const rootDir = createFixture({});
+    writeFixture(
+      rootDir,
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts",
+      `
+        export function resolveDesktopGenericIpcPolicy(env = import.meta.env) {
+          const explicitPolicy = String(env.VITE_DESKTOP_GENERIC_IPC_POLICY ?? "").trim().toLowerCase();
+          if (explicitPolicy === "compat") return "compat";
           return "disabled";
         }
         export function isDesktopGenericIpcDisabled(env = import.meta.env) {
@@ -201,17 +233,7 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
     );
 
     expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
-      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat rollback must remain available",
-    );
-  });
-
-  it("requires tracker to record the explicit compat rollback policy", () => {
-    const tracker = validTracker();
-    tracker.domains.genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy = "missing";
-    const rootDir = createFixture({ tracker });
-
-    expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
-      "docs/desktop-ipc-iteration-status.json: genericIpcAdapterDefaultDisabledReleaseCandidate.rollbackPolicy must be VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
+      "frontend/src/app/integrations/desktopGenericIpcPolicy.ts: after adapter removal candidate, compat must remain a documented no-op and generic IPC must stay disabled",
     );
   });
 
@@ -231,7 +253,25 @@ describe("check-desktop-generic-ipc-retirement-readiness script", () => {
     const rootDir = createFixture({ tracker });
 
     expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
-      "docs/desktop-ipc-iteration-status.json: latest observation round browserDevOk must be true",
+      "docs/desktop-ipc-iteration-status.json: observation round round-25 browserDevOk must be true",
+    );
+  });
+
+  it("requires evidence for every counted default-disabled observation round", () => {
+    const tracker = validTracker();
+    tracker.domains.genericIpcAdapterDefaultDisabledReleaseCandidate.observation.currentConsecutiveGreenRounds = 2;
+    tracker.domains.genericIpcAdapterDefaultDisabledReleaseCandidate.observation.rounds.push({
+      id: "round-26",
+      genericIpcPolicy: "disabled",
+      compatRollbackPolicy: "compat",
+      directBackendApiRequestCount: 1,
+      browserDevOk: true,
+      adapterRemoved: false,
+    });
+    const rootDir = createFixture({ tracker });
+
+    expect(findDesktopGenericIpcRetirementReadinessViolations({ rootDir })).toContain(
+      "docs/desktop-ipc-iteration-status.json: observation round round-26 directBackendApiRequestCount must remain 0",
     );
   });
 

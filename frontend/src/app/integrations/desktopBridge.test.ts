@@ -65,13 +65,6 @@ function createFallbackBridge(overrides: Partial<BackendBridge> = {}): BackendBr
     listVehicleDBCProfiles: vi.fn(),
     addVehicleDBC: vi.fn(),
     removeVehicleDBC: vi.fn(),
-    listPlugins: vi.fn(),
-    getPluginSource: vi.fn(),
-    savePluginSource: vi.fn(),
-    addPlugin: vi.fn(),
-    deletePlugin: vi.fn(),
-    togglePlugin: vi.fn(),
-    setPluginsEnabled: vi.fn(),
     getRawStreamPage: vi.fn(),
     getIndustrialAnalysis: vi.fn(),
     getMediaAnalysis: vi.fn(),
@@ -189,7 +182,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.isAvailable).not.toHaveBeenCalled();
   });
 
-  it("keeps packet, stream, analysis, and event data-plane calls on HTTP only when generic IPC is missing", async () => {
+  it("fails missing typed data-plane calls but keeps events on Wails runtime", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const unsubscribe = vi.fn();
     const fallbackBridge = createFallbackBridge({
@@ -261,99 +254,73 @@ describe("createDesktopBridge", () => {
       fallbackBridge,
     });
 
-    await bridge.listPacketsPage(100, 50, "http");
-    await bridge.getRawStreamPage("TCP", 3, 0, 4096);
-    await bridge.getIndustrialAnalysis();
-    await expect(bridge.getHTTPLoginAnalysis()).resolves.toMatchObject({
-      report: { summary: [{ title: "候选端点", summary: "1 个端点 / 1 次尝试" }] },
+    await expect(bridge.listPacketsPage(100, 50, "http")).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/packets/page?cursor=100&limit=50&filter=http",
+      transport: "desktop-ipc",
     });
-    await expect(bridge.getEvidenceWithFilter(["vehicle"])).resolves.toMatchObject([
-      { id: "vehicle-1", module: "vehicle", summary: "UDS 负响应" },
-    ]);
+    await expect(bridge.getRawStreamPage("TCP", 3, 0, 4096)).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/streams/raw/page?protocol=TCP&streamId=3&cursor=0&limit=4096",
+      transport: "desktop-ipc",
+    });
+    await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/analysis/industrial",
+      transport: "desktop-ipc",
+    });
+    await expect(bridge.getHTTPLoginAnalysis()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/tools/http-login-analysis",
+      transport: "desktop-ipc",
+    });
+    await expect(bridge.getEvidenceWithFilter(["vehicle"])).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/evidence?modules=vehicle",
+      transport: "desktop-ipc",
+    });
     const stop = bridge.subscribeEvents({ status: vi.fn() });
     stop();
 
-    expect(fallbackBridge.listPacketsPage).toHaveBeenCalledWith(100, 50, "http");
-    expect(fallbackBridge.getRawStreamPage).toHaveBeenCalledWith("TCP", 3, 0, 4096);
-    expect(fallbackBridge.getIndustrialAnalysis).toHaveBeenCalledWith();
-    expect(fallbackBridge.getHTTPLoginAnalysis).toHaveBeenCalledWith();
-    expect(fallbackBridge.getEvidenceWithFilter).toHaveBeenCalledWith(["vehicle"]);
-    expect(fallbackBridge.subscribeEvents).toHaveBeenCalled();
-    expect(unsubscribe).toHaveBeenCalled();
+    expect(fallbackBridge.listPacketsPage).not.toHaveBeenCalled();
+    expect(fallbackBridge.getRawStreamPage).not.toHaveBeenCalled();
+    expect(fallbackBridge.getIndustrialAnalysis).not.toHaveBeenCalled();
+    expect(fallbackBridge.getHTTPLoginAnalysis).not.toHaveBeenCalled();
+    expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
+    expect(fallbackBridge.subscribeEvents).not.toHaveBeenCalled();
+    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:packet", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:status", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:error", expect.any(Function));
+    expect(unsubscribe).not.toHaveBeenCalled();
   });
 
-  it("routes data-plane calls through generic Wails IPC when the typed binding is missing", async () => {
+  it("fails fast when a data-plane typed binding is missing instead of using generic IPC", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       getIndustrialAnalysis: vi.fn(),
       getEvidenceWithFilter: vi.fn(),
       listMiscModules: vi.fn(),
     });
-    const invokeBackendJSON = vi.fn(async (request: unknown) => {
-      const path = String((request as { path?: unknown }).path ?? "");
-      switch (path) {
-        case "/api/analysis/industrial":
-          return {
-            total_industrial_packets: 0,
-            protocols: [],
-            conversations: [],
-            modbus: {
-              total_frames: 0,
-              requests: 0,
-              responses: 0,
-              exceptions: 0,
-              function_codes: [],
-              unit_ids: [],
-              reference_hits: [],
-              exception_codes: [],
-              transactions: [],
-            },
-            details: [],
-            notes: [],
-            report: { summary: [], evidence: [], details: [], recommendations: [] },
-          };
-        case "/api/evidence?modules=vehicle":
-          return { records: [] };
-        case "/api/tools/misc/modules":
-          return [];
-        default:
-          throw new Error(`unexpected IPC path: ${path}`);
-      }
-    });
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: invokeBackendJSON,
-        InvokeBackendBlob: vi.fn(),
-        InvokeBackendText: vi.fn(),
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
-    await bridge.getIndustrialAnalysis();
-    await bridge.getEvidenceWithFilter(["vehicle"]);
-    await bridge.listMiscModules();
-
-    expect(invokeBackendJSON).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: "GET",
-        path: "/api/analysis/industrial",
-        body_kind: "none",
-      }),
-    );
-    expect(invokeBackendJSON).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: "GET",
-        path: "/api/evidence?modules=vehicle",
-        body_kind: "none",
-      }),
-    );
-    expect(invokeBackendJSON).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: "GET",
-        path: "/api/tools/misc/modules",
-        body_kind: "none",
-      }),
-    );
+    await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/analysis/industrial",
+      transport: "desktop-ipc",
+    });
+    await expect(bridge.getEvidenceWithFilter(["vehicle"])).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/evidence?modules=vehicle",
+      transport: "desktop-ipc",
+    });
+    await expect(bridge.listMiscModules()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/tools/misc/modules",
+      transport: "desktop-ipc",
+    });
     expect(fallbackBridge.getIndustrialAnalysis).not.toHaveBeenCalled();
     expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
     expect(fallbackBridge.listMiscModules).not.toHaveBeenCalled();
@@ -369,13 +336,6 @@ describe("createDesktopBridge", () => {
       listVehicleDBCProfiles: vi.fn(),
       addVehicleDBC: vi.fn(),
       removeVehicleDBC: vi.fn(),
-      listPlugins: vi.fn(),
-      getPluginSource: vi.fn(),
-      savePluginSource: vi.fn(),
-      addPlugin: vi.fn(),
-      deletePlugin: vi.fn(),
-      togglePlugin: vi.fn(),
-      setPluginsEnabled: vi.fn(),
       listMiscModules: vi.fn(),
       selectMiscModulePackage: vi.fn(),
       importMiscModulePackageFromPath: vi.fn(),
@@ -392,9 +352,6 @@ describe("createDesktopBridge", () => {
       cancelMediaBatchTranscription: vi.fn(),
     });
     const desktopApp: DesktopTransportBinding = {
-      InvokeBackendJSON: vi.fn(async () => {
-        throw new Error("generic IPC should not be used for migrated typed domains");
-      }),
       LocatePacketPage: vi.fn(async () => ({ packet_id: 42, cursor: 100, total: 200, found: true })),
       GetPacket: vi.fn(async () => ({
         id: 42,
@@ -432,13 +389,6 @@ describe("createDesktopBridge", () => {
       ListVehicleDBCProfiles: vi.fn(async () => [{ path: "car.dbc", name: "car", message_count: 2, signal_count: 8 }]),
       AddVehicleDBC: vi.fn(async () => [{ path: "truck.dbc", name: "truck", message_count: 3, signal_count: 12 }]),
       RemoveVehicleDBC: vi.fn(async () => []),
-      ListPlugins: vi.fn(async () => [{ id: "echo", name: "Echo", enabled: true, capabilities: ["packet.read"] }]),
-      GetPluginSource: vi.fn(async () => ({ id: "echo", config_path: "cfg", logic_path: "logic", entry: "echo.js" })),
-      SavePluginSource: vi.fn(async () => ({ id: "echo", config_path: "cfg2", entry: "echo.js" })),
-      AddPlugin: vi.fn(async () => ({ id: "new", name: "New", enabled: false, capabilities: ["packet.read"] })),
-      DeletePlugin: vi.fn(async () => ({ id: "old", deleted: true })),
-      TogglePlugin: vi.fn(async () => ({ id: "echo", enabled: false })),
-      SetPluginsEnabled: vi.fn(async () => [{ id: "echo", enabled: true }]),
       ListMiscModules: vi.fn(async () => [
         {
           id: "webshell.decoder",
@@ -542,34 +492,6 @@ describe("createDesktopBridge", () => {
       { path: "truck.dbc", name: "truck", messageCount: 3, signalCount: 12 },
     ]);
     await expect(bridge.removeVehicleDBC("truck.dbc")).resolves.toEqual([]);
-    await expect(bridge.listPlugins()).resolves.toMatchObject([{ id: "echo", name: "Echo", enabled: true }]);
-    await expect(bridge.getPluginSource("echo")).resolves.toMatchObject({ id: "echo", configPath: "cfg" });
-    await expect(
-      bridge.savePluginSource({
-        id: "echo",
-        configPath: "cfg2",
-        configContent: "",
-        logicPath: "logic",
-        logicContent: "",
-        entry: "echo.js",
-      }),
-    ).resolves.toMatchObject({ id: "echo", configPath: "cfg2" });
-    await expect(
-      bridge.addPlugin({
-        id: "new",
-        name: "New",
-        version: "",
-        tag: "",
-        author: "",
-        enabled: false,
-        entry: "echo.js",
-        runtime: "",
-        capabilities: ["packet.read"],
-      }),
-    ).resolves.toMatchObject({ id: "new", capabilities: ["packet.read"] });
-    await expect(bridge.deletePlugin("old")).resolves.toBeUndefined();
-    await expect(bridge.togglePlugin("echo")).resolves.toMatchObject({ id: "echo", enabled: false });
-    await expect(bridge.setPluginsEnabled(["echo"], true)).resolves.toMatchObject([{ id: "echo", enabled: true }]);
     await expect(bridge.listMiscModules()).resolves.toMatchObject([
       { id: "webshell.decoder", title: "WebShell Decoder", tags: ["webshell"] },
     ]);
@@ -625,29 +547,6 @@ describe("createDesktopBridge", () => {
     expect(desktopApp.ListVehicleDBCProfiles).toHaveBeenCalledTimes(1);
     expect(desktopApp.AddVehicleDBC).toHaveBeenCalledWith("truck.dbc");
     expect(desktopApp.RemoveVehicleDBC).toHaveBeenCalledWith("truck.dbc");
-    expect(desktopApp.ListPlugins).toHaveBeenCalledTimes(1);
-    expect(desktopApp.GetPluginSource).toHaveBeenCalledWith("echo");
-    expect(desktopApp.SavePluginSource).toHaveBeenCalledWith({
-      id: "echo",
-      config_path: "cfg2",
-      config_content: "",
-      logic_path: "logic",
-      logic_content: "",
-      entry: "echo.js",
-    });
-    expect(desktopApp.AddPlugin).toHaveBeenCalledWith({
-      id: "new",
-      name: "New",
-      version: "",
-      tag: "",
-      author: "",
-      enabled: false,
-      entry: "echo.js",
-      capabilities: ["packet.read"],
-    });
-    expect(desktopApp.DeletePlugin).toHaveBeenCalledWith("old");
-    expect(desktopApp.TogglePlugin).toHaveBeenCalledWith("echo");
-    expect(desktopApp.SetPluginsEnabled).toHaveBeenCalledWith(["echo"], true);
     expect(desktopApp.ListMiscModules).toHaveBeenCalledTimes(1);
     expect(desktopApp.SelectMiscModulePackage).toHaveBeenCalledTimes(1);
     expect(desktopApp.ImportMiscModulePackageFromPath).toHaveBeenCalledWith("C:/modules/module.zip");
@@ -662,7 +561,6 @@ describe("createDesktopBridge", () => {
     expect(desktopApp.StartMediaBatchTranscription).toHaveBeenCalledWith(false);
     expect(desktopApp.GetMediaBatchTranscriptionStatus).toHaveBeenCalledTimes(1);
     expect(desktopApp.CancelMediaBatchTranscription).toHaveBeenCalledTimes(1);
-    expect(desktopApp.InvokeBackendJSON).not.toHaveBeenCalled();
     expect(fallbackBridge.locatePacketPage).not.toHaveBeenCalled();
     expect(fallbackBridge.getPacket).not.toHaveBeenCalled();
     expect(fallbackBridge.listThreatHits).not.toHaveBeenCalled();
@@ -671,13 +569,6 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listVehicleDBCProfiles).not.toHaveBeenCalled();
     expect(fallbackBridge.addVehicleDBC).not.toHaveBeenCalled();
     expect(fallbackBridge.removeVehicleDBC).not.toHaveBeenCalled();
-    expect(fallbackBridge.listPlugins).not.toHaveBeenCalled();
-    expect(fallbackBridge.getPluginSource).not.toHaveBeenCalled();
-    expect(fallbackBridge.savePluginSource).not.toHaveBeenCalled();
-    expect(fallbackBridge.addPlugin).not.toHaveBeenCalled();
-    expect(fallbackBridge.deletePlugin).not.toHaveBeenCalled();
-    expect(fallbackBridge.togglePlugin).not.toHaveBeenCalled();
-    expect(fallbackBridge.setPluginsEnabled).not.toHaveBeenCalled();
     expect(fallbackBridge.listMiscModules).not.toHaveBeenCalled();
     expect(fallbackBridge.selectMiscModulePackage).not.toHaveBeenCalled();
     expect(fallbackBridge.importMiscModulePackageFromPath).not.toHaveBeenCalled();
@@ -721,9 +612,6 @@ describe("createDesktopBridge", () => {
       size: 5,
     };
     const desktopApp: DesktopTransportBinding = {
-      InvokeBackendBlob: vi.fn(async () => {
-        throw new Error("generic blob IPC should not be used for migrated media domains");
-      }),
       ExportMediaBatchTranscription: vi.fn(async () => typedBlob),
       DownloadMediaArtifact: vi.fn(async () => typedBlob),
       GetMediaPlaybackBlob: vi.fn(async () => typedBlob),
@@ -738,7 +626,6 @@ describe("createDesktopBridge", () => {
       expect(desktopApp.ExportMediaBatchTranscription).toHaveBeenCalledWith("json");
       expect(desktopApp.DownloadMediaArtifact).toHaveBeenCalledWith("tok/1");
       expect(desktopApp.GetMediaPlaybackBlob).toHaveBeenCalledWith("tok/1");
-      expect(desktopApp.InvokeBackendBlob).not.toHaveBeenCalled();
       expect(fallbackBridge.exportMediaBatchTranscription).not.toHaveBeenCalled();
       expect(fallbackBridge.downloadMediaArtifact).not.toHaveBeenCalled();
       expect(fallbackBridge.getMediaPlaybackBlob).not.toHaveBeenCalled();
@@ -758,42 +645,13 @@ describe("createDesktopBridge", () => {
     }
   });
 
-  it("falls back to generic IPC only when a migrated typed binding is missing", async () => {
+  it("does not restore generic IPC when compat policy is set and a migrated typed binding is missing", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(),
     });
-    const invokeBackendJSON = vi.fn(async (request: unknown) => {
-      expect(request).toMatchObject({
-        method: "GET",
-        path: "/api/objects",
-        body_kind: "none",
-      });
-      return [];
-    });
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: invokeBackendJSON,
-      },
-      fallbackBridge,
-    });
-
-    await bridge.listObjects();
-
-    expect(invokeBackendJSON).toHaveBeenCalledTimes(1);
-    expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
-  });
-
-  it("fails fast instead of using generic IPC or HTTP when the disable experiment is enabled", async () => {
-    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
-    const fallbackBridge = createFallbackBridge({
-      listObjects: vi.fn(async () => []),
-    });
-    const invokeBackendJSON = vi.fn(async () => []);
-    const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: invokeBackendJSON,
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
@@ -802,7 +660,26 @@ describe("createDesktopBridge", () => {
       endpoint: "/api/objects",
       transport: "desktop-ipc",
     });
-    expect(invokeBackendJSON).not.toHaveBeenCalled();
+
+    expect(resolveDesktopGenericIpcPolicy()).toBe("compat");
+    expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
+  });
+
+  it("fails fast instead of using generic IPC or HTTP when the disable experiment is enabled", async () => {
+    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
+    const fallbackBridge = createFallbackBridge({
+      listObjects: vi.fn(async () => []),
+    });
+    const bridge = createDesktopBridge({
+      desktopApp: {},
+      fallbackBridge,
+    });
+
+    await expect(bridge.listObjects()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/objects",
+      transport: "desktop-ipc",
+    });
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
@@ -811,11 +688,8 @@ describe("createDesktopBridge", () => {
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(async () => []),
     });
-    const invokeBackendJSON = vi.fn(async () => []);
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: invokeBackendJSON,
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
@@ -825,34 +699,27 @@ describe("createDesktopBridge", () => {
       transport: "desktop-ipc",
     });
     expect(resolveDesktopGenericIpcPolicy()).toBe("disabled");
-    expect(invokeBackendJSON).not.toHaveBeenCalled();
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
-  it("keeps explicit compat policy adapter-enabled even when the legacy disable alias is set", async () => {
+  it("keeps explicit compat policy as a documented no-op after adapter removal", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(),
     });
-    const invokeBackendJSON = vi.fn(async () => []);
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: invokeBackendJSON,
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
-    await expect(bridge.listObjects()).resolves.toEqual([]);
+    await expect(bridge.listObjects()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/objects",
+      transport: "desktop-ipc",
+    });
 
     expect(resolveDesktopGenericIpcPolicy()).toBe("compat");
-    expect(invokeBackendJSON).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: "GET",
-        path: "/api/objects",
-        body_kind: "none",
-      }),
-    );
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
@@ -863,11 +730,7 @@ describe("createDesktopBridge", () => {
         throw new Error("HTTP fallback should not run");
       }),
     });
-    const invokeBackendJSON = vi.fn(async () => {
-      throw new Error("generic IPC should not run");
-    });
     const desktopApp: DesktopTransportBinding = {
-      InvokeBackendJSON: invokeBackendJSON,
       ListObjects: vi.fn(async () => []),
     };
     const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
@@ -875,7 +738,6 @@ describe("createDesktopBridge", () => {
     await expect(bridge.listObjects()).resolves.toEqual([]);
 
     expect(desktopApp.ListObjects).toHaveBeenCalledTimes(1);
-    expect(invokeBackendJSON).not.toHaveBeenCalled();
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
@@ -886,9 +748,7 @@ describe("createDesktopBridge", () => {
       subscribeEvents: vi.fn(() => fallbackUnsubscribe),
     });
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: vi.fn(),
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
@@ -962,7 +822,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {
-        InvokeBackendJSON: vi.fn(),
         GetCaptureStatus: vi.fn(async () => new Promise<unknown>(() => undefined)),
       },
       fallbackBridge,
@@ -980,19 +839,19 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getCaptureStatus).not.toHaveBeenCalled();
   });
 
-  it("preserves string IPC errors in wrapped desktop data-plane failures", async () => {
+  it("fails with generic_ipc_disabled instead of invoking legacy adapter failures", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge();
     const bridge = createDesktopBridge({
-      desktopApp: {
-        InvokeBackendJSON: vi.fn(async () => {
-          throw "backend token expired";
-        }),
-      },
+      desktopApp: {},
       fallbackBridge,
     });
 
-    await expect(bridge.getIndustrialAnalysis()).rejects.toThrow("backend token expired");
+    await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
+      code: "generic_ipc_disabled",
+      endpoint: "/api/analysis/industrial",
+      transport: "desktop-ipc",
+    });
   });
 
   it("lets packet page callers abort typed IPC without browser HTTP fallback", async () => {
@@ -1007,7 +866,6 @@ describe("createDesktopBridge", () => {
     const controller = new AbortController();
     const bridge = createDesktopBridge({
       desktopApp: {
-        InvokeBackendJSON: vi.fn(),
         ListPacketsPage: vi.fn(async () => new Promise<unknown>(() => undefined)),
       },
       fallbackBridge,
@@ -1104,42 +962,25 @@ describe("createDesktopBridge", () => {
     }
   });
 
-  it("blocks generic desktop IPC fallback when a typed fast runtime snapshot binding exists and fails", async () => {
+  it("falls back to HTTP instead of generic IPC when a typed fast runtime snapshot binding fails", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
-      getToolRuntimeSnapshot: vi.fn(),
-    });
-    const invokeBackendJSON = vi.fn(async (request: unknown) => {
-      expect(request).toMatchObject({
-        method: "GET",
-        path: "/api/tools/runtime-config?probe=fast",
-        body_kind: "none",
-      });
-      return {
-        config: { tshark_path: "ipc-data-plane-tshark", yara_timeout_ms: 25000 },
-        tshark: { available: true, path: "ipc-data-plane-tshark", message: "ok" },
-        ffmpeg: { available: false, path: "", message: "" },
-        speech: { available: false, message: "" },
-        yara: { enabled: false, message: "", timeout_ms: 25000 },
-      };
+      getToolRuntimeSnapshot: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot(undefined, "fast")),
     });
     const desktopApp: DesktopTransportBinding = {
-      InvokeBackendJSON: invokeBackendJSON,
       GetToolRuntimeSnapshotFast: vi.fn(async () => {
         throw "typed runtime bridge missing";
       }),
     };
     const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
 
-    await expect(bridge.getToolRuntimeSnapshot(undefined, "fast")).rejects.toMatchObject({
-      code: "typed_binding_required",
-      endpoint: "/api/tools/runtime-config?probe=fast",
-      transport: "desktop-ipc",
-    });
+    const snapshot = await bridge.getToolRuntimeSnapshot(undefined, "fast");
+    expect(snapshot).toMatchObject({ config: { tsharkPath: "fallback-tshark" } });
+    expect(snapshot.transport).toBe("http-fallback");
+    expect(snapshot.transportError).toContain("typed runtime bridge missing");
 
     expect(desktopApp.GetToolRuntimeSnapshotFast).toHaveBeenCalledTimes(1);
-    expect(invokeBackendJSON).not.toHaveBeenCalled();
-    expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
+    expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(undefined, "fast");
   });
 
   it("keeps abortable runtime config updates on Wails IPC when the binding exists", async () => {

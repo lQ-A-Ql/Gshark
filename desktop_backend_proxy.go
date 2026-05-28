@@ -140,31 +140,6 @@ type desktopVehicleDBCRequest struct {
 	Path string `json:"path"`
 }
 
-type desktopPluginRequest struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Version      string   `json:"version"`
-	Tag          string   `json:"tag"`
-	Author       string   `json:"author"`
-	Enabled      bool     `json:"enabled"`
-	Entry        string   `json:"entry,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
-}
-
-type desktopPluginSourceRequest struct {
-	ID            string `json:"id"`
-	ConfigPath    string `json:"config_path"`
-	ConfigContent string `json:"config_content"`
-	LogicPath     string `json:"logic_path,omitempty"`
-	LogicContent  string `json:"logic_content,omitempty"`
-	Entry         string `json:"entry,omitempty"`
-}
-
-type desktopPluginBulkRequest struct {
-	IDs     []string `json:"ids"`
-	Enabled bool     `json:"enabled"`
-}
-
 type desktopBackendRequest struct {
 	Method    string                 `json:"method"`
 	Path      string                 `json:"path"`
@@ -417,22 +392,7 @@ func (a *DesktopApp) PingBackendDataPlane() desktopBackendProbe {
 	return probe
 }
 
-func (a *DesktopApp) InvokeBackendJSON(req desktopBackendRequest) (any, error) {
-	raw, err := a.invokeBackendRaw(req, "json")
-	if err != nil {
-		return nil, err
-	}
-	if len(bytes.TrimSpace(raw.Body)) == 0 {
-		return map[string]any{}, nil
-	}
-	var payload any
-	if err := json.Unmarshal(raw.Body, &payload); err != nil {
-		return nil, fmt.Errorf("decode backend JSON response for %s %s: %w", req.normalizedMethod(), req.Path, err)
-	}
-	return payload, nil
-}
-
-func (a *DesktopApp) InvokeBackendBlob(req desktopBackendRequest) (desktopBackendBlob, error) {
+func (a *DesktopApp) invokeBackendBlob(req desktopBackendRequest) (desktopBackendBlob, error) {
 	raw, err := a.invokeBackendRaw(req, "blob")
 	if err != nil {
 		return desktopBackendBlob{}, err
@@ -449,7 +409,7 @@ func (a *DesktopApp) InvokeBackendBlob(req desktopBackendRequest) (desktopBacken
 	}, nil
 }
 
-func (a *DesktopApp) InvokeBackendText(req desktopBackendRequest) (string, error) {
+func (a *DesktopApp) invokeBackendText(req desktopBackendRequest) (string, error) {
 	raw, err := a.invokeBackendRaw(req, "text")
 	if err != nil {
 		return "", err
@@ -836,34 +796,6 @@ func (a *DesktopApp) RemoveVehicleDBC(path string) (any, error) {
 	return a.desktopDeleteJSON(query, 10*time.Second)
 }
 
-func (a *DesktopApp) ListPlugins() (any, error) {
-	return a.desktopGetJSON("/api/plugins", 10*time.Second)
-}
-
-func (a *DesktopApp) GetPluginSource(id string) (any, error) {
-	return a.desktopGetJSON("/api/plugins/source?id="+url.QueryEscape(strings.TrimSpace(id)), 10*time.Second)
-}
-
-func (a *DesktopApp) SavePluginSource(source desktopPluginSourceRequest) (any, error) {
-	return a.desktopPostJSON("/api/plugins/source", source, 15*time.Second)
-}
-
-func (a *DesktopApp) AddPlugin(plugin desktopPluginRequest) (any, error) {
-	return a.desktopPostJSON("/api/plugins/add", plugin, 15*time.Second)
-}
-
-func (a *DesktopApp) DeletePlugin(id string) (any, error) {
-	return a.desktopPostJSON("/api/plugins/delete?id="+url.QueryEscape(strings.TrimSpace(id)), map[string]any{}, 10*time.Second)
-}
-
-func (a *DesktopApp) TogglePlugin(id string) (any, error) {
-	return a.desktopPostJSON("/api/plugins/toggle?id="+url.QueryEscape(strings.TrimSpace(id)), map[string]any{}, 10*time.Second)
-}
-
-func (a *DesktopApp) SetPluginsEnabled(ids []string, enabled bool) (any, error) {
-	return a.desktopPostJSON("/api/plugins/bulk", desktopPluginBulkRequest{IDs: ids, Enabled: enabled}, 15*time.Second)
-}
-
 func (a *DesktopApp) ListMiscModules() (any, error) {
 	return a.desktopGetJSON("/api/tools/misc/modules", 15*time.Second)
 }
@@ -1005,7 +937,7 @@ func (a *DesktopApp) ListObjects() (any, error) {
 }
 
 func (a *DesktopApp) DownloadObjectsZip(ids []int) (desktopBackendBlob, error) {
-	return a.InvokeBackendBlob(desktopBackendRequest{
+	return a.invokeBackendBlob(desktopBackendRequest{
 		Method:   http.MethodPost,
 		Path:     "/api/objects/download",
 		BodyKind: "json",
@@ -1018,13 +950,13 @@ func (a *DesktopApp) RunWinRMDecrypt(req desktopWinRMDecryptRequest) (any, error
 }
 
 func (a *DesktopApp) GetWinRMDecryptResultText(resultID string) (string, error) {
-	return a.InvokeBackendText(desktopBackendRequest{
+	return a.invokeBackendText(desktopBackendRequest{
 		Path: "/api/tools/winrm-decrypt/export?result_id=" + url.QueryEscape(strings.TrimSpace(resultID)),
 	})
 }
 
 func (a *DesktopApp) ExportWinRMDecryptResult(resultID string) (desktopBackendBlob, error) {
-	return a.InvokeBackendBlob(desktopBackendRequest{
+	return a.invokeBackendBlob(desktopBackendRequest{
 		Path: "/api/tools/winrm-decrypt/export?result_id=" + url.QueryEscape(strings.TrimSpace(resultID)),
 	})
 }
@@ -1105,19 +1037,19 @@ func (a *DesktopApp) ExportMediaBatchTranscription(format string) (desktopBacken
 	if format == "" {
 		format = "txt"
 	}
-	return a.InvokeBackendBlob(desktopBackendRequest{
+	return a.invokeBackendBlob(desktopBackendRequest{
 		Path: "/api/analysis/media/transcribe/batch/export?format=" + url.QueryEscape(format),
 	})
 }
 
 func (a *DesktopApp) DownloadMediaArtifact(token string) (desktopBackendBlob, error) {
-	return a.InvokeBackendBlob(desktopBackendRequest{
+	return a.invokeBackendBlob(desktopBackendRequest{
 		Path: "/api/analysis/media/export?token=" + url.QueryEscape(strings.TrimSpace(token)),
 	})
 }
 
 func (a *DesktopApp) GetMediaPlaybackBlob(token string) (desktopBackendBlob, error) {
-	return a.InvokeBackendBlob(desktopBackendRequest{
+	return a.invokeBackendBlob(desktopBackendRequest{
 		Path: "/api/analysis/media/play?token=" + url.QueryEscape(strings.TrimSpace(token)),
 	})
 }

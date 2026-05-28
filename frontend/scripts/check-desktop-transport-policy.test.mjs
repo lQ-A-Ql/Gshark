@@ -29,7 +29,7 @@ function writePolicyFixture(requirementBody, typedCallBody) {
     "src/app/integrations/desktopTypedBridgeVehicleDbc.ts",
     "export const vehicleDbc = {};\n",
   );
-  writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgePlugin.ts", "export const plugin = {};\n");
+
   return frontendRoot;
 }
 

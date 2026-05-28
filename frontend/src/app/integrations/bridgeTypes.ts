@@ -18,7 +18,6 @@ import type {
   MediaTranscription,
   MySQLAnalysis,
   Packet,
-  PluginItem,
   ShiroRememberMeAnalysis,
   SMTPAnalysis,
   SpeechBatchTaskStatus,
@@ -45,11 +44,8 @@ import type { EventHandlers } from "./clients/eventClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
 import type { MiscModuleClient } from "./miscModuleClientTypes";
-import type { PluginSource } from "./mappers/pluginSourceMapper";
-
 export type { DesktopTransportBinding } from "./desktopTransportBinding";
 export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
-export type { PluginSource } from "./mappers/pluginSourceMapper";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
 export type { MiscModuleClient } from "./miscModuleClientTypes";
@@ -167,16 +163,6 @@ export interface VehicleDBCClient {
   openDBCFile(): Promise<OpenFileResult>;
 }
 
-export interface PluginClient {
-  listPlugins(): Promise<PluginItem[]>;
-  getPluginSource(id: string): Promise<PluginSource>;
-  savePluginSource(source: PluginSource): Promise<PluginSource>;
-  addPlugin(plugin: PluginItem): Promise<PluginItem>;
-  deletePlugin(id: string): Promise<void>;
-  togglePlugin(id: string): Promise<PluginItem>;
-  setPluginsEnabled(ids: string[], enabled: boolean): Promise<PluginItem[]>;
-}
-
 export interface SecurityMaterialClient {
   getTLSConfig(): Promise<DecryptionConfig | null>;
   updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
@@ -200,7 +186,6 @@ export interface BackendBridge
     EvidenceClient,
     MediaClient,
     VehicleDBCClient,
-    PluginClient,
     SecurityMaterialClient,
     MiscModuleClient {}
 
@@ -215,7 +200,6 @@ export interface BackendClients {
   evidence: EvidenceClient;
   media: MediaClient;
   vehicleDBC: VehicleDBCClient;
-  plugin: PluginClient;
   securityMaterial: SecurityMaterialClient;
   miscModule: MiscModuleClient;
 }

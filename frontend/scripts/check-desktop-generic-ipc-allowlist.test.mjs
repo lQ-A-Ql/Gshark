@@ -16,7 +16,6 @@ function writeClientFixture(content) {
 describe("check-desktop-generic-ipc-allowlist script", () => {
   it("accepts migrated typed routes including MISC import", () => {
     const frontendRoot = writeClientFixture(`
-      request("/api/plugins");
       request("/api/tools/misc/modules");
       request("/api/tools/misc/import");
       request(\`/api/tools/misc/packages/\${encodeURIComponent(id)}/invoke\`);

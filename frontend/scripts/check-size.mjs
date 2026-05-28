@@ -304,11 +304,6 @@ export const sourceSizeBudgets = [
     reason: "vehicle wire DTOs should only describe raw vehicle analysis payload fields",
   },
   {
-    path: "src/app/integrations/wire/pluginWireDtos.ts",
-    maxLines: 40,
-    reason: "plugin wire DTOs should only describe raw plugin, DBC, source, and TLS payload fields",
-  },
-  {
     path: "src/app/integrations/mappers/packetStreamMapper.ts",
     maxLines: 10,
     reason: "packet stream mapper should stay as a compatibility export layer",
@@ -447,16 +442,6 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/tsharkStatusMapper.ts",
     maxLines: 35,
     reason: "TShark status mapper should keep capability status normalization reusable and isolated",
-  },
-  {
-    path: "src/app/integrations/mappers/pluginMapper.ts",
-    maxLines: 45,
-    reason: "plugin mapper should keep plugin item and DBC profile conversion local",
-  },
-  {
-    path: "src/app/integrations/mappers/pluginSourceMapper.ts",
-    maxLines: 40,
-    reason: "plugin source mapper should only convert editable plugin source payloads and requests",
   },
   {
     path: "src/app/integrations/mappers/tlsMapper.ts",

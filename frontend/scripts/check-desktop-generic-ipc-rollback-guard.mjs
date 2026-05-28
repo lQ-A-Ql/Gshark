@@ -15,12 +15,12 @@ const requiredSourceTokens = {
     'return "disabled"',
   ],
   "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts": [
-    "lets an explicit compat policy override the legacy disable alias",
+    "keeps explicit compat recognizable but still disables the removed adapter",
     'VITE_DESKTOP_GENERIC_IPC_POLICY: "compat"',
     'VITE_DESKTOP_DISABLE_GENERIC_IPC: "1"',
   ],
   "frontend/src/app/integrations/desktopBridge.test.ts": [
-    "keeps explicit compat policy adapter-enabled even when the legacy disable alias is set",
+    "keeps explicit compat policy as a documented no-op after adapter removal",
     'vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat")',
     'vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1")',
   ],

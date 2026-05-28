@@ -191,7 +191,7 @@ func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 }
 
 func TestClearCaptureResetsPacketStore(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	if err := svc.packetStore.Append([]model.Packet{
@@ -222,7 +222,7 @@ func TestClearCaptureResetsPacketStore(t *testing.T) {
 }
 
 func TestClearCaptureResetsDerivedAnalysisState(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	svc.mu.Lock()
@@ -267,7 +267,7 @@ func TestClearCaptureResetsDerivedAnalysisState(t *testing.T) {
 }
 
 func TestPrepareCaptureReplacementInvalidatesActiveRun(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	streamCtx, streamCancel := context.WithCancel(context.Background())
@@ -319,7 +319,7 @@ func TestClearCaptureCancelsActiveLoad(t *testing.T) {
 		return ctx.Err()
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
@@ -372,7 +372,7 @@ func TestCaptureStatusReportsActiveFirstScreenLoad(t *testing.T) {
 		return ctx.Err()
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
@@ -427,7 +427,7 @@ func TestPendingLoadRunHonorsCloseBeforeGoroutineStarts(t *testing.T) {
 		return 0, nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
@@ -446,7 +446,7 @@ func TestPendingLoadRunHonorsCloseBeforeGoroutineStarts(t *testing.T) {
 }
 
 func TestClearCaptureCancelsTrackedCaptureTasks(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "unit-test-task")
@@ -470,7 +470,7 @@ func TestClearCaptureCancelsTrackedCaptureTasks(t *testing.T) {
 }
 
 func TestPrepareCaptureReplacementCancelsTrackedCaptureTasks(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "replacement-task")
@@ -511,7 +511,7 @@ func TestLoadPCAPReplacementCancelsPreviousLoad(t *testing.T) {
 		return onPacket(model.Packet{ID: 2, Protocol: "HTTP", Info: "GET /replacement", Payload: opts.FilePath})
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	first := writeTempCaptureFile(t)
 	second := writeTempCaptureFile(t)
@@ -562,7 +562,7 @@ func TestLoadPCAPFailureKeepsPreviousCaptureActive(t *testing.T) {
 		return errors.New("boom")
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{ID: 7, Protocol: "HTTP", Info: "old"}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -606,7 +606,7 @@ func TestLoadPCAPZeroPacketsKeepsPreviousCaptureActive(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	if err := svc.packetStore.Append([]model.Packet{{ID: 9, Protocol: "TCP", Info: "old"}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -697,7 +697,7 @@ func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{
@@ -754,7 +754,7 @@ func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testin
 		return errors.New("invalid display filter")
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{
@@ -780,7 +780,7 @@ func TestPacketsPageWithErrorReturnsDisplayFilterError(t *testing.T) {
 		return errors.New("invalid display filter")
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{
@@ -812,7 +812,7 @@ func TestPacketPageCursorWithErrorReturnsDisplayFilterError(t *testing.T) {
 		return errors.New("invalid display filter")
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{
@@ -843,7 +843,7 @@ func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{{ID: 1, Protocol: "TCP", DestPort: 443}}); err != nil {
@@ -930,7 +930,7 @@ func TestPacketsPageReturnsFirstWindowBeforeDisplayFilterScanCompletes(t *testin
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{
@@ -1006,7 +1006,7 @@ func TestPacketsPageReturnsBlankWhenDisplayFilterMatchesNoPackets(t *testing.T) 
 		return nil
 	}
 
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 	svc.pcap = "demo.pcap"
 	if err := svc.packetStore.Append([]model.Packet{

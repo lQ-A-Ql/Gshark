@@ -52,7 +52,6 @@ type Server struct {
 	media        MediaService
 	toolRuntime  ToolRuntimeService
 	toolAnalysis ToolAnalysisService
-	plugins      PluginService
 
 	hub *Hub
 
@@ -98,7 +97,6 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 		s.media = svc
 		s.toolRuntime = svc
 		s.toolAnalysis = svc
-		s.plugins = svc
 	}
 	s.mcpServer = mcp.NewServer(mcp.Dependencies{
 		Capture:      s.capture,
@@ -107,7 +105,6 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 		Media:        s.media,
 		ToolRuntime:  s.toolRuntime,
 		ToolAnalysis: s.toolAnalysis,
-		Plugins:      s.plugins,
 		Evidence: func(ctx context.Context, modules []string) (any, error) {
 			var filter model.EvidenceFilter
 			filter.Modules = append(filter.Modules, modules...)
@@ -206,12 +203,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analysis/media/transcribe/batch/export", s.handleMediaBatchTranscriptionExport)
 	mux.HandleFunc("/api/tls", s.handleTLS)
 	mux.HandleFunc("/api/audit/logs", s.handleAuditLogs)
-	mux.HandleFunc("/api/plugins", s.handlePlugins)
-	mux.HandleFunc("/api/plugins/add", s.handleAddPlugin)
-	mux.HandleFunc("/api/plugins/delete", s.handleDeletePlugin)
-	mux.HandleFunc("/api/plugins/source", s.handlePluginSource)
-	mux.HandleFunc("/api/plugins/toggle", s.handleTogglePlugin)
-	mux.HandleFunc("/api/plugins/bulk", s.handleBulkPlugins)
 	mux.HandleFunc("/api/tools/ntlm-sessions", s.handleNTLMSessionMaterials)
 	mux.HandleFunc("/api/tools/http-login-analysis", s.handleHTTPLoginAnalysis)
 	mux.HandleFunc("/api/tools/smtp-analysis", s.handleSMTPAnalysis)
@@ -863,92 +854,6 @@ func (s *Server) handleObjectsDownload(w http.ResponseWriter, r *http.Request) {
 	zw.Close()
 }
 
-func (s *Server) handleAddPlugin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var payload model.Plugin
-	if err := decodeJSONBody(w, r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-
-	plugin, err := s.plugins.AddPlugin(payload)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, plugin)
-}
-
-func (s *Server) handleDeletePlugin(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost, http.MethodDelete:
-		// allowed
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	id := strings.TrimSpace(r.URL.Query().Get("id"))
-	if id == "" {
-		var payload struct {
-			ID string `json:"id"`
-		}
-		if err := decodeJSONBody(w, r, &payload); err == nil {
-			id = strings.TrimSpace(payload.ID)
-		}
-	}
-
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "missing plugin id")
-		return
-	}
-
-	if err := s.plugins.DeletePlugin(id); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "deleted": true})
-}
-
-func (s *Server) handlePluginSource(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		id := strings.TrimSpace(r.URL.Query().Get("id"))
-		if id == "" {
-			writeError(w, http.StatusBadRequest, "missing plugin id")
-			return
-		}
-
-		source, err := s.plugins.PluginSource(id)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		writeJSON(w, http.StatusOK, source)
-	case http.MethodPost:
-		var payload model.PluginSource
-		if err := decodeJSONBody(w, r, &payload); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid payload")
-			return
-		}
-		source, err := s.plugins.UpdatePluginSource(payload)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, source)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
 func (s *Server) handleTLS(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -992,61 +897,6 @@ func (s *Server) recentAuditEntries(limit int) []model.AuditEntry {
 	logs := make([]model.AuditEntry, limit)
 	copy(logs, s.auditLogs[start:])
 	return logs
-}
-
-func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	writeJSON(w, http.StatusOK, s.plugins.ListPlugins())
-}
-
-func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "missing plugin id")
-		return
-	}
-	plugin, err := s.plugins.TogglePlugin(id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, plugin)
-}
-
-type pluginBulkRequest struct {
-	IDs     []string `json:"ids"`
-	Enabled bool     `json:"enabled"`
-}
-
-func (s *Server) handleBulkPlugins(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var req pluginBulkRequest
-	if err := decodeJSONBody(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-
-	plugins, err := s.plugins.SetPluginsEnabled(req.IDs, req.Enabled)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "invalid") {
-			writeError(w, http.StatusBadRequest, err.Error())
-		} else {
-			writeError(w, http.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-
-	writeJSON(w, http.StatusOK, plugins)
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -1398,21 +1248,6 @@ func classifyAuditAction(path, method string) string {
 			return "dbc.add"
 		}
 		return "dbc.list"
-	case "/api/plugins":
-		return "plugin.list"
-	case "/api/plugins/add":
-		return "plugin.add"
-	case "/api/plugins/delete":
-		return "plugin.delete"
-	case "/api/plugins/source":
-		if method == http.MethodPost {
-			return "plugin.source.save"
-		}
-		return "plugin.source.read"
-	case "/api/plugins/toggle":
-		return "plugin.toggle"
-	case "/api/plugins/bulk":
-		return "plugin.bulk"
 	case "/api/tools/misc/import":
 		return "misc.import"
 	default:
@@ -1434,7 +1269,7 @@ func classifyAuditAction(path, method string) string {
 
 func classifyAuditRisk(path, method string) string {
 	switch path {
-	case "/api/plugins/add", "/api/plugins/delete", "/api/plugins/source", "/api/plugins/bulk", "/api/tls", "/api/tools/misc/import":
+	case "/api/tls", "/api/tools/misc/import":
 		return "high"
 	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/mcp/config", "/api/hunting/config":
 		if method == http.MethodGet {

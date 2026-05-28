@@ -12,7 +12,6 @@ import (
 
 	"github.com/gshark/sentinel/backend/internal/engine"
 	"github.com/gshark/sentinel/backend/internal/model"
-	"github.com/gshark/sentinel/backend/internal/plugin"
 	"github.com/gshark/sentinel/backend/internal/transport"
 )
 
@@ -44,10 +43,7 @@ func runServe(args []string) {
 	hub.OnStatus(func(status string) { log.Println("[status]", status) })
 	hub.OnError(func(message string) { log.Println("[error]", message) })
 
-	pm := plugin.NewManager()
-	_ = pm.LoadFromDir("plugins/rules")
-
-	svc := engine.NewService(hub, pm)
+	svc := engine.NewService(hub)
 	server := transport.NewServer(svc, hub)
 	token, err := resolveBackendAuthToken()
 	if err != nil {
@@ -80,9 +76,7 @@ func runParse(args []string) {
 		}
 	})
 
-	pm := plugin.NewManager()
-	_ = pm.LoadFromDir("plugins/rules")
-	svc := engine.NewService(hub, pm)
+	svc := engine.NewService(hub)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -100,7 +94,6 @@ func runParse(args []string) {
 	fmt.Println("parsed packets:", len(svc.Packets()))
 	printJSON("threat-hits", svc.ThreatHunt([]string{"flag{", "ctf{"}))
 	printJSON("objects", svc.Objects())
-	printJSON("plugins", svc.ListPlugins())
 }
 
 func usage() {

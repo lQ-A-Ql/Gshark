@@ -8,7 +8,7 @@ import (
 )
 
 func TestCacheStreamStoresClone(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	stream := model.ReassembledStream{
@@ -33,7 +33,7 @@ func TestCacheStreamStoresClone(t *testing.T) {
 }
 
 func TestCacheStreamEvictsOldestBeyondLimit(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	limit := streamCacheLimitValue()
@@ -54,7 +54,7 @@ func TestCacheStreamEvictsOldestBeyondLimit(t *testing.T) {
 }
 
 func TestCacheStreamRefreshesExistingOrder(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	limit := streamCacheLimitValue()
@@ -76,7 +76,7 @@ func TestCacheStreamRefreshesExistingOrder(t *testing.T) {
 }
 
 func TestStreamWithOverridesUsesClones(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	key := streamCacheKey("TCP", 42)

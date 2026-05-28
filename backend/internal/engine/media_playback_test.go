@@ -44,7 +44,7 @@ func TestDetectPlaybackProfile(t *testing.T) {
 }
 
 func TestMediaPlaybackWithContextHonorsCanceledContext(t *testing.T) {
-	svc := NewService(NopEmitter{}, nil)
+	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())

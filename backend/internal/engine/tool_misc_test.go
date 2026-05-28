@@ -13,7 +13,7 @@ import (
 )
 
 func TestGenerateSMB3RandomSessionKey(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	result, err := svc.GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest{
 		Username:            "user",
 		Domain:              "domain",
@@ -30,7 +30,7 @@ func TestGenerateSMB3RandomSessionKey(t *testing.T) {
 }
 
 func TestGenerateSMB3RandomSessionKeyRejectsInvalidHex(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	_, err := svc.GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest{
 		Username:            "user",
 		Domain:              "domain",
@@ -44,7 +44,7 @@ func TestGenerateSMB3RandomSessionKeyRejectsInvalidHex(t *testing.T) {
 }
 
 func TestGenerateSMB3RandomSessionKeyAllowsEmptyDomain(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	result, err := svc.GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest{
 		Username:            "user",
 		Domain:              "",
@@ -61,7 +61,7 @@ func TestGenerateSMB3RandomSessionKeyAllowsEmptyDomain(t *testing.T) {
 }
 
 func TestGenerateSMB3RandomSessionKeyTreatsNullDomainAsEmpty(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	withEmptyDomain, err := svc.GenerateSMB3RandomSessionKey(model.SMB3RandomSessionKeyRequest{
 		Username:            "user",
 		Domain:              "",
@@ -90,7 +90,7 @@ func TestGenerateSMB3RandomSessionKeyTreatsNullDomainAsEmpty(t *testing.T) {
 }
 
 func TestListSMB3SessionCandidatesRejectsMissingCapture(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	_, err := svc.ListSMB3SessionCandidates()
 	if err == nil {
 		t.Fatal("expected missing capture error")
@@ -171,7 +171,7 @@ func TestListSMB3SessionCandidatesBuildsDetailedRows(t *testing.T) {
 		return nil
 	}
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	svc.pcap = "demo.pcapng"
 
 	rows, err := svc.ListSMB3SessionCandidates()
@@ -220,7 +220,7 @@ func TestListSMB3SessionCandidatesBuildsDetailedRows(t *testing.T) {
 }
 
 func TestRunWinRMDecryptRejectsMissingCapture(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	_, err := svc.RunWinRMDecrypt(model.WinRMDecryptRequest{Port: 5985, AuthMode: "password", Password: "pass"})
 	if err == nil {
 		t.Fatal("expected missing capture error")
@@ -239,7 +239,7 @@ func TestRunWinRMDecryptReturnsDiagnosticWhenNoPreviewIsExtracted(t *testing.T) 
 		return nil
 	}
 
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	svc.pcap = "case.pcapng"
 
 	result, err := svc.RunWinRMDecrypt(model.WinRMDecryptRequest{

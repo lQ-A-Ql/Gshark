@@ -5,10 +5,11 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -84,20 +85,13 @@ func TestBackendProxyClientGetsCaptureStatus(t *testing.T) {
 	}
 }
 
-func TestDesktopInvokeBackendJSONProxiesRequest(t *testing.T) {
+func TestDesktopTypedJSONProxiesRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/analysis/industrial" || r.Method != http.MethodPost {
+		if r.URL.Path != "/api/analysis/industrial" || r.Method != http.MethodGet {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
 			t.Fatalf("unexpected authorization header %q", got)
-		}
-		var payload map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
-		if payload["refresh"] != true {
-			t.Fatalf("unexpected request body: %#v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true}`))
@@ -105,30 +99,48 @@ func TestDesktopInvokeBackendJSONProxiesRequest(t *testing.T) {
 	defer server.Close()
 
 	app := newTestDesktopApp(server.URL)
-	payload, err := app.InvokeBackendJSON(desktopBackendRequest{
-		Method:   http.MethodPost,
-		Path:     "/api/analysis/industrial",
-		BodyKind: "json",
-		JSONBody: map[string]any{"refresh": true},
-	})
+	payload, err := app.GetIndustrialAnalysis()
 	if err != nil {
-		t.Fatalf("InvokeBackendJSON() error = %v", err)
+		t.Fatalf("GetIndustrialAnalysis() error = %v", err)
 	}
 	if payload.(map[string]any)["ok"] != true {
 		t.Fatalf("unexpected payload: %#v", payload)
 	}
 }
 
-func TestDesktopInvokeBackendBlobAndText(t *testing.T) {
+func TestDesktopTypedBlobAndTextHelpers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/objects/download":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected objects download method %s", r.Method)
+			}
 			w.Header().Set("Content-Type", "application/zip")
 			w.Header().Set("Content-Disposition", `attachment; filename="objects.zip"`)
 			_, _ = w.Write([]byte("zip"))
 		case "/api/tools/winrm-decrypt/export":
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			_, _ = w.Write([]byte("plain text"))
+		case "/api/analysis/media/transcribe/batch/export":
+			if r.URL.Query().Get("format") != "srt" {
+				t.Fatalf("unexpected batch export format %q", r.URL.RawQuery)
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("Content-Disposition", `attachment; filename="transcription.srt"`)
+			_, _ = w.Write([]byte("srt"))
+		case "/api/analysis/media/export":
+			if r.URL.Query().Get("token") != "media-1" {
+				t.Fatalf("unexpected media export token %q", r.URL.RawQuery)
+			}
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Disposition", `attachment; filename="artifact.bin"`)
+			_, _ = w.Write([]byte("artifact"))
+		case "/api/analysis/media/play":
+			if r.URL.Query().Get("token") != "media-1" {
+				t.Fatalf("unexpected media play token %q", r.URL.RawQuery)
+			}
+			w.Header().Set("Content-Type", "audio/wav")
+			_, _ = w.Write([]byte("wav"))
 		default:
 			http.NotFound(w, r)
 		}
@@ -136,9 +148,9 @@ func TestDesktopInvokeBackendBlobAndText(t *testing.T) {
 	defer server.Close()
 
 	app := newTestDesktopApp(server.URL)
-	blob, err := app.InvokeBackendBlob(desktopBackendRequest{Method: http.MethodPost, Path: "/api/objects/download"})
+	blob, err := app.DownloadObjectsZip([]int{1, 2})
 	if err != nil {
-		t.Fatalf("InvokeBackendBlob() error = %v", err)
+		t.Fatalf("DownloadObjectsZip() error = %v", err)
 	}
 	if blob.ContentType != "application/zip" || blob.Filename != "objects.zip" || blob.Size != 3 {
 		t.Fatalf("unexpected blob metadata: %#v", blob)
@@ -148,12 +160,40 @@ func TestDesktopInvokeBackendBlobAndText(t *testing.T) {
 		t.Fatalf("unexpected blob body decoded=%q err=%v", decoded, err)
 	}
 
-	text, err := app.InvokeBackendText(desktopBackendRequest{Path: "/api/tools/winrm-decrypt/export?result_id=res-1"})
+	text, err := app.GetWinRMDecryptResultText("res-1")
 	if err != nil {
-		t.Fatalf("InvokeBackendText() error = %v", err)
+		t.Fatalf("GetWinRMDecryptResultText() error = %v", err)
 	}
 	if text != "plain text" {
 		t.Fatalf("unexpected text response %q", text)
+	}
+	winrmBlob, err := app.ExportWinRMDecryptResult("res-1")
+	if err != nil {
+		t.Fatalf("ExportWinRMDecryptResult() error = %v", err)
+	}
+	if winrmBlob.ContentType != "text/plain; charset=utf-8" || winrmBlob.Size != int64(len("plain text")) {
+		t.Fatalf("unexpected WinRM export blob metadata: %#v", winrmBlob)
+	}
+	batchBlob, err := app.ExportMediaBatchTranscription("SRT")
+	if err != nil {
+		t.Fatalf("ExportMediaBatchTranscription() error = %v", err)
+	}
+	if batchBlob.ContentType != "text/plain" || batchBlob.Filename != "transcription.srt" || batchBlob.Size != 3 {
+		t.Fatalf("unexpected batch export blob metadata: %#v", batchBlob)
+	}
+	artifactBlob, err := app.DownloadMediaArtifact("media-1")
+	if err != nil {
+		t.Fatalf("DownloadMediaArtifact() error = %v", err)
+	}
+	if artifactBlob.ContentType != "application/octet-stream" || artifactBlob.Filename != "artifact.bin" || artifactBlob.Size != int64(len("artifact")) {
+		t.Fatalf("unexpected media artifact blob metadata: %#v", artifactBlob)
+	}
+	playbackBlob, err := app.GetMediaPlaybackBlob("media-1")
+	if err != nil {
+		t.Fatalf("GetMediaPlaybackBlob() error = %v", err)
+	}
+	if playbackBlob.ContentType != "audio/wav" || playbackBlob.Size != 3 {
+		t.Fatalf("unexpected media playback blob metadata: %#v", playbackBlob)
 	}
 }
 
@@ -191,8 +231,11 @@ func TestBackendProxyClientBlobReadLimit(t *testing.T) {
 	}
 }
 
-func TestDesktopInvokeBackendMultipart(t *testing.T) {
+func TestDesktopTypedMiscImportMultipart(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/tools/misc/import" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
 		reader, err := r.MultipartReader()
 		if err != nil {
 			t.Fatalf("MultipartReader() error = %v", err)
@@ -209,12 +252,12 @@ func TestDesktopInvokeBackendMultipart(t *testing.T) {
 			body, _ := io.ReadAll(part)
 			values[part.FormName()] = string(body)
 			if part.FormName() == "file" {
-				if part.FileName() != "module.zip" || part.Header.Get("Content-Type") != "application/zip" {
-					t.Fatalf("unexpected file part filename=%q content-type=%q", part.FileName(), part.Header.Get("Content-Type"))
+				if part.FileName() != "module.zip" {
+					t.Fatalf("unexpected file part filename=%q", part.FileName())
 				}
 			}
 		}
-		if values["label"] != "decoder" || values["file"] != "zip" {
+		if values["file"] != "zip" {
 			t.Fatalf("unexpected multipart values: %#v", values)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -222,18 +265,15 @@ func TestDesktopInvokeBackendMultipart(t *testing.T) {
 	}))
 	defer server.Close()
 
+	packagePath := filepath.Join(t.TempDir(), "module.zip")
+	if err := os.WriteFile(packagePath, []byte("zip"), 0o600); err != nil {
+		t.Fatalf("write temp module package: %v", err)
+	}
+
 	app := newTestDesktopApp(server.URL)
-	payload, err := app.InvokeBackendJSON(desktopBackendRequest{
-		Method:   http.MethodPost,
-		Path:     "/api/tools/misc/import",
-		BodyKind: "multipart",
-		Multipart: []desktopMultipartPart{
-			{Name: "label", Value: "decoder"},
-			{Name: "file", Filename: "module.zip", ContentType: "application/zip", DataBase64: base64.StdEncoding.EncodeToString([]byte("zip"))},
-		},
-	})
+	payload, err := app.ImportMiscModulePackageFromPath(packagePath)
 	if err != nil {
-		t.Fatalf("InvokeBackendJSON multipart error = %v", err)
+		t.Fatalf("ImportMiscModulePackageFromPath() error = %v", err)
 	}
 	if payload.(map[string]any)["imported"] != true {
 		t.Fatalf("unexpected payload: %#v", payload)

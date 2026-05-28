@@ -3,7 +3,7 @@ package engine
 import "testing"
 
 func TestNewServiceInitializesOwnerState(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 
 	if svc.emitter == nil {
 		t.Fatal("expected default emitter")

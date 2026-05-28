@@ -32,7 +32,7 @@ func (s *usbQueryAnalysisService) USBAnalysisWithOptions(_ context.Context, opts
 func newTestServerWithTempMiscPackages(t *testing.T) *Server {
 	t.Helper()
 
-	return NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
+	return NewServerWithOptions(engine.NewService(nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
 }
 
 func TestResolveMiscPackageDirUsesOverrideAndEnv(t *testing.T) {
@@ -113,7 +113,7 @@ func TestWithAuthRequiresMatchingToken(t *testing.T) {
 }
 
 func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
-	server := NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
+	server := NewServerWithOptions(engine.NewService(nil), NewHub(), ServerOptions{MiscPackageDir: t.TempDir()})
 	server.SetAuthToken("secret-token")
 	handler := server.Handler()
 
@@ -186,7 +186,7 @@ func TestWithAuthRequiresTokenForTrustedDesktopOrigin(t *testing.T) {
 func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	t.Setenv("GSHARK_BACKEND_BUILD_ID", "test-build-id")
 	miscPackageDir := t.TempDir()
-	server := NewServerWithOptions(engine.NewService(nil, nil), NewHub(), ServerOptions{MiscPackageDir: miscPackageDir})
+	server := NewServerWithOptions(engine.NewService(nil), NewHub(), ServerOptions{MiscPackageDir: miscPackageDir})
 	server.SetAuthToken("secret-token")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runtime/identity", nil)
@@ -219,7 +219,7 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 }
 
 func TestHandlerRegistersCoreReadRoutes(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	handler := server.Handler()
 	tests := []struct {
 		path string
@@ -246,7 +246,7 @@ func TestHandlerRegistersCoreReadRoutes(t *testing.T) {
 }
 
 func TestHandlerRegistersMutatingRouteMethodPolicy(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	handler := server.Handler()
 	tests := []struct {
 		name        string
@@ -484,127 +484,13 @@ func TestHandlerRegistersToolRoutes(t *testing.T) {
 	}
 }
 
-func TestHandlerRegistersPluginWriteRoutes(t *testing.T) {
-	plugins := &fakePluginService{}
-	server := &Server{plugins: plugins}
-	handler := server.Handler()
-
-	t.Run("plugin add", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/plugins/add", strings.NewReader(`{"id":"plug-1","name":"Demo","version":"1.0.0","tag":"demo","author":"qa","enabled":true}`))
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected add plugin route to succeed, got %d body=%s", rec.Code, rec.Body.String())
-		}
-		var payload model.Plugin
-		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-			t.Fatalf("decode add plugin payload: %v", err)
-		}
-		if payload.ID != "plug-1" || payload.Enabled != true {
-			t.Fatalf("unexpected add plugin payload: %+v", payload)
-		}
-		if !plugins.addCalled {
-			t.Fatal("expected AddPlugin to be called")
-		}
-	})
-
-	t.Run("plugin delete", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodDelete, "/api/plugins/delete?id=plug-1", nil)
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected delete plugin route to succeed, got %d body=%s", rec.Code, rec.Body.String())
-		}
-		var payload map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-			t.Fatalf("decode delete plugin payload: %v", err)
-		}
-		if got := payload["id"]; got != "plug-1" {
-			t.Fatalf("unexpected delete payload id: %#v", got)
-		}
-		if got := payload["deleted"]; got != true {
-			t.Fatalf("unexpected delete payload deleted flag: %#v", got)
-		}
-		if !plugins.deleteCalled {
-			t.Fatal("expected DeletePlugin to be called")
-		}
-	})
-
-	t.Run("plugin source", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/plugins/source?id=plug-1", nil)
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected plugin source route to succeed, got %d body=%s", rec.Code, rec.Body.String())
-		}
-		var payload model.PluginSource
-		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-			t.Fatalf("decode plugin source payload: %v", err)
-		}
-		if payload.ID != "plug-1" {
-			t.Fatalf("unexpected plugin source payload: %+v", payload)
-		}
-	})
-
-	t.Run("plugin bulk", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/plugins/bulk", strings.NewReader(`{"ids":["plug-1"],"enabled":false}`))
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected plugin bulk route to succeed, got %d body=%s", rec.Code, rec.Body.String())
-		}
-		if !plugins.bulkCalled {
-			t.Fatal("expected SetPluginsEnabled to be called")
-		}
-	})
-}
-
-type fakePluginService struct {
-	addCalled    bool
-	deleteCalled bool
-	bulkCalled   bool
-}
-
-func (s *fakePluginService) ListPlugins() []model.Plugin { return []model.Plugin{} }
-
-func (s *fakePluginService) AddPlugin(p model.Plugin) (model.Plugin, error) {
-	s.addCalled = true
-	return p, nil
-}
-
-func (s *fakePluginService) DeletePlugin(id string) error {
-	s.deleteCalled = true
-	return nil
-}
-
-func (s *fakePluginService) PluginSource(id string) (model.PluginSource, error) {
-	return model.PluginSource{ID: id}, nil
-}
-
-func (s *fakePluginService) UpdatePluginSource(source model.PluginSource) (model.PluginSource, error) {
-	return source, nil
-}
-
-func (s *fakePluginService) TogglePlugin(id string) (model.Plugin, error) {
-	return model.Plugin{ID: id}, nil
-}
-
-func (s *fakePluginService) SetPluginsEnabled(ids []string, enabled bool) ([]model.Plugin, error) {
-	s.bulkCalled = true
-	plugins := make([]model.Plugin, 0, len(ids))
-	for _, id := range ids {
-		plugins = append(plugins, model.Plugin{ID: id, Enabled: enabled})
-	}
-	return plugins, nil
-}
-
 func TestWithAuditRecordsSensitiveRequests(t *testing.T) {
 	server := &Server{}
 	handler := server.withAudit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/api/plugins/add", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/tools/misc/import", nil)
 	req.Header.Set("Origin", "http://127.0.0.1:5173")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -619,7 +505,7 @@ func TestWithAuditRecordsSensitiveRequests(t *testing.T) {
 		t.Fatalf("expected 1 audit log entry, got %d", len(server.auditLogs))
 	}
 	entry := server.auditLogs[0]
-	if entry.Action != "plugin.add" || entry.Risk != "high" || entry.Status != http.StatusAccepted {
+	if entry.Action != "misc.import" || entry.Risk != "high" || entry.Status != http.StatusAccepted {
 		t.Fatalf("unexpected audit entry: %+v", entry)
 	}
 }
@@ -657,7 +543,7 @@ func TestHandleAuditLogsReturnsRecordedEntries(t *testing.T) {
 }
 
 func TestHandleC2AnalysisReturnsInitializedPayload(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/c2-analysis", nil)
 	rec := httptest.NewRecorder()
 
@@ -901,7 +787,7 @@ func (contractToolAnalysisService) WinRMExportFile(string) (string, string, erro
 }
 
 func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/apt-analysis", nil)
 	rec := httptest.NewRecorder()
 
@@ -924,7 +810,7 @@ func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
 }
 
 func TestHandleStreamPayloadSourcesReturnsInitializedPayload(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/streams/payload-sources?limit=10", nil)
 	rec := httptest.NewRecorder()
 
@@ -1148,7 +1034,7 @@ func TestUploadedFileLifecycleCleansInactiveFiles(t *testing.T) {
 }
 
 func TestHandleCapturePrepareReplacement(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/capture/prepare-replacement", nil)
 	rec := httptest.NewRecorder()
@@ -1175,7 +1061,7 @@ func TestHandleCapturePrepareReplacement(t *testing.T) {
 }
 
 func TestHandleCaptureStatusReportsEmptyCapture(t *testing.T) {
-	server := NewServer(engine.NewService(nil, nil), NewHub())
+	server := NewServer(engine.NewService(nil), NewHub())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/capture/status", nil)
 	rec := httptest.NewRecorder()

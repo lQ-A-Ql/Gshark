@@ -9,7 +9,7 @@ import (
 )
 
 func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
@@ -78,7 +78,7 @@ func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 }
 
 func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
@@ -92,7 +92,7 @@ func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
 }
 
 func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
@@ -198,7 +198,7 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 }
 
 func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
@@ -233,7 +233,7 @@ func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
 }
 
 func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *testing.T) {
-	svc := NewService(nil, nil)
+	svc := NewService(nil)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})

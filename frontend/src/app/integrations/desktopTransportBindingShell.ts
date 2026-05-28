@@ -13,7 +13,4 @@ export interface DesktopShellBinding {
   SelectMiscModulePackage?: () => Promise<OpenFileResult | null | undefined>;
   IsBackendReady?: () => Promise<boolean>;
   PingBackendDataPlane?: () => Promise<unknown>;
-  InvokeBackendJSON?: (request: unknown) => Promise<unknown>;
-  InvokeBackendBlob?: (request: unknown) => Promise<unknown>;
-  InvokeBackendText?: (request: unknown) => Promise<string>;
 }

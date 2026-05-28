@@ -1,4 +1,4 @@
-import { withDesktopIpcControls } from "./ipcBackendTransport";
+import { assertDesktopBlobWithinLimit, withDesktopIpcControls } from "./desktopIpcControls";
 
 export const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
 export const LONG_TYPED_IPC_TIMEOUT_MS = 60000;
@@ -21,7 +21,9 @@ export async function typedBlobCall(operation: () => Promise<unknown>, endpoint:
   const payload = (await typedCall(operation, endpoint, undefined, LONG_TYPED_IPC_TIMEOUT_MS)) as {
     data_base64?: unknown;
     content_type?: unknown;
+    size?: unknown;
   };
+  assertDesktopBlobWithinLimit(payload, endpoint);
   return base64ToBlob(String(payload.data_base64 ?? ""), String(payload.content_type ?? "application/octet-stream"));
 }
 
