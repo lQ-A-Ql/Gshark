@@ -24,7 +24,7 @@ export function MassStorageFilters({
   onLunChange: (value: string) => void;
 }) {
   return (
-    <div className="gshark-tile-toolbar grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
+    <div className="meow-tile-toolbar grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
       <SelectField
         label="设备"
         value={activeDevice}

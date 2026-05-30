@@ -38,7 +38,7 @@ export function MediaBatchActions({
         批量转写音频
       </button>
       <button
-        className="gshark-soft-fill inline-flex items-center gap-1 px-3 py-1.5 text-xs hover:bg-accent/45 disabled:cursor-not-allowed disabled:opacity-60"
+        className="meow-soft-fill inline-flex items-center gap-1 px-3 py-1.5 text-xs hover:bg-accent/45 disabled:cursor-not-allowed disabled:opacity-60"
         onClick={() => onStartBatchTranscription(true)}
         disabled={batchStarting || batchRunning}
       >
@@ -67,7 +67,7 @@ export function MediaLoadingNotice({ loading }: MediaLoadingNoticeProps) {
   }
 
   return (
-    <div className="gshark-soft-fill mb-0 px-3 py-2 text-xs text-muted-foreground">
+    <div className="meow-soft-fill mb-0 px-3 py-2 text-xs text-muted-foreground">
       正在识别 RTP / RTSP / Moonlight / GameStream 并尝试还原媒体流...
     </div>
   );
@@ -120,7 +120,7 @@ export function MediaNotesPanel({ notes }: MediaNotesPanelProps) {
           <div className="px-3 py-3 text-muted-foreground">当前抓包未识别到媒体流。</div>
         ) : (
           notes.map((note, index) => (
-            <div key={`${note}-${index}`} className="gshark-soft-fill flex items-start gap-2 px-3 py-2">
+            <div key={`${note}-${index}`} className="meow-soft-fill flex items-start gap-2 px-3 py-2">
               <Video className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
               <span>{note}</span>
             </div>

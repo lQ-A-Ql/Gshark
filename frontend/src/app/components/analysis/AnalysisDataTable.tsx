@@ -52,11 +52,11 @@ export function AnalysisDataTable<T = ReactNode[]>({
   const hasStructuredRows = Boolean(columns && data);
 
   return (
-    <div className={cn("gshark-tile-table", maxHeightClassName, wrapperClassName)}>
+    <div className={cn("meow-tile-table", maxHeightClassName, wrapperClassName)}>
       <table className={cn("w-full table-fixed border-collapse text-left text-xs", tableClassName)}>
         <thead
           className={cn(
-            "sticky top-0 bg-[var(--gshark-table-header-bg)] text-[11px] uppercase tracking-[0.08em] text-slate-500 backdrop-blur-md",
+            "sticky top-0 bg-[var(--meow-table-header-bg)] text-[11px] uppercase tracking-[0.08em] text-slate-500 backdrop-blur-md",
             headerClassName,
           )}
         >
@@ -104,7 +104,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                   <Fragment key={resolvedRowKey}>
                     <tr
                       className={cn(
-                        "border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-[var(--gshark-table-hover-bg)]",
+                        "border-b border-[var(--meow-tile-divider)] align-top transition-colors hover:bg-[var(--meow-table-hover-bg)]",
                         onRowClick && "cursor-pointer",
                         resolvedRowClassName,
                       )}
@@ -134,7 +134,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
                       <tr
                         key={`${resolvedRowKey}-expanded`}
                         className={cn(
-                          "border-b border-[var(--gshark-tile-divider)] bg-[var(--gshark-table-selected-bg)]",
+                          "border-b border-[var(--meow-tile-divider)] bg-[var(--meow-table-selected-bg)]",
                           resolvedExpandedRowClassName,
                         )}
                       >
@@ -160,7 +160,7 @@ export function AnalysisDataTable<T = ReactNode[]>({
             (rows ?? []).map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-b border-[var(--gshark-tile-divider)] align-top transition-colors hover:bg-[var(--gshark-table-hover-bg)]"
+                className="border-b border-[var(--meow-tile-divider)] align-top transition-colors hover:bg-[var(--meow-table-hover-bg)]"
               >
                 {row.map((value, cellIndex) => (
                   <td key={`${rowIndex}-${cellIndex}`} className={cn("break-words px-2.5 py-1.5", cellClassName)}>

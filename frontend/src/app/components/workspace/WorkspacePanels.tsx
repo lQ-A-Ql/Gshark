@@ -66,7 +66,7 @@ export function WorkspacePanels({
 }: WorkspacePanelsProps) {
   return (
     <PanelGroup direction="vertical" className="flex min-h-0 flex-1 flex-col">
-      <Panel defaultSize={50} minSize={20} className="gshark-tile">
+      <Panel defaultSize={50} minSize={20} className="meow-tile">
         {packetPageError ? (
           <WorkspacePacketErrorPanel
             message={packetPageError}
@@ -95,7 +95,7 @@ export function WorkspacePanels({
 
       <PanelResizeHandle className="z-20 h-1 cursor-row-resize bg-border transition-colors hover:bg-blue-300 active:bg-blue-500" />
 
-      <Panel defaultSize={50} className="gshark-tile-grid flex">
+      <Panel defaultSize={50} className="meow-tile-grid flex">
         <PanelGroup direction="horizontal">
           <ProtocolTreePanel
             nodes={protocolTree}
@@ -131,7 +131,7 @@ function WorkspaceFilterLoadingPanel({
 }) {
   return (
     <div className="flex h-full min-h-0 items-center justify-center px-6">
-      <div className="gshark-tile w-full max-w-xl border-white/80 p-5">
+      <div className="meow-tile w-full max-w-xl border-white/80 p-5">
         <div className="mb-3 text-sm font-semibold text-foreground">{title}</div>
         <div className="mb-4 text-xs text-muted-foreground">{detail}</div>
         <Progress value={progress} className="h-2.5" />

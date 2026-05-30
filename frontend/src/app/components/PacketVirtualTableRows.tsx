@@ -48,18 +48,18 @@ export function PacketVirtualTableRows({
             onDoubleClick={() => packet.proto === "HTTP" && onDoubleClickHttp()}
             onContextMenu={(event) => onOpenContextMenu(event, packet)}
             className={cn(
-              "gshark-packet-row grid text-xs transition-[box-shadow,background-color,background-image,color]",
+              "meow-packet-row grid text-xs transition-[box-shadow,background-color,background-image,color]",
               packetColor
-                ? "gshark-packet-row-colored"
+                ? "meow-packet-row-colored"
                 : failureLevel === "critical"
-                  ? "gshark-packet-row-failure-critical"
+                  ? "meow-packet-row-failure-critical"
                   : failureLevel === "major"
-                    ? "gshark-packet-row-failure-major"
+                    ? "meow-packet-row-failure-major"
                     : failureLevel === "warn"
-                      ? "gshark-packet-row-failure-warn"
+                      ? "meow-packet-row-failure-warn"
                       : "text-foreground",
-              !selected && !packetColor && !failureLevel && "gshark-packet-row-neutral",
-              selected && "gshark-packet-row-selected",
+              !selected && !packetColor && !failureLevel && "meow-packet-row-neutral",
+              selected && "meow-packet-row-selected",
             )}
             style={{
               position: "absolute",
@@ -79,7 +79,7 @@ export function PacketVirtualTableRows({
             title={selected ? undefined : packetColor?.ruleName}
           >
             {visibleColumns.map((col) => (
-              <div key={col.id} className="gshark-packet-cell">
+              <div key={col.id} className="meow-packet-cell">
                 {renderPacketCell(packet, col.id)}
               </div>
             ))}

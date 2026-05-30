@@ -89,7 +89,7 @@ function UsbKeyboardPanel({ state }: { state: UsbHidState }) {
           />
         </Panel>
         <Panel title="完整文本流">
-          <pre className="gshark-soft-fill max-h-[260px] overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs leading-5">
+          <pre className="meow-soft-fill max-h-[260px] overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs leading-5">
             {state.keyboardTextPreview}
           </pre>
         </Panel>

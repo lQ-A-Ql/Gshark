@@ -86,16 +86,16 @@ export function StartupGate() {
 
   if (!enterMain) {
     return (
-      <div className="gshark-page-bg gshark-glass-shell flex h-screen w-screen items-center justify-center overflow-hidden px-6 text-slate-900">
-        <div className="gshark-tile gshark-workbench-panel gshark-forensic-scan w-full max-w-[600px] overflow-hidden">
-          <div className="gshark-tile-header px-5 py-4">
+      <div className="meow-page-bg meow-glass-shell flex h-screen w-screen items-center justify-center overflow-hidden px-6 text-slate-900">
+        <div className="meow-tile meow-workbench-panel meow-forensic-scan w-full max-w-[600px] overflow-hidden">
+          <div className="meow-tile-header px-5 py-4">
             <div className="text-[11px] font-semibold tracking-[0.24em] text-blue-600">MEOW~TRAFFIC</div>
             <h1 className="mt-2 text-2xl font-semibold text-slate-950">启动中</h1>
             <p className="mt-1 text-sm leading-6 text-slate-600">正在拉起后端服务并初始化前端界面。</p>
           </div>
 
           <div className="space-y-3 px-5 py-4">
-            <div className="gshark-soft-fill space-y-3 px-3.5 py-3">
+            <div className="meow-soft-fill space-y-3 px-3.5 py-3">
               <StartupStatusLine
                 tone={backendConnected ? "emerald" : "amber"}
                 pulse={!backendConnected}
@@ -142,13 +142,13 @@ export function StartupGate() {
                 <ToolRuntimeTile label="Speech" value={speechStatusText} />
               </div>
             </div>
-            <div className="gshark-diffuse-chip px-3 py-2 text-xs break-all text-slate-500">
+            <div className="meow-diffuse-chip px-3 py-2 text-xs break-all text-slate-500">
               {backendStatus || "等待状态..."}
             </div>
             {!toolRuntimeSnapshot && backendConnected && (
               <div
                 className={cn(
-                  "gshark-soft-fill px-3 py-2 text-xs break-all",
+                  "meow-soft-fill px-3 py-2 text-xs break-all",
                   toolRuntimeProbeState === "failed" ? "text-rose-600" : "text-slate-500",
                 )}
               >
@@ -160,7 +160,7 @@ export function StartupGate() {
             {backendConnected && !isTSharkChecking && (
               <div
                 className={cn(
-                  "gshark-soft-fill px-3 py-2 text-xs break-all",
+                  "meow-soft-fill px-3 py-2 text-xs break-all",
                   tsharkStatus.available ? (tsharkDegraded ? "text-amber-700" : "text-emerald-600") : "text-rose-600",
                 )}
               >
@@ -173,7 +173,7 @@ export function StartupGate() {
               </div>
             )}
             {tsharkDegraded && (tsharkStatus.missingOptionalFields?.length ?? 0) > 0 && (
-              <div className="gshark-soft-fill px-3 py-2 text-xs break-all text-amber-700">
+              <div className="meow-soft-fill px-3 py-2 text-xs break-all text-amber-700">
                 缺少可选字段：{tsharkStatus.missingOptionalFields?.join(", ")}
               </div>
             )}
@@ -182,7 +182,7 @@ export function StartupGate() {
                 <button
                   onClick={() => void handleProbeTools()}
                   disabled={isToolRuntimeLoading || toolRuntimeProbeState === "probing_full"}
-                  className="gshark-control inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="meow-control inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${isToolRuntimeLoading || toolRuntimeProbeState === "probing_full" ? "animate-spin" : ""}`}
@@ -195,7 +195,7 @@ export function StartupGate() {
           </div>
 
           {backendConnected && !isTSharkChecking && !tsharkStatus.available && !toolRuntimeCheckDegraded && (
-            <div className="gshark-soft-fill gshark-risk-accent mx-5 mb-4 px-4 py-3">
+            <div className="meow-soft-fill meow-risk-accent mx-5 mb-4 px-4 py-3">
               <div className="text-sm font-medium text-amber-800">未检测到 TShark，可在设置中配置</div>
               <p className="mt-1 text-xs text-amber-700">
                 可以直接填写 tshark.exe 的绝对路径，或者填写 Wireshark 安装目录。
@@ -205,12 +205,12 @@ export function StartupGate() {
                   value={pathInput}
                   onChange={(event) => setPathInput(event.target.value)}
                   placeholder="C:\\Program Files\\Wireshark\\tshark.exe"
-                  className="gshark-field flex-1 px-3 py-2 text-xs text-slate-900 outline-none"
+                  className="meow-field flex-1 px-3 py-2 text-xs text-slate-900 outline-none"
                 />
                 <button
                   onClick={() => void handleSavePath()}
                   disabled={savingPath}
-                  className="gshark-control-primary px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                  className="meow-control-primary px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingPath ? "保存中" : "保存路径"}
                 </button>
@@ -222,7 +222,7 @@ export function StartupGate() {
                     void handleSavePath("");
                   }}
                   disabled={savingPath}
-                  className="gshark-control mt-2 px-3 py-1.5 text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="meow-control mt-2 px-3 py-1.5 text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   清除自定义路径
                 </button>
@@ -291,7 +291,7 @@ function StartupStatusLine({
 }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className={cn("gshark-status-dot", statusToneClassName[tone], pulse && "animate-pulse")} />
+      <span className={cn("meow-status-dot", statusToneClassName[tone], pulse && "animate-pulse")} />
       <span>
         {label}：{value}
       </span>
@@ -301,7 +301,7 @@ function StartupStatusLine({
 
 function ToolRuntimeTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="gshark-diffuse-chip px-3 py-2">
+    <div className="meow-diffuse-chip px-3 py-2">
       {label}：{value}
     </div>
   );

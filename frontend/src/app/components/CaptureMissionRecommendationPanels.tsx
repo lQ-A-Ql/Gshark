@@ -14,7 +14,7 @@ export function CaptureRecommendationsPanel({
   onApplyFilter,
 }: CaptureRecommendationsPanelProps) {
   return (
-    <div className="gshark-tile gshark-workbench-panel p-3.5">
+    <div className="meow-tile meow-workbench-panel p-3.5">
       <div className="mb-3 text-sm font-semibold text-slate-900">推荐入口</div>
       <div className="grid gap-3 md:grid-cols-2">
         {recommendations.map((item) => (
@@ -58,13 +58,13 @@ function RecommendationCard({
   onFilter?: () => void;
 }) {
   return (
-    <div className="gshark-tile gshark-evidence-accent px-3.5 py-3">
+    <div className="meow-tile meow-evidence-accent px-3.5 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
           {icon}
           {title}
         </div>
-        <div className="gshark-diffuse-chip gshark-evidence-accent px-2 py-0.5 text-[11px] font-medium text-blue-700">
+        <div className="meow-diffuse-chip meow-evidence-accent px-2 py-0.5 text-[11px] font-medium text-blue-700">
           匹配度 {score}
         </div>
       </div>
@@ -72,13 +72,13 @@ function RecommendationCard({
       <div className="mt-3 flex items-center gap-2">
         <button
           onClick={onOpen}
-          className="gshark-control-primary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+          className="meow-control-primary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
         >
           进入模块
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
         {onFilter && (
-          <button onClick={onFilter} className="gshark-control px-3 py-1.5 text-xs font-medium text-slate-700">
+          <button onClick={onFilter} className="meow-control px-3 py-1.5 text-xs font-medium text-slate-700">
             先应用过滤器
           </button>
         )}

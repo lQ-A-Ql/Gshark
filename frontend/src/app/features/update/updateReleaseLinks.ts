@@ -1,6 +1,6 @@
 const SAFE_RELEASE_MARKDOWN_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const CONTROL_CHAR_RE = /[\u0000-\u001F\u007F]/;
-const SAFE_RELEASE_MARKDOWN_BASE_URL = "https://gshark.local/";
+const SAFE_RELEASE_MARKDOWN_BASE_URL = "https://meow-traffic.local/";
 
 export function normalizeReleaseMarkdownHref(href?: string): string | null {
   if (!href) {

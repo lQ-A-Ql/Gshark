@@ -103,7 +103,7 @@ export function MainLayout() {
   };
 
   useEffect(() => {
-    localStorage.setItem("gshark-theme", "light");
+    localStorage.setItem("meow-theme", "light");
   }, []);
 
   useEffect(() => {
@@ -114,7 +114,7 @@ export function MainLayout() {
     const handler = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        window.dispatchEvent(new CustomEvent("gshark:focus-filter"));
+        window.dispatchEvent(new CustomEvent("meow:focus-filter"));
       }
       if (event.ctrlKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
@@ -131,7 +131,7 @@ export function MainLayout() {
   }, [navigate, openCapture]);
 
   const focusFilter = () => {
-    window.dispatchEvent(new CustomEvent("gshark:focus-filter"));
+    window.dispatchEvent(new CustomEvent("meow:focus-filter"));
   };
 
   const applyHttpFilter = () => {
@@ -142,11 +142,11 @@ export function MainLayout() {
   const activeTheme = themeForPath(location.pathname);
   const routeMotion = getRouteMotionDirection(backgroundRouteRef.current, location.pathname);
   const pageThemeStyle = {
-    "--gshark-bg-base": activeTheme.base,
-    "--gshark-bg-top": activeTheme.top,
-    "--gshark-bg-bottom": activeTheme.bottom,
-    "--gshark-bg-accent": activeTheme.accent,
-    "--gshark-bg-accent-2": activeTheme.accent2,
+    "--meow-bg-base": activeTheme.base,
+    "--meow-bg-top": activeTheme.top,
+    "--meow-bg-bottom": activeTheme.bottom,
+    "--meow-bg-accent": activeTheme.accent,
+    "--meow-bg-accent-2": activeTheme.accent2,
   } as CSSProperties;
 
   useLayoutEffect(() => {
@@ -180,7 +180,7 @@ export function MainLayout() {
       }
     >
       <div
-        className="gshark-page-bg gshark-glass-shell flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
+        className="meow-page-bg meow-glass-shell flex h-screen w-screen flex-col overflow-hidden font-sans text-foreground selection:bg-blue-200 selection:text-blue-900"
         style={pageThemeStyle}
         onDragStartCapture={preventBrowserPageDrag}
         onDragOverCapture={preventBrowserPageDrag}
@@ -203,12 +203,12 @@ export function MainLayout() {
         <div className="flex flex-1 overflow-hidden">
           <MainSidebarNav activeTheme={activeTheme} pathname={location.pathname} />
 
-          <main className="gshark-page-bg gshark-theme-main relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <main className="meow-page-bg meow-theme-main relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {backgroundFade ? (
               <div
                 key={`fade-${backgroundFade.key}`}
                 aria-hidden="true"
-                className="gshark-page-bg gshark-theme-fade"
+                className="meow-page-bg meow-theme-fade"
                 style={backgroundFade.style}
                 onAnimationEnd={() => setBackgroundFade(null)}
               />
@@ -216,7 +216,7 @@ export function MainLayout() {
             <div
               key={`route-${location.pathname}`}
               data-route-motion={routeMotion}
-              className="gshark-route-transition flex min-h-0 flex-1 flex-col overflow-hidden"
+              className="meow-route-transition flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               <Outlet />
             </div>

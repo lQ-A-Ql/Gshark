@@ -18,7 +18,7 @@ export function GenericMiscEmbeddedHeader({
   onDelete,
 }: GenericMiscModuleHeaderProps) {
   return (
-    <div className="gshark-tile-toolbar flex flex-wrap items-start justify-between gap-3 border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
+    <div className="meow-tile-toolbar flex flex-wrap items-start justify-between gap-3 border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-cyan-200/28 bg-cyan-50/20 text-cyan-800">
@@ -53,7 +53,7 @@ export function GenericMiscCardHeader({
   onDelete,
 }: GenericMiscModuleHeaderProps) {
   return (
-    <div className="gshark-tile-header relative border-b border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
+    <div className="meow-tile-header relative border-b border-cyan-100/24 bg-cyan-50/18 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">

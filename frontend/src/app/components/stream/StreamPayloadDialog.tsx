@@ -37,8 +37,8 @@ export function StreamPayloadDialog({
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-100/75 px-6 py-8 backdrop-blur-[2px]">
-      <div className="gshark-soft-fill flex h-full max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden">
-        <div className="gshark-workbench-panel flex flex-wrap items-start justify-between gap-3 border-b border-[var(--gshark-tile-divider)] px-4 py-3">
+      <div className="meow-soft-fill flex h-full max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden">
+        <div className="meow-workbench-panel flex flex-wrap items-start justify-between gap-3 border-b border-[var(--meow-tile-divider)] px-4 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-slate-950">{title}</div>
             {subtitle ? <div className="mt-1 text-[11px] leading-4 text-slate-500">{subtitle}</div> : null}
@@ -48,20 +48,20 @@ export function StreamPayloadDialog({
             <button
               type="button"
               onClick={copyContent}
-              className="gshark-control inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900"
+              className="meow-control inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900"
             >
               <Copy className="h-3.5 w-3.5" /> 复制
             </button>
             <button
               type="button"
               onClick={exportContent}
-              className="gshark-control inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900"
+              className="meow-control inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900"
             >
               <Download className="h-3.5 w-3.5" /> 导出
             </button>
             <button
               type="button"
-              className="gshark-control-ghost p-1.5 text-slate-500 transition-colors hover:text-slate-900"
+              className="meow-control-ghost p-1.5 text-slate-500 transition-colors hover:text-slate-900"
               onClick={onClose}
               title="关闭"
             >
@@ -70,9 +70,9 @@ export function StreamPayloadDialog({
           </div>
         </div>
         {visibleMeta.length > 0 ? (
-          <div className="gshark-workbench-panel grid gap-2 border-b border-[var(--gshark-tile-divider)] px-4 py-3 text-[11px] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="meow-workbench-panel grid gap-2 border-b border-[var(--meow-tile-divider)] px-4 py-3 text-[11px] sm:grid-cols-2 lg:grid-cols-4">
             {visibleMeta.map((item) => (
-              <div key={item.label} className="gshark-stream-control-cluster min-w-0 px-2.5 py-2">
+              <div key={item.label} className="meow-stream-control-cluster min-w-0 px-2.5 py-2">
                 <div className="font-semibold text-slate-400">{item.label}</div>
                 <div
                   className="mt-1 truncate font-mono text-slate-700"

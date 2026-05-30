@@ -8,7 +8,7 @@ import type { ThreatHuntingProgressView, ThreatHuntingStats } from "./ThreatHunt
 
 export function ThreatHuntingProgressPanel({ progress }: { progress: ThreatHuntingProgressView }) {
   return (
-    <div className="gshark-tile mb-3 border-blue-200 bg-blue-50/70 p-3.5">
+    <div className="meow-tile mb-3 border-blue-200 bg-blue-50/70 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">{progress.title}</div>
@@ -43,7 +43,7 @@ export function ThreatHuntingCategoryPanel({ stats }: { stats: ThreatHuntingStat
         </span>
       }
       tone="blue"
-      className="gshark-tile flex min-h-0 flex-col"
+      className="meow-tile flex min-h-0 flex-col"
     >
       <div className="border-b border-slate-100 pb-3 text-xs leading-5 text-slate-500">
         这里把命中结果按常见分析语义收在一起看，左侧能快速判断当前更偏 CTF、OWASP 还是异常流量。
@@ -93,7 +93,7 @@ function CategoryCard({
         : "border-amber-200 bg-amber-50/70";
 
   return (
-    <div className={cn("gshark-tile px-3 py-3", accentClass)}>
+    <div className={cn("meow-tile px-3 py-3", accentClass)}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
           {icon}

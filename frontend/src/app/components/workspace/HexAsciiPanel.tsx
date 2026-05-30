@@ -21,21 +21,21 @@ export function HexAsciiPanel({
   const rows = useMemo(() => buildHexRows(frameBytes), [frameBytes]);
 
   return (
-    <Panel defaultSize={50} minSize={20} className="gshark-tile flex flex-col">
-      <div className="gshark-tile-header gshark-workbench-panel flex shrink-0 items-center gap-2 px-4 py-2 text-[13px] font-semibold text-slate-800">
-        <span className="gshark-diffuse-chip gshark-evidence-accent p-1.5 text-amber-600">
+    <Panel defaultSize={50} minSize={20} className="meow-tile flex flex-col">
+      <div className="meow-tile-header meow-workbench-panel flex shrink-0 items-center gap-2 px-4 py-2 text-[13px] font-semibold text-slate-800">
+        <span className="meow-diffuse-chip meow-evidence-accent p-1.5 text-amber-600">
           <FileText className="h-4 w-4" />
         </span>
         十六进制与 ASCII 视图
         {packet && (
-          <span className="gshark-diffuse-chip gshark-evidence-accent ml-2 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
+          <span className="meow-diffuse-chip meow-evidence-accent ml-2 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
             Packet #{packet.id}
           </span>
         )}
       </div>
       <div ref={panelRef} className="flex-1 overflow-auto p-3 font-mono text-[12.5px] leading-5">
         {frameBytes.length === 0 ? (
-          <div className="gshark-soft-fill px-4 py-6 text-sm text-slate-500">暂无 hex 数据</div>
+          <div className="meow-soft-fill px-4 py-6 text-sm text-slate-500">暂无 hex 数据</div>
         ) : (
           <div className="w-max min-w-full space-y-1">
             {rows.map((row) => (
@@ -66,7 +66,7 @@ function HexAsciiRow({
   onSelectByte: (offset: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-[3.25rem_22.1rem_11.9rem] items-start gap-2 px-1.5 py-0.5 text-slate-800 transition-colors hover:bg-[var(--gshark-table-hover-bg)]">
+    <div className="grid grid-cols-[3.25rem_22.1rem_11.9rem] items-start gap-2 px-1.5 py-0.5 text-slate-800 transition-colors hover:bg-[var(--meow-table-hover-bg)]">
       <span className="pt-px text-[11px] font-semibold text-slate-400">{row.offset}</span>
       <span className="flex gap-px whitespace-nowrap">
         {row.bytes.map((item) => (
@@ -80,7 +80,7 @@ function HexAsciiRow({
           />
         ))}
       </span>
-      <span className="flex gap-px whitespace-nowrap border-l border-[var(--gshark-tile-divider)] pl-2">
+      <span className="flex gap-px whitespace-nowrap border-l border-[var(--meow-tile-divider)] pl-2">
         {row.bytes.map((item) => (
           <HexByteButton
             key={`ascii-${item.index}`}

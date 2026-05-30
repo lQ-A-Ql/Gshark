@@ -199,7 +199,7 @@ func (a *DesktopApp) InstallAppUpdate() (err error) {
 	}
 
 	targetPath := filepath.Clean(status.CurrentExecutable)
-	tempDir, err := os.MkdirTemp("", "gshark-update-*")
+	tempDir, err := os.MkdirTemp("", "meow-traffic-update-*")
 	if err != nil {
 		return fmt.Errorf("创建更新目录失败: %w", err)
 	}
@@ -351,7 +351,7 @@ func resolveCurrentVersion() (string, string, string, string) {
 		Source string
 	}{
 		{Value: strings.TrimSpace(appVersion), Source: "build"},
-		{Value: strings.TrimSpace(os.Getenv("GSHARK_VERSION")), Source: "env"},
+		{Value: strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_VERSION")), Source: "env"},
 		{Value: extractVersionCandidate(filepath.Base(exePath)), Source: "filename"},
 		{Value: detectGitTag(), Source: "git-tag"},
 		{Value: detectBuildInfoVersion(), Source: "build-info"},
@@ -378,10 +378,10 @@ func resolveReleaseRepo() string {
 	if repo := strings.TrimSpace(appReleaseRepo); repo != "" {
 		return repo
 	}
-	if repo := strings.TrimSpace(os.Getenv("GSHARK_RELEASE_REPO")); repo != "" {
+	if repo := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_RELEASE_REPO")); repo != "" {
 		return repo
 	}
-	for _, remoteName := range []string{"gshark", "origin"} {
+	for _, remoteName := range []string{"meow-traffic", "origin"} {
 		if repo := detectGitHubRepoFromRemote(remoteName); repo != "" {
 			return repo
 		}
@@ -393,10 +393,10 @@ func resolveUpdateManifestURL(repo string) string {
 	if value := strings.TrimSpace(appManifestURL); value != "" {
 		return value
 	}
-	if value := strings.TrimSpace(os.Getenv("GSHARK_UPDATE_MANIFEST_URL")); value != "" {
+	if value := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_UPDATE_MANIFEST_URL")); value != "" {
 		return value
 	}
-	ref := strings.TrimSpace(os.Getenv("GSHARK_UPDATE_MANIFEST_REF"))
+	ref := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_UPDATE_MANIFEST_REF"))
 	if ref == "" {
 		ref = defaultManifestRef
 	}
@@ -899,7 +899,7 @@ func spawnWindowsUpdater(sourcePath string, targetPath string, waitPID int) erro
 		return fmt.Errorf("当前系统暂不支持自动替换安装")
 	}
 
-	scriptDir := filepath.Join(os.TempDir(), "gshark-sentinel", "updater")
+	scriptDir := filepath.Join(os.TempDir(), "meow-traffic", "updater")
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		return fmt.Errorf("创建更新脚本目录失败: %w", err)
 	}
@@ -955,7 +955,7 @@ func buildUpdaterScript() string {
 func sanitizeFilename(name string) string {
 	base := strings.TrimSpace(filepath.Base(name))
 	if base == "" || base == "." || base == string(filepath.Separator) {
-		return "gshark-update.exe"
+		return "meow-traffic-update.exe"
 	}
 	return base
 }
@@ -987,7 +987,7 @@ func describeUpdateRequestError(stage string, err error) error {
 
 func updateLogf(format string, args ...any) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	fmt.Fprintf(os.Stdout, "[gshark][update][%s] %s\n", timestamp, fmt.Sprintf(format, args...))
+	fmt.Fprintf(os.Stdout, "[meow-traffic][update][%s] %s\n", timestamp, fmt.Sprintf(format, args...))
 }
 
 func applyUpdateRequestHeaders(req *http.Request) {

@@ -175,7 +175,7 @@ func (s *Service) emitStatus(status string) {
 }
 
 func streamFollowTimeout() time.Duration {
-	raw := strings.TrimSpace(os.Getenv("GSHARK_STREAM_FOLLOW_TIMEOUT_MS"))
+	raw := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_STREAM_FOLLOW_TIMEOUT_MS"))
 	if raw == "" {
 		return 20 * time.Second
 	}

@@ -27,7 +27,7 @@ describe("toolRuntimeStorage", () => {
   });
 
   it("falls back to legacy tshark path", () => {
-    window.localStorage.setItem("gshark.tshark-path.v1", " C:/Tools/tshark.exe ");
+    window.localStorage.setItem("meow-traffic.tshark-path.v1", " C:/Tools/tshark.exe ");
 
     expect(readToolRuntimeConfig()).toMatchObject({
       tsharkPath: "C:/Tools/tshark.exe",
@@ -50,7 +50,7 @@ describe("toolRuntimeStorage", () => {
   });
 
   it("migrates a legacy all-empty runtime config to observed state", () => {
-    window.localStorage.setItem("gshark.tool-runtime.v1", JSON.stringify(EMPTY_TOOL_RUNTIME_CONFIG));
+    window.localStorage.setItem("meow-traffic.tool-runtime.v1", JSON.stringify(EMPTY_TOOL_RUNTIME_CONFIG));
 
     expect(readToolRuntimeConfigState()).toEqual({
       config: EMPTY_TOOL_RUNTIME_CONFIG,
@@ -61,7 +61,7 @@ describe("toolRuntimeStorage", () => {
 
   it("normalizes stored runtime config", () => {
     window.localStorage.setItem(
-      "gshark.tool-runtime.v1",
+      "meow-traffic.tool-runtime.v1",
       JSON.stringify({
         tsharkPath: " C:/Wireshark/tshark.exe ",
         ffmpegPath: " C:/ffmpeg.exe ",
@@ -100,7 +100,7 @@ describe("toolRuntimeStorage", () => {
   });
 
   it("treats malformed runtime config as missing so startup can trust the backend snapshot", () => {
-    window.localStorage.setItem("gshark.tool-runtime.v1", "{not-json");
+    window.localStorage.setItem("meow-traffic.tool-runtime.v1", "{not-json");
 
     expect(readToolRuntimeConfigState()).toEqual({
       config: EMPTY_TOOL_RUNTIME_CONFIG,
@@ -121,8 +121,8 @@ describe("toolRuntimeStorage", () => {
       yaraTimeoutMs: 25000,
     });
 
-    expect(window.localStorage.getItem("gshark.tshark-path.v1")).toBe("C:/Wireshark/tshark.exe");
-    expect(JSON.parse(window.localStorage.getItem("gshark.tool-runtime.v1") ?? "{}")).toMatchObject({
+    expect(window.localStorage.getItem("meow-traffic.tshark-path.v1")).toBe("C:/Wireshark/tshark.exe");
+    expect(JSON.parse(window.localStorage.getItem("meow-traffic.tool-runtime.v1") ?? "{}")).toMatchObject({
       version: 2,
       source: "stored-runtime-config",
       config: { tsharkPath: "C:/Wireshark/tshark.exe" },
@@ -171,6 +171,6 @@ describe("toolRuntimeStorage", () => {
     writeUserToolRuntimeConfig({ ...EMPTY_TOOL_RUNTIME_CONFIG, tsharkPath: "second.exe" });
 
     expect(readToolRuntimeConfig().tsharkPath).toBe("second.exe");
-    expect(window.localStorage.getItem("gshark.tshark-path.v1")).toBe("second.exe");
+    expect(window.localStorage.getItem("meow-traffic.tshark-path.v1")).toBe("second.exe");
   });
 });

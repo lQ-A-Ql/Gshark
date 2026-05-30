@@ -59,10 +59,10 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gshark-tile gshark-workbench-panel max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="gshark-tile-header px-6 py-5">
+      <DialogContent className="meow-tile meow-workbench-panel max-w-3xl overflow-hidden p-0">
+        <DialogHeader className="meow-tile-header px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="gshark-soft-fill gshark-evidence-accent flex h-11 w-11 items-center justify-center text-amber-700">
+            <div className="meow-soft-fill meow-evidence-accent flex h-11 w-11 items-center justify-center text-amber-700">
               <LockOpen className="h-5 w-5" />
             </div>
             <div>
@@ -75,18 +75,18 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
         </DialogHeader>
 
         <div className="space-y-4 px-6 py-6">
-          <section className="gshark-soft-fill gshark-evidence-accent p-4">
+          <section className="meow-soft-fill meow-evidence-accent p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <span className="gshark-diffuse-chip border-amber-200/24 bg-amber-50/14 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              <span className="meow-diffuse-chip border-amber-200/24 bg-amber-50/14 px-2.5 py-1 text-xs font-semibold text-amber-800">
                 方案 A
               </span>
               <span className="font-medium text-slate-900">导入主密钥日志文件</span>
-              <span className="gshark-diffuse-chip inline-flex items-center gap-1.5 bg-emerald-50/16 px-2.5 py-1 text-xs text-emerald-700">
+              <span className="meow-diffuse-chip inline-flex items-center gap-1.5 bg-emerald-50/16 px-2.5 py-1 text-xs text-emerald-700">
                 <CheckCircle2 className="h-3.5 w-3.5" /> 推荐，支持 TLS 1.3 / PFS
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="gshark-field flex min-w-0 flex-1 items-center px-3.5 py-2.5 text-sm">
+              <div className="meow-field flex min-w-0 flex-1 items-center px-3.5 py-2.5 text-sm">
                 <FileText className="mr-2.5 h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   type="text"
@@ -98,23 +98,23 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
               </div>
               <button
                 type="button"
-                className="gshark-control inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:text-amber-800"
+                className="meow-control inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:text-amber-800"
               >
                 <Upload className="h-4 w-4 text-slate-400" /> 浏览
               </button>
             </div>
           </section>
 
-          <section className="gshark-soft-fill p-4">
+          <section className="meow-soft-fill p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <span className="gshark-diffuse-chip px-2.5 py-1 text-xs font-semibold text-slate-600">方案 B</span>
+              <span className="meow-diffuse-chip px-2.5 py-1 text-xs font-semibold text-slate-600">方案 B</span>
               <span className="font-medium text-slate-700">导入 RSA 私钥</span>
-              <span className="gshark-diffuse-chip inline-flex items-center gap-1.5 bg-slate-50/14 px-2.5 py-1 text-xs text-slate-500">
+              <span className="meow-diffuse-chip inline-flex items-center gap-1.5 bg-slate-50/14 px-2.5 py-1 text-xs text-slate-500">
                 <Lock className="h-3.5 w-3.5" /> 仅限 TLS 1.2 及以下，无 PFS
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="gshark-field flex min-w-0 flex-1 items-center px-3.5 py-2.5 text-sm">
+              <div className="meow-field flex min-w-0 flex-1 items-center px-3.5 py-2.5 text-sm">
                 <KeyRound className="mr-2.5 h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   type="text"
@@ -126,12 +126,12 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
               </div>
               <button
                 type="button"
-                className="gshark-control inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:text-blue-700"
+                className="meow-control inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:text-blue-700"
               >
                 <Upload className="h-4 w-4 text-slate-400" /> 浏览
               </button>
             </div>
-            <div className="gshark-field mt-3 px-3.5 py-2.5 text-xs">
+            <div className="meow-field mt-3 px-3.5 py-2.5 text-xs">
               <div className="mb-1 font-medium text-slate-500">私钥绑定目标 IP:Port</div>
               <input
                 value={decryptionConfig.privateKeyIpPort}
@@ -143,7 +143,7 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
           </section>
         </div>
 
-        <DialogFooter className="gshark-tile-toolbar items-center justify-between px-6 py-4 sm:justify-between">
+        <DialogFooter className="meow-tile-toolbar items-center justify-between px-6 py-4 sm:justify-between">
           <div className="min-h-5 text-xs">
             {errorMessage ? (
               <span data-testid="tls-error" className="text-rose-600">
@@ -157,7 +157,7 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="gshark-control px-5 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              className="meow-control px-5 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
             >
               取消
             </button>
@@ -166,7 +166,7 @@ export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogP
               type="button"
               onClick={() => void apply()}
               disabled={isApplying}
-              className="gshark-control-primary inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              className="meow-control-primary inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isApplying ? "应用中..." : "应用并重新加载"}

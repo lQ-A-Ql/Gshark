@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { findDesktopGenericIpcRemovalPreflightViolations } from "./check-desktop-generic-ipc-removal-preflight.mjs";
 
 function createFixture({ tracker = validTracker(), extraSource = "", packageJson = validPackageJson() } = {}) {
-  const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-removal-preflight-"));
+  const rootDir = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-removal-preflight-"));
   writeFixture(rootDir, "frontend/src/app/integrations/desktopBridge.ts", validDesktopBridge());
   writeFixture(rootDir, "frontend/src/app/integrations/desktopTransportBindingShell.ts", validBindingShell());
   writeFixture(rootDir, "frontend/wailsjs/go/main/DesktopApp.d.ts", validGeneratedDts());

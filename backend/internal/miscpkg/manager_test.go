@@ -305,7 +305,7 @@ func TestInvokePythonModuleCanUseHostBridge(t *testing.T) {
 		"py-bridge/manifest.json": `{"id":"py-bridge","title":"Python Bridge","summary":"python host bridge","backend":"backend.py"}`,
 		"py-bridge/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true}`,
 		"py-bridge/form.json":     `{"fields":[{"name":"message","label":"Message","type":"text"}]}`,
-		"py-bridge/backend.py": `from gshark_misc_host import run, scan_fields
+		"py-bridge/backend.py": `from MEOW_TRAFFIC_misc_host import run, scan_fields
 
 def on_request(payload):
     rows = scan_fields(["frame.number", "ip.src"], "tcp").get("rows", [])
@@ -372,7 +372,7 @@ func TestInvokePythonHostBridgeUsesContextAwareScanFields(t *testing.T) {
 		"py-context-scan/manifest.json": `{"id":"py-context-scan","title":"Python Context Scan","summary":"python context scan","backend":"backend.py"}`,
 		"py-context-scan/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true}`,
 		"py-context-scan/form.json":     `{"fields":[{"name":"message","label":"Message","type":"text"}]}`,
-		"py-context-scan/backend.py": `from gshark_misc_host import run, scan_fields
+		"py-context-scan/backend.py": `from MEOW_TRAFFIC_misc_host import run, scan_fields
 
 def on_request(payload):
     rows = scan_fields(["frame.number", "dns.qry.name"], "dns").get("rows", [])

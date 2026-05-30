@@ -350,7 +350,7 @@ func TestStreamPacketsFast_WithCustomBinaryAndNoTSharkInPath(t *testing.T) {
 		t.Skip("tshark not available in PATH")
 	}
 
-	pcapFile, err := os.CreateTemp("", "gshark-custom-binary-*.pcap")
+	pcapFile, err := os.CreateTemp("", "meow-traffic-custom-binary-*.pcap")
 	if err != nil {
 		t.Fatalf("create temp pcap: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestStreamPacketsFast_WithCustomBinaryDirectoryAndNoTSharkInPath(t *testing
 		t.Skip("tshark not available in PATH")
 	}
 
-	pcapFile, err := os.CreateTemp("", "gshark-custom-binary-dir-*.pcap")
+	pcapFile, err := os.CreateTemp("", "meow-traffic-custom-binary-dir-*.pcap")
 	if err != nil {
 		t.Fatalf("create temp pcap: %v", err)
 	}

@@ -98,8 +98,8 @@ if (-not $NoRepoManifestUpdate) {
 }
 
 Write-Host "[meow-traffic] running release smoke check" -ForegroundColor Cyan
-$previousSmokeCheck = $env:GSHARK_RELEASE_SMOKE_CHECK
-$previousSmokeResultPath = $env:GSHARK_RELEASE_SMOKE_RESULT_PATH
+$previousSmokeCheck = $env:MEOW_TRAFFIC_RELEASE_SMOKE_CHECK
+$previousSmokeResultPath = $env:MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH
 $smokeResultPath = Join-Path $OutputDir "release-smoke-result.txt"
 $smokeStdoutPath = Join-Path $OutputDir "release-smoke-stdout.txt"
 $smokeStderrPath = Join-Path $OutputDir "release-smoke-stderr.txt"
@@ -113,20 +113,20 @@ if (Test-Path -LiteralPath $smokeStderrPath) {
   Remove-Item -LiteralPath $smokeStderrPath -Force
 }
 try {
-  $env:GSHARK_RELEASE_SMOKE_CHECK = "1"
-  $env:GSHARK_RELEASE_SMOKE_RESULT_PATH = $smokeResultPath
+  $env:MEOW_TRAFFIC_RELEASE_SMOKE_CHECK = "1"
+  $env:MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH = $smokeResultPath
   $smokeProcess = Start-Process -FilePath $releaseExePath -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $smokeStdoutPath -RedirectStandardError $smokeStderrPath
   $smokeExitCode = $smokeProcess.ExitCode
 } finally {
   if ($null -eq $previousSmokeCheck) {
-    Remove-Item Env:\GSHARK_RELEASE_SMOKE_CHECK -ErrorAction SilentlyContinue
+    Remove-Item Env:\MEOW_TRAFFIC_RELEASE_SMOKE_CHECK -ErrorAction SilentlyContinue
   } else {
-    $env:GSHARK_RELEASE_SMOKE_CHECK = $previousSmokeCheck
+    $env:MEOW_TRAFFIC_RELEASE_SMOKE_CHECK = $previousSmokeCheck
   }
   if ($null -eq $previousSmokeResultPath) {
-    Remove-Item Env:\GSHARK_RELEASE_SMOKE_RESULT_PATH -ErrorAction SilentlyContinue
+    Remove-Item Env:\MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH -ErrorAction SilentlyContinue
   } else {
-    $env:GSHARK_RELEASE_SMOKE_RESULT_PATH = $previousSmokeResultPath
+    $env:MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH = $previousSmokeResultPath
   }
 }
 $smokeText = ""

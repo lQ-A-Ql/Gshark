@@ -15,8 +15,8 @@ export function ProtocolTreePanel({
   registerNodeRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
   return (
-    <Panel defaultSize={50} minSize={20} className="gshark-tile flex flex-col border-r border-border">
-      <div className="gshark-tile-header flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs font-semibold text-foreground">
+    <Panel defaultSize={50} minSize={20} className="meow-tile flex flex-col border-r border-border">
+      <div className="meow-tile-header flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs font-semibold text-foreground">
         <Network className="h-4 w-4 text-emerald-600" /> 协议解析树
       </div>
       <div className="flex-1 overflow-auto p-2 font-mono text-xs">

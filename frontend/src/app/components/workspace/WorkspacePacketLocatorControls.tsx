@@ -19,7 +19,7 @@ export function PacketLocatorControls({
   };
 
   return (
-    <div className="gshark-tile-toolbar flex items-center gap-1 px-2 py-1 text-xs">
+    <div className="meow-tile-toolbar flex items-center gap-1 px-2 py-1 text-xs">
       <input
         value={packetIdInput}
         onChange={(event) => onPacketIdInputChange(event.target.value.replace(/[^0-9]/g, ""))}

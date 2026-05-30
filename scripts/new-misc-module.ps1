@@ -99,7 +99,7 @@ export function onRequest(input, ctx) {
 "@
 
 $backendPy = @"
-from gshark_misc_host import run, scan_fields
+from MEOW_TRAFFIC_misc_host import run, scan_fields
 
 def on_request(payload):
     message = str(payload.get("values", {}).get("message", ""))

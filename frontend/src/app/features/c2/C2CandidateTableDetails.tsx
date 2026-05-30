@@ -3,7 +3,7 @@ import { candidatePreviewRecord } from "./C2CandidateTableRules";
 
 export function CandidateDetailPanel({ item, tags }: { item: C2IndicatorRecord; tags: string[] }) {
   return (
-    <div className="gshark-tile overflow-hidden border-rose-100 p-3.5 transition-all duration-200">
+    <div className="meow-tile overflow-hidden border-rose-100 p-3.5 transition-all duration-200">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Evidence Context</div>
@@ -16,7 +16,7 @@ export function CandidateDetailPanel({ item, tags }: { item: C2IndicatorRecord; 
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
             Typed Record Preview
           </div>
-          <pre className="gshark-tile max-h-60 overflow-auto border-slate-800 bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
+          <pre className="meow-tile max-h-60 overflow-auto border-slate-800 bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
             {JSON.stringify(candidatePreviewRecord(item), null, 2)}
           </pre>
         </div>
@@ -56,7 +56,7 @@ function CandidateContext({ item }: { item: C2IndicatorRecord }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="gshark-tile mt-2 grid gap-1.5 border-slate-100 bg-slate-50/70 p-2">
+    <div className="meow-tile mt-2 grid gap-1.5 border-slate-100 bg-slate-50/70 p-2">
       {rows.map((row) => (
         <div key={row.label} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2 text-[11px] leading-5">
           <span className="font-semibold text-slate-400">{row.label}</span>

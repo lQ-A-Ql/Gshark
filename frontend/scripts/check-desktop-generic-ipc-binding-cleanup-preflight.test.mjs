@@ -14,7 +14,7 @@ function createFixture({
   backend = validBackend(),
   backendTest = validBackendTest(),
 } = {}) {
-  const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-binding-cleanup-preflight-"));
+  const rootDir = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-binding-cleanup-preflight-"));
   writeFixture(rootDir, "desktop_backend_proxy.go", backend);
   writeFixture(rootDir, "desktop_backend_proxy_test.go", backendTest);
   writeFixture(rootDir, "frontend/wailsjs/go/main/DesktopApp.d.ts", validGeneratedDts());

@@ -34,9 +34,9 @@ func TestSelectReleaseAssetPrefersWindowsExecutable(t *testing.T) {
 
 	release := githubRelease{
 		Assets: []githubReleaseAsset{
-			{Name: "gshark-v0.0.3-linux.tar.gz", BrowserDownloadURL: "https://example.com/linux"},
+			{Name: "meow-traffic-v0.0.3-linux.tar.gz", BrowserDownloadURL: "https://example.com/linux"},
 			{Name: "meow-traffic.v0.0.3.exe", BrowserDownloadURL: "https://example.com/windows"},
-			{Name: "gshark-v0.0.3-windows.zip", BrowserDownloadURL: "https://example.com/windows-zip"},
+			{Name: "meow-traffic-v0.0.3-windows.zip", BrowserDownloadURL: "https://example.com/windows-zip"},
 		},
 	}
 
@@ -53,8 +53,8 @@ func TestExtractReleaseVersionFallsBackToAssetName(t *testing.T) {
 	t.Parallel()
 
 	release := githubRelease{
-		TagName: "gshark",
-		Name:    "gshark release",
+		TagName: "meow-traffic",
+		Name:    "meow-traffic release",
 		Assets: []githubReleaseAsset{
 			{Name: "meow-traffic.v0.0.2.exe"},
 		},
@@ -67,12 +67,12 @@ func TestExtractReleaseVersionFallsBackToAssetName(t *testing.T) {
 
 func TestResolveUpdateManifestURLPrefersExplicitValue(t *testing.T) {
 	original := appManifestURL
-	appManifestURL = "https://updates.example.com/gshark/version.json"
+	appManifestURL = "https://updates.example.com/meow-traffic/version.json"
 	t.Cleanup(func() {
 		appManifestURL = original
 	})
 
-	if got := resolveUpdateManifestURL("lQ-A-Ql/Gshark"); got != "https://updates.example.com/gshark/version.json" {
+	if got := resolveUpdateManifestURL("lQ-A-Ql/Gshark"); got != "https://updates.example.com/meow-traffic/version.json" {
 		t.Fatalf("resolveUpdateManifestURL() = %q, want explicit manifest URL", got)
 	}
 }
@@ -83,11 +83,11 @@ func TestResolveUpdateManifestURLBuildsRawGitHubURL(t *testing.T) {
 	t.Cleanup(func() {
 		appManifestURL = original
 	})
-	t.Setenv("GSHARK_UPDATE_MANIFEST_URL", "")
-	t.Setenv("GSHARK_UPDATE_MANIFEST_REF", "release/version.json")
+	t.Setenv("MEOW_TRAFFIC_UPDATE_MANIFEST_URL", "")
+	t.Setenv("MEOW_TRAFFIC_UPDATE_MANIFEST_REF", "release/version.json")
 
 	got := resolveUpdateManifestURL("lQ-A-Ql/Gshark")
-	want := "https://raw.githubusercontent.com/lQ-A-Ql/Gshark/release/version.json"
+	want := "https://raw.githubusercontent.com/lQ-A-Ql/meow-traffic/release/version.json"
 	if got != want {
 		t.Fatalf("resolveUpdateManifestURL() = %q, want %q", got, want)
 	}

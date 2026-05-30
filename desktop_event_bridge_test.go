@@ -16,28 +16,28 @@ func TestParseDesktopBackendEvent(t *testing.T) {
 			name:          "ready",
 			eventName:     "ready",
 			rawData:       `{"message":"ready"}`,
-			wantRuntime:   "gshark:backend:ready",
+			wantRuntime:   "meow:backend:ready",
 			wantForwarded: true,
 		},
 		{
 			name:          "status",
 			eventName:     "status",
 			rawData:       `{"message":"解析完成"}`,
-			wantRuntime:   "gshark:backend:status",
+			wantRuntime:   "meow:backend:status",
 			wantForwarded: true,
 		},
 		{
 			name:          "packet",
 			eventName:     "packet",
 			rawData:       `{"id":7}`,
-			wantRuntime:   "gshark:backend:packet",
+			wantRuntime:   "meow:backend:packet",
 			wantForwarded: true,
 		},
 		{
 			name:          "error",
 			eventName:     "error",
 			rawData:       `{"message":"boom"}`,
-			wantRuntime:   "gshark:backend:error",
+			wantRuntime:   "meow:backend:error",
 			wantForwarded: true,
 		},
 		{
@@ -66,7 +66,7 @@ func TestParseDesktopBackendEventMalformedData(t *testing.T) {
 	if !ok {
 		t.Fatal("expected malformed event to be forwarded")
 	}
-	if runtimeEvent != "gshark:backend:status" {
+	if runtimeEvent != "meow:backend:status" {
 		t.Fatalf("runtime event = %q", runtimeEvent)
 	}
 	message, _ := payload.(map[string]any)["message"].(string)

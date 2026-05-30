@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { findDesktopGenericIpcRetirementReadinessViolations } from "./check-desktop-generic-ipc-retirement-readiness.mjs";
 
 function createFixture({ bridge, smoke, exitPlan, tracker, packageJson }) {
-  const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-retirement-"));
+  const rootDir = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-retirement-"));
   writeFixture(rootDir, "frontend/src/app/integrations/desktopBridge.ts", bridge ?? validBridge());
   writeFixture(rootDir, "frontend/src/app/integrations/desktopGenericIpcPolicy.ts", validPolicy());
   writeFixture(
@@ -65,7 +65,7 @@ function validDisabledTransport() {
 function validSmokeScript() {
   return `
     param([switch]$DisableGenericIpcAdapterExperiment)
-    $env:GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT = "1"
+    $env:MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT = "1"
     $result.genericIpcPolicy
     $result.genericIpcDisableExperimentRequested
     $result.genericIpcDisableExperimentBuildFlag

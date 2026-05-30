@@ -1,6 +1,6 @@
 # Desktop IPC typed migration plan
 
-> Product branding is `meow~traffic`; internal compatibility identifiers such as `gshark`, `sentinel`, `GSHARK_*`, and `sentinel-backend.exe` remain current implementation names.
+> Product branding is `meow~traffic`; internal compatibility identifiers such as `meow-traffic`, `sentinel`, `MEOW_TRAFFIC_*`, and `sentinel-backend.exe` remain current implementation names.
 
 This document is the versioned control plan for moving the Wails desktop build from generic backend IPC proxy calls toward typed IPC domain bindings. Local round reports may contain detailed evidence, but the current migration policy and phase status should be reflected here and in `docs/desktop-ipc-iteration-status.json`.
 

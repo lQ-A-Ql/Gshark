@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, type DecoderSettings } from "./StreamDecoderTypes";
 
-const SETTINGS_STORAGE_KEY = "gshark.stream-decoders.v1";
+const SETTINGS_STORAGE_KEY = "meow-traffic.stream-decoders.v1";
 
 export function readDecoderSettings(): DecoderSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;

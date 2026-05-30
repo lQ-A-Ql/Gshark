@@ -41,7 +41,7 @@ Before mutating runtime migration:
 - Preserve current package validation from `backend/internal/miscpkg`: zip file count limits, file size limits, path traversal checks, manifest validation, execution timeout, and Python host bridge sandbox behavior.
 - Keep import/delete/invoke audit semantics equivalent to the HTTP routes.
 - Keep `frontend/scripts/check-desktop-generic-ipc-allowlist.mjs` and `frontend/scripts/check-desktop-misc-compat-inventory.mjs` green as routes move from explicit compatibility into typed migration.
-- Use the smoke-owned package directory boundary for any desktop mutating smoke. `scripts/check-desktop-ipc-smoke.ps1` creates per-run directories under `output/desktop-ipc-smoke/misc-packages`, sets `GSHARK_MISC_PACKAGE_DIR`, and verifies the backend runtime identity reports the same directory.
+- Use the smoke-owned package directory boundary for any desktop mutating smoke. `scripts/check-desktop-ipc-smoke.ps1` creates per-run directories under `output/desktop-ipc-smoke/misc-packages`, sets `MEOW_TRAFFIC_MISC_PACKAGE_DIR`, and verifies the backend runtime identity reports the same directory.
 
 ## Error taxonomy
 

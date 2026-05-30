@@ -39,7 +39,7 @@ export function ShiroRememberMeControls({
 }: ShiroRememberMeControlsProps) {
   return (
     <>
-      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-amber-100 bg-amber-50/50 p-4 text-[11px]">
+      <div className="meow-tile-toolbar flex flex-wrap gap-2 border-amber-100 bg-amber-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={hasCapture ? captureName : "未加载"} color={hasCapture ? "sky" : "slate"} />
         <MetaChip label="候选" value={candidateCount} color="slate" />
         <MetaChip label="密钥命中" value={hitCount} color={hitCount > 0 ? "rose" : "slate"} />

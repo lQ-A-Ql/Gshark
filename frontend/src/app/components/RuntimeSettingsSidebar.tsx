@@ -44,7 +44,7 @@ export function RuntimeSettingsSidebar() {
   } = useRuntimeSettingsSidebarModel();
 
   return (
-    <div className="gshark-tile gshark-tile-strong flex h-full flex-col overflow-hidden">
+    <div className="meow-tile meow-tile-strong flex h-full flex-col overflow-hidden">
       <RuntimeSettingsHeader
         form={form}
         snapshot={toolRuntimeSnapshot}

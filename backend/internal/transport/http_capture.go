@@ -154,7 +154,7 @@ func (s *Server) handleCaptureUpload(w http.ResponseWriter, r *http.Request) {
 		ext = ".pcapng"
 	}
 
-	targetPath := filepath.Join(os.TempDir(), fmt.Sprintf("gshark-%d%s", time.Now().UnixNano(), ext))
+	targetPath := filepath.Join(os.TempDir(), fmt.Sprintf("meow-traffic-%d%s", time.Now().UnixNano(), ext))
 	target, err := os.Create(targetPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create temp file")

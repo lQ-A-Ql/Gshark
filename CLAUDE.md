@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 meow~traffic is a desktop-first offline traffic analysis tool for PCAP/PCAPNG.
 
-Branding note: the product display name is now `meow~traffic`, while compatibility identifiers such as `github.com/gshark/sentinel/...`, `GSHARK_*`, `gshark-sentinel`, and `sentinel-backend.exe` intentionally remain unchanged in this repository.
+Branding note: the product display name is now `meow~traffic`, while compatibility identifiers such as `github.com/gshark/sentinel/...`, `MEOW_TRAFFIC_*`, `meow-traffic`, and `sentinel-backend.exe` intentionally remain unchanged in this repository.
 
 - Desktop shell: Go + Wails (`github.com/gshark/sentinel/desktop`)
 - Backend API/SSE service: Go (`github.com/gshark/sentinel/backend`)
@@ -146,7 +146,7 @@ Frontend (React) ── typed Wails IPC (desktop) / HTTP + SSE (browser) ──>
 Desktop responsibilities:
 - Starts backend process on app startup, stops it on shutdown.
 - Provides Wails file-dialog bindings to frontend.
-- Injects/reads backend auth token (`GSHARK_BACKEND_TOKEN`).
+- Injects/reads backend auth token (`MEOW_TRAFFIC_BACKEND_TOKEN`).
 - Self-update system (`desktop_update.go`) checks GitHub releases when built with `-tags production`; disabled with `-tags dev`.
 
 ### Backend structure (`backend/`)
@@ -208,13 +208,13 @@ Frontend data flow:
 
 ## Operational knobs that affect behavior
 
-- `GSHARK_BACKEND_TOKEN`: backend bearer token (generated if absent).
-- `GSHARK_ALLOW_EXISTING_BACKEND=1`: allows desktop app to reuse an already-running backend on `127.0.0.1:17891`.
+- `MEOW_TRAFFIC_BACKEND_TOKEN`: backend bearer token (generated if absent).
+- `MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND=1`: allows desktop app to reuse an already-running backend on `127.0.0.1:17891`.
 - `VITE_BACKEND_URL`: frontend API base override (defaults to `http://127.0.0.1:17891`).
-- `GSHARK_UPDATE_MANIFEST_REF`: override update manifest branch/ref used by updater flow.
-- `GSHARK_FFMPEG`: explicit FFmpeg path for backend media processing.
-- `GSHARK_PYTHON`: explicit Python interpreter path for plugin/module runtime.
-- `GSHARK_VOSK_MODEL`: explicit Vosk model directory for speech transcription.
+- `MEOW_TRAFFIC_UPDATE_MANIFEST_REF`: override update manifest branch/ref used by updater flow.
+- `MEOW_TRAFFIC_FFMPEG`: explicit FFmpeg path for backend media processing.
+- `MEOW_TRAFFIC_PYTHON`: explicit Python interpreter path for plugin/module runtime.
+- `MEOW_TRAFFIC_VOSK_MODEL`: explicit Vosk model directory for speech transcription.
 
 ## Desktop IPC architecture
 
@@ -222,7 +222,7 @@ Wails desktop data plane uses **typed IPC bindings** (not generic `InvokeBackend
 
 Key points:
 - Control-plane calls (capture status, packet page, start/stop, TLS, runtime probe) carry local timeout/abort protection.
-- Desktop SSE events are forwarded as `gshark:backend:*` Wails runtime events; WebView does not directly connect to `/api/events`.
+- Desktop SSE events are forwarded as `meow-traffic:backend:*` Wails runtime events; WebView does not directly connect to `/api/events`.
 - Blob responses over desktop IPC are capped at 50MB.
 - Browser-dev mode (non-Wails) continues using HTTP/SSE via `httpBridge`.
 - See `frontend/src/app/integrations/desktopBridge.ts` and `frontend/src/app/integrations/desktopTypedBridgeCore.ts`.

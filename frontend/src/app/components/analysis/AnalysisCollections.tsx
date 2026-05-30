@@ -82,7 +82,7 @@ export function AnalysisList({
     return <AnalysisEmptyState>{emptyText}</AnalysisEmptyState>;
   }
   return (
-    <div className={cn("gshark-tile divide-y divide-slate-200/70 overflow-auto", maxHeightClassName)}>
+    <div className={cn("meow-tile divide-y divide-slate-200/70 overflow-auto", maxHeightClassName)}>
       {items.map((item) => (
         <div
           key={`${item.label}-${item.count}`}

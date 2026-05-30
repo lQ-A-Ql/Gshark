@@ -23,7 +23,7 @@ export function VehicleDbcPanel({
     <Panel title="DBC 映射" className="mb-0">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <button className="gshark-control inline-flex items-center gap-1 px-3 py-2 text-xs" onClick={onImport}>
+          <button className="meow-control inline-flex items-center gap-1 px-3 py-2 text-xs" onClick={onImport}>
             <FolderOpen className="h-4 w-4" />
             导入 DBC
           </button>
@@ -31,9 +31,9 @@ export function VehicleDbcPanel({
             value={pathInput}
             onChange={(event) => onPathInputChange(event.target.value)}
             placeholder="或直接输入 DBC 文件路径"
-            className="gshark-field min-w-[320px] flex-1 px-3 py-2 text-xs outline-none"
+            className="meow-field min-w-[320px] flex-1 px-3 py-2 text-xs outline-none"
           />
-          <button className="gshark-control px-3 py-2 text-xs" onClick={onAddPath}>
+          <button className="meow-control px-3 py-2 text-xs" onClick={onAddPath}>
             添加路径
           </button>
         </div>
@@ -44,7 +44,7 @@ export function VehicleDbcPanel({
         ) : (
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
             {profiles.map((profile) => (
-              <div key={profile.path} className="gshark-soft-fill flex items-start justify-between px-3 py-3 text-xs">
+              <div key={profile.path} className="meow-soft-fill flex items-start justify-between px-3 py-3 text-xs">
                 <div className="min-w-0">
                   <div className="font-medium text-foreground">{profile.name}</div>
                   <div className="truncate text-muted-foreground" title={profile.path}>
@@ -55,7 +55,7 @@ export function VehicleDbcPanel({
                   </div>
                 </div>
                 <button
-                  className="gshark-control-ghost ml-3 p-2 text-muted-foreground hover:text-foreground"
+                  className="meow-control-ghost ml-3 p-2 text-muted-foreground hover:text-foreground"
                   onClick={() => onRemove(profile.path)}
                   title="移除 DBC"
                 >

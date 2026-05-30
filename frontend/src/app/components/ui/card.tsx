@@ -6,7 +6,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("gshark-tile gshark-diffuse-edge text-card-foreground flex flex-col gap-3", className)}
+      className={cn("meow-tile meow-diffuse-edge text-card-foreground flex flex-col gap-3", className)}
       {...props}
     />
   );
@@ -17,7 +17,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header gshark-tile-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-4 py-3 has-data-[slot=card-action]:grid-cols-[1fr_auto]",
+        "@container/card-header meow-tile-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-4 py-3 has-data-[slot=card-action]:grid-cols-[1fr_auto]",
         className,
       )}
       {...props}

@@ -7,7 +7,7 @@ interface MySQLSessionOverviewPanelProps {
 
 export function MySQLSessionOverviewPanel({ session }: MySQLSessionOverviewPanelProps) {
   return (
-    <div className="gshark-tile border-slate-200 p-4">
+    <div className="meow-tile border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-slate-800">会话详情</div>

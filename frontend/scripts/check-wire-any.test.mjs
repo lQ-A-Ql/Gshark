@@ -13,7 +13,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 
 describe("check-wire-any script", () => {
   it("reports raw any in production wire DTO files", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-wire-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-wire-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/wire/badWireDto.ts",
@@ -35,7 +35,7 @@ describe("check-wire-any script", () => {
   });
 
   it("passes wire DTO files that use unknown for open payloads", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-wire-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-wire-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/wire/goodWireDto.ts",

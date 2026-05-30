@@ -1,6 +1,6 @@
 # MISC 模块接口规范 v3
 
-> 品牌已更名为 `meow~traffic`；但 `%AppData%/gshark-sentinel/...`、`GSHARK_MISC_*`、`gshark_misc_host` 等内部兼容标识仍保持旧名，以下说明以当前真实运行行为为准。
+> 品牌已更名为 `meow~traffic`；但 `%AppData%/meow-traffic/...`、`MEOW_TRAFFIC_MISC_*`、`MEOW_TRAFFIC_misc_host` 等内部兼容标识仍保持旧名，以下说明以当前真实运行行为为准。
 
 本文档描述当前 `MISC` 区模块化能力的真实落地形态，重点覆盖：
 
@@ -83,10 +83,10 @@
 
 当前安装目录：
 
-- 默认：用户配置目录下的 `gshark-sentinel/plugins/misc/<module-id>/`
-  - Windows 通常为 `%AppData%\gshark-sentinel\plugins\misc\<module-id>`
+- 默认：用户配置目录下的 `meow-traffic/plugins/misc/<module-id>/`
+  - Windows 通常为 `%AppData%\meow-traffic\plugins\misc\<module-id>`
   - macOS/Linux 以 Go `os.UserConfigDir()` 返回值为准
-- 可通过环境变量 `GSHARK_MISC_PACKAGE_DIR` 覆盖 zip 模块安装根目录。
+- 可通过环境变量 `MEOW_TRAFFIC_MISC_PACKAGE_DIR` 覆盖 zip 模块安装根目录。
 - 旧版曾按进程 cwd 写入 `plugins/misc/<module-id>/`；新开发和测试不应再写入源码树。
 
 ## 3. 模块发现接口
@@ -393,7 +393,7 @@ export function onRequest(input, ctx) {
 - JavaScript 模块运行在 Go 进程内的 Goja VM，不是 Node.js 运行时。
 - JavaScript 模块没有 `process.env`，也不会获得完整系统环境变量快照。
 - 本轮不向 JavaScript 模块开放完整环境变量，避免把本机 token、代理、路径等敏感信息扩散到自定义脚本执行面。
-- 如果后续确实需要让 JavaScript 模块读取少量环境变量，应设计为受限宿主 API，例如 `ctx.env(name)`，并只允许 `GSHARK_MISC_` 前缀或 `manifest.json` 显式声明的白名单项。
+- 如果后续确实需要让 JavaScript 模块读取少量环境变量，应设计为受限宿主 API，例如 `ctx.env(name)`，并只允许 `MEOW_TRAFFIC_MISC_` 前缀或 `manifest.json` 显式声明的白名单项。
 
 JavaScript 模块有执行超时保护，可中断模块内的 JS 死循环和长时间计算。该保护不是完整 sandbox，也不保证强制中断正在执行的 Go 宿主回调；例如 `ctx.scanFields()` 进入宿主 `tshark` 扫描后，需要宿主 API 自身支持取消才能立即停止。编写模块时应避免长时间阻塞 host API，并把重型能力升级为内置模块。
 
@@ -448,8 +448,8 @@ sys.stdout.write(json.dumps({
 Python 环境变量边界：
 
 - Python 模块以独立本地进程运行，默认继承当前后端进程的 `os.Environ()`，因此可以通过 `os.environ` 读取后端进程可见的环境变量。
-- 普通模式下宿主主要通过标准输入传入 JSON payload；不会额外设置 `GSHARK_MISC_INPUT_JSON`。
-- `host_bridge: true` 模式会在继承环境的基础上追加 `GSHARK_MISC_INPUT_JSON`、`PYTHONIOENCODING=utf-8` 和包含临时 helper 目录的 `PYTHONPATH`。
+- 普通模式下宿主主要通过标准输入传入 JSON payload；不会额外设置 `MEOW_TRAFFIC_MISC_INPUT_JSON`。
+- `host_bridge: true` 模式会在继承环境的基础上追加 `MEOW_TRAFFIC_MISC_INPUT_JSON`、`PYTHONIOENCODING=utf-8` 和包含临时 helper 目录的 `PYTHONPATH`。
 - JavaScript 与 Python 的差异是有意设计：JavaScript 暂不暴露完整环境变量；Python 本身是本地进程执行面，导入前必须按可信脚本处理。
 
 ### 10.2 宿主桥接模式
@@ -466,12 +466,12 @@ Python 环境变量边界：
 
 宿主会在运行前注入 helper 模块：
 
-- `gshark_misc_host`
+- `MEOW_TRAFFIC_misc_host`
 
 然后 Python 模块可以这样写：
 
 ```python
-from gshark_misc_host import run, scan_fields
+from MEOW_TRAFFIC_misc_host import run, scan_fields
 
 def on_request(payload):
     rows = []
@@ -574,7 +574,7 @@ zip 模块统一通过下面的宿主接口执行：
     "docs_path": "docs/misc-module-interface.md",
     "requires_capture": false
   },
-  "installed_path": "%AppData%/gshark-sentinel/plugins/misc/ioc-demo",
+  "installed_path": "%AppData%/meow-traffic/plugins/misc/ioc-demo",
   "message": "模块包导入成功"
 }
 ```

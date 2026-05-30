@@ -23,10 +23,10 @@ export function GenericMiscResultPanel({
   }
 
   return (
-    <div className="gshark-soft-fill space-y-3 p-4">
+    <div className="meow-soft-fill space-y-3 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-800">{resultTitle}</div>
-        <Badge variant="outline" className="gshark-diffuse-chip text-[11px] text-emerald-700">
+        <Badge variant="outline" className="meow-diffuse-chip text-[11px] text-emerald-700">
           Result
         </Badge>
       </div>
@@ -36,8 +36,8 @@ export function GenericMiscResultPanel({
           rowKey={(_, index) => `${moduleId}-row-${index}`}
           maxHeightClassName="max-h-72"
           tableClassName="min-w-full text-slate-700"
-          wrapperClassName="gshark-tile-table"
-          headerClassName="gshark-tile-header text-slate-800"
+          wrapperClassName="meow-tile-table"
+          headerClassName="meow-tile-header text-slate-800"
           emptyText="暂无表格结果"
           rowClassName="last:border-b-0 hover:bg-cyan-50/20"
           columns={resultTable.columns.map((column) => ({
@@ -50,7 +50,7 @@ export function GenericMiscResultPanel({
         />
       ) : null}
       {resultText ? (
-        <pre className="gshark-soft-fill max-h-72 overflow-auto whitespace-pre-wrap break-words p-3.5 text-xs leading-relaxed text-slate-700">
+        <pre className="meow-soft-fill max-h-72 overflow-auto whitespace-pre-wrap break-words p-3.5 text-xs leading-relaxed text-slate-700">
           {resultText}
         </pre>
       ) : null}

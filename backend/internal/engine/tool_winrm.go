@@ -791,7 +791,7 @@ func previewTextByLines(lines []string, limit int) (string, bool) {
 }
 
 func persistWinRMExport(resultID, filename, content string) (string, error) {
-	dir, err := os.MkdirTemp("", "gshark-winrm-*")
+	dir, err := os.MkdirTemp("", "meow-traffic-winrm-*")
 	if err != nil {
 		return "", fmt.Errorf("创建 WinRM 导出目录失败: %w", err)
 	}

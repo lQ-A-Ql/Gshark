@@ -77,7 +77,7 @@ export default function AptAnalysis() {
 
       {!loading && error && <StatusHint tone="amber">{error}</StatusHint>}
 
-      <div className="gshark-tile-grid grid grid-cols-1 lg:grid-cols-4">
+      <div className="meow-tile-grid grid grid-cols-1 lg:grid-cols-4">
         <MetricCard
           label="组织证据"
           value={analysis.totalEvidence.toLocaleString()}
@@ -104,7 +104,7 @@ export default function AptAnalysis() {
         />
       </div>
 
-      <div className="gshark-tile-toolbar p-2">
+      <div className="meow-tile-toolbar p-2">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {displayProfiles.map((profile) => (
             <ActorTab
@@ -118,7 +118,7 @@ export default function AptAnalysis() {
       </div>
 
       {activeProfile ? (
-        <div className="gshark-tile-grid grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+        <div className="meow-tile-grid grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
           <AptPanel title={`${activeProfile.name} 画像概览`} icon={<Crosshair className="h-4 w-4 text-indigo-600" />}>
             <div className="space-y-3">
               <div>
@@ -158,7 +158,7 @@ export default function AptAnalysis() {
         </div>
       ) : null}
 
-      <div className="gshark-tile-grid grid grid-cols-1 xl:grid-cols-3">
+      <div className="meow-tile-grid grid grid-cols-1 xl:grid-cols-3">
         <AptPanel title="样本家族分布">
           <AnalysisBucketChart
             data={activeProfile?.sampleFamilies ?? analysis.sampleFamilies}
@@ -185,7 +185,7 @@ export default function AptAnalysis() {
         </AptPanel>
       </div>
 
-      <div className="gshark-tile-grid grid grid-cols-1 xl:grid-cols-2">
+      <div className="meow-tile-grid grid grid-cols-1 xl:grid-cols-2">
         <AptPanel title="基础设施线索">
           <AnalysisBucketChart
             data={activeProfile?.infrastructureHints ?? analysis.infrastructureHints}

@@ -20,7 +20,7 @@ export function MediaAnalysisProgressPanel({ progress }: MediaAnalysisProgressPa
   }
 
   return (
-    <div className="gshark-soft-fill mb-0 px-3 py-3">
+    <div className="meow-soft-fill mb-0 px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

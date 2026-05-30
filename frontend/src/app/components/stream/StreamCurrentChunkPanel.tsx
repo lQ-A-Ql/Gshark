@@ -30,7 +30,7 @@ export function StreamCurrentChunkPanel({
   const hasContent = Boolean(content);
 
   return (
-    <div className={cn("gshark-aurora-surface p-5", className)}>
+    <div className={cn("meow-aurora-surface p-5", className)}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold tracking-tight text-slate-900">{title}</div>
@@ -44,13 +44,13 @@ export function StreamCurrentChunkPanel({
           {chips.length > 0 ? (
             <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
               {chips.map((chip, index) => (
-                <span key={index} className="gshark-stream-segment px-2.5 py-1 text-slate-500">
+                <span key={index} className="meow-stream-segment px-2.5 py-1 text-slate-500">
                   {chip}
                 </span>
               ))}
             </div>
           ) : null}
-          <div className="gshark-field max-h-[380px] overflow-auto bg-[rgba(255,255,255,0.42)] p-3 shadow-inner shadow-slate-200/20">
+          <div className="meow-field max-h-[380px] overflow-auto bg-[rgba(255,255,255,0.42)] p-3 shadow-inner shadow-slate-200/20">
             <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-800">
               <HighlightedPayloadText text={content ?? ""} highlight={highlight} />
             </pre>
@@ -58,7 +58,7 @@ export function StreamCurrentChunkPanel({
           {showOpenButton && onOpen ? (
             <button
               type="button"
-              className="gshark-control gshark-evidence-accent mt-3 px-3 py-1.5 text-xs font-medium text-slate-600 transition-all hover:text-sky-700"
+              className="meow-control meow-evidence-accent mt-3 px-3 py-1.5 text-xs font-medium text-slate-600 transition-all hover:text-sky-700"
               onClick={onOpen}
             >
               {openButtonLabel}
@@ -66,7 +66,7 @@ export function StreamCurrentChunkPanel({
           ) : null}
         </>
       ) : (
-        <div className="gshark-inset-halo px-3 py-8 text-center text-xs leading-6 text-slate-500">{emptyText}</div>
+        <div className="meow-inset-halo px-3 py-8 text-center text-xs leading-6 text-slate-500">{emptyText}</div>
       )}
     </div>
   );

@@ -75,7 +75,7 @@ export default function C2Analysis() {
         </StatusHint>
       )}
 
-      <div className="gshark-tile-grid grid grid-cols-1 lg:grid-cols-4">
+      <div className="meow-tile-grid grid grid-cols-1 lg:grid-cols-4">
         <MetricCard
           label="命中包"
           value={analysis.totalMatchedPackets.toLocaleString()}
@@ -102,7 +102,7 @@ export default function C2Analysis() {
         />
       </div>
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title="Family 分布">
           <AnalysisBucketChart
             data={analysis.families}
@@ -122,7 +122,7 @@ export default function C2Analysis() {
         </C2Panel>
       </div>
 
-      <div className="gshark-tile-toolbar mt-0 p-2">
+      <div className="meow-tile-toolbar mt-0 p-2">
         <div className="grid gap-2 md:grid-cols-2">
           <C2FamilyTabButton
             active={activeTab === "cs"}
@@ -141,14 +141,14 @@ export default function C2Analysis() {
         </div>
       </div>
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 lg:grid-cols-4">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 lg:grid-cols-4">
         <MetricCard label={`${familyLabel} 候选`} value={family.candidateCount.toLocaleString()} />
         <MetricCard label="规则位" value={family.matchedRuleCount.toLocaleString()} />
         <MetricCard label="通道种类" value={String(family.channels.length)} />
         <MetricCard label="周期画像" value={String(family.beaconPatterns?.length ?? 0)} />
       </div>
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-3">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-3">
         {baseline.map((item) => (
           <C2FeatureCard key={item.title} title={item.title} text={item.text} />
         ))}
@@ -172,7 +172,7 @@ export default function C2Analysis() {
         </>
       )}
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title={`${familyLabel} Channel 分布`}>
           <AnalysisBucketChart
             data={family.channels}
@@ -191,7 +191,7 @@ export default function C2Analysis() {
         </C2Panel>
       </div>
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title="Beacon / Heartbeat 模式">
           <C2BeaconPatternList family={activeTab} patterns={family.beaconPatterns ?? []} />
         </C2Panel>
@@ -226,7 +226,7 @@ export default function C2Analysis() {
         <C2CandidateTable candidates={family.candidates} />
       </C2Panel>
 
-      <div className="gshark-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
+      <div className="meow-tile-grid mt-0 grid grid-cols-1 xl:grid-cols-2">
         <C2Panel title={`${familyLabel} Notes`}>
           <C2NotesPanel
             notes={family.notes}

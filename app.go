@@ -60,13 +60,13 @@ func (a *DesktopApp) Startup(ctx context.Context) {
 	if err := a.startBackendIfPossible(); err != nil {
 		a.setBackendStatus("failed: " + err.Error())
 		fmt.Fprintf(os.Stderr, "desktop startup: backend bootstrap failed: %v\n", err)
-		if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
+		if os.Getenv("MEOW_TRAFFIC_RELEASE_SMOKE_CHECK") == "1" {
 			os.Exit(1)
 		}
 		return
 	}
 	a.startBackendEventBridge()
-	if os.Getenv("GSHARK_RELEASE_SMOKE_CHECK") == "1" {
+	if os.Getenv("MEOW_TRAFFIC_RELEASE_SMOKE_CHECK") == "1" {
 		writeReleaseSmokeResult("release smoke check: ok")
 		a.stopBackend()
 		os.Exit(0)
@@ -80,19 +80,19 @@ func (a *DesktopApp) Shutdown(_ context.Context) {
 }
 
 func (a *DesktopApp) GetDesktopWebviewSmokeConfig() desktopWebviewSmokeConfig {
-	resultPath := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
+	resultPath := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
 	if resultPath == "" {
 		return desktopWebviewSmokeConfig{}
 	}
-	miscPackageDir := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR"))
+	miscPackageDir := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR"))
 	if miscPackageDir == "" {
-		miscPackageDir = strings.TrimSpace(os.Getenv("GSHARK_MISC_PACKAGE_DIR"))
+		miscPackageDir = strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_MISC_PACKAGE_DIR"))
 	}
 	return desktopWebviewSmokeConfig{
 		Enabled:                     true,
-		CapturePath:                 strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH")),
+		CapturePath:                 strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH")),
 		MiscPackageDir:              miscPackageDir,
-		GenericIPCDisableExperiment: isTruthyEnv("GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT"),
+		GenericIPCDisableExperiment: isTruthyEnv("MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT"),
 	}
 }
 
@@ -106,7 +106,7 @@ func isTruthyEnv(name string) bool {
 }
 
 func (a *DesktopApp) WriteDesktopWebviewSmokeResult(payload map[string]any) error {
-	resultPath := strings.TrimSpace(os.Getenv("GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
+	resultPath := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH"))
 	if resultPath == "" {
 		return fmt.Errorf("desktop webview smoke result path is not configured")
 	}
@@ -284,7 +284,7 @@ func (a *DesktopApp) startBackendIfPossible() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.backendAuthToken == "" {
-		a.backendAuthToken = strings.TrimSpace(os.Getenv("GSHARK_BACKEND_TOKEN"))
+		a.backendAuthToken = strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_BACKEND_TOKEN"))
 	}
 	if a.backendCmd != nil {
 		a.backendStatus = "running"
@@ -299,10 +299,10 @@ func (a *DesktopApp) startBackendIfPossible() error {
 				return fmt.Errorf("backend port 127.0.0.1:17891 is occupied by an incompatible instance: %w", err)
 			}
 			a.backendStatus = "running (reused-existing)"
-			fmt.Fprintln(os.Stdout, "desktop startup: reusing existing backend on 127.0.0.1:17891 due to GSHARK_ALLOW_EXISTING_BACKEND=1")
+			fmt.Fprintln(os.Stdout, "desktop startup: reusing existing backend on 127.0.0.1:17891 due to MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND=1")
 			return nil
 		}
-		return fmt.Errorf("backend port 127.0.0.1:17891 is already in use; close the existing process or set GSHARK_ALLOW_EXISTING_BACKEND=1 to reuse it")
+		return fmt.Errorf("backend port 127.0.0.1:17891 is already in use; close the existing process or set MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND=1 to reuse it")
 	}
 
 	cmd, err := buildBackendCommand()
@@ -317,7 +317,7 @@ func (a *DesktopApp) startBackendIfPossible() error {
 		a.backendAuthToken = token
 	}
 	buildID := backendCommandBuildID(cmd)
-	cmd.Env = append(os.Environ(), "GSHARK_BACKEND_TOKEN="+a.backendAuthToken, "GSHARK_BACKEND_BUILD_ID="+buildID)
+	cmd.Env = append(os.Environ(), "MEOW_TRAFFIC_BACKEND_TOKEN="+a.backendAuthToken, "MEOW_TRAFFIC_BACKEND_BUILD_ID="+buildID)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	fmt.Fprintf(os.Stdout, "desktop startup: launching backend command %q in %q build_id=%q\n", strings.Join(cmd.Args, " "), cmd.Dir, buildID)
@@ -448,7 +448,7 @@ func extractBundledBackendFromAssets(filename string) (string, error) {
 	}
 
 	digest := sha256.Sum256(data)
-	targetDir := filepath.Join(os.TempDir(), "gshark-sentinel", "backend", hex.EncodeToString(digest[:8]))
+	targetDir := filepath.Join(os.TempDir(), "meow-traffic", "backend", hex.EncodeToString(digest[:8]))
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return "", fmt.Errorf("create backend extraction directory %q: %w", targetDir, err)
 	}
@@ -606,7 +606,7 @@ func generateBackendAuthToken() (string, error) {
 
 func writeReleaseSmokeResult(message string) {
 	fmt.Fprintln(os.Stdout, message)
-	resultPath := strings.TrimSpace(os.Getenv("GSHARK_RELEASE_SMOKE_RESULT_PATH"))
+	resultPath := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH"))
 	if resultPath == "" {
 		return
 	}
@@ -620,7 +620,7 @@ func writeReleaseSmokeResult(message string) {
 }
 
 func allowReuseExistingBackend() bool {
-	raw := strings.TrimSpace(os.Getenv("GSHARK_ALLOW_EXISTING_BACKEND"))
+	raw := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND"))
 	switch strings.ToLower(raw) {
 	case "1", "true", "yes", "on":
 		return true

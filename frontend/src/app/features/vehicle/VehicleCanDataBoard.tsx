@@ -33,7 +33,7 @@ export function CanIdDataBoard({ groups }: { groups: CanIdDataGroup[] }) {
         {groups.map((group) => (
           <div
             key={`${group.identifier}-${group.busId}`}
-            className="gshark-soft-fill overflow-hidden"
+            className="meow-soft-fill overflow-hidden"
           >
             <div className="grid grid-cols-[156px_1fr]">
               <div className="border-r border-border bg-accent/20 px-3 py-3">

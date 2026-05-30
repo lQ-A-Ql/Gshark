@@ -17,10 +17,10 @@ const toneClasses: Record<Tone, { hint: string; text: string }> = {
 };
 
 const surfaceClasses: Record<SurfaceVariant, string> = {
-  page: "gshark-tile gshark-tile-strong",
-  section: "gshark-tile",
-  flat: "gshark-tile",
-  subtle: "gshark-tile",
+  page: "meow-tile meow-tile-strong",
+  section: "meow-tile",
+  flat: "meow-tile",
+  subtle: "meow-tile",
 };
 
 const statusDotClasses: Record<Tone, string> = {
@@ -59,13 +59,13 @@ export function SurfacePanel({
   return (
     <section className={cn("min-w-0 overflow-hidden", surfaceClasses[variant], className)}>
       {hasHeader ? (
-        <div className={cn("gshark-tile-header px-3.5 py-2.5", headerClassName)}>
+        <div className={cn("meow-tile-header px-3.5 py-2.5", headerClassName)}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               {title || icon ? (
                 <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900">
                   {icon ? (
-                    <span className="gshark-diffuse-chip gshark-evidence-accent shrink-0 p-1.5">{icon}</span>
+                    <span className="meow-diffuse-chip meow-evidence-accent shrink-0 p-1.5">{icon}</span>
                   ) : null}
                   <span className="truncate">{title}</span>
                 </div>
@@ -99,11 +99,11 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        "gshark-tile gshark-diffuse-edge gshark-evidence-accent flex items-center gap-3 px-3 py-2.5",
+        "meow-tile meow-diffuse-edge meow-evidence-accent flex items-center gap-3 px-3 py-2.5",
         className,
       )}
     >
-      {icon ? <span className="gshark-diffuse-chip gshark-evidence-accent shrink-0 p-1.5">{icon}</span> : null}
+      {icon ? <span className="meow-diffuse-chip meow-evidence-accent shrink-0 p-1.5">{icon}</span> : null}
       <div className="min-w-0">
         <div className="text-[11px] leading-5 text-slate-500">{label}</div>
         <div className={cn("truncate text-sm font-semibold", toneClasses[tone].text)}>{value}</div>
@@ -125,12 +125,12 @@ export function StatusHint({
   return (
     <div
       className={cn(
-        "gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5",
+        "meow-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5",
         toneClasses[tone].hint,
         className,
       )}
     >
-      <span className={cn("gshark-status-dot mt-1 shrink-0", statusDotClasses[tone])} />
+      <span className={cn("meow-status-dot mt-1 shrink-0", statusDotClasses[tone])} />
       {children}
     </div>
   );
@@ -183,7 +183,7 @@ export function WorkbenchTitleBar({
   return (
     <div
       className={cn(
-        "gshark-tile-toolbar gshark-workbench-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-3.5 py-2 text-foreground",
+        "meow-tile-toolbar meow-workbench-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-3.5 py-2 text-foreground",
         className,
       )}
     >
@@ -191,15 +191,15 @@ export function WorkbenchTitleBar({
         {onBack ? (
           <button
             onClick={onBack}
-            className="gshark-control-ghost p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            className="meow-control-ghost p-1.5 text-muted-foreground transition-colors hover:text-foreground"
             title="返回"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         ) : null}
-        {onBack ? <div className="h-5 w-px bg-[var(--gshark-tile-divider)]" /> : null}
+        {onBack ? <div className="h-5 w-px bg-[var(--meow-tile-divider)]" /> : null}
         {icon ? (
-          <div className="gshark-diffuse-chip gshark-evidence-accent flex h-8 w-8 shrink-0 items-center justify-center text-slate-600">
+          <div className="meow-diffuse-chip meow-evidence-accent flex h-8 w-8 shrink-0 items-center justify-center text-slate-600">
             {icon}
           </div>
         ) : null}
@@ -222,7 +222,7 @@ export function WorkbenchChip({ children, className }: { children: ReactNode; cl
   return (
     <span
       className={cn(
-        "gshark-stream-control-cluster inline-flex min-h-7 items-center px-2.5 py-1 text-[11px] leading-4 text-muted-foreground",
+        "meow-stream-control-cluster inline-flex min-h-7 items-center px-2.5 py-1 text-[11px] leading-4 text-muted-foreground",
         className,
       )}
     >

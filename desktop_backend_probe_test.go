@@ -19,7 +19,7 @@ func TestProbeReusableBackendAtAcceptsExpectedIdentity(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
 		case "/api/runtime/identity":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"service":"gshark-sentinel","version":"dev","auth_enabled":true}`))
+			_, _ = w.Write([]byte(`{"service":"meow-traffic","version":"dev","auth_enabled":true}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -80,13 +80,13 @@ func TestProbeReusableBackendAtReportsAuthMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected auth mismatch error")
 	}
-	if err.Error() != "runtime identity probe failed: backend requires a matching GSHARK_BACKEND_TOKEN" {
+	if err.Error() != "runtime identity probe failed: backend requires a matching MEOW_TRAFFIC_BACKEND_TOKEN" {
 		t.Fatalf("unexpected auth mismatch error: %v", err)
 	}
 }
 
 func TestDetectPackagedDesktopRuntimeForDirTreatsReleaseOutAsPackaged(t *testing.T) {
-	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "gshark", "release", "out", "v-test"))
+	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "meow-traffic", "release", "out", "v-test"))
 	if !packaged {
 		t.Fatal("expected release/out dir to be treated as packaged runtime")
 	}
@@ -96,7 +96,7 @@ func TestDetectPackagedDesktopRuntimeForDirTreatsReleaseOutAsPackaged(t *testing
 }
 
 func TestDetectPackagedDesktopRuntimeForDirTreatsExternalDirWithoutBackendAsPackaged(t *testing.T) {
-	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "Downloads", "gshark-portable"))
+	packaged, hint := detectPackagedDesktopRuntimeForDir(filepath.Join("C:\\", "Users", "QAQ", "Desktop", "Downloads", "meow-traffic-portable"))
 	if !packaged {
 		t.Fatal("expected external dir without backend source tree to be treated as packaged runtime")
 	}

@@ -13,7 +13,7 @@ export function CapturePayloadShortcutPanel({
   onOpenMisc,
 }: CapturePayloadShortcutPanelProps) {
   return (
-    <div className="border-t border-[var(--gshark-tile-divider)] p-4 sm:p-5">
+    <div className="border-t border-[var(--meow-tile-divider)] p-4 sm:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">Payload 快速解码</div>
@@ -23,13 +23,13 @@ export function CapturePayloadShortcutPanel({
         </div>
         {selectedPacket && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1 text-[11px] text-slate-600">
+            <div className="meow-diffuse-chip meow-evidence-accent px-3 py-1 text-[11px] text-slate-600">
               Packet #{selectedPacket.id} / {selectedPacket.displayProtocol || selectedPacket.proto}
             </div>
             {selectedPacket.streamId != null && selectedPacket.streamId >= 0 && (
               <button
                 onClick={() => void onOpenCurrentStream()}
-                className="gshark-control inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700"
+                className="meow-control inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700"
               >
                 打开当前关联流
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -37,7 +37,7 @@ export function CapturePayloadShortcutPanel({
             )}
             <button
               onClick={onOpenMisc}
-              className="gshark-control-primary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+              className="meow-control-primary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
             >
               打开 MISC 解码工作台
               <ArrowRight className="h-3.5 w-3.5" />
@@ -48,7 +48,7 @@ export function CapturePayloadShortcutPanel({
 
       {selectedPacket ? (
         <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
-          <div className="gshark-tile gshark-evidence-accent p-3.5">
+          <div className="meow-tile meow-evidence-accent p-3.5">
             <div className="text-sm font-semibold text-slate-900">当前数据包上下文</div>
             <div className="mt-2.5 space-y-2 text-xs">
               <InfoRow
@@ -61,7 +61,7 @@ export function CapturePayloadShortcutPanel({
               <InfoRow label="说明" value={selectedPacket.info || "(no info)"} />
             </div>
           </div>
-          <div className="gshark-tile gshark-evidence-accent p-3.5">
+          <div className="meow-tile meow-evidence-accent p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-slate-900">Payload 预览</div>
@@ -71,12 +71,12 @@ export function CapturePayloadShortcutPanel({
               </div>
               <button
                 onClick={onOpenMisc}
-                className="gshark-control shrink-0 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition"
+                className="meow-control shrink-0 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition"
               >
                 去 MISC
               </button>
             </div>
-            <pre className="gshark-soft-fill mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[11px] leading-5 text-slate-600">
+            <pre className="meow-soft-fill mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[11px] leading-5 text-slate-600">
               {selectedPacket.payload || "(empty payload)"}
             </pre>
           </div>
@@ -92,7 +92,7 @@ export function CapturePayloadShortcutPanel({
 
 function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="gshark-soft-fill px-3 py-2">
+    <div className="meow-soft-fill px-3 py-2">
       <div className="text-[11px] font-medium tracking-[0.12em] text-slate-500">{label}</div>
       <div className={`mt-1 break-all text-sm text-slate-900 ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

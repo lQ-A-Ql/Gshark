@@ -112,7 +112,7 @@ function VehicleSecurityNotesPanel({ recommendations }: { recommendations: strin
           recommendations.map((note, index) => (
             <div
               key={`${note}-${index}`}
-              className="gshark-soft-fill flex items-start gap-2 px-3 py-2"
+              className="meow-soft-fill flex items-start gap-2 px-3 py-2"
             >
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
               <span>{note}</span>

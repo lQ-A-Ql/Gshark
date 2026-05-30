@@ -364,11 +364,11 @@ func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {
 		}
 	}
 
-	tempDir := filepath.Join(os.TempDir(), "gshark-sentinel", "yara")
+	tempDir := filepath.Join(os.TempDir(), "meow-traffic", "yara")
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return yaraRuleBundle{}, err
 	}
-	rulePath := filepath.Join(tempDir, "gshark-default.yar")
+	rulePath := filepath.Join(tempDir, "meow-traffic-default.yar")
 	allSources := yararules.AllRuleSources()
 	if err := os.WriteFile(rulePath, []byte(allSources), 0o644); err != nil {
 		return yaraRuleBundle{}, err
@@ -405,12 +405,12 @@ func buildYaraRuleBundleFromDir(dir string) (yaraRuleBundle, error) {
 		}
 	}
 
-	tempDir := filepath.Join(os.TempDir(), "gshark-sentinel", "yara")
+	tempDir := filepath.Join(os.TempDir(), "meow-traffic", "yara")
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return yaraRuleBundle{}, err
 	}
 	fileHash := fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(strings.ToLower(filepath.Clean(dir)))))
-	rulePath := filepath.Join(tempDir, "gshark-bundle-"+fileHash+".yar")
+	rulePath := filepath.Join(tempDir, "meow-traffic-bundle-"+fileHash+".yar")
 	if err := os.WriteFile(rulePath, []byte(builder.String()), 0o644); err != nil {
 		return yaraRuleBundle{}, err
 	}

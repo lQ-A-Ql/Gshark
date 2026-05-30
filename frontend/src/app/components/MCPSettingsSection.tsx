@@ -113,7 +113,7 @@ export function MCPSettingsSection({
           type="button"
           onClick={onRefresh}
           disabled={!backendConnected || mcpBusy}
-          className="gshark-control inline-flex h-9 items-center gap-2 px-3 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="meow-control inline-flex h-9 items-center gap-2 px-3 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${mcpBusy ? "animate-spin" : ""}`} />
           刷新 MCP 状态
@@ -166,7 +166,7 @@ function CopyValueCard({ label, value, buttonLabel, disabled, onCopy }: CopyValu
           type="button"
           onClick={onCopy}
           disabled={disabled}
-          className="gshark-control inline-flex h-9 items-center gap-2 px-3 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="meow-control inline-flex h-9 items-center gap-2 px-3 text-xs font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Copy className="h-3.5 w-3.5" />
           {buttonLabel}

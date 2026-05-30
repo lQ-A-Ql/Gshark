@@ -136,7 +136,7 @@ function HIDSourceSelector({
   };
 
   return (
-    <div className="gshark-tile-toolbar space-y-3 px-3 py-3">
+    <div className="meow-tile-toolbar space-y-3 px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">HID 数据源</div>

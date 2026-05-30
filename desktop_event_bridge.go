@@ -50,7 +50,7 @@ func (a *DesktopApp) runBackendEventBridge(ctx context.Context) {
 		}
 		if err != nil && ctx.Err() == nil {
 			fmt.Fprintf(os.Stderr, "desktop events: backend SSE bridge disconnected: %v\n", err)
-			wruntime.EventsEmit(a.ctx, "gshark:backend:error", map[string]any{
+			wruntime.EventsEmit(a.ctx, "meow:backend:error", map[string]any{
 				"message": fmt.Sprintf("桌面事件桥断开，%.0fs 后重连：%v", backoff.Seconds(), err),
 			})
 		}
@@ -157,5 +157,5 @@ func parseDesktopBackendEvent(eventName string, rawData string) (string, any, bo
 			payload = map[string]any{"message": rawData}
 		}
 	}
-	return "gshark:backend:" + eventName, payload, true
+	return "meow:backend:" + eventName, payload, true
 }

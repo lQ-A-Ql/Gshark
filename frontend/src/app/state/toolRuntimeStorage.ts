@@ -9,8 +9,8 @@ import {
 } from "./toolRuntimeStorageConfig";
 import type { ToolRuntimeConfigExplicitFields, ToolRuntimeConfigState } from "./toolRuntimeStorageConfig";
 
-const TSHARK_PATH_STORAGE_KEY = "gshark.tshark-path.v1";
-const TOOL_RUNTIME_STORAGE_KEY = "gshark.tool-runtime.v1";
+const TSHARK_PATH_STORAGE_KEY = "meow-traffic.tshark-path.v1";
+const TOOL_RUNTIME_STORAGE_KEY = "meow-traffic.tool-runtime.v1";
 
 export function readToolRuntimeConfig(): ToolRuntimeConfig {
   return readToolRuntimeConfigState().config;

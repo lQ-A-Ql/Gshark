@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { findDesktopGenericIpcAllowlistViolations } from "./check-desktop-generic-ipc-allowlist.mjs";
 
 function writeClientFixture(content) {
-  const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-allowlist-"));
+  const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-allowlist-"));
   const clientDir = resolve(frontendRoot, "src/app/integrations/clients");
   mkdirSync(clientDir, { recursive: true });
   writeFileSync(resolve(clientDir, "demoClient.ts"), content);

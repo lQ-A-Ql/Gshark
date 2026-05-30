@@ -7,7 +7,7 @@ interface SMTPSessionMessagePanelProps {
 
 export function SMTPSessionMessagePanel({ selectedSession }: SMTPSessionMessagePanelProps) {
   return (
-    <div className="gshark-tile border-slate-200 p-4">
+    <div className="meow-tile border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold text-slate-800">邮件重建</div>
         <div className="text-[11px] text-slate-500">{selectedSession?.messages?.length ?? 0} 条</div>
@@ -21,7 +21,7 @@ export function SMTPSessionMessagePanel({ selectedSession }: SMTPSessionMessageP
           {(selectedSession.messages ?? []).map((message) => (
             <div
               key={`${selectedSession.streamId}-${message.sequence}`}
-              className="gshark-tile border-slate-200 bg-slate-50/60 p-3"
+              className="meow-tile border-slate-200 bg-slate-50/60 p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-sm border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700">

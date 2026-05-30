@@ -11,7 +11,7 @@ import (
 )
 
 func TestReadPacketRawHexFromFile_Pcap(t *testing.T) {
-	f, err := os.CreateTemp("", "gshark-raw-*.pcap")
+	f, err := os.CreateTemp("", "meow-traffic-raw-*.pcap")
 	if err != nil {
 		t.Fatalf("create temp pcap: %v", err)
 	}

@@ -108,7 +108,7 @@ func printJSON(name string, v any) {
 }
 
 func resolveBackendAuthToken() (string, error) {
-	token := os.Getenv("GSHARK_BACKEND_TOKEN")
+	token := os.Getenv("MEOW_TRAFFIC_BACKEND_TOKEN")
 	if token != "" {
 		return token, nil
 	}

@@ -40,7 +40,7 @@ export const releaseMarkdownComponents = {
   ),
   li: ({ children }: { children?: ReactNode }) => <li className="pl-1">{children}</li>,
   blockquote: ({ children }: { children?: ReactNode }) => (
-    <blockquote className="gshark-soft-fill mt-0 border-l-4 border-blue-200 px-4 py-3 text-sm leading-7 text-slate-700">
+    <blockquote className="meow-soft-fill mt-0 border-l-4 border-blue-200 px-4 py-3 text-sm leading-7 text-slate-700">
       {children}
     </blockquote>
   ),
@@ -64,7 +64,7 @@ export const releaseMarkdownComponents = {
     </pre>
   ),
   table: ({ children }: { children?: ReactNode }) => (
-    <div className="gshark-tile-table mt-0 overflow-x-auto border-slate-200">
+    <div className="meow-tile-table mt-0 overflow-x-auto border-slate-200">
       <table className="min-w-full border-collapse text-left text-sm text-slate-700">{children}</table>
     </div>
   ),

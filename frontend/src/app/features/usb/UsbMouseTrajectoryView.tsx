@@ -30,7 +30,7 @@ export function MouseTrajectoryView({
 
   return (
     <div className="space-y-3">
-      <div className="gshark-tile overflow-hidden border-border bg-blue-50/45">
+      <div className="meow-tile overflow-hidden border-border bg-blue-50/45">
         <MouseTrajectorySvg
           events={events}
           filterKind={filterKind}

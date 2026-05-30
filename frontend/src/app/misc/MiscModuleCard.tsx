@@ -21,7 +21,7 @@ export function MiscModuleCard({ module, expanded, mounted, onModuleDeleted, onT
   return (
     <section
       className={cn(
-        "gshark-tile gshark-diffuse-edge overflow-hidden transition-all duration-300",
+        "meow-tile meow-diffuse-edge overflow-hidden transition-all duration-300",
         expanded ? "border-cyan-200/28" : "border-white/18",
       )}
     >
@@ -40,14 +40,14 @@ export function MiscModuleCard({ module, expanded, mounted, onModuleDeleted, onT
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-[15px] font-semibold tracking-tight text-slate-900">{module.title}</h2>
               {module.kind === "custom" ? (
-                <span className="gshark-diffuse-chip border-slate-200/22 bg-slate-50/18 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                <span className="meow-diffuse-chip border-slate-200/22 bg-slate-50/18 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
                   Custom
                 </span>
               ) : null}
               {module.cancellable ? (
                 <span
                   title="该模块的分析请求支持中途取消或切换时自动中断"
-                  className="gshark-diffuse-chip border-emerald-200/24 bg-emerald-50/18 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
+                  className="meow-diffuse-chip border-emerald-200/24 bg-emerald-50/18 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
                 >
                   支持中断
                 </span>
@@ -59,7 +59,7 @@ export function MiscModuleCard({ module, expanded, mounted, onModuleDeleted, onT
               {meta.map((item) => (
                 <span
                   key={`${module.id}-${item}`}
-                  className="gshark-diffuse-chip border-slate-200/20 bg-slate-50/14 px-2.5 py-0.5 text-[11px] text-slate-500"
+                  className="meow-diffuse-chip border-slate-200/20 bg-slate-50/14 px-2.5 py-0.5 text-[11px] text-slate-500"
                 >
                   {item}
                 </span>
@@ -70,7 +70,7 @@ export function MiscModuleCard({ module, expanded, mounted, onModuleDeleted, onT
 
         <span
           className={cn(
-            "gshark-diffuse-chip inline-flex shrink-0 items-center gap-2 px-3 py-1.5 text-[11px] font-semibold transition-all",
+            "meow-diffuse-chip inline-flex shrink-0 items-center gap-2 px-3 py-1.5 text-[11px] font-semibold transition-all",
             expanded
               ? "border-cyan-200/28 bg-cyan-50/18 text-cyan-700"
               : "border-slate-200/20 bg-slate-50/12 text-slate-500",
@@ -84,7 +84,7 @@ export function MiscModuleCard({ module, expanded, mounted, onModuleDeleted, onT
       <CollapsibleContent open={expanded}>
         {mounted ? (
           <div className="px-4 pb-4 sm:px-5">
-            <div className="border-t border-[var(--gshark-tile-divider)] pt-4">
+            <div className="border-t border-[var(--meow-tile-divider)] pt-4">
               <Suspense fallback={<ModuleLoadingState module={module} />}>
                 <Renderer module={module} onModuleDeleted={onModuleDeleted} surfaceVariant="embedded" />
               </Suspense>

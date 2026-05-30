@@ -143,7 +143,7 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	s.emitStatus("__progress__:media:0:3:准备媒体流分析")
 	cfg := s.buildMediaScanConfig(pcap)
 
-	tempDir, err := os.MkdirTemp("", "gshark-media-")
+	tempDir, err := os.MkdirTemp("", "meow-traffic-media-")
 	if err != nil {
 		s.emitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err

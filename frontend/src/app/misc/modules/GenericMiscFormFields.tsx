@@ -55,7 +55,7 @@ export function GenericMiscFormFields({
   onValueChange,
 }: GenericMiscFormFieldsProps) {
   return (
-    <div className="gshark-form-surface grid gap-4 p-4">
+    <div className="meow-form-surface grid gap-4 p-4">
       {fields.map((field) => (
         <Field key={`${moduleId}-${field.name}`} label={field.label}>
           {renderField(
@@ -67,7 +67,7 @@ export function GenericMiscFormFields({
             running,
           )}
           {field.helpText ? (
-            <span className="gshark-diffuse-chip px-2.5 py-1.5 text-xs leading-relaxed text-slate-500">
+            <span className="meow-diffuse-chip px-2.5 py-1.5 text-xs leading-relaxed text-slate-500">
               {field.helpText}
             </span>
           ) : null}

@@ -94,13 +94,13 @@ Use environment-variable-gated tests rather than hardcoding the downloaded files
 
 | Env var | Suggested local value | Assertion style |
 | --- | --- | --- |
-| `GSHARK_PUBLIC_USB_CREATE` | `samples/public-pcaps/usb/usb_memory_stick_create_file.pcap` | USB analysis identifies Mass Storage write activity; Evidence does not overpromote mount-only traffic. |
-| `GSHARK_PUBLIC_USB_DELETE` | `samples/public-pcaps/usb/usb_memory_stick_delete_file.pcap` | Delete baseline parses cleanly without being reported as a write exfil signal. |
-| `GSHARK_PUBLIC_S7_BLOCK_DOWNLOAD` | `samples/public-pcaps/industrial/s7comm_downloading_block_db1.pcap` | Industrial analysis parses S7COMM and assigns bounded severity. |
-| `GSHARK_PUBLIC_DNP3_WRITE` | `samples/public-pcaps/industrial/dnp3_write.pcap` | Industrial analysis recognizes DNP3 write semantics without marking all traffic critical. |
-| `GSHARK_PUBLIC_HTTP_JPEG` | `samples/public-pcaps/object/http_with_jpegs.cap.gz` | Object extraction surfaces image content and MIME/magic consistency. |
-| `GSHARK_PUBLIC_BENIGN_HTTP` | `samples/public-pcaps/benign/http.cap` | C2/WebShell/Object heuristics should stay low-noise on ordinary HTTP. |
-| `GSHARK_PUBLIC_CANETH` | `samples/public-pcaps/vehicle/caneth.pcapng` | Vehicle analysis runs without false UDS/DoIP high-risk evidence. |
+| `MEOW_TRAFFIC_PUBLIC_USB_CREATE` | `samples/public-pcaps/usb/usb_memory_stick_create_file.pcap` | USB analysis identifies Mass Storage write activity; Evidence does not overpromote mount-only traffic. |
+| `MEOW_TRAFFIC_PUBLIC_USB_DELETE` | `samples/public-pcaps/usb/usb_memory_stick_delete_file.pcap` | Delete baseline parses cleanly without being reported as a write exfil signal. |
+| `MEOW_TRAFFIC_PUBLIC_S7_BLOCK_DOWNLOAD` | `samples/public-pcaps/industrial/s7comm_downloading_block_db1.pcap` | Industrial analysis parses S7COMM and assigns bounded severity. |
+| `MEOW_TRAFFIC_PUBLIC_DNP3_WRITE` | `samples/public-pcaps/industrial/dnp3_write.pcap` | Industrial analysis recognizes DNP3 write semantics without marking all traffic critical. |
+| `MEOW_TRAFFIC_PUBLIC_HTTP_JPEG` | `samples/public-pcaps/object/http_with_jpegs.cap.gz` | Object extraction surfaces image content and MIME/magic consistency. |
+| `MEOW_TRAFFIC_PUBLIC_BENIGN_HTTP` | `samples/public-pcaps/benign/http.cap` | C2/WebShell/Object heuristics should stay low-noise on ordinary HTTP. |
+| `MEOW_TRAFFIC_PUBLIC_CANETH` | `samples/public-pcaps/vehicle/caneth.pcapng` | Vehicle analysis runs without false UDS/DoIP high-risk evidence. |
 
 ## Validation Performed
 
@@ -116,4 +116,4 @@ Result: all 14 downloaded files were readable with Wireshark/tshark 4.6.4. No bu
 
 ## Next Step
 
-Add an optional backend real-sample test file that reads the `GSHARK_PUBLIC_*` variables above, skips when absent, and records module-specific assertions. Keep MISC WebShell tests outside unified Evidence unless the user explicitly changes that boundary.
+Add an optional backend real-sample test file that reads the `MEOW_TRAFFIC_PUBLIC_*` variables above, skips when absent, and records module-specific assertions. Keep MISC WebShell tests outside unified Evidence unless the user explicitly changes that boundary.

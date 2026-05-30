@@ -62,11 +62,11 @@ export function MiscToolsShell({
       {error && <ErrorBlock message={error} />}
 
       {loading ? (
-        <StatusHint className="gshark-tile px-4 py-12 text-center text-sm font-medium" tone="cyan">
+        <StatusHint className="meow-tile px-4 py-12 text-center text-sm font-medium" tone="cyan">
           正在加载 MISC 模块...
         </StatusHint>
       ) : (
-        <div className="gshark-tile-grid">
+        <div className="meow-tile-grid">
           {filteredModules.map((module) => (
             <MiscModuleCard
               key={module.id}
@@ -79,7 +79,7 @@ export function MiscToolsShell({
           ))}
 
           {filteredModules.length === 0 && !error && (
-            <EmptyState className="gshark-tile px-4 py-12 text-sm">当前筛选下没有可展示的 MISC 模块。</EmptyState>
+            <EmptyState className="meow-tile px-4 py-12 text-sm">当前筛选下没有可展示的 MISC 模块。</EmptyState>
           )}
         </div>
       )}

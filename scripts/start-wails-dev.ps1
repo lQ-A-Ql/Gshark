@@ -66,7 +66,7 @@ function Clear-WailsBackendCaches {
 
 	Remove-FileIfExists (Join-Path $root "frontend\dist\sentinel-backend.exe") "frontend backend asset"
 	Remove-FileIfExists (Join-Path $root "build\bin\sentinel-backend.exe") "build backend binary"
-	Remove-DirectoryIfExists (Join-Path $tempRoot "gshark-sentinel\backend") "extracted backend cache" $tempRoot
+	Remove-DirectoryIfExists (Join-Path $tempRoot "meow-traffic\backend") "extracted backend cache" $tempRoot
 
 	if ($CleanGoCache) {
 		Write-Host "[meow-traffic] clearing Go build cache" -ForegroundColor DarkYellow

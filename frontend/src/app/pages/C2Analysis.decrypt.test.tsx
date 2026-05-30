@@ -128,7 +128,7 @@ describe("C2Analysis decrypt workflow", () => {
     fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
     const modeSelect = screen.getByRole("combobox", { name: "模式" });
     expect(modeSelect).toHaveTextContent("auto：三 KDF + GCM/CBC 自动尝试");
-    expect(modeSelect).toHaveClass("gshark-field", "rounded-sm");
+    expect(modeSelect).toHaveClass("meow-field", "rounded-sm");
     expect(modeSelect).not.toHaveClass("shadow-sm");
     fireEvent.change(screen.getByLabelText(/vkey/), { target: { value: "verify-me" } });
     fireEvent.change(screen.getByLabelText(/salt/), { target: { value: "qwe123qwe" } });

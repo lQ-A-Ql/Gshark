@@ -59,7 +59,7 @@ export function TrafficGraphOverview({ error, loading, stats, timeline, onRetry 
           </button>
         </StatusHint>
       ) : null}
-      <div className="gshark-tile-grid grid grid-cols-1 lg:grid-cols-3">
+      <div className="meow-tile-grid grid grid-cols-1 lg:grid-cols-3">
         <AnalysisStatCard
           title="总包数"
           value={stats.totalPackets.toLocaleString()}

@@ -23,7 +23,7 @@ export function C2BeaconPatternList({
       {patterns.map((item) => (
         <div
           key={`${item.name}-${item.value}`}
-          className="gshark-tile border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
+          className="meow-tile border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
         >
           <div className="flex items-center justify-between gap-3">
             <span className="font-semibold text-slate-800">{item.name}</span>

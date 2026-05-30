@@ -17,7 +17,7 @@ describe("MainLayout drag guard", () => {
   it("allows explicitly marked drop zones to handle drag events themselves", () => {
     const dropZone = document.createElement("div");
     const child = document.createElement("button");
-    dropZone.dataset.gsharkDropZone = "true";
+    dropZone.dataset.meowTrafficDropZone = "true";
     dropZone.appendChild(child);
     const event = {
       preventDefault: vi.fn(),

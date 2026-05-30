@@ -5,7 +5,7 @@ describe("createDesktopClient", () => {
   it("requires authenticated data-plane probes before reporting the backend as available", async () => {
     const requestMock = vi.fn(async (path: string) => {
       if (path === "/health") return { status: "ok" };
-      if (path === "/api/runtime/identity") return { service: "gshark-sentinel" };
+      if (path === "/api/runtime/identity") return { service: "meow-traffic" };
       if (path === "/api/capture/status") return { has_capture: false };
       throw new Error(`unexpected path ${path}`);
     });

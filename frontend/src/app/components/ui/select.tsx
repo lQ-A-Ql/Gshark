@@ -4,7 +4,7 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "./utils";
 
-const EMPTY_SELECT_VALUE = "__gshark_empty_select_value__";
+const EMPTY_SELECT_VALUE = "__meow_traffic_empty_select_value__";
 
 export type SelectOption = {
   value: string;
@@ -58,7 +58,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     data-slot="select-trigger"
     className={cn(
-      "gshark-field flex h-9 w-full items-center justify-between gap-2 px-3 text-left text-[11px] text-slate-700 outline-none transition-all",
+      "meow-field flex h-9 w-full items-center justify-between gap-2 px-3 text-left text-[11px] text-slate-700 outline-none transition-all",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>span]:min-w-0 [&>span]:truncate",
       className,
@@ -110,7 +110,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "gshark-form-surface relative z-[1000] max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden text-xs text-slate-700 shadow-[0_18px_48px_rgba(15,23,42,0.05),0_0_38px_rgba(255,255,255,0.22)] ring-1 ring-white/25 backdrop-blur-xl",
+        "meow-form-surface relative z-[1000] max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden text-xs text-slate-700 shadow-[0_18px_48px_rgba(15,23,42,0.05),0_0_38px_rgba(255,255,255,0.22)] ring-1 ring-white/25 backdrop-blur-xl",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",

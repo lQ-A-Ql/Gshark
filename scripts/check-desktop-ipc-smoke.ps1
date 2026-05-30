@@ -175,19 +175,19 @@ function Invoke-DesktopReleaseSmoke {
   $stderrPath = Join-Path $OutputDir "wails-release-smoke.err.log"
   Remove-Item -LiteralPath $resultPath, $logPath, $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
 
-  $previousSmokeCheck = $env:GSHARK_RELEASE_SMOKE_CHECK
-  $previousSmokeResultPath = $env:GSHARK_RELEASE_SMOKE_RESULT_PATH
-  $previousMiscPackageDir = $env:GSHARK_MISC_PACKAGE_DIR
+  $previousSmokeCheck = $env:MEOW_TRAFFIC_RELEASE_SMOKE_CHECK
+  $previousSmokeResultPath = $env:MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH
+  $previousMiscPackageDir = $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR
   try {
-    $env:GSHARK_RELEASE_SMOKE_CHECK = "1"
-    $env:GSHARK_RELEASE_SMOKE_RESULT_PATH = $resultPath
-    $env:GSHARK_MISC_PACKAGE_DIR = $DesktopReleaseMiscPackageDir
+    $env:MEOW_TRAFFIC_RELEASE_SMOKE_CHECK = "1"
+    $env:MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH = $resultPath
+    $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR = $DesktopReleaseMiscPackageDir
     $process = Start-Process -FilePath "go" -ArgumentList @("run", "-tags", "dev", ".") -WorkingDirectory $root -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     $exitCode = $process.ExitCode
   } finally {
-    Restore-EnvValue "GSHARK_RELEASE_SMOKE_CHECK" $previousSmokeCheck
-    Restore-EnvValue "GSHARK_RELEASE_SMOKE_RESULT_PATH" $previousSmokeResultPath
-    Restore-EnvValue "GSHARK_MISC_PACKAGE_DIR" $previousMiscPackageDir
+    Restore-EnvValue "MEOW_TRAFFIC_RELEASE_SMOKE_CHECK" $previousSmokeCheck
+    Restore-EnvValue "MEOW_TRAFFIC_RELEASE_SMOKE_RESULT_PATH" $previousSmokeResultPath
+    Restore-EnvValue "MEOW_TRAFFIC_MISC_PACKAGE_DIR" $previousMiscPackageDir
     Stop-PortProcess $BackendPort
   }
 
@@ -229,21 +229,21 @@ function Invoke-DesktopWebviewTypedSmoke {
   $stderrPath = Join-Path $OutputDir "wails-webview-typed-smoke.err.log"
   Remove-Item -LiteralPath $resultPath, $logPath, $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
 
-  $previousResultPath = $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH
-  $previousCapturePath = $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH
-  $previousSmokeMiscPackageDir = $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR
-  $previousMiscPackageDir = $env:GSHARK_MISC_PACKAGE_DIR
-  $previousDisableExperiment = $env:GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT
+  $previousResultPath = $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH
+  $previousCapturePath = $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH
+  $previousSmokeMiscPackageDir = $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR
+  $previousMiscPackageDir = $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR
+  $previousDisableExperiment = $env:MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT
   $process = $null
   try {
-    $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH = $resultPath
-    $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH = $CapturePath
-    $env:GSHARK_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
-    $env:GSHARK_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
+    $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH = $resultPath
+    $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH = $CapturePath
+    $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
+    $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
     if ($DisableGenericIpcAdapterExperiment) {
-      $env:GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT = "1"
+      $env:MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT = "1"
     } else {
-      Remove-Item "Env:\GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" -ErrorAction SilentlyContinue
+      Remove-Item "Env:\MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" -ErrorAction SilentlyContinue
     }
     $process = Start-Process -FilePath "go" -ArgumentList @("run", "-tags", "dev", ".") -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 
@@ -284,11 +284,11 @@ function Invoke-DesktopWebviewTypedSmoke {
       Assert-Condition ($result.genericIpcDisableExperimentBuildFlag -eq $true) "Desktop WebView typed smoke requested generic IPC disable experiment, but frontend assets were not built with VITE_DESKTOP_DISABLE_GENERIC_IPC=1"
     }
   } finally {
-    Restore-EnvValue "GSHARK_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH" $previousResultPath
-    Restore-EnvValue "GSHARK_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH" $previousCapturePath
-    Restore-EnvValue "GSHARK_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR" $previousSmokeMiscPackageDir
-    Restore-EnvValue "GSHARK_MISC_PACKAGE_DIR" $previousMiscPackageDir
-    Restore-EnvValue "GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" $previousDisableExperiment
+    Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH" $previousResultPath
+    Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH" $previousCapturePath
+    Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR" $previousSmokeMiscPackageDir
+    Restore-EnvValue "MEOW_TRAFFIC_MISC_PACKAGE_DIR" $previousMiscPackageDir
+    Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" $previousDisableExperiment
     if ($process -and -not $process.HasExited) {
       Stop-ProcessTree $process.Id
     }
@@ -356,7 +356,7 @@ function Invoke-BrowserDevSmoke {
   $viteErr = Join-Path $OutputDir "browser-vite.err.log"
   Remove-Item -LiteralPath $backendOut, $backendErr, $viteOut, $viteErr -Force -ErrorAction SilentlyContinue
 
-  $backendCmd = "`$env:GSHARK_BACKEND_TOKEN='$token'; `$env:GSHARK_MISC_PACKAGE_DIR='$BrowserDevMiscPackageDir'; Set-Location '$root\backend'; go run ./cmd/sentinel serve 127.0.0.1:$BackendPort"
+  $backendCmd = "`$env:MEOW_TRAFFIC_BACKEND_TOKEN='$token'; `$env:MEOW_TRAFFIC_MISC_PACKAGE_DIR='$BrowserDevMiscPackageDir'; Set-Location '$root\backend'; go run ./cmd/sentinel serve 127.0.0.1:$BackendPort"
   $viteCmd = "`$env:VITE_BACKEND_TOKEN='$token'; `$env:VITE_BACKEND_URL='http://127.0.0.1:$BackendPort'; Set-Location '$root\frontend'; pnpm exec vite --host 127.0.0.1 --port $FrontendPort --strictPort"
   $backendProcess = $null
   $viteProcess = $null
@@ -406,7 +406,7 @@ function Invoke-BrowserDevSmoke {
 
     Assert-Condition ($health.status -eq "ok") "Unexpected health status"
     Assert-Condition ($identity.auth_enabled -eq $true) "Browser-dev backend auth was not enabled"
-    Assert-Condition ([string]$identity.service -eq "gshark-sentinel") "Unexpected backend service identity"
+    Assert-Condition ([string]$identity.service -eq "meow-traffic") "Unexpected backend service identity"
     Assert-Condition ($eventLine -eq "event: ready") "SSE did not return ready event"
     Assert-Condition ([int]$capture.packet_count -gt 0) "Capture status returned no packets"
 

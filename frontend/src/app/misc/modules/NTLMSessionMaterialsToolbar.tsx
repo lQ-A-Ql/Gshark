@@ -40,7 +40,7 @@ export function NTLMSessionMaterialsToolbar({
 }: NTLMSessionMaterialsToolbarProps) {
   return (
     <>
-      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-violet-100 bg-violet-50/50 p-4 text-[11px]">
+      <div className="meow-tile-toolbar flex flex-wrap gap-2 border-violet-100 bg-violet-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={hasCapture ? captureName : "未加载"} color={hasCapture ? "sky" : "slate"} />
         <MetaChip label="总材料" value={materialCount} color="slate" />
         <MetaChip label="完整" value={completeCount} color="emerald" />
@@ -92,7 +92,7 @@ export function NTLMSessionMaterialsToolbar({
       </div>
 
       {!error && (
-        <div className="gshark-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
+        <div className="meow-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
           {hasCapture
             ? loading
               ? "正在从当前抓包提取 NTLM 会话材料..."

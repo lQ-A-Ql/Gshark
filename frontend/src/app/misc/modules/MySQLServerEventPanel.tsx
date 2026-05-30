@@ -7,7 +7,7 @@ interface MySQLServerEventPanelProps {
 
 export function MySQLServerEventPanel({ session }: MySQLServerEventPanelProps) {
   return (
-    <div className="gshark-tile border-slate-200 p-4">
+    <div className="meow-tile border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold text-slate-800">服务端事件</div>
         <div className="text-[11px] text-slate-500">{session?.serverEvents.length ?? 0} 条</div>

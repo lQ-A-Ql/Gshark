@@ -13,7 +13,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 
 describe("check-mapper-any script", () => {
   it("reports raw any in production mapper files", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-mapper-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-mapper-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/mappers/badMapper.ts",
@@ -35,7 +35,7 @@ describe("check-mapper-any script", () => {
   });
 
   it("passes mapper files that use unknown parser inputs", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-mapper-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-mapper-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/mappers/goodMapper.ts",

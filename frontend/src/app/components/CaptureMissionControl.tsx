@@ -125,8 +125,8 @@ export function CaptureMissionControl() {
 
   return (
     <section className="px-4 py-4">
-      <div className="gshark-tile gshark-workbench-panel overflow-hidden">
-        <div className="gshark-tile-header px-4 py-4 sm:px-5">
+      <div className="meow-tile meow-workbench-panel overflow-hidden">
+        <div className="meow-tile-header px-4 py-4 sm:px-5">
           <CaptureMissionOverviewHeader
             extractedObjectCount={extractedObjects.length}
             fileName={fileMeta.name}
@@ -147,7 +147,7 @@ export function CaptureMissionControl() {
           <CaptureQuickFiltersPanel quickFilters={overview.quickFilters} onApplyFilter={applyWorkspaceFilter} />
         </div>
 
-        <div className="gshark-tile-grid grid xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="meow-tile-grid grid xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <CaptureRecommendationsPanel
             recommendations={overview.recommendations}
             onOpenRecommendation={openRecommendation}

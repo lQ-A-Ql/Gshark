@@ -16,7 +16,7 @@ export function PrimaryTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`gshark-control inline-flex items-center gap-2 px-4 py-2 text-sm transition-colors ${active ? "border-blue-300/30 bg-blue-50/26 text-blue-700" : "text-muted-foreground hover:text-foreground"}`}
+      className={`meow-control inline-flex items-center gap-2 px-4 py-2 text-sm transition-colors ${active ? "border-blue-300/30 bg-blue-50/26 text-blue-700" : "text-muted-foreground hover:text-foreground"}`}
     >
       {icon}
       {children}
@@ -37,7 +37,7 @@ export function SecondaryTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`gshark-control px-3 py-1.5 text-xs transition-colors ${active ? "border-cyan-300/30 bg-cyan-50/24 text-cyan-700" : "text-muted-foreground hover:text-foreground"}`}
+      className={`meow-control px-3 py-1.5 text-xs transition-colors ${active ? "border-cyan-300/30 bg-cyan-50/24 text-cyan-700" : "text-muted-foreground hover:text-foreground"}`}
     >
       {children}
     </button>
@@ -65,7 +65,7 @@ export function DeviceChips({
             key={device}
             type="button"
             onClick={() => onSelect(device)}
-            className={`gshark-control px-3 py-1.5 text-xs transition-colors ${activeDevice === device ? "border-blue-300/30 bg-blue-50/24 text-blue-700" : "text-muted-foreground hover:text-foreground"}`}
+            className={`meow-control px-3 py-1.5 text-xs transition-colors ${activeDevice === device ? "border-blue-300/30 bg-blue-50/24 text-blue-700" : "text-muted-foreground hover:text-foreground"}`}
           >
             {device}
           </button>
@@ -82,7 +82,7 @@ export function NotesList({ notes, emptyLabel }: { notes: string[]; emptyLabel: 
   return (
     <div className="space-y-2 text-sm">
       {notes.map((note, index) => (
-        <div key={`${note}-${index}`} className="gshark-soft-fill flex items-start gap-2 px-3 py-2">
+        <div key={`${note}-${index}`} className="meow-soft-fill flex items-start gap-2 px-3 py-2">
           <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
           <span>{note}</span>
         </div>
@@ -98,7 +98,7 @@ export function EmptyState({ children }: { children: ReactNode }) {
 export function Banner({ children, tone }: { children: ReactNode; tone: "muted" | "warning" }) {
   const className =
     tone === "warning"
-      ? "gshark-tile mb-3 border-amber-300 px-3 py-2 text-xs text-amber-700"
-      : "gshark-tile mb-3 border-border px-3 py-2 text-xs text-muted-foreground";
+      ? "meow-tile mb-3 border-amber-300 px-3 py-2 text-xs text-amber-700"
+      : "meow-tile mb-3 border-border px-3 py-2 text-xs text-muted-foreground";
   return <div className={className}>{children}</div>;
 }

@@ -13,7 +13,7 @@ interface EvidenceStatusMessageProps {
 export function EvidenceStatusMessage({ error, loading, onRetry }: EvidenceStatusMessageProps) {
   if (loading) {
     return (
-      <div className="gshark-tile mb-3 border-indigo-100 bg-indigo-50/60 px-3 py-2.5 text-xs font-medium text-slate-500">
+      <div className="meow-tile mb-3 border-indigo-100 bg-indigo-50/60 px-3 py-2.5 text-xs font-medium text-slate-500">
         正在聚合跨模块证据...
       </div>
     );
@@ -21,7 +21,7 @@ export function EvidenceStatusMessage({ error, loading, onRetry }: EvidenceStatu
 
   if (error) {
     return (
-      <div className="gshark-tile mb-3 flex items-center gap-2 border-amber-200 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-700">
+      <div className="meow-tile mb-3 flex items-center gap-2 border-amber-200 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-700">
         <span>{error}</span>
         {onRetry && (
           <button

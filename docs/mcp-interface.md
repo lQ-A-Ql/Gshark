@@ -1,6 +1,6 @@
 # meow~traffic 本地 MCP 接入文档 v1
 
-> 品牌已更名为 `meow~traffic`；本文档中涉及的 `github.com/gshark/sentinel/...`、`GSHARK_*`、`gshark-sentinel`、`sentinel-backend.exe` 等名称仍是当前真实可用的内部兼容标识，本轮不迁移。
+> 品牌已更名为 `meow~traffic`；本文档中涉及的 `github.com/gshark/sentinel/...`、`MEOW_TRAFFIC_*`、`meow-traffic`、`sentinel-backend.exe` 等名称仍是当前真实可用的内部兼容标识，本轮不迁移。
 
 本文档描述当前 `meow~traffic` 本地 MCP 的真实落地形态，重点覆盖：
 
@@ -45,8 +45,8 @@
 
 当前实现位置：
 
-- [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/mcp/server.go:1)
-- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/transport/http_server.go:313)
+- [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/mcp/server.go:1)
+- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/transport/http_server.go:313)
 
 ### 2.2 MCP 配置/状态端点
 
@@ -70,8 +70,8 @@
 
 当前实现位置：
 
-- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/transport/http_server.go:296)
-- [backend/internal/engine/mcp_config.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/engine/mcp_config.go:1)
+- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/transport/http_server.go:296)
+- [backend/internal/engine/mcp_config.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/engine/mcp_config.go:1)
 
 ## 3. 鉴权模型
 
@@ -79,17 +79,17 @@
 
 `/api/mcp` 与 `/api/mcp/config` 都走后端统一鉴权；只有 `/health` 是全局鉴权例外。
 
-当后端配置了 `GSHARK_BACKEND_TOKEN`，以下鉴权方式都可用：
+当后端配置了 `MEOW_TRAFFIC_BACKEND_TOKEN`，以下鉴权方式都可用：
 
 1. `Authorization: Bearer <token>`
-2. `X-GShark-Auth: <token>`
+2. `X-meow-traffic-Auth: <token>`
 3. query `access_token=<token>`
 
 推荐统一使用 `Authorization: Bearer <token>`。
 
 鉴权行为实现位置：
 
-- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/transport/http_server.go:1093)
+- [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/transport/http_server.go:1093)
 
 ## 4. 启用与状态
 
@@ -123,7 +123,7 @@
 
 数据结构定义位置：
 
-- [backend/internal/model/types.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/model/types.go:110)
+- [backend/internal/model/types.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/model/types.go:110)
 
 ## 5. 协议能力
 
@@ -506,7 +506,7 @@
 ### 9.1 读取 MCP 状态
 
 ```powershell
-$token = $env:GSHARK_BACKEND_TOKEN
+$token = $env:MEOW_TRAFFIC_BACKEND_TOKEN
 Invoke-WebRequest -UseBasicParsing `
   -Uri 'http://127.0.0.1:17891/api/mcp/config' `
   -Headers @{ Authorization = "Bearer $token" } `
@@ -516,7 +516,7 @@ Invoke-WebRequest -UseBasicParsing `
 ### 9.2 启用 MCP
 
 ```powershell
-$token = $env:GSHARK_BACKEND_TOKEN
+$token = $env:MEOW_TRAFFIC_BACKEND_TOKEN
 Invoke-WebRequest -UseBasicParsing `
   -Uri 'http://127.0.0.1:17891/api/mcp/config' `
   -Headers @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' } `
@@ -527,7 +527,7 @@ Invoke-WebRequest -UseBasicParsing `
 ### 9.3 列工具
 
 ```powershell
-$token = $env:GSHARK_BACKEND_TOKEN
+$token = $env:MEOW_TRAFFIC_BACKEND_TOKEN
 $headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
 $body = '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 Invoke-WebRequest -UseBasicParsing `
@@ -540,7 +540,7 @@ Invoke-WebRequest -UseBasicParsing `
 ### 9.4 读取当前抓包状态
 
 ```powershell
-$token = $env:GSHARK_BACKEND_TOKEN
+$token = $env:MEOW_TRAFFIC_BACKEND_TOKEN
 $headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
 $body = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"capture.status","arguments":{}}}'
 Invoke-WebRequest -UseBasicParsing `
@@ -553,7 +553,7 @@ Invoke-WebRequest -UseBasicParsing `
 ### 9.5 读取 HTTP stream payload
 
 ```powershell
-$token = $env:GSHARK_BACKEND_TOKEN
+$token = $env:MEOW_TRAFFIC_BACKEND_TOKEN
 $headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
 $body = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"stream.http","arguments":{"stream_id":14}}}'
 Invoke-WebRequest -UseBasicParsing `
@@ -568,7 +568,7 @@ Invoke-WebRequest -UseBasicParsing `
 如果需要把当前项目 MCP 接入 Codex，可使用：
 
 ```powershell
-codex mcp add meow-traffic --url http://127.0.0.1:17891/api/mcp --bearer-token-env-var GSHARK_BACKEND_TOKEN
+codex mcp add meow-traffic --url http://127.0.0.1:17891/api/mcp --bearer-token-env-var MEOW_TRAFFIC_BACKEND_TOKEN
 ```
 
 写入后的等效配置如下：
@@ -576,13 +576,13 @@ codex mcp add meow-traffic --url http://127.0.0.1:17891/api/mcp --bearer-token-e
 ```toml
 [mcp_servers.meow-traffic]
 url = "http://127.0.0.1:17891/api/mcp"
-bearer_token_env_var = "GSHARK_BACKEND_TOKEN"
+bearer_token_env_var = "MEOW_TRAFFIC_BACKEND_TOKEN"
 ```
 
 说明：
 
 - 已启动的 Codex 进程通常需要重启后才会继承新的用户环境变量
-- 若 bearer token 轮换，需要同步更新 `GSHARK_BACKEND_TOKEN`
+- 若 bearer token 轮换，需要同步更新 `MEOW_TRAFFIC_BACKEND_TOKEN`
 
 ## 11. MCP Inspector / 第三方客户端接入
 
@@ -651,7 +651,7 @@ MCP tool 调用会透传 HTTP request context。
 
 处理：
 
-- 检查 `GSHARK_BACKEND_TOKEN`
+- 检查 `MEOW_TRAFFIC_BACKEND_TOKEN`
 - 检查客户端是否传了 `Authorization: Bearer <token>`
 
 ### 13.2 `POST /api/mcp` 返回 `404 mcp endpoint is disabled`
@@ -673,7 +673,7 @@ MCP tool 调用会透传 HTTP request context。
 处理：
 
 - 检查后端版本与启动日志
-- 核对 [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/mcp/server.go:1) 是否已包含当前实现
+- 核对 [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/mcp/server.go:1) 是否已包含当前实现
 
 ### 13.4 能连上但读不到抓包
 
@@ -691,9 +691,9 @@ MCP tool 调用会透传 HTTP request context。
 
 ## 14. 当前实现对应位置
 
-- MCP 协议服务： [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/mcp/server.go:1)
-- 路由挂载与鉴权： [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/transport/http_server.go:157)
-- MCP 状态模型： [backend/internal/model/types.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/model/types.go:110)
-- MCP 配置读写： [backend/internal/engine/mcp_config.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/engine/mcp_config.go:1)
-- 设置页 MCP 区块： [frontend/src/app/components/MCPSettingsSection.tsx](/C:/Users/QAQ/Desktop/gshark/frontend/src/app/components/MCPSettingsSection.tsx:1)
-- 运行时设置侧栏逻辑： [frontend/src/app/components/useRuntimeSettingsSidebarModel.ts](/C:/Users/QAQ/Desktop/gshark/frontend/src/app/components/useRuntimeSettingsSidebarModel.ts:1)
+- MCP 协议服务： [backend/internal/mcp/server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/mcp/server.go:1)
+- 路由挂载与鉴权： [backend/internal/transport/http_server.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/transport/http_server.go:157)
+- MCP 状态模型： [backend/internal/model/types.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/model/types.go:110)
+- MCP 配置读写： [backend/internal/engine/mcp_config.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/engine/mcp_config.go:1)
+- 设置页 MCP 区块： [frontend/src/app/components/MCPSettingsSection.tsx](/C:/Users/QAQ/Desktop/meow-traffic/frontend/src/app/components/MCPSettingsSection.tsx:1)
+- 运行时设置侧栏逻辑： [frontend/src/app/components/useRuntimeSettingsSidebarModel.ts](/C:/Users/QAQ/Desktop/meow-traffic/frontend/src/app/components/useRuntimeSettingsSidebarModel.ts:1)

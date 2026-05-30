@@ -94,7 +94,7 @@ func listTempCaptureUploads(t *testing.T) map[string]struct{} {
 	paths := map[string]struct{}{}
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasPrefix(name, "gshark-") && (strings.HasSuffix(name, ".pcap") || strings.HasSuffix(name, ".pcapng") || strings.HasSuffix(name, ".cap")) {
+		if strings.HasPrefix(name, "meow-traffic-") && (strings.HasSuffix(name, ".pcap") || strings.HasSuffix(name, ".pcapng") || strings.HasSuffix(name, ".cap")) {
 			paths[filepath.Join(os.TempDir(), name)] = struct{}{}
 		}
 	}

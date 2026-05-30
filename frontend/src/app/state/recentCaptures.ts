@@ -1,6 +1,6 @@
 import type { RecentCapture } from "../core/types";
 
-export const RECENT_CAPTURES_STORAGE_KEY = "gshark.recent-captures.v1";
+export const RECENT_CAPTURES_STORAGE_KEY = "meow-traffic.recent-captures.v1";
 export const MAX_RECENT_CAPTURES = 8;
 
 export function updateRecentCaptures(prev: RecentCapture[], entry: RecentCapture): RecentCapture[] {

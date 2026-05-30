@@ -63,7 +63,7 @@ export function RawStreamPayloadGrid({
           viewportRef.current = node;
         }
       }}
-      className="gshark-aurora-surface min-h-0 overflow-auto p-4 font-mono text-sm leading-relaxed text-slate-800"
+      className="meow-aurora-surface min-h-0 overflow-auto p-4 font-mono text-sm leading-relaxed text-slate-800"
       onScroll={(event) => {
         if (!onScrollNearBottom) return;
         const nearBottom =
@@ -72,10 +72,10 @@ export function RawStreamPayloadGrid({
       }}
     >
       {loadError && (
-        <div className="gshark-soft-fill gshark-risk-accent mb-3 px-3 py-2 text-xs text-amber-700">{loadError}</div>
+        <div className="meow-soft-fill meow-risk-accent mb-3 px-3 py-2 text-xs text-amber-700">{loadError}</div>
       )}
       {loadMeta?.loading && loadedChunkCount === 0 && (
-        <div className="gshark-soft-fill gshark-evidence-accent mb-3 px-3 py-2 text-xs text-blue-700">
+        <div className="meow-soft-fill meow-evidence-accent mb-3 px-3 py-2 text-xs text-blue-700">
           正在解析 {protocol.toLowerCase()}.stream eq {streamId}，当前只先加载这一条流。
         </div>
       )}

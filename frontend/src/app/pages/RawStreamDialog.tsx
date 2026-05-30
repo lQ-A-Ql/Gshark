@@ -48,7 +48,7 @@ function OpenMiscButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="gshark-control gshark-evidence-accent inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-cyan-700 transition-colors hover:text-cyan-800"
+      className="meow-control meow-evidence-accent inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-cyan-700 transition-colors hover:text-cyan-800"
     >
       打开 MISC 解码工作台
     </button>

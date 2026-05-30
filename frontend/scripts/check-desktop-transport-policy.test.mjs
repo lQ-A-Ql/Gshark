@@ -12,7 +12,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 }
 
 function writePolicyFixture(requirementBody, typedCallBody) {
-  const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-desktop-policy-check-"));
+  const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-desktop-policy-check-"));
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopBridge.ts", "export const bridge = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridge.ts", "export const typed = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeCore.ts", "export const core = {};\n");

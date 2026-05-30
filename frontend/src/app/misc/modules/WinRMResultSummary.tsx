@@ -10,7 +10,7 @@ export function WinRMResultSummary({ result }: WinRMResultSummaryProps) {
 
   return (
     <div className="mt-4 animate-in slide-in-from-bottom-2 duration-300 fade-in">
-      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-sky-100 bg-sky-50/50 p-4 text-[11px]">
+      <div className="meow-tile-toolbar flex flex-wrap gap-2 border-sky-100 bg-sky-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={result.captureName} />
         <MetaChip label="Port" value={result.port} />
         <MetaChip label="Mode" value={result.authMode} />

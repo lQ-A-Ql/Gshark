@@ -281,7 +281,7 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 		return nil
 	}
 
-	tempDir, err := os.MkdirTemp("", "gshark-export-")
+	tempDir, err := os.MkdirTemp("", "meow-traffic-export-")
 	if err != nil {
 		return nil
 	}
@@ -542,7 +542,7 @@ func (s *Service) hasCapturePath() bool {
 }
 
 func streamCacheLimitValue() int {
-	raw := strings.TrimSpace(os.Getenv("GSHARK_STREAM_CACHE_LIMIT"))
+	raw := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_STREAM_CACHE_LIMIT"))
 	if raw == "" {
 		return defaultStreamCacheLimit
 	}

@@ -13,7 +13,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 
 describe("check-boundaries script", () => {
   it("rejects production imports from the wails bridge facade", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/features/demo/useDemo.ts",
@@ -26,7 +26,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects app-layer imports from aggregate bridge types", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/state/useDemo.ts",
@@ -39,7 +39,7 @@ describe("check-boundaries script", () => {
   });
 
   it("allows integration-layer bridge type composition", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/backendClients.ts",
@@ -50,7 +50,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects app-layer imports from bridge composition internals", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/pages/Demo.tsx",
@@ -73,7 +73,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects page and feature imports from aggregate bridge type contracts", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/pages/Demo.tsx",
@@ -86,7 +86,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects page imports from the evidence feature schema shim", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/pages/EvidencePanel.tsx",
@@ -104,7 +104,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects state imports from UI layers", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(frontendRoot, "src/app/state/useDemo.ts", 'import { DemoPanel } from "../components/DemoPanel";');
     writeFixtureFile(frontendRoot, "src/app/components/DemoPanel.tsx", "export function DemoPanel() { return null; }");
 
@@ -114,7 +114,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects cross-domain feature imports", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/features/c2/C2Panel.tsx",
@@ -132,7 +132,7 @@ describe("check-boundaries script", () => {
   });
 
   it("allows feature imports from integrations/backendClients (the sanctioned bridge)", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/features/demo/useDemo.ts",
@@ -144,7 +144,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects new page imports from aggregate backendClients", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/pages/NewPage.tsx",
@@ -158,7 +158,7 @@ describe("check-boundaries script", () => {
   });
 
   it("does not baseline page backendClients edges after migration", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/pages/MiscTools.tsx",
@@ -172,7 +172,7 @@ describe("check-boundaries script", () => {
   });
 
   it("rejects shared analysis component imports from feature layers", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-boundary-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-boundary-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/components/analysis/SharedPanel.tsx",

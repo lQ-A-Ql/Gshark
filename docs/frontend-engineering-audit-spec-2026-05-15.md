@@ -187,14 +187,14 @@ Recommended next slice:
 For documentation-only audit work:
 
 ```powershell
-cd C:\Users\QAQ\Desktop\gshark
+cd C:\Users\QAQ\Desktop\meow-traffic
 git diff -- docs
 ```
 
 For frontend source changes:
 
 ```powershell
-cd C:\Users\QAQ\Desktop\gshark\frontend
+cd C:\Users\QAQ\Desktop\meow-traffic\frontend
 pnpm run typecheck
 pnpm run lint
 pnpm run boundary:check
@@ -210,7 +210,7 @@ pnpm run test:run
 For handoff or CI-equivalent confidence:
 
 ```powershell
-cd C:\Users\QAQ\Desktop\gshark\frontend
+cd C:\Users\QAQ\Desktop\meow-traffic\frontend
 pnpm run ci
 ```
 

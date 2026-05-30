@@ -75,7 +75,7 @@ export function ThreatHuntingWorkbenchPanel({
   onYaraTimeoutMsChange,
 }: ThreatHuntingWorkbenchPanelProps) {
   return (
-    <div className="gshark-tile gshark-tile-strong flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="meow-tile meow-tile-strong flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <ThreatHuntingConfigPanel
         backendConnected={backendConnected}
         configBusy={configBusy}

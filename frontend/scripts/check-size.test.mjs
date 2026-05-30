@@ -25,7 +25,7 @@ describe("check-size script", () => {
   });
 
   it("reports files that exceed their configured line budget", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-size-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-size-check-"));
     writeFixtureFile(frontendRoot, "src/small.ts", "one\ntwo\nthree");
     writeFixtureFile(frontendRoot, "src/large.ts", "one\ntwo\nthree\nfour");
 
@@ -56,7 +56,7 @@ describe("check-size script", () => {
   });
 
   it("reports mapper files that do not have a configured line budget", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-size-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-size-check-"));
     writeFixtureFile(frontendRoot, "src/app/integrations/mappers/budgetedMapper.ts", "export {};");
     writeFixtureFile(frontendRoot, "src/app/integrations/mappers/unbudgetedMapper.ts", "export {};");
     writeFixtureFile(frontendRoot, "src/app/integrations/mappers/unbudgetedMapper.test.ts", "export {};");
@@ -76,7 +76,7 @@ describe("check-size script", () => {
   });
 
   it("reports wire DTO files that do not have a configured line budget", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-size-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-size-check-"));
     writeFixtureFile(frontendRoot, "src/app/integrations/wire/budgetedWireDtos.ts", "export {};");
     writeFixtureFile(frontendRoot, "src/app/integrations/wire/unbudgetedWireDtos.ts", "export {};");
     writeFixtureFile(frontendRoot, "src/app/integrations/wire/unbudgetedWireDtos.test.ts", "export {};");

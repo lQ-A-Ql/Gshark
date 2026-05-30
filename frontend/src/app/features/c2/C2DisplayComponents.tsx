@@ -9,7 +9,7 @@ export function C2Panel({ title, children, className }: { title: string; childre
     <SurfacePanel
       title={title}
       icon={<Network className="h-4 w-4 text-rose-600" />}
-      className={cn("gshark-tile", className)}
+      className={cn("meow-tile", className)}
     >
       {children}
     </SurfacePanel>
@@ -34,13 +34,13 @@ export function C2FamilyTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "gshark-tile flex items-center gap-3 px-3.5 py-3 text-left transition-all",
+        "meow-tile flex items-center gap-3 px-3.5 py-3 text-left transition-all",
         active
           ? "border-rose-200 bg-rose-50/90 text-rose-700"
           : "border-transparent bg-transparent text-slate-500 hover:border-rose-200/30 hover:bg-rose-50/20 hover:text-rose-700",
       )}
     >
-      <span className="gshark-diffuse-chip flex h-9 w-9 shrink-0 items-center justify-center text-current">{icon}</span>
+      <span className="meow-diffuse-chip flex h-9 w-9 shrink-0 items-center justify-center text-current">{icon}</span>
       <span>
         <span className="block text-sm font-semibold">{title}</span>
         <span className="mt-1 block text-xs leading-5 opacity-75">{description}</span>
@@ -51,7 +51,7 @@ export function C2FamilyTabButton({
 
 export function C2FeatureCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="gshark-tile border-rose-100 px-3.5 py-3">
+    <div className="meow-tile border-rose-100 px-3.5 py-3">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         <Activity className="h-4 w-4 text-rose-600" />
         {title}
@@ -63,9 +63,9 @@ export function C2FeatureCard({ title, text }: { title: string; text: string }) 
 
 export function VShellEvidenceSummaryGrid({ items }: { items: VShellEvidenceSummaryItem[] }) {
   return (
-    <div className="gshark-tile-grid mt-0 grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+    <div className="meow-tile-grid mt-0 grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
       {items.map((item) => (
-        <div key={item.label} className="gshark-tile border-cyan-100 px-3.5 py-2.5">
+        <div key={item.label} className="meow-tile border-cyan-100 px-3.5 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-600">{item.label}</div>
             {item.source ? (
@@ -88,7 +88,7 @@ export function C2AptHandoffNotes({ notes }: { notes: string[] }) {
       {notes.map((note, index) => (
         <div
           key={`${note}-${index}`}
-          className="gshark-tile flex items-start gap-2 border-amber-100 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-800"
+          className="meow-tile flex items-start gap-2 border-amber-100 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-800"
         >
           <Workflow className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{note}</span>
@@ -107,7 +107,7 @@ export function C2NotesPanel({ notes, emptyText }: { notes: string[]; emptyText:
       {notes.map((note, index) => (
         <div
           key={`${note}-${index}`}
-          className="gshark-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5 text-slate-600"
+          className="meow-soft-fill flex items-start gap-2 px-3 py-2 text-xs leading-5 text-slate-600"
         >
           <Workflow className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
           <span>{note}</span>

@@ -22,13 +22,13 @@ export function MiscToolsHero({
   onImportModuleFromNativeDialog,
 }: MiscToolsHeroProps) {
   return (
-    <section className="gshark-tile-header overflow-hidden">
+    <section className="meow-tile-header overflow-hidden">
       <div className="pointer-events-none h-px w-full bg-slate-200" />
       <div className="flex flex-col gap-4 px-5 py-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-3">
-              <div className="gshark-soft-fill flex h-10 w-10 items-center justify-center border-cyan-200/24 bg-cyan-50/18 text-cyan-700">
+              <div className="meow-soft-fill flex h-10 w-10 items-center justify-center border-cyan-200/24 bg-cyan-50/18 text-cyan-700">
                 <Wrench className="h-4.5 w-4.5" />
               </div>
               <div className="min-w-0">
@@ -41,7 +41,7 @@ export function MiscToolsHero({
               </div>
             </div>
 
-            <div className="gshark-tile-toolbar flex flex-wrap items-center gap-1.5 border-cyan-200/18 bg-cyan-50/10 px-2.5 py-1.5 text-xs text-slate-500">
+            <div className="meow-tile-toolbar flex flex-wrap items-center gap-1.5 border-cyan-200/18 bg-cyan-50/10 px-2.5 py-1.5 text-xs text-slate-500">
               <span className="font-semibold text-slate-600">模块层</span>
               {miscCategoryOptions.map((item) => {
                 const active = activeCategory === item;
@@ -52,7 +52,7 @@ export function MiscToolsHero({
                     onClick={() => onCategoryChange(item)}
                     className={cn(
                       "border px-2.5 py-0.5 font-medium transition-all",
-                      "gshark-diffuse-chip",
+                      "meow-diffuse-chip",
                       active
                         ? "border-cyan-200/28 bg-cyan-50/24 text-cyan-700"
                         : "border-slate-200/18 bg-slate-50/10 text-slate-500 hover:border-cyan-200/28 hover:text-cyan-700",
@@ -68,13 +68,13 @@ export function MiscToolsHero({
           <div className="grid gap-3 text-[12px] text-slate-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <p className="max-w-2xl leading-6 text-slate-500">{heroDescription}</p>
             <div className="flex flex-wrap gap-2 text-[11px]">
-              <span className="gshark-diffuse-chip border-cyan-200/22 bg-cyan-50/18 px-3 py-1 text-cyan-700">
+              <span className="meow-diffuse-chip border-cyan-200/22 bg-cyan-50/18 px-3 py-1 text-cyan-700">
                 支持中断
               </span>
-              <span className="gshark-diffuse-chip border-slate-200/18 bg-slate-50/10 px-3 py-1 text-slate-600">
+              <span className="meow-diffuse-chip border-slate-200/18 bg-slate-50/10 px-3 py-1 text-slate-600">
                 协议专题
               </span>
-              <span className="gshark-diffuse-chip border-slate-200/18 bg-slate-50/10 px-3 py-1 text-slate-600">
+              <span className="meow-diffuse-chip border-slate-200/18 bg-slate-50/10 px-3 py-1 text-slate-600">
                 结果可导出
               </span>
             </div>

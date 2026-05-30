@@ -70,7 +70,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
       {hasSchemaForm ? (
         <>
           {!embedded && module.formSchema?.description ? (
-            <div className="gshark-soft-fill gshark-evidence-accent px-4 py-3 text-[13px] leading-relaxed text-cyan-900">
+            <div className="meow-soft-fill meow-evidence-accent px-4 py-3 text-[13px] leading-relaxed text-cyan-900">
               {module.formSchema.description}
             </div>
           ) : null}
@@ -85,10 +85,10 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
             }}
           />
 
-          <div className="gshark-tile-toolbar flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="meow-tile-toolbar flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1 text-xs text-slate-500">
               <div className="font-semibold uppercase tracking-[0.2em] text-cyan-700/80">Invoke endpoint</div>
-              <div className="gshark-diffuse-chip break-all px-2.5 py-1.5 font-mono text-[11px] text-slate-700">
+              <div className="meow-diffuse-chip break-all px-2.5 py-1.5 font-mono text-[11px] text-slate-700">
                 {module.interfaceSchema?.invokePath}
               </div>
             </div>
@@ -114,16 +114,16 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
           />
         </>
       ) : (
-        <div className="gshark-soft-fill p-4 text-[13px] text-slate-600">
+        <div className="meow-soft-fill p-4 text-[13px] text-slate-600">
           <div className="font-semibold text-slate-800">已注册模块</div>
           <div className="mt-2 break-all">
             API 前缀:{" "}
-            <span className="gshark-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.apiPrefix}</span>
+            <span className="meow-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.apiPrefix}</span>
           </div>
           {module.docsPath ? (
             <div className="mt-1 break-all">
               文档:{" "}
-              <span className="gshark-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.docsPath}</span>
+              <span className="meow-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.docsPath}</span>
             </div>
           ) : null}
           <div className="mt-3 leading-relaxed">

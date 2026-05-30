@@ -52,7 +52,7 @@ export function VehicleOverviewPanel({ analysis }: { analysis: VehicleAnalysis }
 
 function VehiclePlanItem({ children }: { children: string }) {
   return (
-    <div className="gshark-soft-fill flex items-start gap-2 px-3 py-2">
+    <div className="meow-soft-fill flex items-start gap-2 px-3 py-2">
       <Route className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
       <span>{children}</span>
     </div>

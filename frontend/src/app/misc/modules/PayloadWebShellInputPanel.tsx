@@ -53,8 +53,8 @@ export function PayloadWebShellInputPanel({
     <div
       className={
         embedded
-          ? "gshark-tile overflow-hidden border-slate-100 bg-slate-50/60"
-          : "gshark-tile overflow-hidden border-slate-200"
+          ? "meow-tile overflow-hidden border-slate-100 bg-slate-50/60"
+          : "meow-tile overflow-hidden border-slate-200"
       }
     >
       <div
@@ -114,7 +114,7 @@ export function PayloadWebShellInputPanel({
           onSelect={onSelectSource}
         />
         {selectedSource ? (
-          <div className="gshark-tile mb-3 border-cyan-100 bg-cyan-50/70 px-3 py-2 text-xs leading-5 text-cyan-900">
+          <div className="meow-tile mb-3 border-cyan-100 bg-cyan-50/70 px-3 py-2 text-xs leading-5 text-cyan-900">
             {formatPayloadWebShellSelectedSource(selectedSource)}
           </div>
         ) : null}
@@ -126,7 +126,7 @@ export function PayloadWebShellInputPanel({
           spellCheck={false}
         />
         {inputHint ? (
-          <div className="gshark-tile mt-3 border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <div className="meow-tile mt-3 border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
             {inputHint}
           </div>
         ) : null}

@@ -15,7 +15,7 @@ function createFixture({
   packageJson = validPackageJson(),
   extraSource = "",
 } = {}) {
-  const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-post-removal-"));
+  const rootDir = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-post-removal-"));
   writeFixture(rootDir, "desktop_backend_proxy.go", backendProxy);
   writeFixture(rootDir, "frontend/src/app/integrations/desktopBridge.ts", desktopBridge);
   writeFixture(rootDir, "frontend/src/app/integrations/desktopIpcControls.ts", validDesktopIpcControls());

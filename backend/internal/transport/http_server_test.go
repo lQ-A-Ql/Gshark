@@ -68,7 +68,7 @@ func TestWithCORSAllowsLoopbackDeletePreflight(t *testing.T) {
 	if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET,POST,DELETE,OPTIONS" {
 		t.Fatalf("unexpected allow methods %q", got)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type, X-GShark-Auth" {
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type, X-Meow-Traffic-Auth" {
 		t.Fatalf("unexpected allow headers %q", got)
 	}
 }
@@ -184,7 +184,7 @@ func TestWithAuthRequiresTokenForTrustedDesktopOrigin(t *testing.T) {
 }
 
 func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
-	t.Setenv("GSHARK_BACKEND_BUILD_ID", "test-build-id")
+	t.Setenv("MEOW_TRAFFIC_BACKEND_BUILD_ID", "test-build-id")
 	miscPackageDir := t.TempDir()
 	server := NewServerWithOptions(engine.NewService(nil), NewHub(), ServerOptions{MiscPackageDir: miscPackageDir})
 	server.SetAuthToken("secret-token")
@@ -201,7 +201,7 @@ func TestHandleRuntimeIdentityReportsServiceAndAuthState(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode runtime identity payload: %v", err)
 	}
-	if got := payload["service"]; got != "gshark-sentinel" {
+	if got := payload["service"]; got != "meow-traffic" {
 		t.Fatalf("unexpected service value: %#v", got)
 	}
 	if got := payload["auth_enabled"]; got != true {

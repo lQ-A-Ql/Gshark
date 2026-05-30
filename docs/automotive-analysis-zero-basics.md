@@ -39,7 +39,7 @@
 
 ### 第一步：先打开“车机分析”
 
-进入 [VehicleAnalysis.tsx](/C:/Users/QAQ/Desktop/gshark/frontend/src/app/pages/VehicleAnalysis.tsx) 对应页面后，先看这 4 个区域：
+进入 [VehicleAnalysis.tsx](/C:/Users/QAQ/Desktop/meow-traffic/frontend/src/app/pages/VehicleAnalysis.tsx) 对应页面后，先看这 4 个区域：
 
 - `车载协议分布`
   - 先确认抓包里到底有 `CAN / J1939 / UDS / DoIP` 哪些协议
@@ -234,16 +234,16 @@ J1939 重点不是 SID，而是：
 ## 在当前项目里对应的主要能力
 
 - 后端车机分析主入口：
-  - [vehicle_analysis.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/tshark/vehicle_analysis.go)
+  - [vehicle_analysis.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/tshark/vehicle_analysis.go)
 - CAN payload / OBD / CANopen：
-  - [vehicle_can_payload.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/tshark/vehicle_can_payload.go)
+  - [vehicle_can_payload.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/tshark/vehicle_can_payload.go)
 - DBC 解析：
-  - [dbc.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/tshark/dbc.go)
-  - [vehicle_dbc.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/tshark/vehicle_dbc.go)
+  - [dbc.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/tshark/dbc.go)
+  - [vehicle_dbc.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/tshark/vehicle_dbc.go)
 - UDS 配对与信号时间线：
-  - [vehicle_postprocess.go](/C:/Users/QAQ/Desktop/gshark/backend/internal/tshark/vehicle_postprocess.go)
+  - [vehicle_postprocess.go](/C:/Users/QAQ/Desktop/meow-traffic/backend/internal/tshark/vehicle_postprocess.go)
 - 前端页面：
-  - [VehicleAnalysis.tsx](/C:/Users/QAQ/Desktop/gshark/frontend/src/app/pages/VehicleAnalysis.tsx)
+  - [VehicleAnalysis.tsx](/C:/Users/QAQ/Desktop/meow-traffic/frontend/src/app/pages/VehicleAnalysis.tsx)
 
 ## 下一步该学什么
 

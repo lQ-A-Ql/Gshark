@@ -30,7 +30,7 @@ export function KeyboardReplay({
 
   return (
     <div className="space-y-3">
-      <div className="gshark-tile border-blue-100 p-4">
+      <div className="meow-tile border-blue-100 p-4">
         <KeyboardReplayControls
           currentIndex={currentIndex}
           isPlaying={isPlaying}
@@ -52,7 +52,7 @@ export function KeyboardReplay({
         <StatCard title="释放键" value={currentEvent?.releasedKeys.join(", ") || "--"} />
       </div>
 
-      <div className="gshark-soft-fill px-3 py-3 text-xs text-muted-foreground">
+      <div className="meow-soft-fill px-3 py-3 text-xs text-muted-foreground">
         <div className="font-medium text-foreground">{currentEvent?.summary || "当前事件无摘要"}</div>
         <div className="mt-1">
           文本输出：

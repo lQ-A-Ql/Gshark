@@ -30,7 +30,7 @@ export function UpdateStatusPanel({
   const actionDisabled = loading || installing || !status?.hasUpdate || !status?.canInstall;
 
   return (
-    <AnalysisPanel title="更新状态" tone="blue" className="gshark-tile">
+    <AnalysisPanel title="更新状态" tone="blue" className="meow-tile">
       <div className="space-y-5">
         <div className="grid gap-0 md:grid-cols-4">
           <StatusTile
@@ -62,7 +62,7 @@ export function UpdateStatusPanel({
         </div>
 
         {(loading || installing) && (
-          <div className="gshark-tile border-blue-100 bg-blue-50/55 p-3.5">
+          <div className="meow-tile border-blue-100 bg-blue-50/55 p-3.5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <LoaderCircle className="h-4 w-4 animate-spin text-blue-600" />
               {installing ? "正在下载并替换程序" : "正在检查 GitHub Release"}
@@ -107,10 +107,10 @@ export function UpdateReleaseNotesPanel({ notes }: { notes: string }) {
     <AnalysisPanel
       title="Release 说明"
       tone="blue"
-      className="gshark-tile"
+      className="meow-tile"
       actions={<span className="text-xs font-normal text-slate-500">GitHub 最新 Release 正文</span>}
     >
-      <div className="gshark-soft-fill max-h-[420px] overflow-auto p-3.5">
+      <div className="meow-soft-fill max-h-[420px] overflow-auto p-3.5">
         <LazyMarkdown components={releaseMarkdownComponents}>{notes}</LazyMarkdown>
       </div>
     </AnalysisPanel>
@@ -122,7 +122,7 @@ export function UpdateDiagnosticsPanel({ status, error }: { status: AppUpdateSta
     <AnalysisPanel
       title="查询诊断"
       tone="slate"
-      className="gshark-tile"
+      className="meow-tile"
       actions={<span className="text-xs font-normal text-slate-500">仓库与接口状态</span>}
     >
       <div className="space-y-3 text-sm text-slate-700">
@@ -148,7 +148,7 @@ export function UpdateStepsPanel() {
     <AnalysisPanel
       title="更新步骤"
       tone="blue"
-      className="gshark-tile"
+      className="meow-tile"
       actions={<span className="text-xs font-normal text-slate-500">仅替换主程序本体</span>}
     >
       <div className="space-y-3">
@@ -175,7 +175,7 @@ export function UpdateStepsPanel() {
 
 function UpdateErrorNotice({ error }: { error: string }) {
   return (
-    <div className="gshark-tile flex items-start gap-3 border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+    <div className="meow-tile flex items-start gap-3 border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
         <div className="font-medium">更新检查失败</div>
@@ -188,7 +188,7 @@ function UpdateErrorNotice({ error }: { error: string }) {
 function UpdateStateNotice({ status }: { status: AppUpdateStatus }) {
   return (
     <div
-      className={`gshark-tile flex items-start gap-3 px-4 py-3 text-sm ${
+      className={`meow-tile flex items-start gap-3 px-4 py-3 text-sm ${
         status.hasUpdate
           ? "border-amber-200 bg-amber-50 text-amber-700"
           : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -209,7 +209,7 @@ function UpdateStateNotice({ status }: { status: AppUpdateStatus }) {
 
 function StatusTile({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <div className="gshark-soft-fill p-3.5">
+    <div className="meow-soft-fill p-3.5">
       <div className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">{title}</div>
       <div className="mt-3 break-all text-lg font-semibold text-slate-900">{value}</div>
       <div className="mt-2 text-xs leading-5 text-slate-500">{hint}</div>
@@ -219,7 +219,7 @@ function StatusTile({ title, value, hint }: { title: string; value: string; hint
 
 function StepCard({ index, title, description }: { index: string; title: string; description: string }) {
   return (
-    <div className="gshark-soft-fill p-3.5">
+    <div className="meow-soft-fill p-3.5">
       <div className="flex items-center gap-3">
         <div className="bg-blue-600 px-2.5 py-1 text-xs font-semibold tracking-[0.18em] text-white">{index}</div>
         <div className="text-sm font-semibold text-slate-900">{title}</div>
@@ -231,7 +231,7 @@ function StepCard({ index, title, description }: { index: string; title: string;
 
 function DiagnosticRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="gshark-soft-fill px-3.5 py-3">
+    <div className="meow-soft-fill px-3.5 py-3">
       <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
       <div className="mt-2 break-all font-mono text-[13px] leading-6 text-slate-800">{value}</div>
     </div>

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { findDesktopGenericIpcRollbackGuardViolations } from "./check-desktop-generic-ipc-rollback-guard.mjs";
 
 function createFixture({ policy, policyTest, bridgeTest, exitPlan, packageJson } = {}) {
-  const rootDir = mkdtempSync(resolve(tmpdir(), "gshark-generic-ipc-rollback-"));
+  const rootDir = mkdtempSync(resolve(tmpdir(), "meow-traffic-generic-ipc-rollback-"));
   writeFixture(rootDir, "frontend/src/app/integrations/desktopGenericIpcPolicy.ts", policy ?? validPolicy());
   writeFixture(
     rootDir,

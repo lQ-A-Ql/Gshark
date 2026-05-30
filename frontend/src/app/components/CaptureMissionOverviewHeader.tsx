@@ -54,37 +54,37 @@ export function CaptureMissionOverviewHeader({
 
   return (
     <>
-      <div className="gshark-tile-toolbar flex flex-wrap items-start justify-between gap-4">
+      <div className="meow-tile-toolbar flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-blue-700">ANALYSIS COCKPIT</div>
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">{overview.headline}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{overview.summary}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1">{fileName}</span>
+            <span className="meow-diffuse-chip meow-evidence-accent px-3 py-1">{fileName}</span>
             {overview.topProtocols.map((item) => (
-              <span key={item.label} className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1 text-blue-700">
+              <span key={item.label} className="meow-diffuse-chip meow-evidence-accent px-3 py-1 text-blue-700">
                 {item.label} {item.count}
               </span>
             ))}
             {overviewLoading && (
-              <span className="gshark-diffuse-chip gshark-evidence-accent px-3 py-1 text-amber-700">
+              <span className="meow-diffuse-chip meow-evidence-accent px-3 py-1 text-amber-700">
                 正在汇总专项分析
               </span>
             )}
           </div>
         </div>
 
-        <div className="gshark-tile-toolbar flex flex-wrap items-center gap-2 border-0 bg-transparent p-0">
+        <div className="meow-tile-toolbar flex flex-wrap items-center gap-2 border-0 bg-transparent p-0">
           <button
             onClick={onOpenHunting}
-            className="gshark-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-700 transition-all"
+            className="meow-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-700 transition-all"
           >
             <ShieldAlert className="h-4 w-4" />
             威胁狩猎
           </button>
           <button
             onClick={onOpenTrafficGraph}
-            className="gshark-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 transition-all"
+            className="meow-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 transition-all"
           >
             <Network className="h-4 w-4" />
             流量图
@@ -92,7 +92,7 @@ export function CaptureMissionOverviewHeader({
         </div>
       </div>
 
-      <div className="gshark-tile-grid mt-5 grid md:grid-cols-2 xl:grid-cols-4">
+      <div className="meow-tile-grid mt-5 grid md:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((item) => (
           <MetricCard
             key={item.label}

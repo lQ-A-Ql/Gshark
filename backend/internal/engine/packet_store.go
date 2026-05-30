@@ -40,7 +40,7 @@ func (s *packetStore) Reset() error {
 	s.ids = nil
 	s.positions = make(map[int64]int)
 
-	tmp, err := os.CreateTemp("", "gshark-packets-*.db")
+	tmp, err := os.CreateTemp("", "meow-traffic-packets-*.db")
 	if err != nil {
 		return fmt.Errorf("create packet db: %w", err)
 	}

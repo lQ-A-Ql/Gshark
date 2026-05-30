@@ -35,11 +35,11 @@ func probeReusableBackendAt(ctx context.Context, addr, baseURL, token string) er
 	var identity runtimeIdentity
 	if err := client.getJSON(ctx, "/api/runtime/identity", &identity); err != nil {
 		if strings.Contains(err.Error(), "unauthorized") {
-			return fmt.Errorf("runtime identity probe failed: backend requires a matching GSHARK_BACKEND_TOKEN")
+			return fmt.Errorf("runtime identity probe failed: backend requires a matching MEOW_TRAFFIC_BACKEND_TOKEN")
 		}
 		return fmt.Errorf("runtime identity probe failed: %w", err)
 	}
-	if !strings.EqualFold(identity.Service, "gshark-sentinel") {
+	if !strings.EqualFold(identity.Service, "meow-traffic") {
 		return fmt.Errorf("runtime identity mismatch: unexpected service %q", identity.Service)
 	}
 	fmt.Fprintf(os.Stdout, "desktop startup: reusable backend identity service=%q build_id=%q exe=%q cwd=%q started_at=%q\n", identity.Service, identity.BuildID, identity.ExecutablePath, identity.WorkingDir, identity.StartedAt)

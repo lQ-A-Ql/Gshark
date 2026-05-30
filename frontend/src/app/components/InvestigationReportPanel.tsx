@@ -35,7 +35,7 @@ export function InvestigationReportPanel({
   }
 
   return (
-    <section className={`gshark-tile gshark-tile-strong gshark-diffuse-edge p-4 ${className}`}>
+    <section className={`meow-tile meow-tile-strong meow-diffuse-edge p-4 ${className}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">report schema</div>
@@ -64,7 +64,7 @@ function ReportSection({
   preferredProtocol?: "HTTP" | "TCP" | "UDP";
 }) {
   return (
-    <div className="gshark-tile bg-transparent p-3.5">
+    <div className="meow-tile bg-transparent p-3.5">
       <div className="mb-3 text-sm font-semibold text-slate-800">{title}</div>
       {items.length === 0 ? (
         <div className="px-3 py-3 text-xs text-slate-500">当前分段暂无条目。</div>
@@ -73,7 +73,7 @@ function ReportSection({
           {items.map((item, index) => (
             <div
               key={`${title}-${item.title}-${item.packetId ?? item.streamId ?? index}`}
-              className="gshark-soft-fill p-3"
+              className="meow-soft-fill p-3"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -90,12 +90,12 @@ function ReportSection({
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                 {item.ruleId ? (
-                  <span className="gshark-diffuse-chip border-indigo-200/24 bg-indigo-50/18 px-2 py-0.5 font-mono text-[10px] text-indigo-700">
+                  <span className="meow-diffuse-chip border-indigo-200/24 bg-indigo-50/18 px-2 py-0.5 font-mono text-[10px] text-indigo-700">
                     {item.ruleId}
                   </span>
                 ) : null}
                 {typeof item.confidence === "number" && item.confidence > 0 ? (
-                  <span className="gshark-diffuse-chip border-emerald-200/24 bg-emerald-50/18 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="meow-diffuse-chip border-emerald-200/24 bg-emerald-50/18 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     conf {item.confidence}%
                   </span>
                 ) : null}
@@ -104,7 +104,7 @@ function ReportSection({
                 {item.tags?.map((tag) => (
                   <span
                     key={tag}
-                    className="gshark-diffuse-chip border-slate-200/18 bg-slate-50/12 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-600"
+                    className="meow-diffuse-chip border-slate-200/18 bg-slate-50/12 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-600"
                   >
                     {tag}
                   </span>
@@ -116,7 +116,7 @@ function ReportSection({
                   {item.caveats.map((caveat) => (
                     <span
                       key={caveat}
-                      className="gshark-diffuse-chip border-amber-200/24 bg-amber-50/18 px-2 py-1 text-[10px] leading-4 text-amber-800"
+                      className="meow-diffuse-chip border-amber-200/24 bg-amber-50/18 px-2 py-1 text-[10px] leading-4 text-amber-800"
                     >
                       {caveat}
                     </span>
@@ -136,14 +136,14 @@ function ReportSection({
 
 function RecommendationSection({ items }: { items: string[] }) {
   return (
-    <div className="gshark-tile bg-transparent p-3.5">
+    <div className="meow-tile bg-transparent p-3.5">
       <div className="mb-3 text-sm font-semibold text-slate-800">建议</div>
       {items.length === 0 ? (
         <div className="px-3 py-3 text-xs text-slate-500">当前暂无额外建议。</div>
       ) : (
         <div className="space-y-2">
           {items.map((item, index) => (
-            <div key={`${index}-${item}`} className="gshark-soft-fill px-3 py-3 text-xs leading-5 text-slate-700">
+            <div key={`${index}-${item}`} className="meow-soft-fill px-3 py-3 text-xs leading-5 text-slate-700">
               {item}
             </div>
           ))}

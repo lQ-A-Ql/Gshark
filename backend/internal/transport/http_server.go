@@ -36,7 +36,7 @@ type event struct {
 const (
 	clientEventBufferSize   = 1024
 	maxStreamDecodeBodySize = 1 << 20 // 1MB
-	miscPackageDirEnvVar    = "GSHARK_MISC_PACKAGE_DIR"
+	miscPackageDirEnvVar    = "MEOW_TRAFFIC_MISC_PACKAGE_DIR"
 )
 
 var runtimeIdentityStartedAt = time.Now().UTC().Format(time.RFC3339)
@@ -138,9 +138,9 @@ func resolveMiscPackageDir(override string) string {
 		return trimmed
 	}
 	if configDir, err := os.UserConfigDir(); err == nil && strings.TrimSpace(configDir) != "" {
-		return filepath.Join(configDir, "gshark-sentinel", "plugins", "misc")
+		return filepath.Join(configDir, "meow-traffic", "plugins", "misc")
 	}
-	return filepath.Join(os.TempDir(), "gshark-sentinel", "plugins", "misc")
+	return filepath.Join(os.TempDir(), "meow-traffic", "plugins", "misc")
 }
 
 func (s *Server) SetAuthToken(token string) {
@@ -239,12 +239,12 @@ func (s *Server) handleRuntimeIdentity(w http.ResponseWriter, _ *http.Request) {
 	if miscPackageDir == "" {
 		miscPackageDir = resolveMiscPackageDir("")
 	}
-	buildID := strings.TrimSpace(os.Getenv("GSHARK_BACKEND_BUILD_ID"))
+	buildID := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_BACKEND_BUILD_ID"))
 	if buildID == "" {
 		buildID = "dev"
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"service":          "gshark-sentinel",
+		"service":          "meow-traffic",
 		"version":          "dev",
 		"build_commit":     "",
 		"auth_enabled":     authEnabled,
@@ -1033,7 +1033,7 @@ func withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-GShark-Auth")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Meow-Traffic-Auth")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
@@ -1062,7 +1062,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			candidate = strings.TrimSpace(candidate[7:])
 		}
 		if candidate == "" {
-			candidate = strings.TrimSpace(r.Header.Get("X-GShark-Auth"))
+			candidate = strings.TrimSpace(r.Header.Get("X-Meow-Traffic-Auth"))
 		}
 		if candidate != token {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
@@ -1127,7 +1127,7 @@ func writeError(w http.ResponseWriter, code int, message string) {
 
 var sensitivePathPrefixes = []string{
 	os.TempDir(),
-	filepath.Join("gshark-sentinel"),
+	filepath.Join("meow-traffic"),
 	"/tmp/",
 	"/var/",
 	"C:\\Users\\",

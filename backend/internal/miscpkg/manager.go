@@ -28,7 +28,7 @@ var (
 	moduleExportStripRE = regexp.MustCompile(`(?m)^\s*export\s+`)
 )
 
-const pythonHostBridgeModuleName = "gshark_misc_host"
+const pythonHostBridgeModuleName = "MEOW_TRAFFIC_misc_host"
 
 const (
 	maxModuleZipFiles      = 128
@@ -42,7 +42,7 @@ const pythonHostBridgeSource = `import json
 import os
 import sys
 
-_INPUT = json.loads(os.environ.get("GSHARK_MISC_INPUT_JSON", "{}"))
+_INPUT = json.loads(os.environ.get("MEOW_TRAFFIC_MISC_INPUT_JSON", "{}"))
 _REQ_ID = 0
 
 def get_input():
@@ -623,7 +623,7 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 		bin = "python"
 	}
 
-	helperDir, err := os.MkdirTemp("", "gshark-misc-host-*")
+	helperDir, err := os.MkdirTemp("", "meow-traffic-misc-host-*")
 	if err != nil {
 		return nil, err
 	}
@@ -656,7 +656,7 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 		return nil, err
 	}
 	cmd.Env = append(os.Environ(),
-		"GSHARK_MISC_INPUT_JSON="+string(inputJSON),
+		"MEOW_TRAFFIC_MISC_INPUT_JSON="+string(inputJSON),
 		"PYTHONIOENCODING=utf-8",
 		"PYTHONPATH="+joinPythonPath(helperDir, os.Getenv("PYTHONPATH")),
 	)

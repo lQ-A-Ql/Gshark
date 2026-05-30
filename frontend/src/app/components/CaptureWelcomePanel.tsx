@@ -36,11 +36,11 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
   };
 
   return (
-    <div className="gshark-page-bg flex h-full min-h-0 flex-col overflow-auto p-3 text-foreground sm:p-4">
-      <section className="gshark-aurora-surface flex min-h-0 flex-1 overflow-hidden">
+    <div className="meow-page-bg flex h-full min-h-0 flex-col overflow-auto p-3 text-foreground sm:p-4">
+      <section className="meow-aurora-surface flex min-h-0 flex-1 overflow-hidden">
         <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_380px]">
           <div className="relative p-8 lg:min-h-0 lg:overflow-hidden">
-            <div className="gshark-diffuse-chip mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
+            <div className="meow-diffuse-chip mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-blue-700">
               <Radar className="h-3.5 w-3.5" />
               MEOW~TRAFFIC QUICK START
             </div>
@@ -62,12 +62,12 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                 autoCapitalize="none"
                 spellCheck={false}
                 placeholder="直接输入 PCAP / PCAPNG 绝对路径"
-                className="gshark-field h-12 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400"
+                className="meow-field h-12 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400"
               />
               <button
                 onClick={() => void handleOpenCapture()}
                 disabled={captureActionsDisabled}
-                className="gshark-control-primary inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                className="meow-control-primary inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FolderOpen className="h-4 w-4" />
                 选择文件
@@ -75,7 +75,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               <button
                 onClick={() => void handleOpenCapture(capturePath.trim())}
                 disabled={captureActionsDisabled || !capturePath.trim()}
-                className="gshark-control inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium text-slate-700 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                className="meow-control inline-flex h-12 items-center justify-center gap-2 px-5 text-sm font-medium text-slate-700 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FolderOpen className="h-4 w-4" />
                 路径打开
@@ -105,13 +105,13 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               <img
                 src={logoImg}
                 alt="meow~traffic Background"
-                className="gshark-brand-mark w-full max-w-[440px] object-contain"
+                className="meow-brand-mark w-full max-w-[440px] object-contain"
               />
             </div>
           </div>
 
           <div className="flex min-h-0 flex-col p-8">
-            <div className="gshark-aurora-surface p-5">
+            <div className="meow-aurora-surface p-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ENGINE STATUS</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
                 <span
@@ -127,9 +127,9 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                   ? `tshark 已就绪: ${tsharkStatus.path || "tshark"}`
                   : tsharkStatus.message || "等待配置 tshark"}
               </div>
-              <div className="gshark-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-slate-600">{backendStatus}</div>
+              <div className="meow-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-slate-600">{backendStatus}</div>
               {captureTransaction.phase === "failed" && !captureTransaction.hasActiveCapture && (
-                <div className="gshark-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-amber-900">
+                <div className="meow-soft-fill mt-3 px-4 py-3 text-xs leading-5 text-amber-900">
                   <div className="font-semibold">
                     {captureTransaction.reason === "open_failed" ? "抓包打开失败" : "抓包预加载失败"}
                   </div>
@@ -138,7 +138,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               )}
             </div>
 
-            <div className="gshark-aurora-surface mt-5 flex min-h-0 flex-1 flex-col p-5">
+            <div className="meow-aurora-surface mt-5 flex min-h-0 flex-1 flex-col p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RECENT FILES</div>
@@ -159,7 +159,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
                         key={item.path}
                         onClick={() => void handleOpenCapture(item.path)}
                         disabled={captureActionsDisabled}
-                        className="gshark-control-ghost w-full px-4 py-3 text-left transition-all hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="meow-control-ghost w-full px-4 py-3 text-left transition-all hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <div className="truncate text-sm font-medium text-slate-900">
                           {item.name || item.path.split(/[\\/]/).pop() || item.path}
@@ -184,7 +184,7 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
 
 function GuideCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="gshark-inset-halo px-4 py-4">
+    <div className="meow-inset-halo px-4 py-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         {icon}
         {title}

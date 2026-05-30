@@ -97,7 +97,7 @@ foreach ($sample in $manifest.samples) {
             continue
         }
 
-        $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) ("gshark-threat-" + [Guid]::NewGuid().ToString() + $sourceExt)
+        $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) ("meow-traffic-threat-" + [Guid]::NewGuid().ToString() + $sourceExt)
         Invoke-WebRequest -UseBasicParsing -Uri $sample.sourceUrl -OutFile $tempFile -TimeoutSec 180
         $tempInfo = Get-Item -LiteralPath $tempFile
         if ($tempInfo.Length -gt $MaxBytes) {
@@ -128,7 +128,7 @@ foreach ($sample in $manifest.samples) {
             if ($entryNames.Count -ne 1) {
                 throw "expected exactly one PCAP entry, got $($entryNames.Count)"
             }
-            $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("gshark-threat-extract-" + [Guid]::NewGuid().ToString())
+            $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("meow-traffic-threat-extract-" + [Guid]::NewGuid().ToString())
             New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
             & 7z x "-p$($sample.archivePassword)" "-o$extractDir" -y $tempFile | Out-Null
             if ($LASTEXITCODE -ne 0) {

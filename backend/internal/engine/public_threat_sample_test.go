@@ -94,7 +94,7 @@ func TestThreatSampleCSDecryptWhenRawKeyPresent(t *testing.T) {
 	}
 	rawKey := strings.TrimSpace(cs.KnownKeys["aes_rand"])
 	if rawKey == "" {
-		rawKey = strings.TrimSpace(os.Getenv("GSHARK_SAMPLE_CS_AES_RAND"))
+		rawKey = strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_SAMPLE_CS_AES_RAND"))
 	}
 	if rawKey == "" {
 		t.Skip("no raw key available for public CS sample")

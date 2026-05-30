@@ -12,7 +12,7 @@ export function CaptureQuickFiltersPanel({ quickFilters, onApplyFilter }: Captur
   }
 
   return (
-    <div className="gshark-tile-toolbar gshark-workbench-panel mt-4 p-3.5">
+    <div className="meow-tile-toolbar meow-workbench-panel mt-4 p-3.5">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         <Filter className="h-4 w-4 text-blue-600" />
         推荐过滤器
@@ -22,7 +22,7 @@ export function CaptureQuickFiltersPanel({ quickFilters, onApplyFilter }: Captur
           <button
             key={`${item.label}-${item.filter}`}
             onClick={() => onApplyFilter(item.filter)}
-            className="gshark-control inline-flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition-all hover:text-blue-700"
+            className="meow-control inline-flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition-all hover:text-blue-700"
             title={item.reason}
           >
             <span className="font-medium">{item.label}</span>

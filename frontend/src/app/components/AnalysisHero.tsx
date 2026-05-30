@@ -86,7 +86,7 @@ export function AnalysisHero({
 
   return (
     <section
-      className={cn("gshark-forensic-scan overflow-hidden", isTile ? "gshark-tile gshark-tile-strong" : "gshark-tile")}
+      className={cn("meow-forensic-scan overflow-hidden", isTile ? "meow-tile meow-tile-strong" : "meow-tile")}
     >
       <div className="pointer-events-none h-px w-full bg-slate-200" />
       <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
@@ -94,7 +94,7 @@ export function AnalysisHero({
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <div
               className={cn(
-                "gshark-soft-fill gshark-evidence-accent flex h-10 w-10 shrink-0 items-center justify-center border",
+                "meow-soft-fill meow-evidence-accent flex h-10 w-10 shrink-0 items-center justify-center border",
                 isTile ? "rounded-sm" : "rounded-none",
                 themeConfig.iconWrap,
                 themeConfig.iconText,
@@ -125,7 +125,7 @@ export function AnalysisHero({
                     <span
                       key={tag}
                       className={cn(
-                        "gshark-diffuse-chip px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                        "meow-diffuse-chip px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
                         isTile ? "rounded-sm" : "rounded-none",
                         themeConfig.badgeStyle,
                       )}
@@ -143,7 +143,7 @@ export function AnalysisHero({
                   type="button"
                   onClick={onRefresh}
                   className={cn(
-                    "gshark-diffuse-chip inline-flex h-9 items-center gap-2 px-3 text-xs font-semibold transition-all active:scale-[0.98]",
+                    "meow-diffuse-chip inline-flex h-9 items-center gap-2 px-3 text-xs font-semibold transition-all active:scale-[0.98]",
                     isTile ? "rounded-sm" : "rounded-none",
                     themeConfig.action,
                   )}

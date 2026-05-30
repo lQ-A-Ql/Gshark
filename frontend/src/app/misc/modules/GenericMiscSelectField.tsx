@@ -2,7 +2,7 @@ import { SelectField, type SelectOption } from "../../components/ui/select";
 import type { MiscModuleFormField } from "../../core/types";
 
 export const miscFieldSurfaceClass =
-  "gshark-field text-slate-900 transition-all placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60";
+  "meow-field text-slate-900 transition-all placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface GenericMiscSelectFieldProps {
   field: MiscModuleFormField;

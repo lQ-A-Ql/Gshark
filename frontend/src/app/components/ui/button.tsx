@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "gshark-control-primary",
+        default: "meow-control-primary",
         destructive:
-          "gshark-control border-rose-300/18 bg-rose-500/58 text-white hover:border-rose-300/30 hover:bg-rose-500/68 focus-visible:ring-rose-200/35",
-        outline: "gshark-control text-foreground hover:text-accent-foreground",
-        secondary: "gshark-control text-secondary-foreground hover:text-slate-900",
-        ghost: "gshark-control-ghost hover:text-accent-foreground",
+          "meow-control border-rose-300/18 bg-rose-500/58 text-white hover:border-rose-300/30 hover:bg-rose-500/68 focus-visible:ring-rose-200/35",
+        outline: "meow-control text-foreground hover:text-accent-foreground",
+        secondary: "meow-control text-secondary-foreground hover:text-slate-900",
+        ghost: "meow-control-ghost hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

@@ -17,7 +17,7 @@ function writePackageJson(frontendRoot, packageManager) {
 
 describe("check-package-manager script", () => {
   it("accepts a pnpm-managed frontend workspace", () => {
-    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "gshark-package-manager-check-"));
+    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-package-manager-check-"));
     const frontendRoot = resolve(workspaceRoot, "frontend");
     mkdirSync(frontendRoot, { recursive: true });
     writePackageJson(frontendRoot, "pnpm@10.31.0");
@@ -27,7 +27,7 @@ describe("check-package-manager script", () => {
   });
 
   it("rejects missing pnpm metadata and unsupported lockfiles", () => {
-    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "gshark-package-manager-check-"));
+    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-package-manager-check-"));
     const frontendRoot = resolve(workspaceRoot, "frontend");
     mkdirSync(frontendRoot, { recursive: true });
     writePackageJson(frontendRoot, "npm@11.0.0");

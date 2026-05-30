@@ -22,7 +22,7 @@ export function EvidenceSeveritySummary({
           type="button"
           onClick={() => onSeverityFilterChange(severityFilter === severity ? "all" : severity)}
           className={cn(
-            "gshark-control px-3 py-1 text-[11px] font-medium transition-all",
+            "meow-control px-3 py-1 text-[11px] font-medium transition-all",
             severityFilter === severity ? severityActiveStyle(severity) : "text-slate-600 hover:text-indigo-700",
           )}
         >
@@ -55,8 +55,8 @@ export function EvidenceToolbar({
   onToggleModule,
 }: EvidenceToolbarProps) {
   return (
-    <div className="gshark-tile-toolbar flex flex-wrap items-center gap-2.5 px-3 py-2.5">
-      <div className="gshark-field flex items-center gap-2 px-2 py-1">
+    <div className="meow-tile-toolbar flex flex-wrap items-center gap-2.5 px-3 py-2.5">
+      <div className="meow-field flex items-center gap-2 px-2 py-1">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
           value={query}
@@ -101,7 +101,7 @@ function EvidenceModuleButton({ active, label, module, onToggle }: EvidenceModul
       type="button"
       onClick={() => onToggle(module)}
       className={cn(
-        "gshark-control px-2.5 py-1 text-[11px] font-medium transition-all",
+        "meow-control px-2.5 py-1 text-[11px] font-medium transition-all",
         active ? "border-indigo-200 bg-indigo-100 text-indigo-700" : "text-slate-500 hover:text-indigo-700",
       )}
     >
@@ -120,7 +120,7 @@ function ExportButton({ label, onClick }: ExportButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className="gshark-control flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors"
+      className="meow-control flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors"
     >
       <Download className="h-3 w-3" /> {label}
     </button>

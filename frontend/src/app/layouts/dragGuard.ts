@@ -5,7 +5,7 @@ export type BrowserDragEventLike = {
 };
 
 function isExplicitDropZone(target: EventTarget | null | undefined) {
-  return target instanceof Element && Boolean(target.closest("[data-gshark-drop-zone='true']"));
+  return target instanceof Element && Boolean(target.closest("[data-meow-traffic-drop-zone='true']"));
 }
 
 export function preventBrowserPageDrag(event: BrowserDragEventLike) {

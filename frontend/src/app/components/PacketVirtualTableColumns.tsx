@@ -10,7 +10,7 @@ export interface ColumnSpec {
   visible: boolean;
 }
 
-const COLUMN_STORAGE_KEY = "gshark.packet-table.columns.v1";
+const COLUMN_STORAGE_KEY = "meow-traffic.packet-table.columns.v1";
 
 export const DEFAULT_COLUMNS: ColumnSpec[] = [
   { id: "id", label: "No.", width: 72, visible: true },

@@ -356,7 +356,7 @@ describe("useBackendLifecycle", () => {
       yaraTimeoutMs: 25000,
     });
     const getItemSpy = vi.spyOn(window.localStorage, "getItem").mockImplementation((key: string) => {
-      return key === "gshark.tool-runtime.v1" ? storedConfig : null;
+      return key === "meow-traffic.tool-runtime.v1" ? storedConfig : null;
     });
     const syncedSnapshot = createToolRuntimeSnapshot();
     syncedSnapshot.config.tsharkPath = "C:/Saved/tshark.exe";
@@ -465,7 +465,7 @@ describe("useBackendLifecycle", () => {
 
   it("migrates legacy all-empty runtime storage without clearing backend env config", async () => {
     installRuntimeLocalStorage();
-    window.localStorage.setItem("gshark.tool-runtime.v1", JSON.stringify(createToolRuntimeSnapshot().config));
+    window.localStorage.setItem("meow-traffic.tool-runtime.v1", JSON.stringify(createToolRuntimeSnapshot().config));
     const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
     bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
 
@@ -488,7 +488,7 @@ describe("useBackendLifecycle", () => {
 
   it("merges legacy tshark storage with the backend env config during startup sync", async () => {
     installRuntimeLocalStorage();
-    window.localStorage.setItem("gshark.tshark-path.v1", "C:/Legacy/tshark.exe");
+    window.localStorage.setItem("meow-traffic.tshark-path.v1", "C:/Legacy/tshark.exe");
     const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
     bridgeMocks.getToolRuntimeSnapshot.mockResolvedValue(envSnapshot);
     bridgeMocks.updateToolRuntimeConfig.mockResolvedValue({
@@ -533,7 +533,7 @@ describe("useBackendLifecycle", () => {
   it("lets a stored complete runtime config override backend env config", async () => {
     installRuntimeLocalStorage();
     window.localStorage.setItem(
-      "gshark.tool-runtime.v1",
+      "meow-traffic.tool-runtime.v1",
       JSON.stringify({
         tsharkPath: "C:/Stored/tshark.exe",
         ffmpegPath: "C:/Stored/ffmpeg.exe",
@@ -580,7 +580,7 @@ describe("useBackendLifecycle", () => {
     installRuntimeLocalStorage();
     const envSnapshot = createEnvConfiguredToolRuntimeSnapshot();
     window.localStorage.setItem(
-      "gshark.tool-runtime.v1",
+      "meow-traffic.tool-runtime.v1",
       JSON.stringify({
         version: 2,
         source: "stored-runtime-config",
@@ -646,7 +646,7 @@ describe("useBackendLifecycle", () => {
       expect.any(AbortSignal),
       "fast",
     );
-    const stored = JSON.parse(window.localStorage.getItem("gshark.tool-runtime.v1") || "{}");
+    const stored = JSON.parse(window.localStorage.getItem("meow-traffic.tool-runtime.v1") || "{}");
     expect(stored.source).toBe("stored-runtime-config");
     expect(stored.explicitFields).toEqual({ ffmpegPath: true });
     unmount();
@@ -781,7 +781,7 @@ describe("useBackendLifecycle", () => {
 
   it("keeps backend MCP status authoritative when stale local storage differs", async () => {
     installRuntimeLocalStorage();
-    window.localStorage.setItem("gshark.mcp-config.v1", JSON.stringify({ enabled: true }));
+    window.localStorage.setItem("meow-traffic.mcp-config.v1", JSON.stringify({ enabled: true }));
     bridgeMocks.getMCPStatus.mockResolvedValue(createMCPStatus(false));
     bridgeMocks.updateMCPConfig.mockResolvedValue(createMCPStatus(true));
 
@@ -792,7 +792,7 @@ describe("useBackendLifecycle", () => {
     });
     expect(bridgeMocks.updateMCPConfig).not.toHaveBeenCalled();
     expect(result.current.mcpStatus).toEqual(createMCPStatus(false));
-    expect(window.localStorage.getItem("gshark.mcp-config.v1")).toBe(JSON.stringify({ enabled: true }));
+    expect(window.localStorage.getItem("meow-traffic.mcp-config.v1")).toBe(JSON.stringify({ enabled: true }));
 
     unmount();
   });

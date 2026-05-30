@@ -67,7 +67,7 @@ export function MySQLSessionAnalysisModule({ module, surfaceVariant = "card" }: 
 
   return (
     <MiscModuleSurface module={module} embedded={embedded} icon={<Database className="h-4 w-4" />} tone="emerald">
-      <div className="gshark-tile-toolbar flex flex-wrap gap-2 border-emerald-100 bg-emerald-50/50 p-4 text-[11px]">
+      <div className="meow-tile-toolbar flex flex-wrap gap-2 border-emerald-100 bg-emerald-50/50 p-4 text-[11px]">
         <MetaChip label="抓包" value={hasCapture ? fileMeta.name : "未加载"} color={hasCapture ? "sky" : "slate"} />
         <MetaChip label="会话" value={analysis.sessionCount} color="slate" />
         <MetaChip label="登录" value={analysis.loginCount} color={analysis.loginCount > 0 ? "emerald" : "slate"} />

@@ -10,14 +10,14 @@ interface MySQLSessionListProps {
 
 export function MySQLSessionList({ sessions, selectedStreamId, hasCapture, onSelectSession }: MySQLSessionListProps) {
   return (
-    <div className="gshark-tile border-slate-200 bg-slate-50/60 p-3">
+    <div className="meow-tile border-slate-200 bg-slate-50/60 p-3">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-800">MySQL 会话列表</div>
         <div className="text-[11px] text-slate-500">{sessions.length} 条</div>
       </div>
       <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
         {sessions.length === 0 ? (
-          <div className="gshark-tile border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[13px] text-slate-500">
+          <div className="meow-tile border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[13px] text-slate-500">
             {hasCapture ? "当前筛选下没有匹配的 MySQL 会话" : "未加载抓包"}
           </div>
         ) : (

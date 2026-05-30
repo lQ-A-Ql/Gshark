@@ -104,8 +104,8 @@ export default function Workspace() {
       filterInputRef.current?.select();
     };
 
-    window.addEventListener("gshark:focus-filter", handler);
-    return () => window.removeEventListener("gshark:focus-filter", handler);
+    window.addEventListener("meow:focus-filter", handler);
+    return () => window.removeEventListener("meow:focus-filter", handler);
   }, []);
 
   const hasOpenedCapture = Boolean(fileMeta.path);
@@ -139,14 +139,14 @@ export default function Workspace() {
   }
 
   return (
-    <div className="gshark-tile-page flex h-full flex-col overflow-hidden text-sm text-foreground">
+    <div className="meow-tile-page flex h-full flex-col overflow-hidden text-sm text-foreground">
       <WorkbenchTitleBar
         title="流量工作区"
         subtitle={
           fileMeta.path ? `${fileMeta.name} · ${totalPackets.toLocaleString()} packets` : "打开 PCAP/PCAPNG 后开始分析"
         }
         icon={<Network className="h-4 w-4 text-blue-600" />}
-        className="gshark-tile-header border-blue-100"
+        className="meow-tile-header border-blue-100"
         actions={
           <WorkspaceTitleActions
             capturePath={capturePath}

@@ -45,7 +45,7 @@ func (s *Service) buildYaraScanTargetsWithContext(ctx context.Context, objects [
 		return targets, func() {}, err
 	}
 
-	tempDir, err := os.MkdirTemp("", "gshark-yara-streams-")
+	tempDir, err := os.MkdirTemp("", "meow-traffic-yara-streams-")
 	if err != nil {
 		return targets, func() {}, err
 	}

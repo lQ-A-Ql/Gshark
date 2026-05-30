@@ -644,9 +644,9 @@ func TestUSBHIDSourceModeRejectsUnknownValue(t *testing.T) {
 }
 
 func TestUSBMouseTrafficSampleRegression(t *testing.T) {
-	sample := os.Getenv("GSHARK_USB_MOUSE_SAMPLE")
+	sample := os.Getenv("MEOW_TRAFFIC_USB_MOUSE_SAMPLE")
 	if strings.TrimSpace(sample) == "" {
-		t.Skip("set GSHARK_USB_MOUSE_SAMPLE to run local mouse traffic regression")
+		t.Skip("set MEOW_TRAFFIC_USB_MOUSE_SAMPLE to run local mouse traffic regression")
 	}
 
 	analysis, err := BuildUSBAnalysisFromFile(sample)

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	realSampleOptInEnv            = "GSHARK_ENABLE_REAL_SAMPLE_TESTS"
+	realSampleOptInEnv            = "MEOW_TRAFFIC_ENABLE_REAL_SAMPLE_TESTS"
 	realSampleCS                  = `C:\Users\QAQ\Downloads\cs流量分析.pcapng`
 	realSampleVShell              = `C:\Users\QAQ\Desktop\贺春\hard_pcap\attch.pcapng`
 	realSampleWebShellBehinder    = `C:\Users\QAQ\Desktop\gshark\bx3base.pcap`
@@ -34,7 +34,7 @@ func requireRealSampleRegression(t *testing.T) {
 }
 
 func TestRealSampleCSBuildsC2Evidence(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_CS", realSampleCS)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_CS", realSampleCS)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -67,11 +67,11 @@ func TestRealSampleCSBuildsC2Evidence(t *testing.T) {
 }
 
 func TestRealSampleCSDecryptsWithKnownRawKey(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_CS", realSampleCS)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_CS", realSampleCS)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	rawKey := strings.TrimSpace(os.Getenv("GSHARK_SAMPLE_CS_AES_RAND"))
+	rawKey := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_SAMPLE_CS_AES_RAND"))
 	if rawKey == "" {
 		rawKey = realSampleCSRawKey
 	}
@@ -95,7 +95,7 @@ func TestRealSampleCSDecryptsWithKnownRawKey(t *testing.T) {
 }
 
 func TestRealSampleCSExplainsMetadataWithoutRawKey(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_CS", realSampleCS)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_CS", realSampleCS)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -116,7 +116,7 @@ func TestRealSampleCSExplainsMetadataWithoutRawKey(t *testing.T) {
 }
 
 func TestRealSampleVShellDecryptsTargetPlaintext(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_VSHELL", realSampleVShell)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_VSHELL", realSampleVShell)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -151,21 +151,21 @@ func TestRealSampleWebShellSourceHints(t *testing.T) {
 	}{
 		{
 			name:           "behinder",
-			env:            "GSHARK_SAMPLE_WEBSHELL_BEHINDER",
+			env:            "MEOW_TRAFFIC_SAMPLE_WEBSHELL_BEHINDER",
 			fallback:       realSampleWebShellBehinder,
 			familyNeedles:  []string{"aes_webshell_like", "behinder"},
 			decoderNeedles: []string{"behinder"},
 		},
 		{
 			name:           "godzilla",
-			env:            "GSHARK_SAMPLE_WEBSHELL_GODZILLA",
+			env:            "MEOW_TRAFFIC_SAMPLE_WEBSHELL_GODZILLA",
 			fallback:       realSampleWebShellGodzilla,
 			familyNeedles:  []string{"godzilla_like"},
 			decoderNeedles: []string{"godzilla"},
 		},
 		{
 			name:           "antsword",
-			env:            "GSHARK_SAMPLE_WEBSHELL_ANTSWORD",
+			env:            "MEOW_TRAFFIC_SAMPLE_WEBSHELL_ANTSWORD",
 			fallback:       realSampleWebShellAntSword,
 			familyNeedles:  []string{"antsword_like"},
 			decoderNeedles: []string{"antsword"},
@@ -193,7 +193,7 @@ func TestRealSampleWebShellSourceHints(t *testing.T) {
 }
 
 func TestRealSampleModbusIndustrialEvidence(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_INDUSTRIAL_MODBUS", realSampleIndustrialModbus)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_INDUSTRIAL_MODBUS", realSampleIndustrialModbus)
 
 	analysis, err := svc.IndustrialAnalysis()
 	if err != nil {
@@ -230,7 +230,7 @@ func TestRealSampleModbusIndustrialEvidence(t *testing.T) {
 }
 
 func TestRealSampleCANVehicleBaselineDoesNotEmitFalseHighUDS(t *testing.T) {
-	svc := loadRealSample(t, "GSHARK_SAMPLE_VEHICLE_CAN", realSampleVehicleCAN)
+	svc := loadRealSample(t, "MEOW_TRAFFIC_SAMPLE_VEHICLE_CAN", realSampleVehicleCAN)
 
 	analysis, err := svc.VehicleAnalysis()
 	if err != nil {

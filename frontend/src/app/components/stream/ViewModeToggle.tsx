@@ -16,12 +16,12 @@ export function ViewModeToggle<T extends string>({
   return (
     <div
       className={cn(
-        "gshark-stream-control-cluster flex flex-wrap items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground",
+        "meow-stream-control-cluster flex flex-wrap items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground",
         className,
       )}
     >
       <span className="px-1 text-[11px]">{label}:</span>
-      <div className="gshark-stream-segment flex p-0.5">
+      <div className="meow-stream-segment flex p-0.5">
         {options.map((option) => (
           <button
             key={option.value}
@@ -30,7 +30,7 @@ export function ViewModeToggle<T extends string>({
             className={cn(
               "rounded-sm px-2.5 py-0.5 text-[11px] transition-colors",
               value === option.value
-                ? "gshark-control-primary font-semibold"
+                ? "meow-control-primary font-semibold"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

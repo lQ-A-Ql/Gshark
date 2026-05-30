@@ -13,7 +13,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 
 describe("check-client-any script", () => {
   it("reports raw any in production client files", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-client-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-client-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/clients/badClient.ts",
@@ -35,7 +35,7 @@ describe("check-client-any script", () => {
   });
 
   it("passes client files that use unknown parser inputs and explicit DTOs", () => {
-    const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-client-any-check-"));
+    const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-client-any-check-"));
     writeFixtureFile(
       frontendRoot,
       "src/app/integrations/clients/goodClient.ts",

@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	ffmpegEnvVar    = "GSHARK_FFMPEG"
-	pythonEnvVar    = "GSHARK_PYTHON"
-	voskModelEnvVar = "GSHARK_VOSK_MODEL"
+	ffmpegEnvVar    = "MEOW_TRAFFIC_FFMPEG"
+	pythonEnvVar    = "MEOW_TRAFFIC_PYTHON"
+	voskModelEnvVar = "MEOW_TRAFFIC_VOSK_MODEL"
 )
 
 const (

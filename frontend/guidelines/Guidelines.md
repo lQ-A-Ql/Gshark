@@ -12,15 +12,15 @@ meow~traffic is a dense security traffic investigation workbench. The UI should 
 
 ## Surface Roles
 
-- Page shell: `gshark-page-bg`, `gshark-glass-shell`, and `gshark-theme-main` belong to the app layout.
+- Page shell: `meow-page-bg`, `meow-glass-shell`, and `meow-theme-main` belong to the app layout.
 - Page content: use `PageShell` with tiled layout for normal analysis pages.
-- Region/container: use `gshark-tile`, `gshark-tile-grid`, `gshark-tile-header`, `gshark-tile-toolbar`, or `gshark-tile-table`.
-- Soft inner emphasis: use `gshark-soft-fill`.
-- Chips and small labels: use `gshark-diffuse-chip` or `AnalysisBadge`.
-- Buttons and icon controls: use shared `Button` or `gshark-control`, `gshark-control-primary`, `gshark-control-ghost`.
-- Inputs/selects/forms: use shared `Input`, `Select`, `gshark-field`, or `gshark-form-surface`.
-- Status: use `StatusHint`, `gshark-status-dot`, `gshark-risk-accent`, and `gshark-evidence-accent`.
-- Stream pages: keep their dedicated workbench structure; only sync controls with `gshark-stream-control-cluster`, `gshark-stream-segment`, and `gshark-stream-value`.
+- Region/container: use `meow-tile`, `meow-tile-grid`, `meow-tile-header`, `meow-tile-toolbar`, or `meow-tile-table`.
+- Soft inner emphasis: use `meow-soft-fill`.
+- Chips and small labels: use `meow-diffuse-chip` or `AnalysisBadge`.
+- Buttons and icon controls: use shared `Button` or `meow-control`, `meow-control-primary`, `meow-control-ghost`.
+- Inputs/selects/forms: use shared `Input`, `Select`, `meow-field`, or `meow-form-surface`.
+- Status: use `StatusHint`, `meow-status-dot`, `meow-risk-accent`, and `meow-evidence-accent`.
+- Stream pages: keep their dedicated workbench structure; only sync controls with `meow-stream-control-cluster`, `meow-stream-segment`, and `meow-stream-value`.
 
 ## Avoid
 

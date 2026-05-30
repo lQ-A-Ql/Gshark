@@ -2,7 +2,7 @@
 
 meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、协议研究和危险应用分析场景的桌面端离线流量分析工具。项目以 `tshark` 为解析核心，前端提供高信息密度的分析工作区与专项页面，后端负责抓包加载、分页、流重组、对象提取、协议专项分析、威胁狩猎和 MISC 模块执行。
 
-> 品牌已更名为 `meow~traffic`；为保持兼容，仓库、Go module path、`GSHARK_*` 环境变量、`gshark-sentinel` 目录名、`gshark:*` 事件名和 `sentinel-backend.exe` 等内部标识仍暂时保留旧名。
+> 品牌已更名为 `meow~traffic`；为保持兼容，仓库、Go module path、`MEOW_TRAFFIC_*` 环境变量、`meow-traffic` 目录名、`meow-traffic:*` 事件名和 `sentinel-backend.exe` 等内部标识仍暂时保留旧名。
 
 ## 核心特性
 
@@ -143,10 +143,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 
 - 如果系统 `PATH` 中找不到 `tshark`，应用启动后会要求填写 `tshark.exe` 路径或 Wireshark 安装目录。
 - 如果 `PATH` 中已有可用 `tshark`，应用会直接使用。
-- 后端进程会读取 `GSHARK_FFMPEG`、`GSHARK_PYTHON`、`GSHARK_VOSK_MODEL` 作为 FFmpeg、Python 与 Vosk 模型目录的显式配置；这些值会显示在运行时组件设置的“显式配置”输入框中。
+- 后端进程会读取 `MEOW_TRAFFIC_FFMPEG`、`MEOW_TRAFFIC_PYTHON`、`MEOW_TRAFFIC_VOSK_MODEL` 作为 FFmpeg、Python 与 Vosk 模型目录的显式配置；这些值会显示在运行时组件设置的“显式配置”输入框中。
 - 运行时组件设置里的输入框为空，不等于组件不可用。输入框代表用户固定保存的显式路径；下方状态卡显示后端从环境变量、`PATH` 或默认目录探测到的当前实际路径。
-- 保存空的 FFmpeg / Python / Vosk 字段会清除当前后端进程中的对应 `GSHARK_*` 显式配置，随后回到 `PATH` 或默认目录探测。
-- 旧版前端可能留下全空的运行时配置缓存；新版启动会把这类缓存迁移为“自动观测配置”，不会再用空值覆盖后端进程已经读取到的 `GSHARK_*` 环境变量。只有用户在设置侧栏点击“保存并应用”的字段才会作为显式配置写回后端。
+- 保存空的 FFmpeg / Python / Vosk 字段会清除当前后端进程中的对应 `MEOW_TRAFFIC_*` 显式配置，随后回到 `PATH` 或默认目录探测。
+- 旧版前端可能留下全空的运行时配置缓存；新版启动会把这类缓存迁移为“自动观测配置”，不会再用空值覆盖后端进程已经读取到的 `MEOW_TRAFFIC_*` 环境变量。只有用户在设置侧栏点击“保存并应用”的字段才会作为显式配置写回后端。
 - `tshark` 能力探测中出现 `profile=compat` 或缺少可选字段时，表示部分专项分析降级，不表示 `tshark` 不可用。4.6.5 中 USB Mass Storage SCSI opcode 使用 `scsi.spc.opcode`，后端会兼容旧请求名 `usbms.scsi.opcode`。抓包入口只以 `tshark.available` 作为可用判断。
 - 语音转写状态会拆分显示 Python、`vosk` 包、Vosk 模型目录和 FFmpeg。Python 已就绪但默认模型目录不存在时，`speech.available=false` 是模型缺失，不是 Python 不可读。
 - Wails 配置默认使用 `pnpm install` 和 `pnpm run build:wails`。
@@ -169,7 +169,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 
 - 项目当前是桌面端优先工作流。
 - `scripts/start-dev.ps1` 会委托给 `scripts/start-wails-dev.ps1`。
-- `start-wails-dev.ps1` 默认会清理旧的内嵌后端缓存：`frontend/dist/sentinel-backend.exe`、`build/bin/sentinel-backend.exe` 和 `%TEMP%\gshark-sentinel\backend`，避免 Wails dev 复用过期后端。需要跳过清理时可传 `-NoClean`；怀疑 Go 构建缓存命中旧产物时可额外传 `-CleanGoCache`。
+- `start-wails-dev.ps1` 默认会清理旧的内嵌后端缓存：`frontend/dist/sentinel-backend.exe`、`build/bin/sentinel-backend.exe` 和 `%TEMP%\meow-traffic\backend`，避免 Wails dev 复用过期后端。需要跳过清理时可传 `-NoClean`；怀疑 Go 构建缓存命中旧产物时可额外传 `-CleanGoCache`。
 - Wails 桌面环境的运行时组件探测优先走 Wails IPC 代理；HTTP 只作为普通浏览器模式或 Wails binding 不存在时的 fallback。这样可以避免“后端已连接，但 `/api/tools/runtime-config` 因 token、origin 或端口复用失败导致设置页全是未检测”的链路分裂。
 - 启动页和运行时组件设置都提供“重新探测工具”，用于重新读取 TShark、FFmpeg、Python/Vosk 与 YARA 状态。运行时探测分为快速状态和完整能力探测：启动时先读取 `probe=fast`，只确认路径、解释器和模型目录等低成本状态；随后后台执行 `probe=full`，再补齐 TShark 字段能力、Python `vosk` 包和 YARA 规则包等慢探测。设置页会显示最近一次探测链路（Wails IPC / HTTP fallback）、探测模式、组件耗时和失败原因。
 - `/api/tools/runtime-config` 默认保持完整探测；前端启动和手动刷新会显式请求 `?probe=fast`，避免 3500ms 启动预算被 TShark `-G fields` 或 Python `import vosk` 等慢探测拖成“工具不可读”。Wails IPC 快速探测若 2 秒内没有返回，会自动尝试 HTTP fast fallback，并保留原始 IPC 超时原因。
@@ -179,7 +179,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-wails-dev.ps1
 - 预加载诊断中的 `page=0/0 status=-` 表示前端读到的 committed capture 仍为空。若后端正在解析，`/api/capture/status` 会同时返回 `load.phase`、`parser_profile`、`processed`、`accepted`、`staged_count` 等 active load 信息，前端会显示“后端正在解析，尚未提交首屏数据”，而不是误报首屏数据失败。
 - Wails 桌面环境下页面数据面已迁移为 typed IPC 优先：React WebView 通过 `desktopBridge` 调用明确的 Wails typed binding，缺少已迁移数据面的 typed binding 时会以 `generic_ipc_disabled` 失败，不再恢复 generic IPC 后端代理，也不静默回退浏览器 HTTP。C2、工控、车机、USB、APT、证据、对象、流、媒体、插件、狩猎、MISC 上传和导出等长尾页面不再直接从 WebView `fetch` 后端 `/api/...`。
 - Wails 桌面环境中，已迁移 typed IPC 调用失败会直接显示 IPC 端点和原因，不再静默回退浏览器 HTTP。旧 generic IPC backend/generated binding 已移除；`VITE_DESKTOP_GENERIC_IPC_POLICY=compat` 仅保留为可识别的 no-op 策略值。普通 browser-dev HTTP/SSE 调试模式继续使用 `httpBridge`、HTTP token、统一超时和错误分类。
-- Wails 桌面事件不再由 WebView 直连 `/api/events`；桌面壳内部读取后端 SSE 并转发 `gshark:backend:*` Wails runtime events。DevTools Network 中页面数据 API 不应再出现对 `127.0.0.1:17891/api/...` 的直接请求，静态资源和 Vite 开发请求除外。
+- Wails 桌面事件不再由 WebView 直连 `/api/events`；桌面壳内部读取后端 SSE 并转发 `meow-traffic:backend:*` Wails runtime events。DevTools Network 中页面数据 API 不应再出现对 `127.0.0.1:17891/api/...` 的直接请求，静态资源和 Vite 开发请求除外。
 - Wails typed IPC 控制面也带本地 timeout / abort 保护：capture status、packet page、start/stop、TLS 和运行时探测不会因为 binding promise 悬挂而让页面无限 loading。调用方取消 `AbortSignal` 时会保留 `AbortError` 语义。
 - 桌面 IPC blob 响应默认限制为 50MB。超过上限时会显示“桌面 IPC blob 响应过大”，避免 base64 放大导致 WebView 内存尖峰；大文件导出后续应改原生保存或流式传输。
 - 桌面事件桥使用独立 HTTP client：连接阶段有 dial/header timeout，正常 SSE 长连接没有总超时；收到 `ready/status/packet/error` 后会重置重连 backoff。

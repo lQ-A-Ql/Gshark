@@ -62,7 +62,7 @@ export function SMB3SessionKeyResultPanel({
         </div>
       )}
       {result && (
-        <div className="gshark-tile mt-4 animate-in slide-in-from-bottom-2 border-indigo-100 bg-indigo-50/50 p-5 duration-300 fade-in">
+        <div className="meow-tile mt-4 animate-in slide-in-from-bottom-2 border-indigo-100 bg-indigo-50/50 p-5 duration-300 fade-in">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-900">
               <Key className="h-3.5 w-3.5 text-indigo-500" />

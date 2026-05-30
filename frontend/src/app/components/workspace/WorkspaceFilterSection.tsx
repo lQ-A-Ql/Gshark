@@ -26,7 +26,7 @@ export function WorkspaceFilterSection({
 }: WorkspaceFilterSectionProps) {
   return (
     <>
-      <div className="gshark-tile-toolbar border-b border-blue-100">
+      <div className="meow-tile-toolbar border-b border-blue-100">
         <DisplayFilterBar
           value={value}
           suggestions={suggestions}

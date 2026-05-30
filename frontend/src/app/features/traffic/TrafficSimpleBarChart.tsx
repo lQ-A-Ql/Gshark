@@ -19,7 +19,7 @@ export function SimpleBarChart({ data, color, onSelect }: SimpleBarChartProps) {
   }
 
   return (
-    <div className="gshark-tile-table max-h-[480px] overflow-auto">
+    <div className="meow-tile-table max-h-[480px] overflow-auto">
       <div className="divide-y divide-slate-100">
         {data.map((row) => (
           <button

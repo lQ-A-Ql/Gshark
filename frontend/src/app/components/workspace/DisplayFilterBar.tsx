@@ -21,13 +21,13 @@ export function DisplayFilterBar({
   onClearHistory: () => void;
 }) {
   return (
-    <div className="gshark-tile-toolbar flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+    <div className="meow-tile-toolbar flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
       <Filter className="h-4 w-4 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">显示过滤器</span>
-      <div className="gshark-field flex flex-1 items-center overflow-hidden transition-all">
+      <div className="meow-field flex flex-1 items-center overflow-hidden transition-all">
         <input
           id="display-filter-input"
-          list="gshark-filter-suggestions"
+          list="meow-filter-suggestions"
           ref={inputRef}
           type="text"
           name="display-filter-input"
@@ -44,7 +44,7 @@ export function DisplayFilterBar({
           className="flex-1 border-none bg-transparent px-3 py-1 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
           placeholder={'例如: http.request.method == "POST" and ip.addr == 192.168.1.10'}
         />
-        <datalist id="gshark-filter-suggestions">
+        <datalist id="meow-filter-suggestions">
           {suggestions.map((item) => (
             <option key={item} value={item} />
           ))}
@@ -62,20 +62,20 @@ export function DisplayFilterBar({
       <button
         onClick={onApply}
         disabled={disabled}
-        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:opacity-60"
+        className="meow-control flex items-center gap-1 px-3 py-1 text-xs text-foreground transition-all disabled:opacity-60"
       >
         <Play className="h-3 w-3 text-blue-600" /> 应用
       </button>
       <button
         onClick={onClear}
         disabled={disabled}
-        className="gshark-control flex items-center gap-1 px-3 py-1 text-xs text-muted-foreground transition-all disabled:opacity-60"
+        className="meow-control flex items-center gap-1 px-3 py-1 text-xs text-muted-foreground transition-all disabled:opacity-60"
       >
         <RefreshCw className="h-3 w-3" /> 清除
       </button>
       <button
         onClick={onClearHistory}
-        className="gshark-control px-2 py-1 text-[11px] text-muted-foreground transition-all"
+        className="meow-control px-2 py-1 text-[11px] text-muted-foreground transition-all"
         title="清空最近过滤历史"
       >
         清空历史

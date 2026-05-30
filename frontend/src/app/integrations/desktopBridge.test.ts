@@ -288,9 +288,9 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getHTTPLoginAnalysis).not.toHaveBeenCalled();
     expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
     expect(fallbackBridge.subscribeEvents).not.toHaveBeenCalled();
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:packet", expect.any(Function));
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:status", expect.any(Function));
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:error", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:packet", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:status", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:error", expect.any(Function));
     expect(unsubscribe).not.toHaveBeenCalled();
   });
 
@@ -755,9 +755,9 @@ describe("createDesktopBridge", () => {
     const stop = bridge.subscribeEvents({ status: vi.fn() });
     stop();
 
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:packet", expect.any(Function));
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:status", expect.any(Function));
-    expect(EventsOn).toHaveBeenCalledWith("gshark:backend:error", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:packet", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:status", expect.any(Function));
+    expect(EventsOn).toHaveBeenCalledWith("meow:backend:error", expect.any(Function));
     expect(fallbackBridge.subscribeEvents).not.toHaveBeenCalled();
     expect(fallbackUnsubscribe).not.toHaveBeenCalled();
   });

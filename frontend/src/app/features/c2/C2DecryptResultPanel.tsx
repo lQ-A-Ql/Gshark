@@ -8,8 +8,8 @@ import type { C2DecryptResult } from "../../core/types";
 import { C2NotesPanel } from "./C2DisplayComponents";
 
 const C2_DECRYPT_TABLE_WRAPPER_CLASS = "overflow-auto";
-const C2_DECRYPT_TABLE_HEADER_CLASS = "gshark-tile-header text-slate-700";
-const C2_DECRYPT_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-[var(--gshark-table-selected-bg)]";
+const C2_DECRYPT_TABLE_HEADER_CLASS = "meow-tile-header text-slate-700";
+const C2_DECRYPT_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-[var(--meow-table-selected-bg)]";
 const C2_DECRYPT_MONO_CELL_CLASS = "font-mono text-slate-600";
 
 export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | null }) {
@@ -49,7 +49,7 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
   const exportCsv = () => exportTextFile(`c2-decrypt-${result.family}.csv`, c2DecryptResultToCsv(result), "text/csv");
 
   return (
-    <div className="gshark-tile min-w-0 space-y-3 overflow-hidden border-slate-100 p-4">
+    <div className="meow-tile min-w-0 space-y-3 overflow-hidden border-slate-100 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-slate-900">解密结果 · {result.status}</div>
@@ -58,17 +58,17 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
           </div>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={exportJson} className="gshark-control h-8 text-xs">
+          <Button type="button" variant="outline" onClick={exportJson} className="meow-control h-8 text-xs">
             导出 JSON
           </Button>
-          <Button type="button" variant="outline" onClick={exportCsv} className="gshark-control h-8 text-xs">
+          <Button type="button" variant="outline" onClick={exportCsv} className="meow-control h-8 text-xs">
             导出 CSV
           </Button>
         </div>
       </div>
       {result.notes.length > 0 ? <C2NotesPanel notes={result.notes} emptyText="" /> : null}
       {result.family === "cs" ? (
-        <div className="gshark-tile border-sky-100 bg-sky-50/80 px-3 py-2 text-xs leading-5 text-sky-900">
+        <div className="meow-tile border-sky-100 bg-sky-50/80 px-3 py-2 text-xs leading-5 text-sky-900">
           <div className="mb-1 flex items-center gap-1.5 font-semibold">
             <Info className="h-3.5 w-3.5" />
             CS 解密阅读提示
@@ -81,13 +81,13 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
           </p>
         </div>
       ) : null}
-      <div className="gshark-tile-toolbar flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="meow-tile-toolbar flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="min-w-0 flex-1">
           <span className="sr-only">搜索解密结果</span>
           <input
             value={recordQuery}
             onChange={(event) => setRecordQuery(event.target.value)}
-            className="gshark-soft-fill h-9 w-full px-3 text-xs text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+            className="meow-soft-fill h-9 w-full px-3 text-xs text-slate-700 outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
             placeholder="搜索明文、算法、stream、packet"
           />
         </label>
@@ -136,12 +136,12 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
             cellClassName: "min-w-0 space-y-1",
             render: (item) =>
               item.error ? (
-                <div className="gshark-tile max-w-full overflow-auto break-words border-amber-100 bg-amber-50/70 p-2 text-amber-700">
+                <div className="meow-tile max-w-full overflow-auto break-words border-amber-100 bg-amber-50/70 p-2 text-amber-700">
                   {item.error}
                 </div>
               ) : (
                 <div className="min-w-0 space-y-1">
-                  <pre className="gshark-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-5 text-slate-100">
+                  <pre className="meow-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-5 text-slate-100">
                     {item.plaintextPreview || "--"}
                   </pre>
                   <DecryptTagLine
@@ -195,7 +195,7 @@ function DecryptTagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+        <span key={value} className="meow-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
           {value}
         </span>
       ))}

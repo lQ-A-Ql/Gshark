@@ -17,7 +17,7 @@ export function CaptureTransactionErrorPanel({
 }: CaptureTransactionErrorPanelProps) {
   return (
     <div className="flex h-full min-h-0 items-center justify-center px-6">
-      <div className="gshark-tile w-full max-w-2xl border-amber-200 p-5">
+      <div className="meow-tile w-full max-w-2xl border-amber-200 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-800">
           <AlertTriangle className="h-4 w-4" />
           {hasActiveCapture ? "抓包切换失败" : "抓包打开失败"}

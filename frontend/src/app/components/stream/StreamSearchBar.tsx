@@ -37,8 +37,8 @@ export function StreamSearchBar({
   const navigationDisabled = disabled || (hasResultSummary && resultCount <= 0);
 
   return (
-    <div className={cn("gshark-stream-control-cluster flex min-w-0 flex-wrap items-center gap-2 px-2 py-1", className)}>
-      <div className="gshark-field flex w-72 max-w-full items-center overflow-hidden px-2 transition-colors">
+    <div className={cn("meow-stream-control-cluster flex min-w-0 flex-wrap items-center gap-2 px-2 py-1", className)}>
+      <div className="meow-field flex w-72 max-w-full items-center overflow-hidden px-2 transition-colors">
         <Search className="ml-2 h-4 w-4 text-muted-foreground" />
         <input
           value={value}
@@ -50,7 +50,7 @@ export function StreamSearchBar({
       </div>
       <button
         type="button"
-        className="gshark-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+        className="meow-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
         onClick={onPrev}
         disabled={navigationDisabled}
       >
@@ -58,13 +58,13 @@ export function StreamSearchBar({
       </button>
       <button
         type="button"
-        className="gshark-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+        className="meow-control-ghost p-1.5 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
         onClick={onNext}
         disabled={navigationDisabled}
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-      <span className="gshark-stream-segment px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+      <span className="meow-stream-segment px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
         {resultSummary}
       </span>
     </div>

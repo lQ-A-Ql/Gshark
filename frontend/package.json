@@ -1,5 +1,5 @@
 {
-  "name": "@gshark/sentinel-frontend",
+  "name": "@meow-traffic/sentinel-frontend",
   "private": true,
   "version": "0.0.1",
   "type": "module",

@@ -629,14 +629,14 @@ func pythonCommandCanStart(ctx context.Context, pythonCmd []string) error {
 }
 
 func defaultSpeechModelPath() string {
-	if raw := strings.TrimSpace(os.Getenv("GSHARK_VOSK_MODEL")); raw != "" {
+	if raw := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_VOSK_MODEL")); raw != "" {
 		return filepath.Clean(raw)
 	}
 	if raw := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); raw != "" {
-		return filepath.Join(raw, "gshark-sentinel", "models", "vosk", "zh-CN")
+		return filepath.Join(raw, "meow-traffic", "models", "vosk", "zh-CN")
 	}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		return filepath.Join(home, ".gshark-sentinel", "models", "vosk", "zh-CN")
+		return filepath.Join(home, ".meow-traffic", "models", "vosk", "zh-CN")
 	}
 	return filepath.Join(".", "models", "vosk", "zh-CN")
 }

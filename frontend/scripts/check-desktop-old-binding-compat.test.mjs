@@ -29,7 +29,7 @@ function writeFixtureFile(frontendRoot, relativePath, content) {
 }
 
 function createFixture(files) {
-  const frontendRoot = mkdtempSync(resolve(tmpdir(), "gshark-old-binding-compat-"));
+  const frontendRoot = mkdtempSync(resolve(tmpdir(), "meow-traffic-old-binding-compat-"));
   for (const [relativePath, content] of Object.entries(files)) {
     writeFixtureFile(frontendRoot, relativePath, content);
   }
@@ -37,7 +37,7 @@ function createFixture(files) {
 }
 
 function writeExitPlan(content = exitPlan) {
-  const workspace = mkdtempSync(resolve(tmpdir(), "gshark-old-binding-exit-plan-"));
+  const workspace = mkdtempSync(resolve(tmpdir(), "meow-traffic-old-binding-exit-plan-"));
   const exitPlanPath = resolve(workspace, "docs/desktop-ipc-old-binding-exit-plan.md");
   mkdirSync(resolve(exitPlanPath, ".."), { recursive: true });
   writeFileSync(exitPlanPath, content);

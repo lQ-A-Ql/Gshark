@@ -24,7 +24,7 @@ function writeFixtureFile(root, relativePath, content) {
 }
 
 function createFixture(toolClientBody, designBody = design) {
-  const workspace = mkdtempSync(resolve(tmpdir(), "gshark-misc-compat-inventory-"));
+  const workspace = mkdtempSync(resolve(tmpdir(), "meow-traffic-misc-compat-inventory-"));
   const frontendRoot = resolve(workspace, "frontend");
   const designPath = resolve(workspace, "docs/desktop-ipc-misc-native-binding-design.md");
   writeFixtureFile(frontendRoot, "src/app/integrations/clients/toolClient.ts", toolClientBody);

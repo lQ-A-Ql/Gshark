@@ -101,7 +101,7 @@ export function C2DecryptWorkbench({
 
   return (
     <div className="space-y-0">
-      <div className="gshark-tile border-slate-100 bg-slate-50/70 px-4 py-3 text-xs leading-6 text-slate-600">
+      <div className="meow-tile border-slate-100 bg-slate-50/70 px-4 py-3 text-xs leading-6 text-slate-600">
         解密结果仅作为衍生视图展示，不覆盖原始 payload，不写回 packet store，也不改变 C2 detection
         结果。当前候选来源：candidates / aggregates / 关联 stream 与 packet。
       </div>
@@ -111,7 +111,7 @@ export function C2DecryptWorkbench({
         </EmptyState>
       ) : (
         <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <div className="gshark-tile space-y-3 border-slate-100 p-4">
+          <div className="meow-tile space-y-3 border-slate-100 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <KeyRound className="h-4 w-4 text-rose-500" />
               {family === "cs" ? "CS keyed offline decrypt" : "VShell vkey / salt decrypt"}
@@ -142,7 +142,7 @@ export function C2DecryptWorkbench({
               />
             )}
             {error ? (
-              <div className="gshark-tile border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              <div className="meow-tile border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                 {error}
               </div>
             ) : null}

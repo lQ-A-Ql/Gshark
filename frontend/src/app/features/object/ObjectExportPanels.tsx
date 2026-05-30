@@ -33,8 +33,8 @@ export function ObjectExportToolbar({
   onTypeFilterChange,
 }: ObjectExportToolbarProps) {
   return (
-    <div className="gshark-tile-toolbar flex flex-wrap items-center gap-2.5 px-3 py-2.5">
-      <div className="gshark-field flex items-center gap-2 px-2 py-1">
+    <div className="meow-tile-toolbar flex flex-wrap items-center gap-2.5 px-3 py-2.5">
+      <div className="meow-field flex items-center gap-2 px-2 py-1">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
           value={query}
@@ -68,7 +68,7 @@ export function ObjectGroupChips({ groups }: ObjectGroupChipsProps) {
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       {groups.map((group) => (
-        <span key={group.label} className="gshark-diffuse-chip px-2.5 py-1 text-[11px] font-medium text-slate-500">
+        <span key={group.label} className="meow-diffuse-chip px-2.5 py-1 text-[11px] font-medium text-slate-500">
           {group.label} · {group.items.length}
         </span>
       ))}
@@ -103,7 +103,7 @@ export function ObjectGroupGrid({
               <div className="text-sm font-semibold text-foreground">{group.label}</div>
               <div className="text-[11px] text-muted-foreground">{group.items.length} 个对象</div>
             </div>
-            <div className="gshark-tile-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="meow-tile-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {visibleItems.map((file) => (
                 <ObjectCard
                   key={file.id}
@@ -117,7 +117,7 @@ export function ObjectGroupGrid({
               <button
                 type="button"
                 onClick={() => onExpandGroup(group.label)}
-                className="gshark-control mt-0 w-full py-2 text-xs text-slate-500 transition-colors hover:text-amber-700"
+                className="meow-control mt-0 w-full py-2 text-xs text-slate-500 transition-colors hover:text-amber-700"
               >
                 显示全部 {group.items.length} 个对象
               </button>
@@ -143,7 +143,7 @@ function ObjectCard({ file, selected, onToggleSelect }: ObjectCardProps) {
     <div
       onClick={() => onToggleSelect(file.id)}
       className={cn(
-        "group gshark-tile relative flex cursor-pointer flex-col items-center justify-center p-3 transition-all",
+        "group meow-tile relative flex cursor-pointer flex-col items-center justify-center p-3 transition-all",
         selected
           ? "border-blue-300 bg-blue-50/35 ring-1 ring-blue-300"
           : "bg-transparent hover:border-amber-200 hover:bg-amber-50/20",
@@ -178,7 +178,7 @@ export function ObjectExportFooter({
   onDownloadSelected,
 }: ObjectExportFooterProps) {
   return (
-    <div className="gshark-tile-toolbar flex items-center justify-between px-3 py-2.5">
+    <div className="meow-tile-toolbar flex items-center justify-between px-3 py-2.5">
       <div className="text-xs font-medium text-muted-foreground">
         已选 {selectedCount} 个文件 ({formatBytes(selectedBytes)})
       </div>
@@ -186,14 +186,14 @@ export function ObjectExportFooter({
         <button
           onClick={onDownloadSelected}
           disabled={selectedCount === 0}
-          className="gshark-control flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-foreground transition-colors disabled:opacity-50"
+          className="meow-control flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-foreground transition-colors disabled:opacity-50"
         >
           <Download className="h-3.5 w-3.5" /> 导出选中
         </button>
         <button
           onClick={onDownloadAll}
           disabled={objectCount === 0}
-          className="gshark-control-primary flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+          className="meow-control-primary flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
         >
           <Archive className="h-3.5 w-3.5" /> 导出全部
         </button>

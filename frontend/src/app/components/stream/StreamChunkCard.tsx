@@ -49,7 +49,7 @@ export function StreamChunkCard({
         <div className="mt-2 flex justify-end text-[11px] opacity-80">
           <button
             type="button"
-            className="gshark-control px-2 py-1 hover:opacity-100"
+            className="meow-control px-2 py-1 hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onOpen();

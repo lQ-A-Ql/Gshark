@@ -32,7 +32,7 @@ export function SpeechSettingsSection({
           hint={voskModelPathHint(snapshot, form.voskModelPath)}
           value={form.voskModelPath}
           onChange={(value) => setForm((prev) => ({ ...prev, voskModelPath: value }))}
-          placeholder="C:\\Users\\QAQ\\AppData\\Local\\gshark-sentinel\\models\\vosk\\zh-CN"
+          placeholder="C:\\Users\\QAQ\\AppData\\Local\\meow-traffic\\models\\vosk\\zh-CN"
         />
       </div>
       <StatusLine

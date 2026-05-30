@@ -18,14 +18,14 @@ export function AnalysisStatCard({
   return (
     <div
       className={cn(
-        "gshark-tile gshark-tile-strong gshark-evidence-accent p-3 transition-colors duration-200 hover:border-slate-300/24",
+        "meow-tile meow-tile-strong meow-evidence-accent p-3 transition-colors duration-200 hover:border-slate-300/24",
         toneTileBorder[tone],
         className,
       )}
     >
       <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         <span>{title}</span>
-        {icon ? <span className="gshark-diffuse-chip gshark-evidence-accent p-1.5">{icon}</span> : null}
+        {icon ? <span className="meow-diffuse-chip meow-evidence-accent p-1.5">{icon}</span> : null}
       </div>
       <div className="text-[22px] font-semibold tracking-tight text-slate-950">{value}</div>
     </div>
@@ -48,12 +48,12 @@ export function AnalysisPanel({
   return (
     <div
       className={cn(
-        "gshark-tile gshark-workbench-panel overflow-hidden p-3.5 transition-colors duration-200 hover:border-slate-300/24",
+        "meow-tile meow-workbench-panel overflow-hidden p-3.5 transition-colors duration-200 hover:border-slate-300/24",
         toneTileBorder[tone],
         className,
       )}
     >
-      <div className="gshark-tile-header -mx-3.5 -mt-3.5 mb-3 flex items-center justify-between gap-3 px-3.5 py-2.5">
+      <div className="meow-tile-header -mx-3.5 -mt-3.5 mb-3 flex items-center justify-between gap-3 px-3.5 py-2.5">
         <div className="text-sm font-semibold tracking-tight text-slate-900">{title}</div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
@@ -74,7 +74,7 @@ export function AnalysisMiniStat({
   className?: string;
 }) {
   return (
-    <div className={cn("gshark-soft-fill gshark-evidence-accent px-3 py-2", className)}>
+    <div className={cn("meow-soft-fill meow-evidence-accent px-3 py-2", className)}>
       <div className="text-[11px] font-medium text-slate-400">{title}</div>
       <div className={cn("text-sm font-semibold", toneMiniText[tone])}>{value}</div>
     </div>
@@ -93,7 +93,7 @@ export function AnalysisBadge({
   return (
     <span
       className={cn(
-        "gshark-diffuse-chip inline-flex items-center px-2 py-0.5 text-[11px] font-semibold tracking-[0.01em]",
+        "meow-diffuse-chip inline-flex items-center px-2 py-0.5 text-[11px] font-semibold tracking-[0.01em]",
         toneBadge[tone],
         className,
       )}
@@ -121,7 +121,7 @@ export function AnalysisCallout({
   return (
     <div
       className={cn(
-        "gshark-soft-fill gshark-evidence-accent flex items-start gap-2 px-3 py-2 text-xs",
+        "meow-soft-fill meow-evidence-accent flex items-start gap-2 px-3 py-2 text-xs",
         toneCallout[tone],
         className,
       )}

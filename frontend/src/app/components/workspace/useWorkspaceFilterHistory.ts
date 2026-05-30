@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const FILTER_HISTORY_KEY = "gshark.filter-history.v1";
+const FILTER_HISTORY_KEY = "meow-traffic.filter-history.v1";
 const MAX_FILTER_HISTORY = 12;
 
 const DEFAULT_FILTER_SUGGESTIONS = [

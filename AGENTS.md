@@ -14,7 +14,7 @@ cd backend && go test ./...
 
 ## Two Go modules, one workspace
 
-- Product branding is `meow~traffic`. Internal compatibility identifiers stay on the historical `gshark` / `sentinel` names unless explicitly migrated.
+- Product branding is `meow~traffic`. Internal compatibility identifiers stay on the historical `meow-traffic` / `sentinel` names unless explicitly migrated.
 - Root (`go.mod`): `github.com/gshark/sentinel/desktop`, Go 1.22 — Wails desktop shell only
 - `backend/` (`go.mod`): `github.com/gshark/sentinel/backend`, Go 1.25 — all real logic
 - `go.work` at root ties them together for IDE/`go test` convenience
@@ -50,8 +50,8 @@ Backend: `17891`. Wails dev server: `34115`. `scripts/start-wails-dev.ps1` kills
 
 ## Env vars
 
-- `GSHARK_BACKEND_TOKEN` — bearer token (auto-generated if absent)
-- `GSHARK_ALLOW_EXISTING_BACKEND=1` — reuse already-running backend
+- `MEOW_TRAFFIC_BACKEND_TOKEN` — bearer token (auto-generated if absent)
+- `MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND=1` — reuse already-running backend
 - `VITE_BACKEND_URL` — frontend API override (default `http://127.0.0.1:17891`)
 
 ## Full local check
@@ -76,7 +76,7 @@ Spec: `docs/misc-module-interface.md`.
 
 - `frontend/dist/sentinel-backend.exe` (embedded)
 - `build/bin/sentinel-backend.exe`
-- `%TEMP%/gshark-sentinel/backend/sentinel-backend.exe`
+- `%TEMP%/meow-traffic/backend/sentinel-backend.exe`
 
 If `wails dev` doesn't pick up your backend changes, delete all three + clear Go build cache. `scripts/start-wails-dev.ps1` does NOT auto-clean these yet.
 

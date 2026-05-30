@@ -30,7 +30,7 @@ const requiredSourceTokens = {
   ],
   "scripts/check-desktop-ipc-smoke.ps1": [
     "DisableGenericIpcAdapterExperiment",
-    "GSHARK_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT",
+    "MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT",
     "genericIpcPolicy",
     "genericIpcDisableExperimentRequested",
     "genericIpcDisableExperimentBuildFlag",

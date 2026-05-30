@@ -28,7 +28,7 @@ export function SMB3SessionCandidateSelector({
     <>
       <Field label="Session 候选选择器">
         <div className="space-y-3">
-          <div className="gshark-tile-toolbar flex items-center justify-between gap-3 border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
+          <div className="meow-tile-toolbar flex items-center justify-between gap-3 border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
             <div className="min-w-0">
               <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-indigo-500">Session 候选</div>
               <div className="mt-1 text-[13px] text-slate-600">
@@ -55,7 +55,7 @@ export function SMB3SessionCandidateSelector({
           <div
             data-testid="smb-session-candidate-select"
             aria-disabled={!hasCapture || loading || candidates.length === 0}
-            className={`gshark-tile p-3 transition-colors ${
+            className={`meow-tile p-3 transition-colors ${
               !hasCapture || candidates.length === 0
                 ? "border-slate-200 bg-slate-50"
                 : "border-indigo-100 bg-slate-50/40"
@@ -73,7 +73,7 @@ export function SMB3SessionCandidateSelector({
                 ))}
               </div>
             ) : (
-              <div className="gshark-tile border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[13px] text-slate-500">
+              <div className="meow-tile border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[13px] text-slate-500">
                 {hasCapture ? "未在当前抓包中发现可用的 SMB3 Session 候选" : "未加载抓包，请先在主工作区导入文件"}
               </div>
             )}
@@ -81,7 +81,7 @@ export function SMB3SessionCandidateSelector({
         </div>
       </Field>
       {!error && (
-        <div className="gshark-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{summary}</div>
+        <div className="meow-tile border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{summary}</div>
       )}
       {error && <ErrorBlock message={error} />}
     </>

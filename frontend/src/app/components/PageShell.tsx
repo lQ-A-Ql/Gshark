@@ -15,8 +15,8 @@ const densityClassName = {
 };
 
 const tiledDensityClassName = {
-  compact: "gshark-tile-page min-h-full w-full p-0",
-  roomy: "gshark-tile-page min-h-full w-full p-0",
+  compact: "meow-tile-page min-h-full w-full p-0",
+  roomy: "meow-tile-page min-h-full w-full p-0",
 };
 
 export function PageShell({

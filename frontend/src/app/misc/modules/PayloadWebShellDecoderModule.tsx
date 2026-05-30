@@ -96,7 +96,7 @@ export function PayloadWebShellDecoderModule({ module, surfaceVariant = "card" }
   }
 
   return (
-    <div className={embedded ? "space-y-4" : "gshark-tile space-y-4 border-slate-200 p-4"}>
+    <div className={embedded ? "space-y-4" : "meow-tile space-y-4 border-slate-200 p-4"}>
       <PayloadWebShellInputPanel
         module={module}
         embedded={embedded}

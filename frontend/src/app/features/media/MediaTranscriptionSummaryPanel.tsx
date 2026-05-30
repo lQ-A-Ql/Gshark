@@ -72,7 +72,7 @@ export function MediaTranscriptionSummaryPanel({
     <Panel title={`转写汇总 (${batchSummaryItems.length})`} className="mt-0">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button
-          className="gshark-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+          className="meow-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
           onClick={() => void copyAllText()}
           disabled={batchSummaryItems.length === 0}
         >
@@ -80,7 +80,7 @@ export function MediaTranscriptionSummaryPanel({
           复制全部
         </button>
         <button
-          className="gshark-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+          className="meow-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
           onClick={() => void onExportBatchTranscription("txt")}
           disabled={batchSummaryItems.length === 0}
         >
@@ -88,7 +88,7 @@ export function MediaTranscriptionSummaryPanel({
           导出 TXT
         </button>
         <button
-          className="gshark-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
+          className="meow-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent disabled:opacity-60"
           onClick={() => void onExportBatchTranscription("json")}
           disabled={batchSummaryItems.length === 0}
         >
@@ -101,12 +101,12 @@ export function MediaTranscriptionSummaryPanel({
       ) : (
         <div className="divide-y divide-slate-200/45">
           {batchSummaryItems.map((item) => (
-            <details key={item.token} className="gshark-soft-fill border-0" open>
+            <details key={item.token} className="meow-soft-fill border-0" open>
               <summary className="cursor-pointer list-none px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium">{item.title}</div>
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="gshark-soft-fill px-2 py-0.5">{item.cached ? "缓存" : "新转写"}</span>
+                    <span className="meow-soft-fill px-2 py-0.5">{item.cached ? "缓存" : "新转写"}</span>
                     <span>{item.status}</span>
                   </div>
                 </div>
@@ -115,7 +115,7 @@ export function MediaTranscriptionSummaryPanel({
                 <div className="whitespace-pre-wrap text-sm text-foreground">{item.text}</div>
                 <div className="mt-3">
                   <button
-                    className="gshark-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent"
+                    className="meow-soft-fill inline-flex items-center gap-1 px-2 py-1 text-xs hover:bg-accent"
                     onClick={() => void onCopyText(item.text)}
                   >
                     <Copy className="h-3.5 w-3.5" />

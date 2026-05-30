@@ -29,7 +29,7 @@ export function IntervalSparkline({
     .map((value) => `${value.toFixed(value >= 10 ? 0 : 1)}s`)
     .join(" / ");
   return (
-    <div className={cn("gshark-tile border-slate-100 px-3 py-2", compact ? "mt-2 px-2 py-1" : "mt-3")}>
+    <div className={cn("meow-tile border-slate-100 px-3 py-2", compact ? "mt-2 px-2 py-1" : "mt-3")}>
       <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         <span>Interval Sparkline</span>
         <span className="font-mono normal-case tracking-normal text-slate-500">
@@ -57,8 +57,8 @@ export function AggregateExpandButton({
       aria-label={`${expanded ? "收起" : "展开"} ${label}`}
       onClick={onClick}
       className={cn(
-        "gshark-control inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-semibold transition-all duration-200",
-        expanded ? "gshark-evidence-accent text-cyan-700" : "text-slate-600 hover:text-cyan-700",
+        "meow-control inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-semibold transition-all duration-200",
+        expanded ? "meow-evidence-accent text-cyan-700" : "text-slate-600 hover:text-cyan-700",
       )}
     >
       {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -88,7 +88,7 @@ export function CSDNSAggregateDetailPanel({ item }: { item: C2DNSAggregate }) {
   ].filter(Boolean);
 
   return (
-    <div className="gshark-tile overflow-hidden border-rose-100 p-3.5 transition-all duration-200">
+    <div className="meow-tile overflow-hidden border-rose-100 p-3.5 transition-all duration-200">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">DNS Aggregate Detail</div>
@@ -101,11 +101,11 @@ export function CSDNSAggregateDetailPanel({ item }: { item: C2DNSAggregate }) {
       <DetailMetricGrid rows={metrics} />
       <IntervalSparkline values={item.intervals} color="stroke-rose-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div className="gshark-soft-fill p-2.5">
+        <div className="meow-soft-fill p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">Query Type 分布</div>
           <TagLine values={queryTypeTags.length > 0 ? queryTypeTags : ["--"]} />
         </div>
-        <div className="gshark-soft-fill p-2.5">
+        <div className="meow-soft-fill p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">TXT / NULL / CNAME 形态</div>
           <TagLine values={dnsShapeTags.length > 0 ? dnsShapeTags : ["no-txt-null-cname"]} />
         </div>
@@ -129,7 +129,7 @@ export function VShellStreamAggregateDetailPanel({ item }: { item: C2StreamAggre
   const listenerTags = (item.listenerHints ?? []).map((hint) => `${hint.label}:${hint.count}`);
 
   return (
-    <div className="gshark-tile overflow-hidden border-cyan-100 p-3.5 transition-all duration-200">
+    <div className="meow-tile overflow-hidden border-cyan-100 p-3.5 transition-all duration-200">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">VShell Stream Detail</div>
@@ -148,11 +148,11 @@ export function VShellStreamAggregateDetailPanel({ item }: { item: C2StreamAggre
       <DetailMetricGrid rows={metrics} />
       <IntervalSparkline values={item.intervals} color="stroke-cyan-500" />
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div className="gshark-soft-fill p-2.5">
+        <div className="meow-soft-fill p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">架构标记 / Payload 形态</div>
           <TagLine values={archTags.length > 0 ? archTags : ["no-arch-marker"]} />
         </div>
-        <div className="gshark-soft-fill p-2.5">
+        <div className="meow-soft-fill p-2.5">
           <div className="mb-2 text-[11px] font-semibold text-slate-400">Listener / 管理面提示</div>
           <TagLine values={listenerTags.length > 0 ? listenerTags : ["no-listener-hint"]} />
         </div>
@@ -165,7 +165,7 @@ function DetailMetricGrid({ rows }: { rows: Array<{ label: string; value?: strin
   const visibleRows = rows.filter((row) => row.value && row.value.trim() !== "");
   if (visibleRows.length === 0) return null;
   return (
-    <div className="gshark-soft-fill grid gap-1.5 p-2 md:grid-cols-2">
+    <div className="meow-soft-fill grid gap-1.5 p-2 md:grid-cols-2">
       {visibleRows.map((row) => (
         <div key={row.label} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-[11px] leading-5">
           <span className="font-semibold text-slate-400">{row.label}</span>
@@ -181,7 +181,7 @@ export function TagLine({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {values.map((value) => (
-        <span key={value} className="gshark-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+        <span key={value} className="meow-diffuse-chip px-2 py-0.5 text-[10px] font-semibold text-slate-500">
           {value}
         </span>
       ))}
