@@ -21,7 +21,10 @@ export function MainSidebarNav({ activeTheme, pathname }: Pick<MainLayoutChromeP
           >
             <Icon className="h-5 w-5" />
             {isActive && (
-              <div className={cn("absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full", activeTheme.bar)} />
+              <>
+                <div className={cn("absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full", activeTheme.bar)} />
+                <span className={cn("meow-paw-indicator", activeTheme.active)} />
+              </>
             )}
             <div className="meow-aurora-surface pointer-events-none invisible absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap px-2.5 py-1.5 text-xs font-semibold text-slate-700 opacity-0 transition-all group-hover:visible group-hover:opacity-100">
               {item.label}

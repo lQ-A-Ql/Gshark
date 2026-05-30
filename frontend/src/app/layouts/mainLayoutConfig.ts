@@ -71,6 +71,15 @@ export const PAGE_THEMES = {
     active: "text-cyan-600",
     bar: "bg-cyan-500",
   },
+  cream: {
+    base: "252 251 248",
+    top: "254 253 251",
+    bottom: "250 249 246",
+    accent: "139 92 246",
+    accent2: "168 85 247",
+    active: "text-violet-600",
+    bar: "bg-violet-500",
+  },
 } as const;
 
 export type PageThemeName = keyof typeof PAGE_THEMES;
@@ -84,7 +93,7 @@ export type MainNavItem = {
 };
 
 export const NAV_ITEMS: MainNavItem[] = [
-  { path: "/", icon: LayoutDashboard, label: "主工作区", theme: "blue" },
+  { path: "/", icon: LayoutDashboard, label: "主工作区", theme: "cream" },
   { path: "/analysis-cockpit", icon: Radar, label: "分析驾驶舱", theme: "indigo" },
   { path: "/c2-analysis", icon: Bug, label: "C2 样本分析", theme: "rose" },
   { path: "/apt-analysis", icon: Crosshair, label: "APT 组织画像", theme: "indigo" },
@@ -97,11 +106,11 @@ export const NAV_ITEMS: MainNavItem[] = [
   { path: "/hunting", icon: ShieldAlert, label: "威胁狩猎中心", theme: "rose" },
   { path: "/objects", icon: FileDown, label: "附件提取", theme: "amber" },
   { path: "/misc", icon: Wrench, label: "MISC 工具箱", theme: "cyan" },
-  { path: "/updates", icon: RefreshCw, label: "检查更新", theme: "blue" },
+  { path: "/updates", icon: RefreshCw, label: "检查更新", theme: "cream" },
 ];
 
 export function themeForPath(pathname: string): PageTheme {
   const navTheme = NAV_ITEMS.find((item) => item.path !== "/" && pathname.startsWith(item.path))?.theme;
-  const fallbackTheme: PageThemeName = pathname.includes("stream") ? "cyan" : "blue";
+  const fallbackTheme: PageThemeName = pathname.includes("stream") ? "cyan" : "cream";
   return PAGE_THEMES[navTheme ?? fallbackTheme];
 }
