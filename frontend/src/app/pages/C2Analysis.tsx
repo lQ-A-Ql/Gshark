@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { MetricCard, StatusHint } from "../components/DesignSystem";
+import { MeowEmptyState } from "../components/MeowEmptyState";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { AnalysisBucketChart, AnalysisList } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
@@ -106,7 +107,7 @@ export default function C2Analysis() {
         <C2Panel title="Family 分布">
           <AnalysisBucketChart
             data={analysis.families}
-            emptyText="当前抓包未形成 CS / VShell 命中，家族分布会在出现可复核候选后汇总。"
+            emptyText={<MeowEmptyState variant="keyboard">当前抓包未形成 CS / VShell 命中，家族分布会在出现可复核候选后汇总。</MeowEmptyState>}
             barClassName="bg-rose-500"
             labelWidthClassName="grid-cols-[minmax(0,1fr)_minmax(96px,1.2fr)_72px]"
           />

@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Crosshair } from "lucide-react";
 import { AnalysisBadge, AnalysisDataTable, type AnalysisTone } from "../../components/analysis/AnalysisPrimitives";
+import { MeowEmptyState } from "../../components/MeowEmptyState";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import type { ThreatHit } from "../../core/types";
 
@@ -81,7 +82,7 @@ export function ThreatHuntingHitsTable({
             : "text-foreground";
         }}
         onRowClick={(hit) => onSelectHit(hit.id)}
-        emptyText="暂无威胁命中"
+        emptyText={<MeowEmptyState variant="window">一切平静，暂无威胁命中。</MeowEmptyState>}
         maxHeightClassName="max-h-none"
         wrapperClassName="meow-tile-table min-h-0 flex-1 rounded-none border-0 bg-transparent"
         tableClassName="cursor-default whitespace-nowrap"

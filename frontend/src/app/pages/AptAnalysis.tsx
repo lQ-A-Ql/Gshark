@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { MetricCard, StatusHint } from "../components/DesignSystem";
+import { MeowEmptyState } from "../components/MeowEmptyState";
 import { AnalysisBucketChart, AnalysisMiniStat } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import {
@@ -162,7 +163,7 @@ export default function AptAnalysis() {
         <AptPanel title="样本家族分布">
           <AnalysisBucketChart
             data={activeProfile?.sampleFamilies ?? analysis.sampleFamilies}
-            emptyText="尚无样本家族证据，等待 C2 / 样本解析模块输出。"
+            emptyText={<MeowEmptyState variant="window">尚无样本家族证据，等待 C2 / 样本解析模块输出。</MeowEmptyState>}
             barClassName="bg-indigo-500"
             labelWidthClassName="grid-cols-[minmax(0,1fr)_minmax(96px,1.2fr)_72px]"
           />

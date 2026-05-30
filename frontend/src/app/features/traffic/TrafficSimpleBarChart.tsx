@@ -15,7 +15,7 @@ export function SimpleBarChart({ data, color, onSelect }: SimpleBarChartProps) {
   const max = Math.max(1, ...data.map((x) => x.count));
 
   if (data.length === 0) {
-    return <AnalysisEmptyState>暂无数据</AnalysisEmptyState>;
+    return <AnalysisEmptyState cat="window">暂无数据</AnalysisEmptyState>;
   }
 
   return (

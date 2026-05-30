@@ -1,6 +1,7 @@
 import { Clapperboard, Headphones, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AnalysisDataTable as DataTable, AnalysisPanel as Panel } from "../../components/analysis/AnalysisPrimitives";
+import { MeowEmptyState } from "../../components/MeowEmptyState";
 import type { MediaSession, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
 import { ExportActionsCell, MediaTypeBadge, TranscriptionCell } from "./MediaSessionCells";
 
@@ -84,7 +85,7 @@ export function MediaSessionTable({
         rowKey={(session) => session.id}
         maxHeightClassName="max-h-[560px]"
         tableClassName="min-w-[1380px]"
-        emptyText="暂无可还原的媒体会话"
+        emptyText={<MeowEmptyState variant="headphones">暂无可还原的媒体会话</MeowEmptyState>}
         columns={[
           {
             key: "type",

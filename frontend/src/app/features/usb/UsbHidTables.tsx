@@ -1,4 +1,5 @@
 import { AnalysisDataTable as DataTable } from "../../components/analysis/AnalysisPrimitives";
+import { MeowEmptyState } from "../../components/MeowEmptyState";
 import type { USBKeyboardEvent } from "../../core/types";
 import { HIDTableShell, useVisibleRows } from "./UsbHidTablesShell";
 import {
@@ -22,7 +23,7 @@ export function KeyboardEventTable({ rows, resetKey = "" }: { rows: USBKeyboardE
         headerClassName={USB_TABLE_HEADER_CLASS}
         tableClassName="min-w-[1180px]"
         rowClassName={USB_TABLE_ROW_CLASS}
-        emptyText="暂无键盘行为"
+        emptyText={<MeowEmptyState variant="box">暂无键盘行为</MeowEmptyState>}
         columns={[
           {
             key: "packet",
