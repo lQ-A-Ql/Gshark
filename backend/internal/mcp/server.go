@@ -26,6 +26,14 @@ type Dependencies struct {
 	MiscModules  func() []model.MiscModuleManifest
 	AuditLogs    func(limit int) []model.AuditEntry
 	AuthEnabled  func() bool
+	StreamDecode func(req StreamDecodeRequest) (any, error)
+}
+
+// StreamDecodeRequest mirrors the engine decode request for MCP callers.
+type StreamDecodeRequest struct {
+	Decoder string         `json:"decoder"`
+	Payload string         `json:"payload"`
+	Options map[string]any `json:"options"`
 }
 
 type CaptureService interface {
@@ -41,7 +49,11 @@ type CaptureService interface {
 	ListStreamPayloadSources(limit int) ([]model.StreamPayloadSource, error)
 }
 
-type DetectionService interface{}
+type DetectionService interface {
+	ThreatHuntWithContext(ctx context.Context, prefixes []string) []model.ThreatHit
+	ObjectsWithContext(ctx context.Context) []model.ObjectFile
+	GetHuntingRuntimeConfig() model.HuntingRuntimeConfig
+}
 
 type AnalysisService interface {
 	GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error)
@@ -49,10 +61,13 @@ type AnalysisService interface {
 	VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error)
 	USBAnalysisWithOptions(ctx context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error)
 	C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error)
+	C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error)
 	APTAnalysis(ctx context.Context) (model.APTAnalysis, error)
 }
 
-type MediaService interface{}
+type MediaService interface {
+	MediaAnalysis() (model.MediaAnalysis, error)
+}
 
 type ToolRuntimeService interface {
 	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
@@ -65,6 +80,7 @@ type ToolAnalysisService interface {
 	MySQLAnalysis(ctx context.Context) (model.MySQLAnalysis, error)
 	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
 	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
+	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 }
 
 type Server struct {
@@ -219,6 +235,47 @@ func (s *Server) tools() []map[string]any {
 			},
 		}, nil), true, true),
 		s.newTool("tooling.smb3_candidates", "List SMB3 session candidates.", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
+
+		// --- Expanded tools (high priority) ---
+		s.newTool("threat.hunting_hits", "Run threat hunting and return hits (YARA + prefix pattern matching).", objectSchema(map[string]any{
+			"prefixes": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Optional prefix strings to search for in packet payloads. Empty uses configured defaults.",
+			},
+		}, nil), true, false),
+		s.newTool("c2.candidates", "List C2 candidate streams with confidence scores.", objectSchema(map[string]any{
+			"family":         map[string]any{"type": "string", "enum": []string{"cs", "vshell", "all"}},
+			"min_confidence": map[string]any{"type": "integer", "minimum": 0, "maximum": 100},
+			"limit":          map[string]any{"type": "integer", "minimum": 1, "maximum": 500},
+		}, nil), true, true),
+		s.newTool("objects.list", "List extracted objects/files from current capture.", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
+		s.newTool("tooling.winrm_decrypt", "Decrypt WinRM session using NTLM credentials.", objectSchema(map[string]any{
+			"port":                   map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},
+			"auth_mode":              map[string]any{"type": "string", "enum": []string{"password", "nt_hash"}},
+			"password":               map[string]any{"type": "string"},
+			"nt_hash":                map[string]any{"type": "string"},
+			"preview_lines":          map[string]any{"type": "integer", "minimum": 1, "maximum": 2000},
+			"include_error_frames":   map[string]any{"type": "boolean"},
+			"extract_command_output": map[string]any{"type": "boolean"},
+		}, []string{"port", "auth_mode"}), false, false),
+
+		// --- Expanded tools (medium priority) ---
+		s.newTool("capture.filter_count", "Count packets matching a display filter without returning packet data.", objectSchema(map[string]any{
+			"filter": map[string]any{"type": "string"},
+		}, []string{"filter"}), true, true),
+		s.newTool("stream.decode", "Run stream decoder (base64/behinder/antsword/godzilla/auto) on payload.", objectSchema(map[string]any{
+			"decoder": map[string]any{"type": "string", "enum": []string{"base64", "behinder", "antsword", "godzilla", "auto"}},
+			"payload": map[string]any{"type": "string", "description": "Raw payload text to decode."},
+			"options": map[string]any{"type": "object", "description": "Decoder-specific options (key, pass, cipherMode, etc)."},
+		}, []string{"decoder", "payload"}), true, true),
+		s.newTool("c2.decrypt", "Decrypt C2 traffic with provided key/config.", objectSchema(map[string]any{
+			"family": map[string]any{"type": "string", "enum": []string{"cs", "vshell"}},
+			"scope":  map[string]any{"type": "object", "description": "Scope filter: packet_ids, stream_ids, use_candidates, use_aggregates."},
+			"vshell": map[string]any{"type": "object", "description": "VShell options: vkey, salt, mode."},
+			"cs":     map[string]any{"type": "object", "description": "CobaltStrike options: key_mode, aes_key, hmac_key, aes_rand, rsa_private_key, transform_mode."},
+		}, []string{"family"}), false, false),
+		s.newTool("media.sessions", "List media sessions (RTP/RTSP audio/video) from current capture.", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
 	}
 	sort.SliceStable(tools, func(i, j int) bool {
 		return tools[i]["name"].(string) < tools[j]["name"].(string)
@@ -497,6 +554,135 @@ func (s *Server) toolResult(ctx context.Context, name string, args map[string]an
 		return s.deps.ToolAnalysis.ShiroRememberMeAnalysis(ctx, model.ShiroRememberMeRequest{CandidateKeys: stringSliceValue(args["candidate_keys"])})
 	case "tooling.smb3_candidates":
 		return s.deps.ToolAnalysis.ListSMB3SessionCandidatesWithContext(ctx)
+
+	// --- Expanded tools (high priority) ---
+	case "threat.hunting_hits":
+		var prefixes []string
+		for _, item := range stringSliceValue(args["prefixes"]) {
+			if trimmed := strings.TrimSpace(item); trimmed != "" {
+				prefixes = append(prefixes, trimmed)
+			}
+		}
+		hits := s.deps.Detection.ThreatHuntWithContext(ctx, prefixes)
+		return map[string]any{
+			"hits":  hits,
+			"total": len(hits),
+		}, nil
+	case "c2.candidates":
+		analysis, err := s.deps.Analysis.C2SampleAnalysis(ctx)
+		if err != nil {
+			return nil, err
+		}
+		family := strings.ToLower(strings.TrimSpace(stringValue(args["family"])))
+		if family == "" {
+			family = "all"
+		}
+		minConfidence := int(numberValue(args["min_confidence"]))
+		limit := int(numberValue(args["limit"]))
+		if limit <= 0 {
+			limit = 100
+		}
+		var candidates []model.C2IndicatorRecord
+		switch family {
+		case "cs":
+			candidates = analysis.CS.Candidates
+		case "vshell":
+			candidates = analysis.VShell.Candidates
+		default:
+			candidates = append(candidates, analysis.CS.Candidates...)
+			candidates = append(candidates, analysis.VShell.Candidates...)
+		}
+		if minConfidence > 0 {
+			filtered := make([]model.C2IndicatorRecord, 0, len(candidates))
+			for _, c := range candidates {
+				if c.Confidence >= minConfidence {
+					filtered = append(filtered, c)
+				}
+			}
+			candidates = filtered
+		}
+		if len(candidates) > limit {
+			candidates = candidates[:limit]
+		}
+		return map[string]any{
+			"family":     family,
+			"candidates": candidates,
+			"total":      len(candidates),
+		}, nil
+	case "objects.list":
+		objects := s.deps.Detection.ObjectsWithContext(ctx)
+		return map[string]any{
+			"objects": objects,
+			"total":   len(objects),
+		}, nil
+	case "tooling.winrm_decrypt":
+		req := model.WinRMDecryptRequest{
+			Port:                 int(numberValue(args["port"])),
+			AuthMode:             strings.TrimSpace(stringValue(args["auth_mode"])),
+			Password:             strings.TrimSpace(stringValue(args["password"])),
+			NTHash:               strings.TrimSpace(stringValue(args["nt_hash"])),
+			PreviewLines:         int(numberValue(args["preview_lines"])),
+			IncludeErrorFrames:   boolValue(args["include_error_frames"]),
+			ExtractCommandOutput: boolValue(args["extract_command_output"]),
+		}
+		return s.deps.ToolAnalysis.RunWinRMDecryptWithContext(ctx, req)
+
+	// --- Expanded tools (medium priority) ---
+	case "capture.filter_count":
+		filter := strings.TrimSpace(stringValue(args["filter"]))
+		if filter == "" {
+			return nil, fmt.Errorf("filter is required")
+		}
+		_, _, total, pending, err := s.deps.Capture.PacketsPageWithState(0, 1, filter)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"filter":  filter,
+			"count":   total,
+			"pending": pending,
+		}, nil
+	case "stream.decode":
+		decoder := strings.TrimSpace(stringValue(args["decoder"]))
+		payload := stringValue(args["payload"])
+		var options map[string]any
+		if raw, ok := args["options"].(map[string]any); ok {
+			options = raw
+		}
+		if s.deps.StreamDecode == nil {
+			return nil, fmt.Errorf("stream decode not available")
+		}
+		return s.deps.StreamDecode(StreamDecodeRequest{
+			Decoder: decoder,
+			Payload: payload,
+			Options: options,
+		})
+	case "c2.decrypt":
+		var req model.C2DecryptRequest
+		req.Family = strings.TrimSpace(stringValue(args["family"]))
+		if scopeRaw, ok := args["scope"].(map[string]any); ok {
+			scopeBytes, _ := json.Marshal(scopeRaw)
+			_ = json.Unmarshal(scopeBytes, &req.Scope)
+		}
+		if vshellRaw, ok := args["vshell"].(map[string]any); ok {
+			vshellBytes, _ := json.Marshal(vshellRaw)
+			_ = json.Unmarshal(vshellBytes, &req.VShell)
+		}
+		if csRaw, ok := args["cs"].(map[string]any); ok {
+			csBytes, _ := json.Marshal(csRaw)
+			_ = json.Unmarshal(csBytes, &req.CS)
+		}
+		return s.deps.Analysis.C2Decrypt(ctx, req)
+	case "media.sessions":
+		analysis, err := s.deps.Media.MediaAnalysis()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"sessions": analysis.Sessions,
+			"total":    len(analysis.Sessions),
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown tool")
 	}
@@ -615,4 +801,17 @@ func truncateText(text string, max int) string {
 		return text
 	}
 	return text[:max] + "\n...<truncated>"
+}
+
+func boolValue(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case string:
+		return strings.ToLower(strings.TrimSpace(v)) == "true"
+	case float64:
+		return v != 0
+	default:
+		return false
+	}
 }

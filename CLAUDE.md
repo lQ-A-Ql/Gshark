@@ -22,6 +22,9 @@ Branding note: the product display name is now `meow~traffic`, while compatibili
 - Development is desktop-only: start via Wails scripts, not separate frontend/backend web workflows.
 - ESLint is part of frontend CI. Prettier is configured as a scoped baseline check for touched/split frontend files; only `gofmt` is mandatory for Go.
 - Frontend uses `@` path alias (`@` → `./src`) configured in `vite.config.ts`.
+- Frontend tests use Vitest with jsdom environment; setup file at `src/test/setup.ts` mocks ResizeObserver, localStorage, PointerEvent, and canvas context.
+- ESLint rules: unused vars prefixed with `_` are allowed (`@typescript-eslint/no-unused-vars` with `argsIgnorePattern: "^_"`); `@typescript-eslint/no-explicit-any` is off; `react-hooks/rules-of-hooks` is error-level.
+- Package manager is pinned: `pnpm@10.31.0` (enforced by `pnpm run package-manager:check` in CI).
 
 ## Common Commands
 
@@ -166,11 +169,20 @@ Important backend behavior:
 - Runtime tool config includes tshark/ffmpeg/python/speech/yara settings via API.
 - YARA rules under `backend/rules/yara/` are embedded via Go embed and copied into build artifacts.
 
+Backend architecture boundaries (CI-enforced via `go test ./internal/architecture`):
+- `model` has no dependencies on `engine`, `transport`, `tshark`, `plugin`, or `miscpkg`.
+- `transport` does not depend on `tshark` internals.
+- Report builders (`analysis_report*`) stay pure — no tshark/transport imports, no capture state references.
+- Report rule metadata is registry-owned (only in `analysis_report_rules.go` / `analysis_report_shared.go`).
+- `internal/report` stays dependency-light (no engine/transport/tshark).
+- Evidence files stay transport-free.
+- Transport handlers must pass request context to long-running service methods.
+
 ### Frontend structure (`frontend/src/app`)
 
 - `routes.tsx`: React Router v7 with lazy-loaded feature routes.
 - `state/SentinelContext.tsx`: central app state (packet pagination, selected packet, stream state, threat/media progress, plugin state). This is a large monolithic context (~73KB).
-- `integrations/wailsBridge.ts`: typed backend bridge for HTTP/SSE + desktop bindings (~120KB).
+- `integrations/`: backend communication layer (see integrations architecture below).
 - `core/types.ts`: frontend contract types mirroring backend responses.
 - `pages/*`: feature views (workspace, stream views, threat hunting, protocol analyses, media/USB/tools pages).
 - `components/ui/`: Radix UI primitives (button, dialog, card, tooltip, etc.).
@@ -181,6 +193,37 @@ Frontend data flow:
 - SSE events (`packet/status/error`) update context state incrementally.
 - Paginated packet APIs (`/api/packets/page`, locate APIs) drive large-capture browsing.
 - Stream pages load chunked stream data and support payload patch persistence.
+
+### Frontend integrations layer
+
+The `integrations/` directory follows a 3-tier pattern:
+
+- `wire/` — Raw backend DTO types (field-for-field match of JSON responses). No logic.
+- `mappers/` — Pure functions converting wire DTOs to frontend view models. No React, no side effects.
+- `clients/` — Domain-specific API call wrappers. Transport-only, no UI or feature logic.
+
+App code consumes `backendClients` (which composes clients) or individual domain clients. Pages and features never reach into wire/mapper layers directly.
+
+### Frontend layering rules (CI-enforced)
+
+The boundary check (`pnpm run boundary:check`) enforces these import invariants:
+
+1. No production code may import `./integrations/wailsBridge` — use `integrations/backendClients`.
+2. Only `integrations/` may reach into `bridgeTypes`, `bridgeFactory`, `httpBridge`, `desktopBridge`, or `bridgeDomains`. App code must consume domain projections from `integrations/backendClients`.
+3. State code (`state/**`) may not import UI components (`pages/` or `components/`).
+4. Pages may not import mappers directly — consume feature/core view models.
+5. Pages may not add new direct dependencies on aggregate `backendClients`.
+6. Features may not import from other features (route through `core/`, `components/analysis`, or `integrations/`).
+7. Mappers (`integrations/mappers/**`) stay UI-free: no React, no pages/components, no feature rules.
+8. Clients (`integrations/clients/**`) stay transport-only: no pages, components, or features.
+9. UI primitives (`components/ui/**`) stay domain-free.
+10. Shared analysis components (`components/analysis/**`) stay domain-neutral — no features/ imports.
+
+### Frontend size budgets
+
+Every key frontend file has a line-count budget enforced by `pnpm run size:check`. If a file exceeds its budget, CI fails. When adding code to a budgeted file, check `frontend/scripts/check-size.mjs` for the limit. If you need more space, split the logic into a sibling module rather than raising the budget.
+
+All mapper files (`integrations/mappers/`) and wire DTO files (`integrations/wire/`) must have a size budget entry — unbudgeted files also fail CI.
 
 ### Plugins and rules
 
@@ -197,6 +240,14 @@ Frontend data flow:
 - Scaffold new modules: `./scripts/new-misc-module.ps1` (e.g. `powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id echo-demo -Title "Echo Demo" -Runtime javascript -Zip`).
 - Spec: `docs/misc-module-interface.md`.
 - Example: `examples/misc-modules/echo-demo`.
+
+### Backend governance
+
+The `internal/governance` package maintains a machine-readable defect register (`docs/governance-defect-register.json`). CI validates (`go test ./internal/governance`):
+- Resolved defects must have closure evidence (commit, modified files, validation commands, evidence tests).
+- Open defects must not have closure evidence.
+- Report rendering and archive path conventions are tested.
+- Self-audit and integration tests verify governance consistency.
 
 ## CI
 

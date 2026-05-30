@@ -1074,3 +1074,122 @@ func requireJSONNestedObject(t *testing.T, payload map[string]any, key string) m
 	}
 	return value
 }
+
+func TestMCPExpandedToolsContract(t *testing.T) {
+	server := NewServer(engine.NewService(nil), NewHub())
+	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
+
+	callMCP := func(t *testing.T, toolName string, args string) map[string]any {
+		t.Helper()
+		body := `{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"` + toolName + `","arguments":` + args + `}}`
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(body))
+		server.Handler().ServeHTTP(rec, req)
+		requireStatus(t, rec, http.StatusOK)
+		payload := decodeJSONMap(t, rec)
+		if errObj, ok := payload["error"]; ok {
+			t.Fatalf("MCP tool %s returned error: %#v", toolName, errObj)
+		}
+		result := requireJSONNestedObject(t, payload, "result")
+		requireJSONKeys(t, result, "content", "structuredContent", "isError")
+		if result["isError"] == true {
+			t.Fatalf("MCP tool %s isError=true", toolName)
+		}
+		return result
+	}
+
+	t.Run("threat.hunting_hits", func(t *testing.T) {
+		result := callMCP(t, "threat.hunting_hits", `{"prefixes":["flag{"]}`)
+		sc := result["structuredContent"].(map[string]any)
+		requireJSONKeys(t, sc, "hits", "total")
+		requireJSONNumber(t, sc, "total")
+	})
+
+	t.Run("c2.candidates", func(t *testing.T) {
+		result := callMCP(t, "c2.candidates", `{"family":"all","min_confidence":0,"limit":10}`)
+		sc := result["structuredContent"].(map[string]any)
+		requireJSONKeys(t, sc, "family", "candidates", "total")
+		if sc["family"] != "all" {
+			t.Fatalf("family = %#v, want all", sc["family"])
+		}
+		requireJSONNumber(t, sc, "total")
+	})
+
+	t.Run("objects.list", func(t *testing.T) {
+		result := callMCP(t, "objects.list", `{}`)
+		sc := result["structuredContent"].(map[string]any)
+		requireJSONKeys(t, sc, "objects", "total")
+		requireJSONNumber(t, sc, "total")
+	})
+
+	t.Run("capture.filter_count", func(t *testing.T) {
+		result := callMCP(t, "capture.filter_count", `{"filter":"tcp"}`)
+		sc := result["structuredContent"].(map[string]any)
+		requireJSONKeys(t, sc, "filter", "count", "pending")
+		if sc["filter"] != "tcp" {
+			t.Fatalf("filter = %#v, want tcp", sc["filter"])
+		}
+		requireJSONNumber(t, sc, "count")
+	})
+
+	t.Run("stream.decode", func(t *testing.T) {
+		result := callMCP(t, "stream.decode", `{"decoder":"base64","payload":"aGVsbG8="}`)
+		sc := result["structuredContent"].(map[string]any)
+		requireJSONKeys(t, sc, "decoder", "summary", "text")
+		if sc["decoder"] != "base64" {
+			t.Fatalf("decoder = %#v, want base64", sc["decoder"])
+		}
+		if sc["text"] != "hello" {
+			t.Fatalf("text = %#v, want hello", sc["text"])
+		}
+	})
+
+	t.Run("media.sessions", func(t *testing.T) {
+		// media.sessions returns an error when no capture is loaded; verify the
+		// tool call completes without panic and returns a well-formed MCP error.
+		body := `{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"media.sessions","arguments":{}}}`
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(body))
+		server.Handler().ServeHTTP(rec, req)
+		requireStatus(t, rec, http.StatusOK)
+		payload := decodeJSONMap(t, rec)
+		// Expect an RPC-level error since no capture is loaded.
+		errObj := requireJSONNestedObject(t, payload, "error")
+		requireJSONKeys(t, errObj, "code", "message")
+	})
+}
+
+func TestMCPExpandedToolsListIncludesNewTools(t *testing.T) {
+	server := NewServer(engine.NewService(nil), NewHub())
+	server.toolRuntime.SetMCPConfig(model.MCPConfig{Enabled: true})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	server.Handler().ServeHTTP(rec, req)
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	result := requireJSONNestedObject(t, payload, "result")
+	tools := requireJSONArray(t, result, "tools")
+
+	toolNames := make(map[string]bool)
+	for _, tool := range tools {
+		toolObj := tool.(map[string]any)
+		toolNames[toolObj["name"].(string)] = true
+	}
+
+	expected := []string{
+		"threat.hunting_hits",
+		"c2.candidates",
+		"objects.list",
+		"tooling.winrm_decrypt",
+		"capture.filter_count",
+		"stream.decode",
+		"c2.decrypt",
+		"media.sessions",
+	}
+	for _, name := range expected {
+		if !toolNames[name] {
+			t.Errorf("tools/list missing expected tool %q", name)
+		}
+	}
+}

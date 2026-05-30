@@ -117,6 +117,17 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 			defer s.mu.Unlock()
 			return strings.TrimSpace(s.authToken) != ""
 		},
+		StreamDecode: func(req mcp.StreamDecodeRequest) (any, error) {
+			result, err := engine.DecodeStreamPayload(engine.StreamDecodeRequest{
+				Decoder: req.Decoder,
+				Payload: req.Payload,
+				Options: req.Options,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
+		},
 	})
 	hub.OnPacket(func(packet model.Packet) {
 		s.broadcast(event{Type: "packet", Data: packet})
