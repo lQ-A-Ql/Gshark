@@ -2,6 +2,7 @@ import { Binary, BookOpenText, FolderOpen, History, Radar, ShieldAlert } from "l
 import { useMemo, useState, type ReactNode } from "react";
 import { useSentinel } from "../state/SentinelContext";
 import { formatBytes } from "../state/formatBytes";
+import { MeowEmptyState } from "./MeowEmptyState";
 import logoImg from "../../assets/logo.png";
 
 function formatRecentTime(value: string) {
@@ -148,9 +149,9 @@ export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProp
               </div>
 
               {recentItems.length === 0 ? (
-                <div className="mt-4 px-4 py-6 text-center text-xs leading-5 text-slate-500">
+                <MeowEmptyState variant="box" className="mt-4">
                   这里会保留最近打开过的抓包路径，方便你反复对照样本与回归测试。
-                </div>
+                </MeowEmptyState>
               ) : (
                 <div className="mt-4 min-h-0 max-h-[420px] flex-1 overflow-y-auto pr-2">
                   <div className="space-y-3">

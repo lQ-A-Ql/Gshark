@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../ui/utils";
 import { toneBadge, toneCallout, toneMiniText, toneTileBorder, type AnalysisTone } from "./analysisTone";
+import type { MeowCatVariant } from "../MeowEmptyState";
 
 export function AnalysisStatCard({
   title,
@@ -103,8 +104,27 @@ export function AnalysisBadge({
   );
 }
 
-export function AnalysisEmptyState({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("px-3 py-6 text-center text-xs leading-6 text-slate-500", className)}>{children}</div>;
+export function AnalysisEmptyState({
+  children,
+  className,
+  cat,
+}: {
+  children: ReactNode;
+  className?: string;
+  cat?: MeowCatVariant;
+}) {
+  return (
+    <div className={cn("px-3 py-6 text-center text-xs leading-6 text-slate-500", className)}>
+      {cat && (
+        <div
+          className={cn("meow-empty-cat-figure mx-auto mb-2 text-slate-300", `meow-empty-cat-${cat}`)}
+          role="img"
+          aria-hidden
+        />
+      )}
+      {children}
+    </div>
+  );
 }
 
 export function AnalysisCallout({
