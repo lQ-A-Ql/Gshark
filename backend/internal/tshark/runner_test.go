@@ -134,6 +134,40 @@ func TestParsePacketFromEK_PreservesDisplayProtocol(t *testing.T) {
 	}
 }
 
+func TestParsePacketFromEK_WebSocketProtocolNormalized(t *testing.T) {
+	// WebSocket data frames have frame_protocols containing "http:websocket"
+	// and displayProtocol "WebSocket". Protocol should normalize to "WebSocket".
+	line := `{"layers":{"frame":{"frame_protocols":"eth:ip:tcp:http:websocket:data-text-lines","frame_len":"171","frame_time_epoch":"1700000002.0"},"ip":{"ip_src":"192.168.10.10","ip_dst":"103.45.67.89"},"tcp":{"tcp_srcport":"48770","tcp_dstport":"8443","tcp_stream":"208","tcp_payload":"81:fe:00:9f"},"_ws":{"col":{"Protocol":"WebSocket","info":"WebSocket Text [FIN]"}}}}`
+	pkt, err := ParsePacketFromEK(line, 3252)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pkt.Protocol != "WebSocket" {
+		t.Fatalf("expected normalized protocol WebSocket, got %s", pkt.Protocol)
+	}
+	if pkt.DisplayProtocol != "WebSocket" {
+		t.Fatalf("expected display protocol WebSocket, got %s", pkt.DisplayProtocol)
+	}
+	if pkt.StreamID != 208 {
+		t.Fatalf("expected stream ID 208, got %d", pkt.StreamID)
+	}
+}
+
+func TestParsePacketFromEK_HTTPHandshakeNormalizedAsHTTP(t *testing.T) {
+	// The HTTP Upgrade handshake frame should still be "HTTP"
+	line := `{"layers":{"frame":{"frame_protocols":"eth:ip:tcp:http","frame_len":"276","frame_time_epoch":"1700000000.05"},"ip":{"ip_src":"192.168.10.10","ip_dst":"103.45.67.89"},"tcp":{"tcp_srcport":"48770","tcp_dstport":"8443","tcp_stream":"208","tcp_payload":"47:45:54:20"},"http":{"http_request_method":"GET","http_request_uri":"/?a=l64&t=ws_","http_request_version":"HTTP/1.1","http_host":"103.45.67.89:8443"},"_ws":{"col":{"Protocol":"HTTP","info":"GET /?a=l64&t=ws_ HTTP/1.1"}}}}`
+	pkt, err := ParsePacketFromEK(line, 3249)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pkt.Protocol != "HTTP" {
+		t.Fatalf("expected normalized protocol HTTP, got %s", pkt.Protocol)
+	}
+	if pkt.StreamID != 208 {
+		t.Fatalf("expected stream ID 208, got %d", pkt.StreamID)
+	}
+}
+
 func TestParsePacketFromEK_UsesFrameNumberWhenAvailable(t *testing.T) {
 	line := `{"layers":{"frame":{"frame_number":"42","frame_protocols":"eth:ip:tcp","frame_len":"96","frame_time_epoch":"1700000000.123"},"ip":{"ip_src":"192.168.1.10","ip_dst":"10.0.0.5"},"tcp":{"tcp_srcport":"50000","tcp_dstport":"443"},"_ws":{"col":{"Protocol":"TCP","info":"Client Hello"}}}}`
 	pkt, err := ParsePacketFromEK(line, 1)
