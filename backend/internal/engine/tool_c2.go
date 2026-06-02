@@ -643,15 +643,38 @@ func (b *c2AnalysisBuilder) inspectPeriodicStream(packets []model.Packet) {
 	if len(intervals) < 3 {
 		return
 	}
+
+	// Compute average/jitter twice: once on all intervals, once filtering
+	// out short intra-burst intervals (< 3s). Use whichever succeeds.
 	avg, jitter := avgAndJitter(intervals)
 	if avg < 3 || jitter > 0.35 {
-		return
+		// Try filtering out short intra-burst intervals to find the
+		// dominant heartbeat period (e.g. VShell ~10s with burst frames).
+		longIntervals := make([]float64, 0, len(intervals))
+		for _, d := range intervals {
+			if d >= 3 {
+				longIntervals = append(longIntervals, d)
+			}
+		}
+		if len(longIntervals) < 3 {
+			return
+		}
+		// Also filter outlier intervals (> 2x the median) to handle
+		// TCP retransmissions that inflate the average.
+		longIntervals = filterOutlierIntervals(longIntervals)
+		if len(longIntervals) < 3 {
+			return
+		}
+		avg, jitter = avgAndJitter(longIntervals)
+		if avg < 3 || jitter > 0.35 {
+			return
+		}
 	}
 	packet := packets[0]
 	summary := fmt.Sprintf("周期性回连候选 avg=%.1fs jitter=%.0f%%", avg, jitter*100)
 	tags := []string{"periodic", "beacon-like"}
 	confidence := 62
-	if avg >= 8 && avg <= 12 {
+	if avg >= 8 && avg <= 14 {
 		b.result.VShell.BeaconPatterns = append(b.result.VShell.BeaconPatterns, model.C2BeaconPattern{
 			Name:       "heartbeat-interval",
 			Value:      fmt.Sprintf("%.1fs", avg),
@@ -1554,6 +1577,26 @@ func avgAndJitter(values []float64) (float64, float64) {
 		deviation += math.Abs(value - avg)
 	}
 	return avg, deviation / float64(len(values)) / avg
+}
+
+// filterOutlierIntervals removes intervals > 2x the median to handle
+// TCP retransmissions or network jitter that inflate the average.
+func filterOutlierIntervals(values []float64) []float64 {
+	if len(values) < 3 {
+		return values
+	}
+	sorted := make([]float64, len(values))
+	copy(sorted, values)
+	sort.Float64s(sorted)
+	median := sorted[len(sorted)/2]
+	threshold := median * 2
+	out := make([]float64, 0, len(values))
+	for _, v := range values {
+		if v <= threshold {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func bucketsFromMap(input map[string]int, limit int) []model.TrafficBucket {
