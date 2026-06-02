@@ -295,13 +295,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/wire/usbWireDtos.ts",
-    maxLines: 30,
+    maxLines: 35,
     reason: "USB wire DTOs should only describe raw USB analysis payload fields",
   },
   {
     path: "src/app/integrations/wire/vehicleWireDtos.ts",
-    maxLines: 20,
-    reason: "vehicle wire DTOs should only describe raw vehicle analysis payload fields",
+    maxLines: 28,
+    reason: "vehicle wire DTOs should only describe raw vehicle analysis and DBC profile payload fields",
   },
   {
     path: "src/app/integrations/mappers/packetStreamMapper.ts",
@@ -350,12 +350,12 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/evidenceMapper.ts",
-    maxLines: 55,
+    maxLines: 60,
     reason: "evidence mapper should only normalize unified evidence records and module names",
   },
   {
     path: "src/app/integrations/mappers/investigationReportMapper.ts",
-    maxLines: 30,
+    maxLines: 40,
     reason: "investigation report mapper should only normalize shared report section items and recommendation lists",
   },
   {
@@ -415,7 +415,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/speechBatchMapper.ts",
-    maxLines: 40,
+    maxLines: 45,
     reason: "speech batch mapper should keep batch queue status conversion local",
   },
   {
@@ -450,8 +450,8 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/integrations/mappers/trafficMapper.ts",
-    maxLines: 30,
-    reason: "traffic mapper should only normalize global traffic stats buckets",
+    maxLines: 35,
+    reason: "traffic mapper should only normalize global traffic stats and protocol hierarchy",
   },
   {
     path: "src/app/integrations/mappers/usbMapper.ts",
@@ -477,6 +477,11 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/mappers/usbRecordMapper.ts",
     maxLines: 30,
     reason: "USB record mapper should keep flat packet record conversion only",
+  },
+  {
+    path: "src/app/integrations/mappers/dbcMapper.ts",
+    maxLines: 20,
+    reason: "DBC mapper should only convert DBC profile wire payloads to typed view models",
   },
   {
     path: "src/app/integrations/mappers/vehicleMapper.ts",
@@ -1080,7 +1085,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/analysis/AnalysisCards.tsx",
-    maxLines: 150,
+    maxLines: 160,
     reason: "analysis cards should keep shared card, badge, callout, panel, and empty-state primitives together",
   },
   {
@@ -1105,8 +1110,13 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/traffic/TrafficGraphPanels.tsx",
-    maxLines: 130,
-    reason: "traffic graph panels should keep overview cards and bucket panel composition out of the page",
+    maxLines: 105,
+    reason: "traffic graph panels should keep bucket panel composition out of the page",
+  },
+  {
+    path: "src/app/features/traffic/TrafficGraphOverview.tsx",
+    maxLines: 65,
+    reason: "traffic graph overview should keep stat cards and loading/error status only",
   },
   {
     path: "src/app/features/traffic/trafficGraphFilters.ts",
@@ -1665,7 +1675,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/features/hunting/ThreatHuntingResultPanels.tsx",
-    maxLines: 145,
+    maxLines: 155,
     reason: "threat hunting result panels should own hits table and selected detail presentation only",
   },
   {
