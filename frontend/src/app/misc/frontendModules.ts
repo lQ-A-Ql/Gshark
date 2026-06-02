@@ -1,0 +1,40 @@
+import type { MiscModuleManifest } from "../core/types";
+
+export const frontendOnlyModules: MiscModuleManifest[] = [
+  {
+    id: "base64-codec",
+    title: "Base64 / Hex / URL 编解码",
+    summary: "双向编解码工具，支持 Base64、Hex、URL 编码转换",
+    kind: "builtin",
+    tags: ["payload", "decode", "encode"],
+    apiPrefix: "",
+    protocolDomain: "通用",
+    requiresCapture: false,
+    supportsExport: false,
+    cancellable: false,
+  },
+  {
+    id: "timestamp-converter",
+    title: "时间戳转换",
+    summary: "Unix 时间戳与日期字符串双向转换",
+    kind: "builtin",
+    tags: ["timestamp", "date", "convert"],
+    apiPrefix: "",
+    protocolDomain: "通用",
+    requiresCapture: false,
+    supportsExport: false,
+    cancellable: false,
+  },
+  {
+    id: "hash-calculator",
+    title: "哈希计算器",
+    summary: "计算文本的 CRC32、SHA-1、SHA-256 哈希值",
+    kind: "builtin",
+    tags: ["hash", "sha", "crc", "encode"],
+    apiPrefix: "",
+    protocolDomain: "通用",
+    requiresCapture: false,
+    supportsExport: false,
+    cancellable: false,
+  },
+];

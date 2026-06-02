@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MiscModuleManifest } from "../core/types";
 import { backendClients } from "../integrations/backendClients";
-import type { MiscCategory } from "./MiscToolsShell";
 
 interface MiscToolsCatalogClient {
   listMiscModules(): Promise<MiscModuleManifest[]>;
@@ -21,7 +20,8 @@ export function useMiscToolsCatalog({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<MiscCategory>("Misc");
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("Misc");
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [mountedModules, setMountedModules] = useState<Record<string, boolean>>({});
 
@@ -33,6 +33,10 @@ export function useMiscToolsCatalog({
         const rows = await miscModuleClient.listMiscModules();
         if (isCancelled()) return;
         setModules(rows);
+        setSelectedModuleId((current) => {
+          if (current && rows.some((m) => m.id === current)) return current;
+          return rows[0]?.id ?? null;
+        });
         setExpandedModules((current) => {
           const next = { ...current };
           for (const module of rows) {
@@ -112,6 +116,10 @@ export function useMiscToolsCatalog({
     await loadModules();
   }, [loadModules]);
 
+  const selectModule = useCallback((moduleID: string) => {
+    setSelectedModuleId(moduleID);
+  }, []);
+
   const toggleModule = useCallback((moduleID: string) => {
     setMountedModules((current) => ({
       ...current,
@@ -128,6 +136,8 @@ export function useMiscToolsCatalog({
     loading,
     error,
     importing,
+    selectedModuleId,
+    selectModule,
     activeCategory,
     expandedModules,
     mountedModules,

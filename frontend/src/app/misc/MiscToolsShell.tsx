@@ -1,27 +1,23 @@
-import { useMemo } from "react";
-import { EmptyState, StatusHint } from "../components/DesignSystem";
+import { StatusHint } from "../components/DesignSystem";
 import { PageShell } from "../components/PageShell";
 import type { MiscModuleManifest } from "../core/types";
 import { ErrorBlock } from "./ui";
-import { MiscModuleCard } from "./MiscModuleCard";
-import { MiscToolsHero } from "./MiscToolsHero";
-import { matchesCategory } from "./miscModuleRules";
+import { MiscToolsSlimHeader } from "./MiscToolsSlimHeader";
+import { MiscModuleSidebar } from "./MiscModuleSidebar";
+import { MiscModuleWorkbench } from "./MiscModuleWorkbench";
 
-export type MiscCategory = "Misc" | "Payload" | "Modules" | "WinRM" | "SMB3";
+export type { MiscCategory } from "./miscModuleRules";
 
 interface MiscToolsShellProps {
   modules: MiscModuleManifest[];
   loading: boolean;
   error: string;
   importing: boolean;
-  activeCategory: MiscCategory;
-  expandedModules: Record<string, boolean>;
-  mountedModules: Record<string, boolean>;
-  onCategoryChange: (category: MiscCategory) => void;
+  selectedModuleId: string | null;
+  onSelectModule: (id: string) => void;
   onImportModule: (file: File) => void | Promise<void>;
   onImportModuleFromNativeDialog?: () => void | Promise<void>;
   onModuleDeleted: (moduleId: string) => void | Promise<void>;
-  onToggleModule: (moduleId: string) => void;
 }
 
 export function MiscToolsShell({
@@ -29,32 +25,17 @@ export function MiscToolsShell({
   loading,
   error,
   importing,
-  activeCategory,
-  expandedModules,
-  mountedModules,
-  onCategoryChange,
+  selectedModuleId,
+  onSelectModule,
   onImportModule,
   onImportModuleFromNativeDialog,
   onModuleDeleted,
-  onToggleModule,
 }: MiscToolsShellProps) {
-  const filteredModules = useMemo(
-    () => modules.filter((module) => matchesCategory(module, activeCategory)),
-    [modules, activeCategory],
-  );
-  const heroDescription = useMemo(() => {
-    const builtins = modules.filter((module) => module.kind !== "custom").length;
-    const customs = modules.filter((module) => module.kind === "custom").length;
-    return `将低频但高价值的协议辅助能力按模块编排，当前已接入 ${modules.length} 个模块（内建 ${builtins} / 自定义 ${customs}）。`;
-  }, [modules]);
-
   return (
     <PageShell>
-      <MiscToolsHero
-        activeCategory={activeCategory}
-        heroDescription={heroDescription}
+      <MiscToolsSlimHeader
+        moduleCount={modules.length}
         importing={importing}
-        onCategoryChange={onCategoryChange}
         onImportModule={onImportModule}
         onImportModuleFromNativeDialog={onImportModuleFromNativeDialog}
       />
@@ -66,21 +47,17 @@ export function MiscToolsShell({
           正在加载 MISC 模块...
         </StatusHint>
       ) : (
-        <div className="meow-tile-grid">
-          {filteredModules.map((module) => (
-            <MiscModuleCard
-              key={module.id}
-              module={module}
-              expanded={Boolean(expandedModules[module.id])}
-              mounted={Boolean(expandedModules[module.id]) || Boolean(mountedModules[module.id])}
-              onModuleDeleted={onModuleDeleted}
-              onToggleModule={onToggleModule}
-            />
-          ))}
-
-          {filteredModules.length === 0 && !error && (
-            <EmptyState className="meow-tile px-4 py-12 text-sm">当前筛选下没有可展示的 MISC 模块。</EmptyState>
-          )}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <MiscModuleSidebar
+            modules={modules}
+            selectedModuleId={selectedModuleId}
+            onSelectModule={onSelectModule}
+          />
+          <MiscModuleWorkbench
+            modules={modules}
+            selectedModuleId={selectedModuleId}
+            onModuleDeleted={onModuleDeleted}
+          />
         </div>
       )}
     </PageShell>

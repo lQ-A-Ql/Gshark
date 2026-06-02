@@ -1,9 +1,47 @@
 import { Binary, Database, KeyRound, Mail, Shield, Wrench, type LucideIcon } from "lucide-react";
 import type { MiscModuleManifest } from "../core/types";
-import type { MiscCategory } from "./MiscToolsShell";
 
-export const miscCategoryOptions: MiscCategory[] = ["Misc", "Payload", "Modules", "WinRM", "SMB3"];
+export type MiscCategory = "credential" | "payload" | "protocol" | "utility" | "custom";
 
+export const miscCategoryLabels: Record<MiscCategory, string> = {
+  credential: "凭据",
+  payload: "Payload",
+  protocol: "协议",
+  utility: "工具",
+  custom: "自定义",
+};
+
+export const miscCategoryOrder: MiscCategory[] = ["credential", "payload", "protocol", "utility", "custom"];
+
+export const miscCategoryOptions: MiscCategory[] = miscCategoryOrder;
+
+function buildHaystack(module: MiscModuleManifest): string {
+  return [module.id, module.title, module.summary, module.protocolDomain, ...(module.tags ?? []), ...(module.dependsOn ?? [])]
+    .join(" ")
+    .toLowerCase();
+}
+
+export function moduleCategory(module: MiscModuleManifest): MiscCategory {
+  if (module.kind === "custom") return "custom";
+  const haystack = buildHaystack(module);
+  if (haystack.includes("winrm") || haystack.includes("ntlm") || haystack.includes("smb3") || haystack.includes("shiro") || haystack.includes("rememberme")) {
+    return "credential";
+  }
+  if (haystack.includes("payload") || haystack.includes("webshell") || haystack.includes("decode") || haystack.includes("base64")) {
+    return "payload";
+  }
+  if (haystack.includes("http") || haystack.includes("mysql") || haystack.includes("smtp") || haystack.includes("mail")) {
+    return "protocol";
+  }
+  if (haystack.includes("timestamp") || haystack.includes("hash") || haystack.includes("convert")) {
+    return "utility";
+  }
+  return "utility";
+}
+
+export function matchesCategory(module: MiscModuleManifest, category: MiscCategory) {
+  return moduleCategory(module) === category;
+}
 export function summarizeModule(module: MiscModuleManifest) {
   const items: string[] = [];
   if (module.protocolDomain) items.push(module.protocolDomain);
@@ -12,39 +50,8 @@ export function summarizeModule(module: MiscModuleManifest) {
   return items.slice(0, 3);
 }
 
-export function matchesCategory(module: MiscModuleManifest, category: MiscCategory) {
-  const haystack = [
-    module.title,
-    module.summary,
-    module.protocolDomain,
-    ...(module.tags ?? []),
-    ...(module.dependsOn ?? []),
-  ]
-    .join(" ")
-    .toLowerCase();
-  switch (category) {
-    case "Modules":
-      return module.kind === "custom";
-    case "Payload":
-      return (
-        haystack.includes("payload") ||
-        haystack.includes("webshell") ||
-        haystack.includes("decode") ||
-        haystack.includes("base64")
-      );
-    case "WinRM":
-      return haystack.includes("winrm") || haystack.includes("ntlm");
-    case "SMB3":
-      return haystack.includes("smb3");
-    default:
-      return true;
-  }
-}
-
 export function resolveModuleIcon(module: MiscModuleManifest): { Icon: LucideIcon; surface: string; text: string } {
-  const haystack = [module.id, module.title, module.summary, module.protocolDomain, ...(module.tags ?? [])]
-    .join(" ")
-    .toLowerCase();
+  const haystack = buildHaystack(module);
   if (haystack.includes("mysql")) {
     return { Icon: Database, surface: "meow-soft-fill border-emerald-200/28 bg-emerald-50/20", text: "text-emerald-700" };
   }
