@@ -39,15 +39,15 @@ type portScanKey struct {
 }
 
 type portScanGroup struct {
-	key         portScanKey
-	ports       map[int]struct{}
-	synCount    int
-	rstCount    int
-	totalCount  int
-	openPorts   map[int]struct{}
-	firstPacket int64
-	firstTime   string
-	lastTime    string
+	key          portScanKey
+	synPorts     map[int]struct{} // ports that received SYN-only (no ACK)
+	openPorts    map[int]struct{} // ports that replied SYN-ACK
+	rstCount     int              // RST received from target (attributed back)
+	synCount     int              // pure SYN-only count
+	dataPackets  int              // non-SYN/RST packets (actual data transfer)
+	firstPacket  int64
+	firstTime    string
+	lastTime     string
 }
 
 type dirBruteKey struct {
@@ -97,39 +97,47 @@ func buildBruteforceAnalysis(ctx context.Context, packets []model.Packet) (model
 			if packet.SourceIP == "" || packet.DestIP == "" {
 				continue
 			}
-			key := portScanKey{src: packet.SourceIP, dst: packet.DestIP}
-			group := portScans[key]
-			if group == nil {
-				group = &portScanGroup{
-					key:         key,
-					ports:       make(map[int]struct{}),
-					openPorts:   make(map[int]struct{}),
-					firstPacket: packet.ID,
-					firstTime:   packet.Timestamp,
-				}
-				portScans[key] = group
-			}
-			group.totalCount++
-			group.lastTime = packet.Timestamp
-			if packet.DestPort > 0 {
-				group.ports[packet.DestPort] = struct{}{}
-			}
 
 			isSYN := packet.Color.TCPSYN || strings.Contains(packet.Info, "[SYN]")
 			isRST := packet.Color.TCPRST || strings.Contains(packet.Info, "[RST]")
 			isSYNACK := strings.Contains(packet.Info, "[SYN, ACK]")
 
 			if isSYN && !isSYNACK {
+				// Pure SYN → record in the scanner's group (src→dst)
+				key := portScanKey{src: packet.SourceIP, dst: packet.DestIP}
+				group := portScans[key]
+				if group == nil {
+					group = &portScanGroup{
+						key:       key,
+						synPorts:  make(map[int]struct{}),
+						openPorts: make(map[int]struct{}),
+						firstPacket: packet.ID,
+						firstTime:   packet.Timestamp,
+					}
+					portScans[key] = group
+				}
 				group.synCount++
-			}
-			if isRST {
-				group.rstCount++
-			}
-			// Track open ports from SYN-ACK responses (reverse direction)
-			if isSYNACK {
-				reverseKey := portScanKey{src: packet.DestIP, dst: packet.SourceIP}
-				if reverseGroup := portScans[reverseKey]; reverseGroup != nil {
-					reverseGroup.openPorts[packet.SourcePort] = struct{}{}
+				group.lastTime = packet.Timestamp
+				if packet.DestPort > 0 {
+					group.synPorts[packet.DestPort] = struct{}{}
+				}
+			} else if isRST {
+				// RST from target → attribute to the scanner (reverse lookup)
+				scannerKey := portScanKey{src: packet.DestIP, dst: packet.SourceIP}
+				if group := portScans[scannerKey]; group != nil {
+					group.rstCount++
+				}
+			} else if isSYNACK {
+				// SYN-ACK from target → mark port as open on the scanner's group
+				scannerKey := portScanKey{src: packet.DestIP, dst: packet.SourceIP}
+				if group := portScans[scannerKey]; group != nil {
+					group.openPorts[packet.SourcePort] = struct{}{}
+				}
+			} else {
+				// Data/ACK packet → count as established traffic (anti false-positive)
+				key := portScanKey{src: packet.SourceIP, dst: packet.DestIP}
+				if group := portScans[key]; group != nil {
+					group.dataPackets++
 				}
 			}
 		}
@@ -190,30 +198,33 @@ func buildBruteforceAnalysis(ctx context.Context, packets []model.Packet) (model
 
 	// Analyze port scan groups
 	for _, group := range portScans {
-		uniquePorts := len(group.ports)
-		if uniquePorts <= 20 {
+		uniqueSynPorts := len(group.synPorts)
+		if uniqueSynPorts <= 20 {
 			continue
 		}
-		if group.totalCount == 0 {
-			continue
-		}
-		synRatio := float64(group.synCount) / float64(group.totalCount)
-		rstRatio := float64(group.rstCount) / float64(group.synCount+1)
-
-		flagged := synRatio > 0.5 || rstRatio > 0.7
-		if !flagged {
+		// Anti false-positive: if data packets >> SYN packets, it's likely
+		// sustained communication (e.g. C2) rather than a scan.
+		if group.dataPackets > group.synCount*3 {
 			continue
 		}
 
+		// Core heuristic: many SYN to different ports with few data packets = scan
 		confidence := 50
-		if uniquePorts > 100 {
+		if uniqueSynPorts > 500 {
+			confidence = 95
+		} else if uniqueSynPorts > 100 {
 			confidence = 90
-		} else if uniquePorts > 50 {
+		} else if uniqueSynPorts > 50 {
 			confidence = 70
 		}
 
+		// Boost confidence if RST ratio is high (target rejecting most probes)
+		if group.synCount > 0 && group.rstCount > group.synCount/2 {
+			confidence = min(confidence+10, 99)
+		}
+
 		scanType := "connect-scan"
-		if synRatio > 0.7 && group.rstCount > group.synCount/2 {
+		if group.dataPackets < group.synCount/4 {
 			scanType = "syn-scan"
 		}
 
@@ -228,7 +239,7 @@ func buildBruteforceAnalysis(ctx context.Context, packets []model.Packet) (model
 		result.PortScanHits = append(result.PortScanHits, model.PortScanCandidate{
 			SourceIP:       group.key.src,
 			TargetIP:       group.key.dst,
-			UniquePortsHit: uniquePorts,
+			UniquePortsHit: uniqueSynPorts,
 			SynCount:       group.synCount,
 			RstCount:       group.rstCount,
 			OpenPorts:      openPortsList,
