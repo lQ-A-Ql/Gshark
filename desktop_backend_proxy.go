@@ -985,6 +985,14 @@ func (a *DesktopApp) GetMySQLAnalysis() (any, error) {
 	return a.desktopGetJSON("/api/tools/mysql-analysis", 30*time.Second)
 }
 
+func (a *DesktopApp) GetUDPTunnelAnalysis() (any, error) {
+	return a.desktopGetJSON("/api/tools/udp-tunnel", 30*time.Second)
+}
+
+func (a *DesktopApp) GetBruteforceAnalysis() (any, error) {
+	return a.desktopGetJSON("/api/tools/bruteforce", 30*time.Second)
+}
+
 func (a *DesktopApp) GetShiroRememberMeAnalysis(candidateKeys []string) (any, error) {
 	return a.desktopPostJSON("/api/tools/shiro-rememberme", map[string]any{
 		"candidate_keys": candidateKeys,

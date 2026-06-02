@@ -330,6 +330,10 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 			_, _ = w.Write([]byte(`{"random_session_key":"aa"}`))
 		case "/api/tools/http-login-analysis":
 			_, _ = w.Write([]byte(`{"total_attempts":0}`))
+		case "/api/tools/udp-tunnel":
+			_, _ = w.Write([]byte(`{"total_suspicious":0,"dns_tunnel_hits":[],"udp_tunnel_hits":[],"notes":[]}`))
+		case "/api/tools/bruteforce":
+			_, _ = w.Write([]byte(`{"total_suspicious":0,"port_scan_hits":[],"dir_bruteforce_hits":[],"notes":[]}`))
 		case "/api/analysis/usb":
 			_, _ = w.Write([]byte(`{"records":[]}`))
 		case "/api/c2-analysis/decrypt":
@@ -365,6 +369,12 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 	if _, err := app.GetHTTPLoginAnalysis(); err != nil {
 		t.Fatalf("GetHTTPLoginAnalysis error = %v", err)
 	}
+	if _, err := app.GetUDPTunnelAnalysis(); err != nil {
+		t.Fatalf("GetUDPTunnelAnalysis error = %v", err)
+	}
+	if _, err := app.GetBruteforceAnalysis(); err != nil {
+		t.Fatalf("GetBruteforceAnalysis error = %v", err)
+	}
 	if _, err := app.GetUSBAnalysis("auto", 20000); err != nil {
 		t.Fatalf("GetUSBAnalysis error = %v", err)
 	}
@@ -382,6 +392,8 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 		"GET /api/tools/winrm-decrypt/export?result_id=res-1",
 		"POST /api/tools/smb3-random-session-key",
 		"GET /api/tools/http-login-analysis",
+		"GET /api/tools/udp-tunnel",
+		"GET /api/tools/bruteforce",
 		"GET /api/analysis/usb?",
 		"POST /api/c2-analysis/decrypt",
 		"GET /api/evidence?",
