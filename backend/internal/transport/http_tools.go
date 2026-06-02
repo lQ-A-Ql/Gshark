@@ -170,3 +170,29 @@ func (s *Server) handleShiroRememberMeAnalysis(w http.ResponseWriter, r *http.Re
 	}
 	writeJSON(w, http.StatusOK, rows)
 }
+
+func (s *Server) handleUDPTunnelAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.toolAnalysis.UDPTunnelAnalysis(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleBruteforceAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	rows, err := s.toolAnalysis.BruteforceAnalysis(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}

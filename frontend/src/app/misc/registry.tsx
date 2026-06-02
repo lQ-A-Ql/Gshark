@@ -23,6 +23,8 @@ const moduleRenderers: Record<string, ComponentType<MiscModuleRendererProps>> = 
   "base64-codec": lazyModule(() => import("./modules/Base64CodecModule"), "Base64CodecModule"),
   "timestamp-converter": lazyModule(() => import("./modules/TimestampConverterModule"), "TimestampConverterModule"),
   "hash-calculator": lazyModule(() => import("./modules/HashCalculatorModule"), "HashCalculatorModule"),
+  "udp-tunnel-detection": lazyModule(() => import("./modules/UDPTunnelModule"), "UDPTunnelModule"),
+  "bruteforce-detection": lazyModule(() => import("./modules/BruteforceModule"), "BruteforceModule"),
 };
 
 export function resolveMiscModuleRenderer(moduleID: string): ComponentType<MiscModuleRendererProps> {

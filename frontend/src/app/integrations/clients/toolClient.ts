@@ -1,4 +1,5 @@
 import type {
+  BruteforceAnalysis,
   DBCProfile,
   DecryptionConfig,
   HTTPLoginAnalysis,
@@ -12,6 +13,7 @@ import type {
   SMB3RandomSessionKeyResult,
   SMB3SessionCandidate,
   SMTPAnalysis,
+  UDPTunnelAnalysis,
   WinRMDecryptRequest,
   WinRMDecryptResult,
 } from "../../core/types";
@@ -23,6 +25,7 @@ import {
   asShiroRememberMeAnalysis,
   asSMTPAnalysis,
 } from "../mappers/protocolToolMapper";
+import { asBruteforceAnalysis, asUDPTunnelAnalysis } from "../mappers/securityDetectionMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "../mappers/tlsMapper";
 import {
   asMiscModuleImportResult,
@@ -79,6 +82,8 @@ export interface ToolClient {
   removeVehicleDBC(path: string): Promise<DBCProfile[]>;
   getTLSConfig(): Promise<DecryptionConfig | null>;
   updateTLSConfig(cfg: DecryptionConfig): Promise<void>;
+  getUDPTunnelAnalysis(signal?: AbortSignal): Promise<UDPTunnelAnalysis>;
+  getBruteforceAnalysis(signal?: AbortSignal): Promise<BruteforceAnalysis>;
 }
 
 export function createToolClient(request: JsonRequest, requestText: TextRequest, requestBlob: BlobRequest): ToolClient {
@@ -223,6 +228,16 @@ export function createToolClient(request: JsonRequest, requestText: TextRequest,
         method: "POST",
         body: JSON.stringify(toDecryptionConfigRequest(cfg)),
       });
+    },
+
+    async getUDPTunnelAnalysis(signal?: AbortSignal) {
+      const payload = await request<unknown>("/api/tools/udp-tunnel", { signal });
+      return asUDPTunnelAnalysis(payload);
+    },
+
+    async getBruteforceAnalysis(signal?: AbortSignal) {
+      const payload = await request<unknown>("/api/tools/bruteforce", { signal });
+      return asBruteforceAnalysis(payload);
     },
   };
 }

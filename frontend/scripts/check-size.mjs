@@ -187,6 +187,11 @@ export const sourceSizeBudgets = [
     reason: "WinRM mapper should stay isolated from misc module and session material mapping",
   },
   {
+    path: "src/app/integrations/mappers/securityDetectionMapper.ts",
+    maxLines: 75,
+    reason: "UDP tunnel and bruteforce detection mapper should stay focused on wire-to-domain conversion",
+  },
+  {
     path: "src/app/integrations/wire/toolWireDtos.ts",
     maxLines: 35,
     reason: "tool wire DTOs should only describe raw backend payload fields before mapper normalization",

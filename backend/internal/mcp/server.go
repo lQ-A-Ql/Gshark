@@ -81,6 +81,8 @@ type ToolAnalysisService interface {
 	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
 	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
 	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
+	UDPTunnelAnalysis(ctx context.Context) (model.UDPTunnelAnalysis, error)
+	BruteforceAnalysis(ctx context.Context) (model.BruteforceAnalysis, error)
 }
 
 type Server struct {
@@ -235,6 +237,8 @@ func (s *Server) tools() []map[string]any {
 			},
 		}, nil), true, true),
 		s.newTool("tooling.smb3_candidates", "List SMB3 session candidates.", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
+		s.newTool("tooling.udp_tunnel", "Detect UDP tunneling (DNS tunnels, generic UDP tunnels).", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
+		s.newTool("tooling.bruteforce", "Detect port scanning and directory bruteforce attacks.", map[string]any{"type": "object", "properties": map[string]any{}}, true, true),
 
 		// --- Expanded tools (high priority) ---
 		s.newTool("threat.hunting_hits", "Run threat hunting and return hits (YARA + prefix pattern matching).", objectSchema(map[string]any{
@@ -554,6 +558,10 @@ func (s *Server) toolResult(ctx context.Context, name string, args map[string]an
 		return s.deps.ToolAnalysis.ShiroRememberMeAnalysis(ctx, model.ShiroRememberMeRequest{CandidateKeys: stringSliceValue(args["candidate_keys"])})
 	case "tooling.smb3_candidates":
 		return s.deps.ToolAnalysis.ListSMB3SessionCandidatesWithContext(ctx)
+	case "tooling.udp_tunnel":
+		return s.deps.ToolAnalysis.UDPTunnelAnalysis(ctx)
+	case "tooling.bruteforce":
+		return s.deps.ToolAnalysis.BruteforceAnalysis(ctx)
 
 	// --- Expanded tools (high priority) ---
 	case "threat.hunting_hits":

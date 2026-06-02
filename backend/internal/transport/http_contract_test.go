@@ -831,6 +831,14 @@ func (mcpContractToolAnalysisService) WinRMExportFile(string) (string, string, e
 	return "", "", nil
 }
 
+func (mcpContractToolAnalysisService) UDPTunnelAnalysis(context.Context) (model.UDPTunnelAnalysis, error) {
+	return model.UDPTunnelAnalysis{}, nil
+}
+
+func (mcpContractToolAnalysisService) BruteforceAnalysis(context.Context) (model.BruteforceAnalysis, error) {
+	return model.BruteforceAnalysis{}, nil
+}
+
 type contractEvidenceAnalysisService struct {
 	contractAnalysisService
 	modules []string

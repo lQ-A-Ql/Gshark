@@ -101,7 +101,7 @@ type ToolRuntimeService interface {
 }
 
 // ToolAnalysisService groups per-tool analysis methods (NTLM / HTTP-login /
-// SMTP / MySQL / Shiro / SMB3 / WinRM) consumed by the transport layer.
+// SMTP / MySQL / Shiro / SMB3 / WinRM / UDP-tunnel / bruteforce) consumed by the transport layer.
 type ToolAnalysisService interface {
 	ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error)
 	ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error)
@@ -115,4 +115,6 @@ type ToolAnalysisService interface {
 	RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	WinRMExportFile(resultID string) (string, string, error)
+	UDPTunnelAnalysis(ctx context.Context) (model.UDPTunnelAnalysis, error)
+	BruteforceAnalysis(ctx context.Context) (model.BruteforceAnalysis, error)
 }

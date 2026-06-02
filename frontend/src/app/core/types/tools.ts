@@ -84,3 +84,70 @@ export interface ToolRuntimeSnapshot {
   transport?: "desktop-ipc" | "http-fallback" | "unknown";
   transportError?: string;
 }
+
+export interface DNSTunnelHit {
+  baseDomain: string;
+  queryCount: number;
+  uniqueSubdomains: number;
+  avgSubdomainLen: number;
+  maxPayloadSize: number;
+  entropyScore: number;
+  confidence: number;
+  firstPacketId: number;
+  evidence: string;
+}
+
+export interface UDPTunnelHit {
+  source: string;
+  destination: string;
+  port: number;
+  packetCount: number;
+  bytesTotal: number;
+  avgPayloadLen: number;
+  stddevLen: number;
+  durationSec: number;
+  confidence: number;
+  firstPacketId: number;
+  protocol: string;
+}
+
+export interface UDPTunnelAnalysis {
+  totalSuspicious: number;
+  dnsTunnelHits: DNSTunnelHit[];
+  udpTunnelHits: UDPTunnelHit[];
+  notes: string[];
+}
+
+export interface PortScanHit {
+  sourceIp: string;
+  targetIp: string;
+  uniquePortsHit: number;
+  synCount: number;
+  rstCount: number;
+  openPorts: number[];
+  durationSec: number;
+  scanType: string;
+  confidence: number;
+  firstPacketId: number;
+}
+
+export interface DirBruteforceHit {
+  sourceIp: string;
+  targetHost: string;
+  totalRequests: number;
+  status404Count: number;
+  status403Count: number;
+  status200Count: number;
+  uniquePaths: number;
+  requestsPerSec: number;
+  samplePaths: string[];
+  confidence: number;
+  firstPacketId: number;
+}
+
+export interface BruteforceAnalysis {
+  totalSuspicious: number;
+  portScanHits: PortScanHit[];
+  dirBruteforceHits: DirBruteforceHit[];
+  notes: string[];
+}

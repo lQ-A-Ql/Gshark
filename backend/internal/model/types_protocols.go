@@ -295,3 +295,74 @@ type SMB3RandomSessionKeyResult struct {
 	RandomSessionKey string `json:"random_session_key"`
 	Message          string `json:"message"`
 }
+
+// UDP Tunnel Detection
+
+type UDPTunnelAnalysis struct {
+	TotalSuspicious int                  `json:"total_suspicious"`
+	DNSTunnelHits   []DNSTunnelCandidate `json:"dns_tunnel_hits"`
+	UDPTunnelHits   []UDPTunnelCandidate `json:"udp_tunnel_hits"`
+	Notes           []string             `json:"notes"`
+}
+
+type DNSTunnelCandidate struct {
+	BaseDomain       string  `json:"base_domain"`
+	QueryCount       int     `json:"query_count"`
+	UniqueSubdomains int     `json:"unique_subdomains"`
+	AvgSubdomainLen  float64 `json:"avg_subdomain_len"`
+	MaxPayloadSize   int     `json:"max_payload_size"`
+	EntropyScore     float64 `json:"entropy_score"`
+	Confidence       int     `json:"confidence"`
+	FirstPacketID    int64   `json:"first_packet_id"`
+	Evidence         string  `json:"evidence"`
+}
+
+type UDPTunnelCandidate struct {
+	Source        string  `json:"source"`
+	Destination   string  `json:"destination"`
+	Port          int     `json:"port"`
+	PacketCount   int     `json:"packet_count"`
+	BytesTotal    int     `json:"bytes_total"`
+	AvgPayloadLen float64 `json:"avg_payload_len"`
+	StdDevLen     float64 `json:"stddev_len"`
+	DurationSec   float64 `json:"duration_sec"`
+	Confidence    int     `json:"confidence"`
+	FirstPacketID int64   `json:"first_packet_id"`
+	Protocol      string  `json:"protocol"`
+}
+
+// Bruteforce Detection
+
+type BruteforceAnalysis struct {
+	TotalSuspicious   int                      `json:"total_suspicious"`
+	PortScanHits      []PortScanCandidate      `json:"port_scan_hits"`
+	DirBruteforceHits []DirBruteforceCandidate `json:"dir_bruteforce_hits"`
+	Notes             []string                 `json:"notes"`
+}
+
+type PortScanCandidate struct {
+	SourceIP       string  `json:"source_ip"`
+	TargetIP       string  `json:"target_ip"`
+	UniquePortsHit int     `json:"unique_ports_hit"`
+	SynCount       int     `json:"syn_count"`
+	RstCount       int     `json:"rst_count"`
+	OpenPorts      []int   `json:"open_ports"`
+	DurationSec    float64 `json:"duration_sec"`
+	ScanType       string  `json:"scan_type"`
+	Confidence     int     `json:"confidence"`
+	FirstPacketID  int64   `json:"first_packet_id"`
+}
+
+type DirBruteforceCandidate struct {
+	SourceIP       string   `json:"source_ip"`
+	TargetHost     string   `json:"target_host"`
+	TotalRequests  int      `json:"total_requests"`
+	Status404Count int      `json:"status_404_count"`
+	Status403Count int      `json:"status_403_count"`
+	Status200Count int      `json:"status_200_count"`
+	UniquePaths    int      `json:"unique_paths"`
+	RequestsPerSec float64  `json:"requests_per_sec"`
+	SamplePaths    []string `json:"sample_paths"`
+	Confidence     int      `json:"confidence"`
+	FirstPacketID  int64    `json:"first_packet_id"`
+}

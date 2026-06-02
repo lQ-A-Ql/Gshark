@@ -128,6 +128,8 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     getSMTPAnalysis: toolClient.getSMTPAnalysis,
     getMySQLAnalysis: toolClient.getMySQLAnalysis,
     getShiroRememberMeAnalysis: toolClient.getShiroRememberMeAnalysis,
+    getUDPTunnelAnalysis: toolClient.getUDPTunnelAnalysis,
+    getBruteforceAnalysis: toolClient.getBruteforceAnalysis,
 
     subscribeEvents: transport.subscribeEvents,
   };

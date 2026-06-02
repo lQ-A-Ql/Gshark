@@ -21,4 +21,6 @@ export interface DesktopToolingBinding {
   ImportMiscModulePackageFromPath?: (path: string) => Promise<unknown>;
   DeleteMiscModulePackage?: (id: string) => Promise<unknown>;
   RunMiscModulePackage?: (id: string, values: Record<string, string>) => Promise<unknown>;
+  GetUDPTunnelAnalysis?: () => Promise<unknown>;
+  GetBruteforceAnalysis?: () => Promise<unknown>;
 }

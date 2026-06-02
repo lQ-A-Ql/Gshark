@@ -9,6 +9,7 @@ import {
   asSMTPAnalysis,
 } from "./mappers/protocolToolMapper";
 import { asObjectList } from "./mappers/objectMapper";
+import { asBruteforceAnalysis, asUDPTunnelAnalysis } from "./mappers/securityDetectionMapper";
 import {
   asNTLMSessionMaterials,
   asSMB3RandomSessionKeyResult,
@@ -92,6 +93,16 @@ export function createObjectToolingTypedOverrides(desktopApp: DesktopTransportBi
           signal,
           LONG_TYPED_IPC_TIMEOUT_MS,
         ),
+      );
+    },
+    async getUDPTunnelAnalysis(signal) {
+      return asUDPTunnelAnalysis(
+        await typedCall(() => desktopApp.GetUDPTunnelAnalysis!(), "DesktopApp.GetUDPTunnelAnalysis", signal),
+      );
+    },
+    async getBruteforceAnalysis(signal) {
+      return asBruteforceAnalysis(
+        await typedCall(() => desktopApp.GetBruteforceAnalysis!(), "DesktopApp.GetBruteforceAnalysis", signal),
       );
     },
   };

@@ -1,5 +1,6 @@
 import type {
   AppUpdateStatus,
+  BruteforceAnalysis,
   C2DecryptRequest,
   C2DecryptResult,
   APTAnalysis,
@@ -29,6 +30,7 @@ import type {
   StreamPayloadSource,
   ThreatHit,
   NTLMSessionMaterial,
+  UDPTunnelAnalysis,
   USBAnalysis,
   USBHIDSourceMode,
   VehicleAnalysis,
@@ -138,6 +140,8 @@ export interface AnalysisClient {
   getSMTPAnalysis(signal?: AbortSignal): Promise<SMTPAnalysis>;
   getMySQLAnalysis(signal?: AbortSignal): Promise<MySQLAnalysis>;
   getShiroRememberMeAnalysis(candidateKeys?: string[], signal?: AbortSignal): Promise<ShiroRememberMeAnalysis>;
+  getUDPTunnelAnalysis(signal?: AbortSignal): Promise<UDPTunnelAnalysis>;
+  getBruteforceAnalysis(signal?: AbortSignal): Promise<BruteforceAnalysis>;
 }
 
 export interface EvidenceClient {

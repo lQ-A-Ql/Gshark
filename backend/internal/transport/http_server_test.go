@@ -786,6 +786,14 @@ func (contractToolAnalysisService) WinRMExportFile(string) (string, string, erro
 	return "", "", nil
 }
 
+func (contractToolAnalysisService) UDPTunnelAnalysis(context.Context) (model.UDPTunnelAnalysis, error) {
+	return model.UDPTunnelAnalysis{}, nil
+}
+
+func (contractToolAnalysisService) BruteforceAnalysis(context.Context) (model.BruteforceAnalysis, error) {
+	return model.BruteforceAnalysis{}, nil
+}
+
 func TestHandleAPTAnalysisReturnsInitializedPayload(t *testing.T) {
 	server := NewServer(engine.NewService(nil), NewHub())
 	req := httptest.NewRequest(http.MethodGet, "/api/apt-analysis", nil)

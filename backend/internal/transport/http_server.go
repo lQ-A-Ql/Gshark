@@ -219,6 +219,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tools/smtp-analysis", s.handleSMTPAnalysis)
 	mux.HandleFunc("/api/tools/mysql-analysis", s.handleMySQLAnalysis)
 	mux.HandleFunc("/api/tools/shiro-rememberme", s.handleShiroRememberMeAnalysis)
+	mux.HandleFunc("/api/tools/udp-tunnel", s.handleUDPTunnelAnalysis)
+	mux.HandleFunc("/api/tools/bruteforce", s.handleBruteforceAnalysis)
 
 	return withRecovery(withCORS(s.withAuth(s.withAudit(mux))))
 }

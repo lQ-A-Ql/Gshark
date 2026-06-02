@@ -53,4 +53,6 @@ export const typedBindingRequirements: Record<string, keyof DesktopTransportBind
   importMiscModulePackageFromPath: "ImportMiscModulePackageFromPath",
   deleteMiscModule: "DeleteMiscModulePackage",
   runMiscModule: "RunMiscModulePackage",
+  getUDPTunnelAnalysis: "GetUDPTunnelAnalysis",
+  getBruteforceAnalysis: "GetBruteforceAnalysis",
 };

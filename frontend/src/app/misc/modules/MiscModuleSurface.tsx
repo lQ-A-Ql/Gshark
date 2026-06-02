@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { MiscModuleManifest } from "../../core/types";
 import { cn } from "../../components/ui/utils";
 
-type MiscModuleTone = "cyan" | "emerald" | "sky" | "violet" | "amber" | "indigo";
+type MiscModuleTone = "cyan" | "emerald" | "sky" | "violet" | "amber" | "indigo" | "rose";
 
 const toneClasses: Record<MiscModuleTone, { header: string; icon: string }> = {
   amber: {
@@ -20,6 +20,10 @@ const toneClasses: Record<MiscModuleTone, { header: string; icon: string }> = {
   indigo: {
     header: "meow-evidence-accent",
     icon: "meow-evidence-accent text-indigo-700",
+  },
+  rose: {
+    header: "meow-risk-accent",
+    icon: "meow-risk-accent text-rose-700",
   },
   sky: {
     header: "meow-evidence-accent",
