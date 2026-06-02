@@ -235,9 +235,11 @@ All mapper files (`integrations/mappers/`) and wire DTO files (`integrations/wir
 
 ### MISC module system
 
-- Built-in modules (frontend): HTTPLoginAnalysis, SMTPSession, MySQLSession, ShiroRememberMe, NTLMSessionMaterials, WinRMDecrypt, SMB3SessionKey, PayloadWebShellDecoder.
+- Built-in modules (frontend): HTTPLoginAnalysis, SMTPSession, MySQLSession, ShiroRememberMe, NTLMSessionMaterials, WinRMDecrypt, SMB3SessionKey, PayloadWebShellDecoder, UDPTunnelDetection, BruteforceDetection, Base64Codec, TimestampConverter, HashCalculator.
+- Frontend-only modules (no backend): Base64Codec, TimestampConverter, HashCalculator — defined in `frontend/src/app/misc/frontendModules.ts`.
 - Custom zip modules: `manifest.json + api.json + form.json + backend.js/.py`, managed via `internal/miscpkg/manager.go`.
 - Scaffold new modules: `./scripts/new-misc-module.ps1` (e.g. `powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id echo-demo -Title "Echo Demo" -Runtime javascript -Zip`).
+- MISC page layout: left sidebar (grouped by category) + right workbench; categories: credential / payload / protocol / utility / custom.
 - Spec: `docs/misc-module-interface.md`.
 - Example: `examples/misc-modules/echo-demo`.
 
