@@ -1,5 +1,6 @@
 import { Hash } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Textarea } from "../../components/ui/textarea";
 import type { MiscModuleRendererProps } from "../types";
 import { MiscModuleSurface } from "./MiscModuleSurface";
 import { copyTextToClipboard } from "../../utils/browserFile";
@@ -76,8 +77,8 @@ export function HashCalculatorModule({ module, surfaceVariant = "card" }: MiscMo
     <MiscModuleSurface module={module} embedded={embedded} icon={<Hash className="h-4 w-4" />} tone="emerald">
       <div className="space-y-1">
         <label className="text-[11px] font-medium text-slate-500">输入文本</label>
-        <textarea
-          className="meow-field w-full resize-none font-mono text-xs"
+        <Textarea
+          className="font-mono text-xs"
           rows={4}
           placeholder="在此输入待计算哈希的文本..."
           value={input}

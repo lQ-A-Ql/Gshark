@@ -1,5 +1,6 @@
 import { Binary } from "lucide-react";
 import { useState, useCallback } from "react";
+import { Textarea } from "../../components/ui/textarea";
 import type { MiscModuleRendererProps } from "../types";
 import { MiscModuleSurface } from "./MiscModuleSurface";
 import { copyTextToClipboard } from "../../utils/browserFile";
@@ -86,8 +87,8 @@ export function Base64CodecModule({ module, surfaceVariant = "card" }: MiscModul
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
           <label className="text-[11px] font-medium text-slate-500">输入</label>
-          <textarea
-            className="meow-field w-full resize-none font-mono text-xs"
+          <Textarea
+            className="font-mono text-xs"
             rows={6}
             placeholder="在此输入内容..."
             value={input}
@@ -96,8 +97,8 @@ export function Base64CodecModule({ module, surfaceVariant = "card" }: MiscModul
         </div>
         <div className="space-y-1">
           <label className="text-[11px] font-medium text-slate-500">输出</label>
-          <textarea
-            className="meow-field w-full resize-none font-mono text-xs"
+          <Textarea
+            className="font-mono text-xs"
             rows={6}
             readOnly
             value={error || result}

@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react";
 import { useState, useCallback } from "react";
+import { Input } from "../../components/ui/input";
 import type { MiscModuleRendererProps } from "../types";
 import { MiscModuleSurface } from "./MiscModuleSurface";
 import { copyTextToClipboard } from "../../utils/browserFile";
@@ -82,8 +83,8 @@ export function TimestampConverterModule({ module, surfaceVariant = "card" }: Mi
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
           <label className="text-[11px] font-medium text-slate-500">时间戳或日期字符串</label>
-          <input
-            className="meow-field w-full font-mono text-xs"
+          <Input
+            className="font-mono text-xs"
             placeholder="如 1717315200 或 2024-06-02T12:00:00Z"
             value={input}
             onChange={(e) => setInput(e.target.value)}
