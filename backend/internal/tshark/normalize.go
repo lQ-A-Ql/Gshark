@@ -10,7 +10,7 @@ func normalizeProto(proto string) string {
 	p := strings.ToLower(proto)
 	switch {
 	case strings.Contains(p, "websocket"):
-		return "HTTP"
+		return "WebSocket"
 	case strings.Contains(p, "http"):
 		return "HTTP"
 	case strings.Contains(p, "usb"):

@@ -127,7 +127,7 @@ func buildC2SampleAnalysisFromPackets(ctx context.Context, packets []model.Packe
 			return model.C2SampleAnalysis{}, err
 		}
 		if packet.StreamID != 0 {
-			key := fmt.Sprintf("%s:%d", strings.ToUpper(packet.Protocol), packet.StreamID)
+			key := fmt.Sprintf("stream:%d", packet.StreamID)
 			builder.streams[key] = append(builder.streams[key], packet)
 		}
 		builder.inspectPacket(packet)
@@ -607,7 +607,7 @@ func (b *c2AnalysisBuilder) promoteCSHTTPObservations() {
 }
 
 func (b *c2AnalysisBuilder) inspectStreamPatterns(ctx context.Context) {
-	for key, packets := range b.streams {
+	for _, packets := range b.streams {
 		if err := ctx.Err(); err != nil {
 			return
 		}
@@ -615,12 +615,22 @@ func (b *c2AnalysisBuilder) inspectStreamPatterns(ctx context.Context) {
 			continue
 		}
 		sort.SliceStable(packets, func(i, j int) bool { return packets[i].ID < packets[j].ID })
-		protocol := strings.ToUpper(strings.Split(key, ":")[0])
-		if strings.Contains(protocol, "TCP") || strings.Contains(protocol, "HTTP") || strings.Contains(protocol, "TLS") {
-			b.inspectPeriodicStream(packets)
-			b.inspectVShellShortLongStream(packets)
+		if !streamHasTCPProtocol(packets) {
+			continue
+		}
+		b.inspectPeriodicStream(packets)
+		b.inspectVShellShortLongStream(packets)
+	}
+}
+
+func streamHasTCPProtocol(packets []model.Packet) bool {
+	for _, p := range packets {
+		proto := strings.ToUpper(p.Protocol)
+		if strings.Contains(proto, "TCP") || strings.Contains(proto, "HTTP") || strings.Contains(proto, "TLS") || strings.Contains(proto, "WEBSOCKET") {
+			return true
 		}
 	}
+	return false
 }
 
 func (b *c2AnalysisBuilder) inspectPeriodicStream(packets []model.Packet) {
