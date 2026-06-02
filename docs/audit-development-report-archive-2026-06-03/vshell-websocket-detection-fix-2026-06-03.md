@@ -50,6 +50,14 @@ WebSocket 心跳间隔因 TCP 重传被拉长（部分间隔达 22s），简单�
 | `backend/internal/engine/tool_c2.go` | stream key 改为纯 stream ID；新增 `streamHasTCPProtocol()`、`filterOutlierIntervals()`；心跳阈值放宽到 [8,14] |
 | `backend/internal/engine/vshell_ws_e2e_test.go` | 新增：WebSocket VShell 端到端检测测试 |
 
+## 测试覆盖
+
+| 测试文件 | 用例数 | 覆盖内容 |
+|---------|--------|---------|
+| `c2_stream_helpers_test.go` | 15 | `filterOutlierIntervals`（5）、`streamHasTCPProtocol`（9）、stream key 格式（1） |
+| `vshell_ws_e2e_test.go` | 1 | 真实 pcap 端到端：握手 + 心跳 + 候选数 |
+| `runner_test.go`（新增 2 个） | 2 | EK 解析：WebSocket 帧 Protocol="WebSocket"、HTTP 握手帧 Protocol="HTTP" |
+
 ## 技术决策
 
 - WebSocket 作为独立协议（不是 HTTP 别名），因为握手完成后是独立的二进制帧协议
