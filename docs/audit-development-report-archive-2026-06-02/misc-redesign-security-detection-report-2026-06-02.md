@@ -85,11 +85,17 @@
 
 **检测算法：**
 
-1. 端口扫描检测：
-   - 按 (sourceIP, targetIP) 分组 TCP 包
-   - 统计唯一目标端口数、SYN/RST 计数
-   - 标记条件：唯一端口 > 20 AND (SYN 占比 > 50% OR RST/SYN > 70%)
-   - 扫描类型分类：syn-scan / connect-scan
+1. 端口扫描检测（修订版 — 修复样本 269-lockdown 漏检/误报问题）：
+   - 仅追踪 SYN-only 包（排除 SYN-ACK）的目标端口分布
+   - RST 回包归因到扫描发起方（反向查找 `(dst, src)` 组）
+   - 数据包（非 SYN/RST）独立计数作为反误报信号
+   - 标记条件：唯一 SYN 目标端口 > 20 AND dataPackets ≤ synCount × 3
+   - 扫描类型：dataPackets < synCount/4 → syn-scan，否则 connect-scan
+   - 置信度：500+ 端口 = 95，100+ = 90，50+ = 70，20+ = 50；高 RST 比额外 +10
+
+   修复前的问题：
+   - RST 被记入反向组导致正向组不满足 SYN 占比阈值（漏检真实扫描）
+   - C2 回连因反向组累积 RST + 混入端口而被误报为扫描
 
 2. 目录爆破检测：
    - 按 (sourceIP, targetHost) 分组 HTTP 请求
@@ -108,6 +114,7 @@
 - `desktop_backend_proxy.go` 新增 `GetUDPTunnelAnalysis()` / `GetBruteforceAnalysis()`
 - 前端 typed bridge 完整覆盖（binding 声明 + requirement 映射 + typed override）
 - 修复了桌面构建时 generic IPC adapter 策略禁用报错
+- 与自定义 zip 模块的 MISC IPC 通道（`ListMiscModules` / `RunMiscModulePackage`）完全独立，互不影响
 
 ---
 
