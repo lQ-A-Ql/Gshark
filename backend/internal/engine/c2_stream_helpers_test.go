@@ -9,9 +9,9 @@ import (
 
 func TestFilterOutlierIntervals(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []float64
-		wantLen  int
+		name    string
+		input   []float64
+		wantLen int
 	}{
 		{
 			name:    "no outliers",

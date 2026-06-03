@@ -593,11 +593,33 @@ func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, stre
 			continue
 		}
 		for _, assembled := range assembleVShellStreamDirections(stream) {
+			packet := streamRepresentativePacket(streamID, assembled.direction, stream, representatives[streamID])
+
+			// WebSocket-aware path: VShell rides AES-GCM frames inside WebSocket
+			// data frames. Client→server frames are XOR-masked, so the raw stream
+			// bytes are undecryptable until the mask is stripped. Decode the
+			// colon-hex body, parse WebSocket framing, and emit the unmasked inner
+			// payloads as candidates so the GCM pipeline can recover them.
+			if wsInner := wsFrameInnerPayloads(decodeLooseHex(assembled.body)); len(wsInner) > 0 {
+				for i, inner := range wsInner {
+					if len(inner) < 8 {
+						continue
+					}
+					candidate := c2DecryptCandidate{
+						packet:    packet,
+						raw:       inner,
+						label:     fmt.Sprintf("tcp-stream:%d:%s:ws-frame-%d", streamID, assembled.direction, i),
+						transform: "ws-unmask-" + assembled.direction,
+						direction: streamChunkRecordDirection(assembled.direction),
+					}
+					appendC2DecryptCandidateUnbounded(out, seen, candidate)
+				}
+			}
+
 			for _, transformed := range decodeC2TransformCandidates(assembled.body, "auto") {
 				if len(transformed.raw) < 8 {
 					continue
 				}
-				packet := streamRepresentativePacket(streamID, assembled.direction, stream, representatives[streamID])
 				candidate := c2DecryptCandidate{
 					packet:    packet,
 					raw:       transformed.raw,

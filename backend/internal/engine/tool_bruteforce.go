@@ -39,15 +39,15 @@ type portScanKey struct {
 }
 
 type portScanGroup struct {
-	key          portScanKey
-	synPorts     map[int]struct{} // ports that received SYN-only (no ACK)
-	openPorts    map[int]struct{} // ports that replied SYN-ACK
-	rstCount     int              // RST received from target (attributed back)
-	synCount     int              // pure SYN-only count
-	dataPackets  int              // non-SYN/RST packets (actual data transfer)
-	firstPacket  int64
-	firstTime    string
-	lastTime     string
+	key         portScanKey
+	synPorts    map[int]struct{} // ports that received SYN-only (no ACK)
+	openPorts   map[int]struct{} // ports that replied SYN-ACK
+	rstCount    int              // RST received from target (attributed back)
+	synCount    int              // pure SYN-only count
+	dataPackets int              // non-SYN/RST packets (actual data transfer)
+	firstPacket int64
+	firstTime   string
+	lastTime    string
 }
 
 type dirBruteKey struct {
@@ -108,9 +108,9 @@ func buildBruteforceAnalysis(ctx context.Context, packets []model.Packet) (model
 				group := portScans[key]
 				if group == nil {
 					group = &portScanGroup{
-						key:       key,
-						synPorts:  make(map[int]struct{}),
-						openPorts: make(map[int]struct{}),
+						key:         key,
+						synPorts:    make(map[int]struct{}),
+						openPorts:   make(map[int]struct{}),
 						firstPacket: packet.ID,
 						firstTime:   packet.Timestamp,
 					}

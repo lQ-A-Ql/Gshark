@@ -17,69 +17,15 @@ import (
 
 type Service struct {
 	emitter EventEmitter
-
-	mu                      sync.RWMutex
-	loadMu                  sync.Mutex
-	activeLoadMu            sync.Mutex
-	activeLoadID            int64
-	activeLoadCancel        context.CancelFunc
-	activeLoadStatus        *model.CaptureLoadStatus
-	captureTaskMu           sync.Mutex
-	captureTaskSeq          int64
-	captureTasks            map[int64]captureTaskCancel
-	packetStore             *packetStore
-	tlsConf                 model.TLSConfig
-	runID                   int64
-	pcap                    string
-	displayFilterCache      map[string]*filteredPacketIndex
-	displayFilterCacheOrder []string
-	globalTrafficStats      *model.GlobalTrafficStats
-	industrialAnalysis      *model.IndustrialAnalysis
-	vehicleAnalysis         *model.VehicleAnalysis
-	mediaAnalysis           *model.MediaAnalysis
-	usbAnalysis             *model.USBAnalysis
-	usbAnalysisBySource     map[string]*model.USBAnalysis
-	c2Analysis              *model.C2SampleAnalysis
-	aptAnalysis             *model.APTAnalysis
-	vehicleDBCDefs          []*tshark.DBCDatabase
-	streamCache             map[string]model.ReassembledStream
-	streamCacheOrder        []string
-	rawStreamIndex          map[string]model.ReassembledStream
-	streamOverrides         map[string]map[int]string
-
-	exportDir      string
-	mediaExportDir string
-	objectsLoaded  bool
-	objects        []model.ObjectFile
-	mediaArtifacts map[string]string
-	mediaPlayback  map[string]string
-	mediaSpeech    map[string]model.MediaTranscription
-	speechBatch    *model.SpeechBatchTaskStatus
-	speechCancel   context.CancelFunc
-	objMu          sync.Mutex
-	yaraLoaded     bool
-	yaraScanning   bool
-	yaraHits       []model.ThreatHit
-	yaraLastError  string
-	yaraMu         sync.Mutex
-
-	// toolRuntimeMu serializes reads and writes of the tool runtime
-	// configuration surface (tshark path, ffmpeg/python/vosk env vars and
-	// the yaraConf slice below). It wraps the composite ToolRuntimeConfig
-	// read so callers always observe a consistent snapshot.
-	toolRuntimeMu sync.RWMutex
-	// toolRuntimeFullProbeMu prevents repeated full runtime probes from
-	// launching duplicate tshark/Python capability processes concurrently.
-	toolRuntimeFullProbeMu sync.Mutex
-
-	huntMu          sync.RWMutex
-	huntingPrefixes []string
-	yaraConf        model.YaraConfig
-
-	cancel context.CancelFunc
-
-	mcpMu     sync.RWMutex
-	mcpConfig model.MCPConfig
+	captureState
+	displayFilterState
+	streamState
+	analysisCache
+	objectState
+	mediaState
+	yaraHuntingState
+	toolRuntimeState
+	mcpState
 }
 
 const defaultStreamCacheLimit = 256
@@ -146,23 +92,34 @@ func NewService(emitter EventEmitter) *Service {
 		log.Fatalf("engine: init packet store: %v", err)
 	}
 	return &Service{
-		emitter:            emitter,
-		packetStore:        store,
-		captureTasks:       map[int64]captureTaskCancel{},
-		displayFilterCache: map[string]*filteredPacketIndex{},
-		streamCache:        map[string]model.ReassembledStream{},
-		rawStreamIndex:     map[string]model.ReassembledStream{},
-		streamOverrides:    map[string]map[int]string{},
-		mediaArtifacts:     map[string]string{},
-		mediaPlayback:      map[string]string{},
-		mediaSpeech:        map[string]model.MediaTranscription{},
-		huntingPrefixes: []string{
-			"flag{",
-			"ctf{",
+		emitter: emitter,
+		captureState: captureState{
+			packetStore:  store,
+			captureTasks: map[int64]captureTaskCancel{},
 		},
-		yaraConf: model.YaraConfig{
-			Enabled:   true,
-			TimeoutMS: 25000,
+		displayFilterState: displayFilterState{
+			displayFilterCache: map[string]*filteredPacketIndex{},
+		},
+		streamState: streamState{
+			streamCache:     map[string]model.ReassembledStream{},
+			rawStreamIndex:  map[string]model.ReassembledStream{},
+			streamOverrides: map[string]map[int]string{},
+		},
+		objectState: objectState{},
+		mediaState: mediaState{
+			mediaArtifacts: map[string]string{},
+			mediaPlayback:  map[string]string{},
+			mediaSpeech:    map[string]model.MediaTranscription{},
+		},
+		yaraHuntingState: yaraHuntingState{
+			huntingPrefixes: []string{
+				"flag{",
+				"ctf{",
+			},
+			yaraConf: model.YaraConfig{
+				Enabled:   true,
+				TimeoutMS: 25000,
+			},
 		},
 	}
 }

@@ -27,6 +27,8 @@
     "preview": "vite preview",
     "size:check": "node scripts/check-size.mjs",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "wails-binding:check": "node scripts/check-wails-bindings.mjs",
@@ -57,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",

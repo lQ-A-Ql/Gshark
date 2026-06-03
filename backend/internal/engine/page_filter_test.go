@@ -177,7 +177,7 @@ func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{packetStore: store}
+	svc := &Service{captureState: captureState{packetStore: store}}
 	cursor, total, found := svc.PacketPageCursor(4, 2, "http")
 	if !found {
 		t.Fatal("expected packet #4 to be found in filtered results")
@@ -664,7 +664,7 @@ func TestThreatHuntStreamsFromPacketStore(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{packetStore: store}
+	svc := &Service{captureState: captureState{packetStore: store}}
 	hits := svc.ThreatHunt([]string{"flag{"})
 	if len(hits) < 2 {
 		t.Fatalf("expected streamed hunt hits, got %+v", hits)

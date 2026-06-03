@@ -1,0 +1,2355 @@
+openapi: 3.0.3
+info:
+  title: meow~traffic API
+  description: Backend API for the meow~traffic network traffic analysis platform.
+  version: 0.0.1
+  contact:
+    name: meow~traffic
+servers:
+  - url: http://127.0.0.1:17891
+    description: Local backend
+security:
+  - BearerAuth: []
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    PacketId:
+      name: id
+      in: query
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Packet ID
+    StreamId:
+      name: streamId
+      in: query
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Stream ID
+    Protocol:
+      name: protocol
+      in: query
+      schema:
+        type: string
+        default: TCP
+        enum: [TCP, UDP, HTTP]
+      description: Protocol name
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    Packet:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+        source_ip:
+          type: string
+        source_port:
+          type: integer
+        dest_ip:
+          type: string
+        dest_port:
+          type: integer
+        protocol:
+          type: string
+        display_protocol:
+          type: string
+        length:
+          type: integer
+        info:
+          type: string
+        payload:
+          type: string
+        raw_hex:
+          type: string
+        udp_payload_hex:
+          type: string
+        stream_id:
+          type: integer
+          format: int64
+        ip_header_len:
+          type: integer
+        l4_header_len:
+          type: integer
+    CaptureStatus:
+      type: object
+      properties:
+        file_path:
+          type: string
+        has_capture:
+          type: boolean
+        packet_count:
+          type: integer
+        load:
+          type: object
+          properties:
+            run_id:
+              type: integer
+              format: int64
+            file_path:
+              type: string
+            phase:
+              type: string
+            parser_profile:
+              type: string
+            estimated_total:
+              type: integer
+            processed:
+              type: integer
+            accepted:
+              type: integer
+            staged_count:
+              type: integer
+            last_error:
+              type: string
+            started_at:
+              type: string
+            updated_at:
+              type: string
+            completed_at:
+              type: string
+    StreamChunk:
+      type: object
+      properties:
+        packet_id:
+          type: integer
+          format: int64
+        direction:
+          type: string
+        body:
+          type: string
+    ReassembledStream:
+      type: object
+      properties:
+        stream_id:
+          type: integer
+          format: int64
+        protocol:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/StreamChunk'
+        request:
+          type: string
+        response:
+          type: string
+        load_meta:
+          type: object
+          properties:
+            source:
+              type: string
+            loading:
+              type: boolean
+            cache_hit:
+              type: boolean
+            index_hit:
+              type: boolean
+            file_fallback:
+              type: boolean
+            tshark_ms:
+              type: integer
+              format: int64
+            override_count:
+              type: integer
+    StreamPayloadSource:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+        host:
+          type: string
+        uri:
+          type: string
+        packet_id:
+          type: integer
+          format: int64
+        stream_id:
+          type: integer
+          format: int64
+        source_type:
+          type: string
+        param_name:
+          type: string
+        payload:
+          type: string
+        preview:
+          type: string
+        confidence:
+          type: integer
+        signals:
+          type: array
+          items:
+            type: string
+        decoder_hints:
+          type: array
+          items:
+            type: string
+        family_hint:
+          type: string
+        source_role:
+          type: string
+        content_type:
+          type: string
+        occurrence_count:
+          type: integer
+        first_time:
+          type: string
+        last_time:
+          type: string
+    StreamPayloadInspection:
+      type: object
+      properties:
+        normalized_payload:
+          type: string
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              kind:
+                type: string
+              param_name:
+                type: string
+              value:
+                type: string
+              preview:
+                type: string
+              confidence:
+                type: integer
+              decoder_hints:
+                type: array
+                items:
+                    type: string
+              family_hint:
+                type: string
+        suggested_candidate_id:
+          type: string
+        suggested_decoder:
+          type: string
+        suggested_family:
+          type: string
+        confidence:
+          type: integer
+        reasons:
+          type: array
+          items:
+            type: string
+    GlobalTrafficStats:
+      type: object
+      properties:
+        total_packets:
+          type: integer
+        protocol_kinds:
+          type: integer
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        protocol_dist:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        top_talkers:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        top_hostnames:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        top_domains:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        top_src_ips:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        top_dst_ips:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              count:
+                type: integer
+        protocol_hierarchy:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+              children:
+                type: array
+                items:
+                  type: object
+    EvidenceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        module:
+          type: string
+        source_module:
+          type: string
+        packet_id:
+          type: integer
+          format: int64
+        stream_id:
+          type: integer
+          format: int64
+        family:
+          type: string
+        actor_id:
+          type: string
+        actor_name:
+          type: string
+        source_type:
+          type: string
+        summary:
+          type: string
+        value:
+          type: string
+        confidence:
+          type: integer
+        severity:
+          type: string
+        source:
+          type: string
+        destination:
+          type: string
+        host:
+          type: string
+        uri:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        caveats:
+          type: array
+          items:
+            type: string
+    EvidenceResponse:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceRecord'
+        total:
+          type: integer
+        notes:
+          type: array
+          items:
+            type: string
+    MiscModuleManifest:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        api_prefix:
+          type: string
+        docs_path:
+          type: string
+        requires_capture:
+          type: boolean
+        protocol_domain:
+          type: string
+        supports_export:
+          type: boolean
+        cancellable:
+          type: boolean
+        depends_on:
+          type: array
+          items:
+            type: string
+    AuditEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        action:
+          type: string
+        risk:
+          type: string
+        status:
+          type: integer
+        duration_ms:
+          type: integer
+        remote_addr:
+          type: string
+    ToolRuntimeSnapshot:
+      type: object
+      properties:
+        config:
+          type: object
+        tshark:
+          type: object
+          properties:
+            path:
+              type: string
+            version:
+              type: string
+            available:
+              type: boolean
+            custom_path:
+              type: boolean
+        ffmpeg:
+          type: object
+          properties:
+            path:
+              type: string
+            version:
+              type: string
+            available:
+              type: boolean
+    TLSConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        cert_file:
+          type: string
+        key_file:
+          type: string
+        min_version:
+          type: string
+    MCPConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        transport:
+          type: string
+        endpoint:
+          type: string
+    MCPStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        transport:
+          type: string
+        endpoint:
+          type: string
+        auth_required:
+          type: boolean
+    SpeechToTextStatus:
+      type: object
+      properties:
+        available:
+          type: boolean
+        engine:
+          type: string
+        model:
+          type: string
+        language:
+          type: string
+    MediaTranscription:
+      type: object
+      properties:
+        token:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+        language:
+          type: string
+        duration_seconds:
+          type: number
+        engine:
+          type: string
+        model:
+          type: string
+    SpeechBatchTaskStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        total:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+        current_token:
+          type: string
+    MediaTranscriptionBatchExport:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              token:
+                type: string
+              title:
+                type: string
+              text:
+                type: string
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns service health status.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/runtime/identity:
+    get:
+      tags: [Health]
+      summary: Runtime identity
+      description: Returns runtime identity information including service name, version, build info, and auth status.
+      operationId: getRuntimeIdentity
+      responses:
+        '200':
+          description: Runtime identity info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                  version:
+                    type: string
+                  build_commit:
+                    type: string
+                  auth_enabled:
+                    type: boolean
+                  build_id:
+                    type: string
+                  misc_package_dir:
+                    type: string
+                  started_at:
+                    type: string
+
+  /api/events:
+    get:
+      tags: [Events]
+      summary: Server-sent events stream
+      description: Opens an SSE connection for real-time packet, status, and error events.
+      operationId: streamEvents
+      responses:
+        '200':
+          description: SSE event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/capture/start:
+    post:
+      tags: [Capture]
+      summary: Start capture loading
+      description: Begins loading a PCAP file asynchronously. Returns immediately with accepted status.
+      operationId: startCapture
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file_path]
+              properties:
+                file_path:
+                  type: string
+                  description: Path to the capture file on the server filesystem
+                display_filter:
+                  type: string
+                  description: Wireshark display filter
+                max_packets:
+                  type: integer
+                  description: Maximum number of packets to load
+                emit_packets:
+                  type: boolean
+                fast_list:
+                  type: boolean
+                list_profile:
+                  type: string
+                enable_enrichment:
+                  type: boolean
+                tls:
+                  $ref: '#/components/schemas/TLSConfig'
+      responses:
+        '202':
+          description: Capture loading started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: streaming
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/capture/stop:
+    post:
+      tags: [Capture]
+      summary: Stop streaming
+      description: Stops the current streaming/capture process.
+      operationId: stopCapture
+      responses:
+        '200':
+          description: Streaming stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: stopped
+
+  /api/capture/prepare-replacement:
+    post:
+      tags: [Capture]
+      summary: Prepare capture replacement
+      description: Prepares the system to load a new capture file, releasing current resources.
+      operationId: prepareCaptureReplacement
+      responses:
+        '200':
+          description: Prepared for replacement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: prepared
+
+  /api/capture/close:
+    post:
+      tags: [Capture]
+      summary: Close capture
+      description: Clears the current capture and releases all resources.
+      operationId: closeCapture
+      responses:
+        '200':
+          description: Capture closed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: closed
+        '400':
+          description: No capture loaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/capture/status:
+    get:
+      tags: [Capture]
+      summary: Capture status
+      description: Returns current capture loading status including phase, progress, and packet count.
+      operationId: getCaptureStatus
+      responses:
+        '200':
+          description: Current capture status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaptureStatus'
+
+  /api/capture/upload:
+    post:
+      tags: [Capture]
+      summary: Upload capture file
+      description: Uploads a PCAP/PCAPNG/CAP file (max 2GB). Returns the server-side path for use with /api/capture/start.
+      operationId: uploadCapture
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Capture file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filePath:
+                    type: string
+                  fileSize:
+                    type: integer
+                    format: int64
+                  fileName:
+                    type: string
+        '413':
+          description: File exceeds 2GB limit
+
+  /api/packets:
+    get:
+      tags: [Packets]
+      summary: List all packets
+      description: Returns all loaded packets.
+      operationId: listPackets
+      responses:
+        '200':
+          description: List of packets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Packet'
+
+  /api/packets/page:
+    get:
+      tags: [Packets]
+      summary: Paginated packet list
+      description: Returns packets with cursor-based pagination and optional display filter.
+      operationId: listPacketsPage
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Cursor position for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 10000
+          description: Number of packets per page
+        - name: filter
+          in: query
+          schema:
+            type: string
+          description: Wireshark display filter
+      responses:
+        '200':
+          description: Paginated packet list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Packet'
+                  next_cursor:
+                    type: integer
+                  total:
+                    type: integer
+                  has_more:
+                    type: boolean
+                  filtering:
+                    type: boolean
+        '400':
+          description: Invalid display filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/packets/locate:
+    get:
+      tags: [Packets]
+      summary: Locate packet in paginated list
+      description: Finds the cursor position for a specific packet ID within the current filter.
+      operationId: locatePacket
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Packet ID to locate
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          description: Page limit used for cursor calculation
+        - name: filter
+          in: query
+          schema:
+            type: string
+          description: Active display filter
+      responses:
+        '200':
+          description: Packet location info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packet_id:
+                    type: integer
+                    format: int64
+                  cursor:
+                    type: integer
+                  total:
+                    type: integer
+                  found:
+                    type: boolean
+        '400':
+          description: Invalid packet id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/packet:
+    get:
+      tags: [Packets]
+      summary: Get single packet
+      description: Returns a single packet by ID.
+      operationId: getPacket
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Packet ID
+      responses:
+        '200':
+          description: Packet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Packet'
+        '404':
+          description: Packet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/packet/raw:
+    get:
+      tags: [Packets]
+      summary: Get raw packet hex
+      description: Returns the raw hex dump of a packet.
+      operationId: getPacketRaw
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Raw packet hex
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packet_id:
+                    type: integer
+                    format: int64
+                  raw_hex:
+                    type: string
+        '404':
+          description: Packet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/packet/layers:
+    get:
+      tags: [Packets]
+      summary: Get packet protocol layers
+      description: Returns the protocol layer breakdown of a packet.
+      operationId: getPacketLayers
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Packet layers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packet_id:
+                    type: integer
+                    format: int64
+                  layers:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Packet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/streams/index:
+    get:
+      tags: [Streams]
+      summary: List stream IDs
+      description: Returns all stream IDs for a given protocol.
+      operationId: listStreamIDs
+      parameters:
+        - name: protocol
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [HTTP, TCP, UDP]
+          description: Protocol to list streams for
+      responses:
+        '200':
+          description: Stream IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  protocol:
+                    type: string
+                  total:
+                    type: integer
+                  ids:
+                    type: array
+                    items:
+                      type: integer
+        '400':
+          description: Invalid protocol
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/streams/http:
+    get:
+      tags: [Streams]
+      summary: Get HTTP stream
+      description: Returns an HTTP stream reassembled into request/response pairs.
+      operationId: getHTTPStream
+      parameters:
+        - $ref: '#/components/parameters/StreamId'
+      responses:
+        '200':
+          description: HTTP stream data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReassembledStream'
+
+  /api/streams/raw:
+    get:
+      tags: [Streams]
+      summary: Get raw stream
+      description: Returns raw TCP/UDP stream chunks.
+      operationId: getRawStream
+      parameters:
+        - $ref: '#/components/parameters/StreamId'
+        - $ref: '#/components/parameters/Protocol'
+      responses:
+        '200':
+          description: Raw stream data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReassembledStream'
+
+  /api/streams/raw/page:
+    get:
+      tags: [Streams]
+      summary: Get raw stream page
+      description: Returns a paginated view of raw stream chunks.
+      operationId: getRawStreamPage
+      parameters:
+        - $ref: '#/components/parameters/StreamId'
+        - $ref: '#/components/parameters/Protocol'
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated stream data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stream_id:
+                    type: integer
+                    format: int64
+                  protocol:
+                    type: string
+                  from:
+                    type: string
+                  to:
+                    type: string
+                  chunks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StreamChunk'
+                  load_meta:
+                    type: object
+                  next_cursor:
+                    type: integer
+                  total:
+                    type: integer
+                  has_more:
+                    type: boolean
+
+  /api/streams/payload-sources:
+    get:
+      tags: [Streams]
+      summary: List stream payload sources
+      description: Returns suspicious payload sources detected in streams (e.g., WebShell URIs, repeat-burst patterns).
+      operationId: listStreamPayloadSources
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of results
+      responses:
+        '200':
+          description: Payload sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreamPayloadSource'
+
+  /api/streams/decode:
+    post:
+      tags: [Streams]
+      summary: Decode stream payload
+      description: Decodes a stream payload using the specified decoder (base64, hex, url, deflate, etc.).
+      operationId: decodeStreamPayload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decoder, payload]
+              properties:
+                decoder:
+                  type: string
+                  description: Decoder name (e.g., base64, hex, url, deflate, gzip)
+                payload:
+                  type: string
+                  description: Encoded payload to decode
+                options:
+                  type: object
+                  description: Decoder-specific options
+      responses:
+        '200':
+          description: Decoded result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  decoded:
+                    type: string
+                  decoder:
+                    type: string
+                  success:
+                    type: boolean
+                  error:
+                    type: string
+        '400':
+          description: Invalid payload or decoder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/streams/inspect:
+    post:
+      tags: [Streams]
+      summary: Inspect stream payload
+      description: Inspects a payload to detect encoding type, suggest decoders, and identify potential WebShell families.
+      operationId: inspectStreamPayload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payload]
+              properties:
+                payload:
+                  type: string
+                  description: Payload to inspect
+      responses:
+        '200':
+          description: Inspection result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamPayloadInspection'
+
+  /api/streams/payloads:
+    post:
+      tags: [Streams]
+      summary: Update stream payloads
+      description: Applies patches to stream chunk payloads for decode/inspect workflow.
+      operationId: updateStreamPayloads
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [protocol, stream_id, patches]
+              properties:
+                protocol:
+                  type: string
+                stream_id:
+                  type: integer
+                  format: int64
+                patches:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      index:
+                        type: integer
+                      body:
+                        type: string
+      responses:
+        '200':
+          description: Updated stream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReassembledStream'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/stats/traffic/global:
+    get:
+      tags: [Analysis]
+      summary: Global traffic statistics
+      description: Returns global traffic statistics including protocol distribution, top talkers, and timeline.
+      operationId: getGlobalTrafficStats
+      responses:
+        '200':
+          description: Traffic statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTrafficStats'
+
+  /api/analysis/industrial:
+    get:
+      tags: [Analysis]
+      summary: Industrial protocol analysis
+      description: Returns analysis of industrial protocols (Modbus, S7, DNP3, EtherNet/IP, etc.) found in the capture.
+      operationId: getIndustrialAnalysis
+      responses:
+        '200':
+          description: Industrial analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  protocols:
+                    type: array
+                    items:
+                      type: object
+                  conversations:
+                    type: array
+                    items:
+                      type: object
+
+  /api/analysis/vehicle:
+    get:
+      tags: [Analysis]
+      summary: Vehicle protocol analysis
+      description: Returns analysis of vehicle protocols (CAN bus, UDS, etc.) found in the capture.
+      operationId: getVehicleAnalysis
+      responses:
+        '200':
+          description: Vehicle analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  protocols:
+                    type: array
+                    items:
+                      type: object
+                  conversations:
+                    type: array
+                    items:
+                      type: object
+
+  /api/analysis/vehicle/dbc:
+    get:
+      tags: [Analysis]
+      summary: List DBC profiles
+      description: Returns loaded DBC (CAN database) profiles.
+      operationId: listVehicleDBCProfiles
+      responses:
+        '200':
+          description: DBC profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+    post:
+      tags: [Analysis]
+      summary: Add DBC profile
+      description: Loads a DBC file for CAN bus decoding.
+      operationId: addVehicleDBCProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: Server-side path to the DBC file
+      responses:
+        '200':
+          description: Updated DBC profiles list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          description: Invalid path
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Analysis]
+      summary: Remove DBC profile
+      description: Removes a loaded DBC profile.
+      operationId: removeVehicleDBCProfile
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Path of the DBC file to remove
+      responses:
+        '200':
+          description: Updated DBC profiles list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/analysis/media:
+    get:
+      tags: [Analysis]
+      summary: Media analysis
+      description: Returns media artifacts (audio, video, images) extracted from the capture.
+      operationId: getMediaAnalysis
+      parameters:
+        - name: refresh
+          in: query
+          schema:
+            type: string
+            enum: ['1', 'true', 'yes']
+          description: Force refresh of media analysis
+      responses:
+        '200':
+          description: Media analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifacts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        token:
+                          type: string
+                        name:
+                          type: string
+                        mime:
+                          type: string
+                        size_bytes:
+                          type: integer
+                          format: int64
+                        packet_id:
+                          type: integer
+                          format: int64
+
+  /api/analysis/usb:
+    get:
+      tags: [Analysis]
+      summary: USB analysis
+      description: Returns USB traffic analysis including HID input events.
+      operationId: getUSBAnalysis
+      parameters:
+        - name: hid_source
+          in: query
+          schema:
+            type: string
+            enum: [auto, usbhid, capdata, btatt, raw]
+            default: auto
+          description: HID data source mode
+        - name: hid_event_limit
+          in: query
+          schema:
+            type: integer
+          description: Maximum number of HID events to return
+      responses:
+        '200':
+          description: USB analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      type: object
+                  hid_events:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Invalid hid_source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/c2-analysis:
+    get:
+      tags: [Analysis]
+      summary: C2 framework analysis
+      description: Detects C2 framework traffic (Cobalt Strike, VShell, etc.) in the capture.
+      operationId: getC2Analysis
+      responses:
+        '200':
+          description: C2 analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  samples:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+
+  /api/c2-analysis/decrypt:
+    post:
+      tags: [Analysis]
+      summary: Decrypt C2 traffic
+      description: Attempts to decrypt C2 traffic using provided keys or brute-force.
+      operationId: decryptC2Traffic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                protocol:
+                  type: string
+                  description: C2 protocol (e.g., cobaltstrike, vshell)
+                stream_id:
+                  type: integer
+                  format: int64
+                key:
+                  type: string
+                  description: Decryption key (hex-encoded)
+                salt:
+                  type: string
+                  description: Salt value (hex-encoded)
+                method:
+                  type: string
+                  description: Decryption method
+      responses:
+        '200':
+          description: Decryption result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plaintext:
+                    type: string
+                  method:
+                    type: string
+                  error:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/apt-analysis:
+    get:
+      tags: [Analysis]
+      summary: APT analysis
+      description: Returns APT (Advanced Persistent Threat) indicators and analysis.
+      operationId: getAPTAnalysis
+      responses:
+        '200':
+          description: APT analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indicators:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+
+  /api/evidence:
+    get:
+      tags: [Analysis]
+      summary: Gather evidence
+      description: Aggregates evidence from hunting, C2, APT, industrial, and object analysis modules.
+      operationId: getEvidence
+      parameters:
+        - name: modules
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of modules to include (e.g., hunting,c2,apt,industrial,object)
+      responses:
+        '200':
+          description: Aggregated evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+
+  /api/analysis/media/export:
+    get:
+      tags: [Media]
+      summary: Export media artifact
+      description: Downloads a media artifact file by token.
+      operationId: exportMediaArtifact
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Media artifact token
+      responses:
+        '200':
+          description: Media file download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Artifact not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analysis/media/play:
+    get:
+      tags: [Media]
+      summary: Play media artifact
+      description: Streams a media artifact for playback (transcoded to MP4/M4A if needed via ffmpeg).
+      operationId: playMediaArtifact
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Media artifact token
+      responses:
+        '200':
+          description: Media stream for playback
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Playback failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analysis/media/transcribe:
+    post:
+      tags: [Media]
+      summary: Transcribe media artifact
+      description: Transcribes a single media artifact using speech-to-text.
+      operationId: transcribeMediaArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: Media artifact token
+                force:
+                  type: boolean
+                  default: false
+                  description: Force re-transcription even if cached result exists
+      responses:
+        '200':
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaTranscription'
+        '400':
+          description: Transcription failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analysis/media/transcribe/batch:
+    get:
+      tags: [Media]
+      summary: Batch transcription status
+      description: Returns the current batch transcription task status.
+      operationId: getBatchTranscriptionStatus
+      responses:
+        '200':
+          description: Batch transcription status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpeechBatchTaskStatus'
+    post:
+      tags: [Media]
+      summary: Start batch transcription
+      description: Starts batch transcription of all media artifacts.
+      operationId: startBatchTranscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  default: false
+                  description: Force re-transcription of already processed items
+      responses:
+        '200':
+          description: Batch transcription started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpeechBatchTaskStatus'
+        '400':
+          description: Failed to start batch transcription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analysis/media/transcribe/batch/cancel:
+    post:
+      tags: [Media]
+      summary: Cancel batch transcription
+      description: Cancels the running batch transcription task.
+      operationId: cancelBatchTranscription
+      responses:
+        '200':
+          description: Batch transcription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpeechBatchTaskStatus'
+
+  /api/analysis/media/transcribe/batch/export:
+    get:
+      tags: [Media]
+      summary: Export batch transcription
+      description: Exports batch transcription results as text or JSON file.
+      operationId: exportBatchTranscription
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [txt, json]
+          description: Export format
+      responses:
+        '200':
+          description: Exported transcription file
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaTranscriptionBatchExport'
+        '400':
+          description: No results available or unsupported format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tools/tshark:
+    get:
+      tags: [Tools]
+      summary: Get tshark status
+      description: Returns tshark tool status including path, version, and availability.
+      operationId: getTsharkStatus
+      responses:
+        '200':
+          description: tshark status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  version:
+                    type: string
+                  available:
+                    type: boolean
+                  custom_path:
+                    type: boolean
+    post:
+      tags: [Tools]
+      summary: Set tshark path
+      description: Sets a custom tshark binary path.
+      operationId: setTsharkPath
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: Path to tshark binary
+      responses:
+        '200':
+          description: Updated tshark status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  version:
+                    type: string
+                  available:
+                    type: boolean
+                  custom_path:
+                    type: boolean
+
+  /api/tools/runtime-config:
+    get:
+      tags: [Tools]
+      summary: Get runtime config
+      description: Returns the full tool runtime configuration snapshot.
+      operationId: getToolRuntimeConfig
+      parameters:
+        - name: probe
+          in: query
+          schema:
+            type: string
+            default: full
+          description: Probe mode (full, skip, etc.)
+      responses:
+        '200':
+          description: Runtime configuration snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolRuntimeSnapshot'
+    post:
+      tags: [Tools]
+      summary: Update runtime config
+      description: Updates the tool runtime configuration (paths, options).
+      operationId: setToolRuntimeConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tshark_path:
+                  type: string
+                python_path:
+                  type: string
+                ffmpeg_path:
+                  type: string
+      responses:
+        '200':
+          description: Updated runtime configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolRuntimeSnapshot'
+
+  /api/tools/ffmpeg:
+    get:
+      tags: [Tools]
+      summary: Get ffmpeg status
+      description: Returns ffmpeg tool availability and version.
+      operationId: getFFmpegStatus
+      responses:
+        '200':
+          description: ffmpeg status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  version:
+                    type: string
+                  available:
+                    type: boolean
+
+  /api/tools/speech-to-text:
+    get:
+      tags: [Tools]
+      summary: Get speech-to-text status
+      description: Returns speech-to-text engine availability and configuration.
+      operationId: getSpeechToTextStatus
+      responses:
+        '200':
+          description: Speech-to-text status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpeechToTextStatus'
+
+  /api/tools/ntlm-sessions:
+    get:
+      tags: [Tools]
+      summary: List NTLM session materials
+      description: Extracts NTLM challenge, NT proof, session key, and direction info from HTTP/WinRM/SMB3 traffic.
+      operationId: listNTLMSessionMaterials
+      responses:
+        '200':
+          description: NTLM session materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/http-login-analysis:
+    get:
+      tags: [Tools]
+      summary: HTTP login analysis
+      description: Aggregates HTTP login/auth requests and identifies success, failure, and bruteforce patterns.
+      operationId: getHTTPLoginAnalysis
+      responses:
+        '200':
+          description: HTTP login analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/smtp-analysis:
+    get:
+      tags: [Tools]
+      summary: SMTP session analysis
+      description: Reconstructs SMTP sessions including auth, MAIL FROM/RCPT TO, DATA content, and attachments.
+      operationId: getSMTPAnalysis
+      responses:
+        '200':
+          description: SMTP analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/mysql-analysis:
+    get:
+      tags: [Tools]
+      summary: MySQL session analysis
+      description: Extracts MySQL handshake, login, queries, and responses into structured sessions.
+      operationId: getMySQLAnalysis
+      responses:
+        '200':
+          description: MySQL analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/shiro-rememberme:
+    get:
+      tags: [Tools]
+      summary: Shiro rememberMe analysis (GET)
+      description: Analyzes Shiro rememberMe cookies with default options.
+      operationId: getShiroRememberMeAnalysis
+      responses:
+        '200':
+          description: Shiro analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+    post:
+      tags: [Tools]
+      summary: Shiro rememberMe analysis (POST)
+      description: Analyzes Shiro rememberMe cookies with custom options (e.g., custom AES keys).
+      operationId: postShiroRememberMeAnalysis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys:
+                  type: array
+                  items:
+                    type: string
+                  description: Additional AES keys to test (hex-encoded)
+      responses:
+        '200':
+          description: Shiro analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/udp-tunnel:
+    get:
+      tags: [Tools]
+      summary: UDP tunnel detection
+      description: Detects potential UDP tunneling in the capture.
+      operationId: getUDPTunnelAnalysis
+      responses:
+        '200':
+          description: UDP tunnel analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/bruteforce:
+    get:
+      tags: [Tools]
+      summary: Bruteforce detection
+      description: Detects potential brute-force attack patterns in the capture.
+      operationId: getBruteforceAnalysis
+      responses:
+        '200':
+          description: Bruteforce analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/winrm-decrypt:
+    post:
+      tags: [Tools]
+      summary: WinRM decryption
+      description: Decrypts WinRM over HTTP + NTLM traffic for plaintext extraction.
+      operationId: runWinRMDecrypt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stream_id:
+                  type: integer
+                  format: int64
+                session_key:
+                  type: string
+                  description: NTLM session key (hex-encoded)
+      responses:
+        '200':
+          description: Decryption result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plaintext:
+                    type: string
+                  error:
+                    type: string
+        '400':
+          description: Decryption failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tools/smb3-session-candidates:
+    get:
+      tags: [Tools]
+      summary: SMB3 session candidates
+      description: Extracts SMB3/NTLM session material candidates from the capture.
+      operationId: listSMB3SessionCandidates
+      responses:
+        '200':
+          description: SMB3 session candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/tools/smb3-random-session-key:
+    post:
+      tags: [Tools]
+      summary: Generate SMB3 random session key
+      description: Generates an SMB3 Random Session Key from session material.
+      operationId: generateSMB3RandomSessionKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_key:
+                  type: string
+                  description: NTLM session key (hex-encoded)
+                encrypted_random_session_key:
+                  type: string
+                  description: Encrypted random session key from the capture (hex-encoded)
+      responses:
+        '200':
+          description: Generated session key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  random_session_key:
+                    type: string
+                  error:
+                    type: string
+        '400':
+          description: Key generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tools/misc/modules:
+    get:
+      tags: [MISC]
+      summary: List MISC modules
+      description: Returns all available MISC analysis modules (built-in and packaged).
+      operationId: listMiscModules
+      responses:
+        '200':
+          description: MISC module manifests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MiscModuleManifest'
+
+  /api/tools/misc/import:
+    post:
+      tags: [MISC]
+      summary: Import MISC module package
+      description: Imports a MISC module from a ZIP file upload.
+      operationId: importMiscModulePackage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ZIP file containing the MISC module package
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  version:
+                    type: string
+                  installed:
+                    type: boolean
+
+  /api/tools/misc/packages/{id}:
+    delete:
+      tags: [MISC]
+      summary: Delete MISC module package
+      description: Deletes a packaged MISC module.
+      operationId: deleteMiscModulePackage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module package ID
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  deleted:
+                    type: boolean
+
+  /api/tools/misc/packages/{id}/invoke:
+    post:
+      tags: [MISC]
+      summary: Invoke MISC module
+      description: Invokes a packaged MISC module with the given request.
+      operationId: invokeMiscModulePackage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module package ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  description: Action to invoke
+                params:
+                  type: object
+                  description: Action parameters
+      responses:
+        '200':
+          description: Module invocation result
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invocation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tls:
+    get:
+      tags: [TLS]
+      summary: Get TLS config
+      description: Returns the current TLS configuration.
+      operationId: getTLSConfig
+      responses:
+        '200':
+          description: TLS configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TLSConfig'
+    post:
+      tags: [TLS]
+      summary: Update TLS config
+      description: Updates the TLS configuration (cert, key, min version).
+      operationId: setTLSConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TLSConfig'
+      responses:
+        '200':
+          description: TLS config updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: updated
+
+  /api/mcp/config:
+    get:
+      tags: [MCP]
+      summary: Get MCP config
+      description: Returns the current MCP server configuration and status.
+      operationId: getMCPConfig
+      responses:
+        '200':
+          description: MCP status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPStatus'
+    post:
+      tags: [MCP]
+      summary: Update MCP config
+      description: Updates the MCP server configuration.
+      operationId: setMCPConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPConfig'
+      responses:
+        '200':
+          description: Updated MCP status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPStatus'
+
+  /api/mcp:
+    post:
+      tags: [MCP]
+      summary: MCP endpoint
+      description: JSON-RPC endpoint for the Model Context Protocol server. Dispatches MCP tool calls.
+      operationId: mcpRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: JSON-RPC 2.0 request
+      responses:
+        '200':
+          description: JSON-RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: MCP endpoint is disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/audit/logs:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      description: Returns recent API audit log entries (last 200 entries).
+      operationId: listAuditLogs
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'

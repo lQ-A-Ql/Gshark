@@ -11,17 +11,18 @@ import (
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/servicecontract"
 )
 
 const protocolVersion = "2025-06-18"
 
 type Dependencies struct {
-	Capture      CaptureService
-	Detection    DetectionService
-	Analysis     AnalysisService
-	Media        MediaService
-	ToolRuntime  ToolRuntimeService
-	ToolAnalysis ToolAnalysisService
+	Capture      servicecontract.CaptureReadService
+	Detection    servicecontract.DetectionReadService
+	Analysis     servicecontract.AnalysisReadService
+	Media        servicecontract.MediaReadService
+	ToolRuntime  servicecontract.ToolRuntimeReadService
+	ToolAnalysis servicecontract.ToolAnalysisReadService
 	Evidence     func(ctx context.Context, modules []string) (any, error)
 	MiscModules  func() []model.MiscModuleManifest
 	AuditLogs    func(limit int) []model.AuditEntry
@@ -34,55 +35,6 @@ type StreamDecodeRequest struct {
 	Decoder string         `json:"decoder"`
 	Payload string         `json:"payload"`
 	Options map[string]any `json:"options"`
-}
-
-type CaptureService interface {
-	CaptureStatus() model.CaptureStatus
-	PacketsPageWithState(cursor, limit int, filter string) ([]model.Packet, int, int, bool, error)
-	Packet(packetID int64) (model.Packet, error)
-	PacketRawHex(packetID int64) (string, error)
-	PacketLayers(packetID int64) (map[string]any, error)
-	StreamIDs(protocol string) []int64
-	HTTPStream(ctx context.Context, streamID int64) model.ReassembledStream
-	RawStream(ctx context.Context, protocol string, streamID int64) model.ReassembledStream
-	RawStreamPage(ctx context.Context, protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int)
-	ListStreamPayloadSources(limit int) ([]model.StreamPayloadSource, error)
-}
-
-type DetectionService interface {
-	ThreatHuntWithContext(ctx context.Context, prefixes []string) []model.ThreatHit
-	ObjectsWithContext(ctx context.Context) []model.ObjectFile
-	GetHuntingRuntimeConfig() model.HuntingRuntimeConfig
-}
-
-type AnalysisService interface {
-	GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error)
-	IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error)
-	VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error)
-	USBAnalysisWithOptions(ctx context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error)
-	C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error)
-	C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error)
-	APTAnalysis(ctx context.Context) (model.APTAnalysis, error)
-}
-
-type MediaService interface {
-	MediaAnalysis() (model.MediaAnalysis, error)
-}
-
-type ToolRuntimeService interface {
-	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
-}
-
-type ToolAnalysisService interface {
-	ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error)
-	HTTPLoginAnalysis(ctx context.Context) (model.HTTPLoginAnalysis, error)
-	SMTPAnalysis(ctx context.Context) (model.SMTPAnalysis, error)
-	MySQLAnalysis(ctx context.Context) (model.MySQLAnalysis, error)
-	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
-	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
-	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
-	UDPTunnelAnalysis(ctx context.Context) (model.UDPTunnelAnalysis, error)
-	BruteforceAnalysis(ctx context.Context) (model.BruteforceAnalysis, error)
 }
 
 type Server struct {

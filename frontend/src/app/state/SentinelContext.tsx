@@ -22,6 +22,12 @@ import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
 import { useCaptureStartWorkflow } from "./hooks/useCaptureStartWorkflow";
 import { useSentinelPacketStreamBundle } from "./hooks/useSentinelPacketStreamBundle";
 import { useSentinelRuntimeRefs } from "./hooks/useSentinelRuntimeRefs";
+import { BackendProvider } from "./contexts/BackendContext";
+import { CaptureProvider } from "./contexts/CaptureContext";
+import { PacketProvider } from "./contexts/PacketContext";
+import { StreamProvider } from "./contexts/StreamContext";
+import { FilterProvider } from "./contexts/FilterContext";
+import { AnalysisProvider } from "./contexts/AnalysisContext";
 
 const SentinelContext = createContext<SentinelContextValue | null>(null);
 
@@ -393,61 +399,13 @@ export function SentinelProvider({ children }: PropsWithChildren) {
     cancelMediaBatchTranscription: backendClients.media.cancelMediaBatchTranscription,
     closeCapture: backendClients.capture.closeCapture,
   });
-  const value = useMemo<SentinelContextValue>(
+
+  // ---- Sub-context value objects ----
+
+  const backendValue = useMemo(
     () => ({
-      packets,
-      totalPackets,
-      currentPage,
-      totalPages,
-      isPreloadingCapture,
-      preloadProcessed,
-      preloadTotal,
-      capturePreloadDiagnostics,
-      filteredPackets,
-      hasMorePackets,
-      hasPrevPackets,
-      isPageLoading,
-      isFilterLoading,
-      packetPageError,
-      captureTransaction,
-      loadMorePackets,
-      loadPrevPackets,
-      jumpToPage,
-      retryPacketPage,
-      locatePacketById,
-      selectedPacket,
-      selectedPacketRawHex,
-      selectedPacketId,
-      displayFilter,
-      setDisplayFilter,
-      applyFilter,
-      clearFilter,
-      selectPacket,
-      protocolTree,
-      hexDump,
-      threatHits,
-      isThreatAnalysisLoading,
-      threatAnalysisProgress,
-      extractedObjects,
-      httpStream,
-      tcpStream,
-      udpStream,
-      streamIds,
-      setActiveStream,
-      persistStreamPayloads,
-      streamSwitchMetrics,
-      decryptionConfig,
-      updateDecryptionConfig,
-      fileMeta,
-      captureRevision,
-      recentCaptures,
-      openCapture,
-      stopCapture,
-      retryCapturePreloadConfirm,
-      preparePacketStream,
       backendConnected,
       backendStatus,
-      mediaAnalysisProgress,
       tsharkStatus,
       isTSharkChecking,
       toolRuntimeCheckDegraded,
@@ -464,6 +422,85 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       mcpStatus,
       refreshMCPStatus,
       saveMCPConfig,
+      decryptionConfig,
+      updateDecryptionConfig,
+    }),
+    [
+      backendConnected,
+      backendStatus,
+      tsharkStatus,
+      isTSharkChecking,
+      toolRuntimeCheckDegraded,
+      toolRuntimeProbeState,
+      toolRuntimeProbeTransport,
+      lastToolRuntimeProbeError,
+      setTSharkPath,
+      toolRuntimeSnapshot,
+      isToolRuntimeLoading,
+      refreshToolRuntimeSnapshot,
+      saveToolRuntimeConfig,
+      backendAuthToken,
+      isBackendAuthTokenLoading,
+      mcpStatus,
+      refreshMCPStatus,
+      saveMCPConfig,
+      decryptionConfig,
+      updateDecryptionConfig,
+    ],
+  );
+
+  const captureValue = useMemo(
+    () => ({
+      isPreloadingCapture,
+      preloadProcessed,
+      preloadTotal,
+      capturePreloadDiagnostics,
+      captureTransaction,
+      fileMeta,
+      captureRevision,
+      recentCaptures,
+      openCapture,
+      stopCapture,
+      retryCapturePreloadConfirm,
+    }),
+    [
+      isPreloadingCapture,
+      preloadProcessed,
+      preloadTotal,
+      capturePreloadDiagnostics,
+      captureTransaction,
+      fileMeta,
+      captureRevision,
+      recentCaptures,
+      openCapture,
+      stopCapture,
+      retryCapturePreloadConfirm,
+    ],
+  );
+
+  const packetValue = useMemo(
+    () => ({
+      packets,
+      totalPackets,
+      currentPage,
+      totalPages,
+      filteredPackets,
+      hasMorePackets,
+      hasPrevPackets,
+      isPageLoading,
+      isFilterLoading,
+      packetPageError,
+      loadMorePackets,
+      loadPrevPackets,
+      jumpToPage,
+      retryPacketPage,
+      locatePacketById,
+      selectedPacket,
+      selectedPacketRawHex,
+      selectedPacketId,
+      selectPacket,
+      protocolTree,
+      hexDump,
     }),
     [
       packets,
@@ -471,16 +508,11 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       currentPage,
       totalPages,
       filteredPackets,
-      isPreloadingCapture,
-      preloadProcessed,
-      preloadTotal,
-      capturePreloadDiagnostics,
       hasMorePackets,
       hasPrevPackets,
       isPageLoading,
       isFilterLoading,
       packetPageError,
-      captureTransaction,
       loadMorePackets,
       loadPrevPackets,
       jumpToPage,
@@ -489,16 +521,14 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       selectedPacket,
       selectedPacketRawHex,
       selectedPacketId,
-      displayFilter,
-      applyFilter,
-      clearFilter,
       selectPacket,
       protocolTree,
       hexDump,
-      threatHits,
-      isThreatAnalysisLoading,
-      threatAnalysisProgress,
-      extractedObjects,
+    ],
+  );
+
+  const streamValue = useMemo(
+    () => ({
       httpStream,
       tcpStream,
       udpStream,
@@ -506,38 +536,61 @@ export function SentinelProvider({ children }: PropsWithChildren) {
       setActiveStream,
       persistStreamPayloads,
       streamSwitchMetrics,
-      decryptionConfig,
-      updateDecryptionConfig,
-      fileMeta,
-      captureRevision,
-      recentCaptures,
-      openCapture,
-      stopCapture,
-      retryCapturePreloadConfirm,
       preparePacketStream,
-      backendConnected,
-      backendStatus,
-      mediaAnalysisProgress,
-      tsharkStatus,
-      isTSharkChecking,
-      toolRuntimeCheckDegraded,
-      toolRuntimeProbeState,
-      toolRuntimeProbeTransport,
-      lastToolRuntimeProbeError,
-      setTSharkPath,
-      toolRuntimeSnapshot,
-      isToolRuntimeLoading,
-      refreshToolRuntimeSnapshot,
-      saveToolRuntimeConfig,
-      backendAuthToken,
-      isBackendAuthTokenLoading,
-      mcpStatus,
-      refreshMCPStatus,
-      saveMCPConfig,
-    ],
+    }),
+    [httpStream, tcpStream, udpStream, streamIds, setActiveStream, persistStreamPayloads, streamSwitchMetrics, preparePacketStream],
   );
 
-  return <SentinelContext.Provider value={value}>{children}</SentinelContext.Provider>;
+  const filterValue = useMemo(
+    () => ({
+      displayFilter,
+      setDisplayFilter,
+      applyFilter,
+      clearFilter,
+    }),
+    [displayFilter, setDisplayFilter, applyFilter, clearFilter],
+  );
+
+  const analysisValue = useMemo(
+    () => ({
+      threatHits,
+      isThreatAnalysisLoading,
+      threatAnalysisProgress,
+      extractedObjects,
+      mediaAnalysisProgress,
+    }),
+    [threatHits, isThreatAnalysisLoading, threatAnalysisProgress, extractedObjects, mediaAnalysisProgress],
+  );
+
+  // ---- Backward-compatible combined value ----
+
+  const value = useMemo<SentinelContextValue>(
+    () => ({
+      ...backendValue,
+      ...captureValue,
+      ...packetValue,
+      ...streamValue,
+      ...filterValue,
+      ...analysisValue,
+    }),
+    [backendValue, captureValue, packetValue, streamValue, filterValue, analysisValue],
+  );
+
+  return (
+    <SentinelContext.Provider value={value}>
+      <BackendProvider value={backendValue}>
+        <CaptureProvider value={captureValue}>
+          <PacketProvider value={packetValue}>
+            <StreamProvider value={streamValue}>
+              <FilterProvider value={filterValue}>
+                <AnalysisProvider value={analysisValue}>{children}</AnalysisProvider>
+              </FilterProvider>
+            </StreamProvider>
+          </PacketProvider>
+        </CaptureProvider>
+      </BackendProvider>
+    </SentinelContext.Provider>
+  );
 }
 
 export function useSentinel() {

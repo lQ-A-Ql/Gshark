@@ -4,69 +4,62 @@ import (
 	"context"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/servicecontract"
 )
 
 // CaptureService covers capture lifecycle together with packet/stream lookups
-// consumed by the HTTP transport layer. It is intentionally narrow: only the
-// methods actually invoked by the transport layer are declared.
+// consumed by the HTTP transport layer. It embeds the shared read-only
+// contract and adds transport-only lifecycle methods.
 type CaptureService interface {
+	servicecontract.CaptureReadService
+
+	// Transport-only lifecycle methods:
 	BeginCaptureLoad(ctx context.Context) (int64, context.Context)
 	LoadPCAPWithRun(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error
 	PrepareCaptureReplacement()
 	StopStreaming() bool
 	ClearCapture() error
-	CaptureStatus() model.CaptureStatus
 	CurrentCapturePath() string
-
 	Packets() []model.Packet
-	PacketsPageWithState(cursor, limit int, filter string) ([]model.Packet, int, int, bool, error)
 	PacketPageCursorWithError(packetID int64, limit int, filter string) (int, int, bool, error)
-	Packet(packetID int64) (model.Packet, error)
-	PacketRawHex(packetID int64) (string, error)
-	PacketLayers(packetID int64) (map[string]any, error)
-
-	StreamIDs(protocol string) []int64
-	HTTPStream(ctx context.Context, streamID int64) model.ReassembledStream
-	RawStream(ctx context.Context, protocol string, streamID int64) model.ReassembledStream
-	RawStreamPage(ctx context.Context, protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int)
 	UpdateStreamPayloads(ctx context.Context, protocol string, streamID int64, patches []model.StreamChunkPatch) (model.ReassembledStream, error)
-	ListStreamPayloadSources(limit int) ([]model.StreamPayloadSource, error)
 }
 
 // DetectionService groups threat hunting, YARA configuration and object export
-// functionality consumed by the transport layer.
+// functionality consumed by the transport layer. It embeds the shared
+// read-only contract and adds transport-only setters.
 type DetectionService interface {
-	ThreatHuntWithContext(ctx context.Context, prefixes []string) []model.ThreatHit
-	GetHuntingRuntimeConfig() model.HuntingRuntimeConfig
+	servicecontract.DetectionReadService
+
+	// Transport-only setter:
 	SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.HuntingRuntimeConfig
-	ObjectsWithContext(ctx context.Context) []model.ObjectFile
 }
 
 // AnalysisService groups the industrial / vehicle / USB / C2 / APT / traffic /
-// evidence analysis methods consumed by the transport layer.
+// evidence analysis methods consumed by the transport layer. It embeds the
+// shared read-only contract and adds transport-only convenience methods.
 type AnalysisService interface {
+	servicecontract.AnalysisReadService
+
+	// Transport-only convenience methods (non-context variants + DBC + evidence):
 	GlobalTrafficStats() (model.GlobalTrafficStats, error)
-	GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error)
 	IndustrialAnalysis() (model.IndustrialAnalysis, error)
-	IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error)
 	VehicleAnalysis() (model.VehicleAnalysis, error)
-	VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error)
 	VehicleDBCProfiles() []model.DBCProfile
 	AddVehicleDBC(path string) ([]model.DBCProfile, error)
 	RemoveVehicleDBC(path string) []model.DBCProfile
 	USBAnalysis() (model.USBAnalysis, error)
 	USBAnalysisWithContext(ctx context.Context) (model.USBAnalysis, error)
-	USBAnalysisWithOptions(ctx context.Context, opts model.USBAnalysisOptions) (model.USBAnalysis, error)
-	C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error)
-	C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (model.C2DecryptResult, error)
-	APTAnalysis(ctx context.Context) (model.APTAnalysis, error)
 	GatherEvidence(ctx context.Context, filter model.EvidenceFilter) (model.EvidenceResponse, error)
 }
 
 // MediaService groups media playback, media artifact export and speech
-// transcription methods consumed by the transport layer.
+// transcription methods consumed by the transport layer. It embeds the shared
+// read-only contract and adds transport-only media pipeline methods.
 type MediaService interface {
-	MediaAnalysis() (model.MediaAnalysis, error)
+	servicecontract.MediaReadService
+
+	// Transport-only media pipeline methods:
 	RefreshMediaAnalysis() (model.MediaAnalysis, error)
 	MediaArtifact(token string) (string, string, error)
 	MediaPlaybackWithContext(ctx context.Context, token string) (string, string, error)
@@ -80,8 +73,12 @@ type MediaService interface {
 }
 
 // ToolRuntimeService groups tool runtime configuration (tshark / ffmpeg / TLS)
-// methods consumed by the transport layer.
+// methods consumed by the transport layer. It embeds the shared read-only
+// contract and adds transport-only configuration methods.
 type ToolRuntimeService interface {
+	servicecontract.ToolRuntimeReadService
+
+	// Transport-only configuration methods:
 	TSharkStatus() model.TSharkToolStatus
 	TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus
 	SetTSharkPath(path string) model.TSharkToolStatus
@@ -90,7 +87,6 @@ type ToolRuntimeService interface {
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot
 	ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot
-	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
 	SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig
 	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig
@@ -101,20 +97,16 @@ type ToolRuntimeService interface {
 }
 
 // ToolAnalysisService groups per-tool analysis methods (NTLM / HTTP-login /
-// SMTP / MySQL / Shiro / SMB3 / WinRM / UDP-tunnel / bruteforce) consumed by the transport layer.
+// SMTP / MySQL / Shiro / SMB3 / WinRM / UDP-tunnel / bruteforce) consumed by
+// the transport layer. It embeds the shared read-only contract and adds
+// transport-only convenience methods.
 type ToolAnalysisService interface {
+	servicecontract.ToolAnalysisReadService
+
+	// Transport-only convenience methods (non-context variants + export):
 	ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error)
-	ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error)
-	HTTPLoginAnalysis(ctx context.Context) (model.HTTPLoginAnalysis, error)
-	SMTPAnalysis(ctx context.Context) (model.SMTPAnalysis, error)
-	MySQLAnalysis(ctx context.Context) (model.MySQLAnalysis, error)
-	ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRememberMeRequest) (model.ShiroRememberMeAnalysis, error)
 	ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, error)
-	ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error)
 	GenerateSMB3RandomSessionKey(req model.SMB3RandomSessionKeyRequest) (model.SMB3RandomSessionKeyResult, error)
 	RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
-	RunWinRMDecryptWithContext(ctx context.Context, req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	WinRMExportFile(resultID string) (string, string, error)
-	UDPTunnelAnalysis(ctx context.Context) (model.UDPTunnelAnalysis, error)
-	BruteforceAnalysis(ctx context.Context) (model.BruteforceAnalysis, error)
 }

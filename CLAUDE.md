@@ -168,6 +168,7 @@ Important backend behavior:
 - Threat hunting combines prefix matching, plugins, and YARA.
 - Runtime tool config includes tshark/ffmpeg/python/speech/yara settings via API.
 - YARA rules under `backend/rules/yara/` are embedded via Go embed and copied into build artifacts.
+- Protocol normalization (`internal/tshark/normalize.go`): WebSocket is standalone protocol; stream grouping uses `stream:{id}` not `{protocol}:{id}`.
 
 Backend architecture boundaries (CI-enforced via `go test ./internal/architecture`):
 - `model` has no dependencies on `engine`, `transport`, `tshark`, `plugin`, or `miscpkg`.
@@ -242,6 +243,28 @@ All mapper files (`integrations/mappers/`) and wire DTO files (`integrations/wir
 - MISC page layout: left sidebar (grouped by category) + right workbench; categories: credential / payload / protocol / utility / custom.
 - Spec: `docs/misc-module-interface.md`.
 - Example: `examples/misc-modules/echo-demo`.
+
+### C2 analysis and decryption
+
+The C2 analysis subsystem (`internal/engine/tool_c2.go`) detects and analyzes Command & Control traffic:
+
+**Detection mechanisms**:
+- Stream-level pattern analysis (periodic heartbeats, short/long packet alternation)
+- HTTP endpoint fingerprinting (URI patterns, User-Agent, status codes)
+- DNS query analysis (TXT records, NULL queries, long labels)
+- Protocol-specific signatures (WebSocket handshakes, CS/VShell indicators)
+
+**WebSocket C2 handling**:
+- WebSocket frames are parsed as standalone protocol (not HTTP alias)
+- Stream grouping uses pure stream ID (`stream:{id}`) to unify HTTP handshake + WebSocket data frames
+- Heartbeat detection includes outlier filtering (removes >2x median intervals from TCP retransmissions)
+- VShell WebSocket decryption: `internal/engine/vshell_websocket_decrypt.go` parses WebSocket frames, unmasks client payloads, and decrypts AES-GCM messages
+
+**Decryption workbench** (`internal/engine/c2_decrypt.go`):
+- VShell: triple-KDF (md5(salt), md5(salt+vkey), md5(saltPad32+vkey)) + AES-GCM/CBC
+- Cobalt Strike: AES-CBC with HMAC-SHA256 verification, RSA-encrypted metadata support
+- Candidates collected from: packet payloads, HTTP fields (tshark extraction), TCP stream reassembly
+- Results scored by: key verification status, plaintext quality, forensic signal detection
 
 ### Backend governance
 

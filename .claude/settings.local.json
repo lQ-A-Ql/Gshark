@@ -16,7 +16,15 @@
       "Bash(npx vitest:*)",
       "Bash(npx vite:*)",
       "Bash",
-      "Edit"
+      "Edit",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.trellix.com)",
+      "WebFetch(domain:blog.cybercdh.com)",
+      "WebFetch(domain:www.ptsecurity.com)",
+      "WebFetch(domain:global.ptsecurity.com)",
+      "WebFetch(domain:malpedia.caad.fkie.fraunhofer.de)",
+      "WebFetch(domain:mp.weixin.qq.com)"
     ]
   }
 }

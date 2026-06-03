@@ -10,7 +10,7 @@ import { C2NotesPanel } from "./C2DisplayComponents";
 const C2_DECRYPT_TABLE_WRAPPER_CLASS = "overflow-auto";
 const C2_DECRYPT_TABLE_HEADER_CLASS = "meow-tile-header text-slate-700";
 const C2_DECRYPT_TABLE_ROW_CLASS = "last:border-b-0 odd:bg-transparent even:bg-[var(--meow-table-selected-bg)]";
-const C2_DECRYPT_MONO_CELL_CLASS = "font-mono text-slate-600";
+const C2_DECRYPT_MONO_CELL_CLASS = "font-mono text-slate-700";
 
 export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | null }) {
   const [recordQuery, setRecordQuery] = useState("");
@@ -141,7 +141,9 @@ export function C2DecryptResultPanel({ result }: { result: C2DecryptResult | nul
                 </div>
               ) : (
                 <div className="min-w-0 space-y-1">
-                  <pre className="meow-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-5 text-slate-100">
+                  {/* Protocol badge */}
+                  <ProtocolBadge tags={item.tags} algorithm={item.algorithm} />
+                  <pre className="meow-tile max-h-72 max-w-full overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words border-slate-700 bg-slate-900 p-3 font-mono text-xs leading-relaxed text-slate-50 shadow-inner">
                     {item.plaintextPreview || "--"}
                   </pre>
                   <DecryptTagLine
@@ -199,6 +201,64 @@ function DecryptTagLine({ values }: { values: string[] }) {
           {value}
         </span>
       ))}
+    </div>
+  );
+}
+
+function ProtocolBadge({ tags, algorithm }: { tags?: string[]; algorithm?: string }) {
+  const searchText = [...(tags ?? []), algorithm ?? ""].join(" ").toLowerCase();
+
+  // Detect protocol type from tags/algorithm
+  let protocol: { label: string; icon: React.ReactNode; colors: string } | null = null;
+
+  if (searchText.includes("websocket")) {
+    protocol = {
+      label: "WebSocket",
+      icon: (
+        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" />
+        </svg>
+      ),
+      colors: "bg-indigo-100 text-indigo-700",
+    };
+  } else if (searchText.includes("http") || searchText.includes("tshark")) {
+    protocol = {
+      label: "HTTP",
+      icon: (
+        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+        </svg>
+      ),
+      colors: "bg-blue-100 text-blue-700",
+    };
+  } else if (searchText.includes("stream") || searchText.includes("tcp")) {
+    protocol = {
+      label: "TCP Stream",
+      icon: (
+        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+        </svg>
+      ),
+      colors: "bg-emerald-100 text-emerald-700",
+    };
+  } else if (searchText.includes("dns")) {
+    protocol = {
+      label: "DNS",
+      icon: (
+        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
+        </svg>
+      ),
+      colors: "bg-purple-100 text-purple-700",
+    };
+  }
+
+  if (!protocol) return null;
+
+  return (
+    <div className={cn("mb-1 inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-semibold", protocol.colors)}>
+      {protocol.icon}
+      {protocol.label}
     </div>
   );
 }
