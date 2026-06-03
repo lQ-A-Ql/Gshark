@@ -163,8 +163,19 @@ func tryMultiMessageWithLengthPrefix(payload []byte, gcm cipher.AEAD) ([][]byte,
 	return plaintexts, len(plaintexts) > 0
 }
 
+// tryScanGCMMessagesMaxScanBytes bounds the brute-force end-position search in
+// tryScanGCMMessages. The VShell wire format always length-prefixes each message,
+// so this scan is only a best-effort fallback; without a bound it is O(n²) in GCM
+// operations and a large unprefixed payload would hang the decrypt request.
+const tryScanGCMMessagesMaxScanBytes = 4096
+
 // tryScanGCMMessages scans payload for AES-GCM messages without length prefixes.
-// This handles concatenated messages where each message is: [12-byte nonce][ciphertext][16-byte tag]
+// This handles concatenated messages where each message is: [12-byte nonce][ciphertext][16-byte tag].
+//
+// This is a bounded best-effort fallback only. The real VShell protocol prefixes
+// every message with a 4-byte length (handled by tryMultiMessageWithLengthPrefix),
+// so the brute-force end-position search here is capped to avoid O(n²) GCM blowups
+// on large or non-VShell payloads.
 func tryScanGCMMessages(payload []byte, gcm cipher.AEAD) ([][]byte, bool) {
 	var plaintexts [][]byte
 	minMessageSize := gcm.NonceSize() + gcm.Overhead() // 12 + 16 = 28 bytes minimum
@@ -175,9 +186,16 @@ func tryScanGCMMessages(payload []byte, gcm cipher.AEAD) ([][]byte, bool) {
 			break
 		}
 
+		// Bound the inner scan window so a single offset cannot drive an
+		// unbounded number of GCM.Open attempts.
+		scanLimit := len(payload)
+		if offset+tryScanGCMMessagesMaxScanBytes < scanLimit {
+			scanLimit = offset + tryScanGCMMessagesMaxScanBytes
+		}
+
 		// Try different message lengths at this offset
 		found := false
-		for end := offset + minMessageSize; end <= len(payload); end++ {
+		for end := offset + minMessageSize; end <= scanLimit; end++ {
 			candidate := payload[offset:end]
 			if len(candidate) < minMessageSize {
 				continue

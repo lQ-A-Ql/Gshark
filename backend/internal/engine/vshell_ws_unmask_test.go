@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
@@ -270,6 +271,78 @@ func TestC2DecryptVShellUnmasksClientWebSocketStream(t *testing.T) {
 	}
 	if !hasDecryptedRecordWithAlgorithm(result, "ws-client-cmd", "ws-unmask-client") {
 		t.Fatalf("expected ws-unmask-client decrypt, got %+v", result.Records)
+	}
+}
+
+// TestC2DecryptVShellUnmasksMultiFrameClientStream covers the concatenation
+// path: a single client→server stream carrying SEVERAL masked WebSocket frames
+// (the long-lived C2 case) must yield one decrypted record per inner VShell
+// message. This guards the fix that concatenates inner payloads into one
+// candidate (bounded count) yet still splits back to per-message frames in the
+// decrypt loop — replacing the earlier one-candidate-per-frame behavior that
+// timed the decrypt task out on streams with many heartbeat frames.
+func TestC2DecryptVShellUnmasksMultiFrameClientStream(t *testing.T) {
+	salt := "Pr0duct10n_S4lt_2024_VSh3ll_X"
+	vkey := "vk_prod_2024"
+	key := deriveVShellKeyHex(salt)
+
+	plaintexts := [][]byte{
+		[]byte(`{"VerifyKey":"vk_prod_2024","cmd":"ws-multi-1"}`),
+		[]byte(`{"VerifyKey":"vk_prod_2024","cmd":"ws-multi-2"}`),
+		[]byte(`{"VerifyKey":"vk_prod_2024","cmd":"ws-multi-3"}`),
+	}
+	masks := [][]byte{
+		{0x1a, 0x2b, 0x3c, 0x4d},
+		{0x99, 0x88, 0x77, 0x66},
+		{0x0f, 0xf0, 0x0f, 0xf0},
+	}
+	var stream []byte
+	for i, pt := range plaintexts {
+		inner := buildVShellInnerMessage(t, key, pt)
+		stream = append(stream, buildMaskedClientFrame(inner, masks[i])...)
+	}
+
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+
+	packets := []model.Packet{{
+		ID:         401,
+		Timestamp:  "2026-06-03T12:30:00Z",
+		SourceIP:   "192.168.116.129",
+		SourcePort: 51500,
+		DestIP:     "103.45.67.89",
+		DestPort:   8443,
+		Protocol:   "TCP",
+		Payload:    hexEncodeForTest(stream),
+		StreamID:   88,
+	}}
+	if err := svc.packetStore.Append(packets); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	svc.rawStreamIndex[streamCacheKey("TCP", 88)] = model.ReassembledStream{
+		StreamID: 88,
+		Protocol: "TCP",
+		From:     "192.168.116.129",
+		To:       "103.45.67.89",
+		Chunks: []model.StreamChunk{
+			{PacketID: 401, Direction: "client", Body: bytesToColonHex(stream)},
+		},
+	}
+
+	result, err := svc.C2Decrypt(context.Background(), model.C2DecryptRequest{
+		Family: "vshell",
+		Scope:  model.C2DecryptScope{StreamIDs: []int64{88}},
+		VShell: model.C2VShellDecryptOptions{VKey: vkey, Salt: salt, Mode: "auto"},
+	})
+	if err != nil {
+		t.Fatalf("C2Decrypt() error = %v", err)
+	}
+	// All three inner messages must decrypt from the single concatenated candidate.
+	for i := 1; i <= 3; i++ {
+		needle := fmt.Sprintf("ws-multi-%d", i)
+		if !hasDecryptedRecordWithAlgorithm(result, needle, "ws-unmask-client") {
+			t.Fatalf("expected decrypted %q via ws-unmask-client, got %+v", needle, result.Records)
+		}
 	}
 }
 

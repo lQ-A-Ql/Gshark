@@ -598,17 +598,27 @@ func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, stre
 			// WebSocket-aware path: VShell rides AES-GCM frames inside WebSocket
 			// data frames. Client→server frames are XOR-masked, so the raw stream
 			// bytes are undecryptable until the mask is stripped. Decode the
-			// colon-hex body, parse WebSocket framing, and emit the unmasked inner
-			// payloads as candidates so the GCM pipeline can recover them.
+			// colon-hex body, parse WebSocket framing, and concatenate the unmasked
+			// inner payloads into a single candidate. Each inner payload is itself a
+			// [4-byte LE length][nonce+ct+tag] VShell frame, so the concatenation is
+			// exactly the multi-frame format splitVShellFrames already understands;
+			// the decrypt loop will split it back into per-message frames. Emitting
+			// one candidate per direction (instead of one per WebSocket frame) keeps
+			// the candidate count bounded on long-lived C2 streams with hundreds of
+			// heartbeat frames, which previously caused the decrypt task to time out.
 			if wsInner := wsFrameInnerPayloads(decodeLooseHex(assembled.body)); len(wsInner) > 0 {
-				for i, inner := range wsInner {
+				combined := make([]byte, 0, len(assembled.body)/2)
+				for _, inner := range wsInner {
 					if len(inner) < 8 {
 						continue
 					}
+					combined = append(combined, inner...)
+				}
+				if len(combined) >= 8 {
 					candidate := c2DecryptCandidate{
 						packet:    packet,
-						raw:       inner,
-						label:     fmt.Sprintf("tcp-stream:%d:%s:ws-frame-%d", streamID, assembled.direction, i),
+						raw:       combined,
+						label:     fmt.Sprintf("tcp-stream:%d:%s:ws", streamID, assembled.direction),
 						transform: "ws-unmask-" + assembled.direction,
 						direction: streamChunkRecordDirection(assembled.direction),
 					}
