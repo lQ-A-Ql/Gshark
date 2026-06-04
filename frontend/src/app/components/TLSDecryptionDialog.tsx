@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileText, KeyRound, Loader2, Lock, LockOpen, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { useFilter } from "../state/contexts/FilterContext";
 import { backendClients } from "../integrations/backendClients";
 
 interface TLSDecryptionDialogProps {
@@ -10,15 +12,9 @@ interface TLSDecryptionDialogProps {
 }
 
 export function TLSDecryptionDialog({ open, onOpenChange }: TLSDecryptionDialogProps) {
-  const {
-    decryptionConfig,
-    updateDecryptionConfig,
-    fileMeta,
-    openCapture,
-    displayFilter,
-    setDisplayFilter,
-    applyFilter,
-  } = useSentinel();
+  const { decryptionConfig, updateDecryptionConfig } = useBackend();
+  const { fileMeta, openCapture } = useCapture();
+  const { displayFilter, setDisplayFilter, applyFilter } = useFilter();
   const [saved, setSaved] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");

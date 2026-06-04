@@ -14,10 +14,14 @@ import {
 import type { EvidenceSeverity } from "../core/evidenceTypes";
 import { useEvidencePanelModel } from "../features/evidence/useEvidencePanelModel";
 import { useEvidence } from "../features/evidence/useEvidence";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function EvidencePanel() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { totalPackets } = usePacket();
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<EvidenceSeverity | "all">("all");

@@ -26,6 +26,9 @@ type Service struct {
 	yaraHuntingState
 	toolRuntimeState
 	mcpState
+	playbookStatePB
+	savedSearchStateSS
+	hypothesisStateHT
 }
 
 const defaultStreamCacheLimit = 256
@@ -120,6 +123,16 @@ func NewService(emitter EventEmitter) *Service {
 				Enabled:   true,
 				TimeoutMS: 25000,
 			},
+		},
+		playbookStatePB: playbookStatePB{
+			playbooks: map[string]*model.HuntingPlaybook{},
+			lastRun:   map[string]*model.PlaybookRunResult{},
+		},
+		savedSearchStateSS: savedSearchStateSS{
+			savedSearches: map[string]*model.SavedSearch{},
+		},
+		hypothesisStateHT: hypothesisStateHT{
+			hypotheses: map[string]*model.Hypothesis{},
 		},
 	}
 }

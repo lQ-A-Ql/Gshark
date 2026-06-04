@@ -139,6 +139,410 @@ func (s *Service) ListStreamPayloadSources(limit int) ([]model.StreamPayloadSour
 	return out, nil
 }
 
+// UnifiedClassification represents a unified view of a detected WebShell family
+// aggregated across multiple payload candidates and streams.
+type UnifiedClassification struct {
+	Family        string                `json:"family"`
+	DisplayName   string                `json:"display_name"`
+	Version       string                `json:"version,omitempty"`
+	Confidence    int                   `json:"confidence"`
+	EvidenceCount int                   `json:"evidence_count"`
+	SignalSummary []string              `json:"signal_summary,omitempty"`
+	Candidates    []ClassifiedCandidate `json:"candidates,omitempty"`
+}
+
+// ClassifiedCandidate represents a single payload source contributing to a unified family classification.
+type ClassifiedCandidate struct {
+	SourceID   string   `json:"source_id"`
+	ParamName  string   `json:"param_name,omitempty"`
+	Confidence int      `json:"confidence"`
+	Signals    []string `json:"signals,omitempty"`
+	SourceRole string   `json:"source_role,omitempty"`
+}
+
+// ClassifyWebShellFamilies aggregates payload sources into unified WebShell family
+// classifications. It groups sources by family, computes aggregate confidence based
+// on signal count and cross-candidate corroboration, and identifies tool versions
+// from distinguishing signals.
+func ClassifyWebShellFamilies(sources []model.StreamPayloadSource) []UnifiedClassification {
+	if len(sources) == 0 {
+		return nil
+	}
+
+	// Group sources by inferred family.
+	groups := map[string][]int{}
+	for idx, source := range sources {
+		family := inferSourceFamily(source)
+		if family == "" {
+			continue
+		}
+		groups[family] = append(groups[family], idx)
+	}
+
+	classifications := make([]UnifiedClassification, 0, len(groups))
+	for family, idxs := range groups {
+		uc := buildUnifiedClassification(sources, family, idxs)
+		if uc.Confidence > 0 && uc.EvidenceCount > 0 {
+			classifications = append(classifications, uc)
+		}
+	}
+
+	sort.SliceStable(classifications, func(i, j int) bool {
+		if classifications[i].Confidence != classifications[j].Confidence {
+			return classifications[i].Confidence > classifications[j].Confidence
+		}
+		if classifications[i].EvidenceCount != classifications[j].EvidenceCount {
+			return classifications[i].EvidenceCount > classifications[j].EvidenceCount
+		}
+		return classifications[i].Family < classifications[j].Family
+	})
+	return classifications
+}
+
+func buildUnifiedClassification(sources []model.StreamPayloadSource, family string, idxs []int) UnifiedClassification {
+	uc := UnifiedClassification{
+		Family:      family,
+		DisplayName: webshellFamilyDisplayName(family),
+	}
+
+	allSignals := map[string]int{}
+	for _, idx := range idxs {
+		src := sources[idx]
+		uc.EvidenceCount++
+		if src.Confidence > uc.Confidence {
+			uc.Confidence = src.Confidence
+		}
+		uc.Candidates = append(uc.Candidates, ClassifiedCandidate{
+			SourceID:   src.ID,
+			ParamName:  src.ParamName,
+			Confidence: src.Confidence,
+			Signals:    append([]string(nil), src.Signals...),
+			SourceRole: src.SourceRole,
+		})
+		for _, sig := range src.Signals {
+			allSignals[strings.ToLower(sig)]++
+		}
+	}
+
+	// Aggregate signal summary: collect unique signals sorted by frequency.
+	freqs := make([]signalFreq, 0, len(allSignals))
+	for name, count := range allSignals {
+		freqs = append(freqs, signalFreq{name, count})
+	}
+	sort.SliceStable(freqs, func(i, j int) bool {
+		if freqs[i].count != freqs[j].count {
+			return freqs[i].count > freqs[j].count
+		}
+		return freqs[i].name < freqs[j].name
+	})
+	uc.SignalSummary = make([]string, 0, len(freqs))
+	for _, f := range freqs {
+		uc.SignalSummary = append(uc.SignalSummary, f.name)
+	}
+
+	// Compute aggregate confidence.
+	uc.Confidence = computeFamilyConfidence(uc.Confidence, len(idxs), len(allSignals), freqs)
+
+	// Identify version from signals.
+	uc.Version = identifyWebShellVersion(family, sources, idxs)
+
+	return uc
+}
+
+// inferSourceFamily returns the best-guess family for a payload source based on
+// FamilyHint, DecoderHints, and signal patterns.
+func inferSourceFamily(source model.StreamPayloadSource) string {
+	if source.FamilyHint != "" {
+		return normalizeFamily(source.FamilyHint)
+	}
+	// Check decoder hints.
+	for _, hint := range source.DecoderHints {
+		h := strings.ToLower(strings.TrimSpace(hint))
+		switch h {
+		case "behinder":
+			return "behinder"
+		case "antsword":
+			return "antsword"
+		case "godzilla":
+			return "godzilla"
+		case "china_chopper":
+			return "china_chopper"
+		case "regeorg":
+			return "regeorg"
+		}
+	}
+	// Infer from signals.
+	for _, sig := range source.Signals {
+		switch strings.ToLower(sig) {
+		case "antsword_like", "chr-chain", "script-keyword", "script-after-base64":
+			return "antsword"
+		case "godzilla_like", "godzilla-random-param":
+			return "godzilla"
+		case "behinder_v2", "behinder-v2-hex-key", "behinder-v2-pass-param":
+			return "behinder"
+		case "aes_webshell_like", "base64-aes-block":
+			return "behinder"
+		case "hex_cipher", "hex-block-cipher":
+			// Ambiguous: could be Godzilla or Behinder. Check if there's a stronger signal.
+			for _, sig2 := range source.Signals {
+				if strings.ToLower(sig2) == "godzilla-random-param" {
+					return "godzilla"
+				}
+			}
+			return "behinder"
+		case "china-chopper-eval", "china-chopper-param":
+			return "china_chopper"
+		case "regeorg-tunnel-headers":
+			return "regeorg"
+		}
+	}
+	return ""
+}
+
+// normalizeFamily maps raw family hints to canonical family names.
+func normalizeFamily(hint string) string {
+	h := strings.ToLower(strings.TrimSpace(hint))
+	switch {
+	case strings.HasPrefix(h, "antsword"):
+		return "antsword"
+	case strings.HasPrefix(h, "godzilla"):
+		return "godzilla"
+	case strings.HasPrefix(h, "behinder"):
+		return "behinder"
+	case strings.HasPrefix(h, "china_chopper") || strings.HasPrefix(h, "china chopper"):
+		return "china_chopper"
+	case strings.HasPrefix(h, "regeorg") || strings.HasPrefix(h, "neo-regeorg"):
+		return "regeorg"
+	case h == "aes_webshell_like" || h == "hex_cipher":
+		return "behinder"
+	default:
+		return h
+	}
+}
+
+func webshellFamilyDisplayName(family string) string {
+	switch family {
+	case "behinder":
+		return "冰蝎 (Behinder)"
+	case "antsword":
+		return "蚁剑 (AntSword)"
+	case "godzilla":
+		return "哥斯拉 (Godzilla)"
+	case "china_chopper":
+		return "菜刀 (China Chopper)"
+	case "regeorg":
+		return "reGeorg / neo-reGeorg"
+	default:
+		return family
+	}
+}
+
+// computeFamilyConfidence calculates the aggregate confidence for a family from
+// the maximum individual confidence, evidence count bonus, and signal diversity bonus.
+func computeFamilyConfidence(maxConf, evidenceCount, signalCount int, freqs []signalFreq) int {
+	conf := maxConf
+
+	// Cross-candidate corroboration bonus: more evidence = higher confidence.
+	switch {
+	case evidenceCount >= 5:
+		conf += 20
+	case evidenceCount >= 3:
+		conf += 14
+	case evidenceCount >= 2:
+		conf += 8
+	}
+
+	// Signal diversity bonus: more unique signal types = more robust detection.
+	switch {
+	case signalCount >= 6:
+		conf += 12
+	case signalCount >= 4:
+		conf += 8
+	case signalCount >= 2:
+		conf += 4
+	}
+
+	// Penalize if only one type of signal (low diversity).
+	if signalCount == 1 && evidenceCount == 1 {
+		conf -= 10
+	}
+
+	if conf > 100 {
+		conf = 100
+	}
+	if conf < 0 {
+		conf = 0
+	}
+	return conf
+}
+
+// signalFreq is used internally by buildUnifiedClassification.
+type signalFreq struct {
+	name  string
+	count int
+}
+
+// identifyWebShellVersion attempts to determine the specific version of a tool
+// based on distinguishing signals from the candidates.
+func identifyWebShellVersion(family string, sources []model.StreamPayloadSource, idxs []int) string {
+	switch family {
+	case "behinder":
+		return identifyBehinderVersion(sources, idxs)
+	case "godzilla":
+		return identifyGodzillaVersion(sources, idxs)
+	case "antsword":
+		return identifyAntSwordVersion(sources, idxs)
+	}
+	return ""
+}
+
+func identifyBehinderVersion(sources []model.StreamPayloadSource, idxs []int) string {
+	hasV2HexKey := false
+	hasV2PassParam := false
+	hasDefaultKey := false
+	hasKeyNegotiation := false
+	hasVersionHintV3 := false
+	hasVersionHintV4 := false
+	hasCustomProtocol := false
+
+	for _, idx := range idxs {
+		src := sources[idx]
+		for _, sig := range src.Signals {
+			switch strings.ToLower(sig) {
+			case "behinder-v2-hex-key":
+				hasV2HexKey = true
+			case "behinder-v2-pass-param":
+				hasV2PassParam = true
+			}
+		}
+		if src.SourceRole == "key_negotiation" {
+			hasKeyNegotiation = true
+		}
+		if src.DecoderOptionsHint != nil {
+			if vh, ok := src.DecoderOptionsHint["versionHint"].(string); ok {
+				switch strings.ToLower(vh) {
+				case "v3.0", "v3":
+					hasVersionHintV3 = true
+				case "v4.0", "v4":
+					hasVersionHintV4 = true
+				}
+			}
+			if kn, ok := src.DecoderOptionsHint["keyNegotiation"].(bool); ok && kn {
+				hasKeyNegotiation = true
+			}
+		}
+		// Check for default Behinder v3/v4 key pattern.
+		if src.FamilyHint == "behinder_v2" || src.FamilyHint == "behinder" {
+			for _, sig := range src.Signals {
+				if strings.ToLower(sig) == "behinder-v2-hex-key" {
+					// The default key e45e329feb5d925b is also a v2 hex key.
+					// Distinguish by checking if there's also a pass param (v2) or not (v3 default).
+					hasDefaultKey = true
+				}
+			}
+		}
+		// Check for custom protocol signals (v4.0 uses a custom binary protocol).
+		for _, sig := range src.Signals {
+			if strings.ToLower(sig) == "custom-protocol" || strings.ToLower(sig) == "binary-protocol" {
+				hasCustomProtocol = true
+			}
+		}
+	}
+
+	// v4.0: custom protocol or explicit version hint.
+	if hasVersionHintV4 || hasCustomProtocol {
+		return "v4.0"
+	}
+	// v3.0: explicit version hint, or default key without v2 handshake.
+	if hasVersionHintV3 {
+		return "v3.0"
+	}
+	// v2.0: dynamic key negotiation detected (hex key response or pass param).
+	if hasV2HexKey || hasV2PassParam {
+		return "v2.0"
+	}
+	// If key negotiation was detected but no v2-specific signals, likely v2.0.
+	if hasKeyNegotiation {
+		return "v2.0"
+	}
+	// Default key without handshake signals → v3.0 (default key is e45e329feb5d925b).
+	if hasDefaultKey {
+		return "v3.0"
+	}
+	return ""
+}
+
+func identifyGodzillaVersion(sources []model.StreamPayloadSource, idxs []int) string {
+	hasAES_ECB := false
+	hasAES_CBC := false
+	hasCustomCipher := false
+	hasVersionHint := ""
+
+	for _, idx := range idxs {
+		src := sources[idx]
+		if src.DecoderOptionsHint == nil {
+			continue
+		}
+		if cipher, ok := src.DecoderOptionsHint["cipher"].(string); ok {
+			switch strings.ToLower(cipher) {
+			case "aes_ecb", "aes-ecb":
+				hasAES_ECB = true
+			case "aes_cbc", "aes-cbc":
+				hasAES_CBC = true
+			default:
+				hasCustomCipher = true
+			}
+		}
+		if vh, ok := src.DecoderOptionsHint["versionHint"].(string); ok && vh != "" {
+			hasVersionHint = vh
+		}
+	}
+	if hasVersionHint != "" {
+		return hasVersionHint
+	}
+	if hasCustomCipher {
+		return "v4.0+"
+	}
+	if hasAES_CBC {
+		return "v3.0+"
+	}
+	if hasAES_ECB {
+		return "v2.0+"
+	}
+	return ""
+}
+
+func identifyAntSwordVersion(sources []model.StreamPayloadSource, idxs []int) string {
+	hasChrChain := false
+	hasEvalKeyword := false
+	hasScriptAfterBase64 := false
+
+	for _, idx := range idxs {
+		src := sources[idx]
+		for _, sig := range src.Signals {
+			switch strings.ToLower(sig) {
+			case "chr-chain":
+				hasChrChain = true
+			case "script-keyword":
+				hasEvalKeyword = true
+			case "script-after-base64":
+				hasScriptAfterBase64 = true
+			}
+		}
+	}
+	// chr-chain encoding is a distinctive AntSword feature.
+	if hasChrChain {
+		return "chr-encoding"
+	}
+	if hasScriptAfterBase64 {
+		return "base64-encoding"
+	}
+	if hasEvalKeyword {
+		return "eval-encoding"
+	}
+	return ""
+}
+
 func (s *Service) collectPayloadSourcesFromMeta(packet model.Packet, meta payloadSourceHTTPMeta, collected *[]model.StreamPayloadSource, seen map[string]struct{}) {
 	inspection := InspectStreamPayload(meta.raw)
 	for _, candidate := range inspection.Candidates {
@@ -179,10 +583,10 @@ func shouldFetchPayloadSourceStreamBody(meta payloadSourceHTTPMeta) bool {
 
 func payloadSourcesHaveStrongWebshellHint(sources []model.StreamPayloadSource) bool {
 	for _, source := range sources {
-		if source.FamilyHint == "antsword_like" || source.FamilyHint == "godzilla_like" || source.FamilyHint == "aes_webshell_like" {
+		if source.FamilyHint == "antsword_like" || source.FamilyHint == "godzilla_like" || source.FamilyHint == "aes_webshell_like" || source.FamilyHint == "behinder_v2" {
 			return true
 		}
-		if source.SourceRole == "script_or_command" {
+		if source.SourceRole == "script_or_command" || source.SourceRole == "key_negotiation" {
 			return true
 		}
 		if streamPayloadSourceHasDecoder(source, "behinder", "antsword", "godzilla") {
@@ -190,7 +594,7 @@ func payloadSourcesHaveStrongWebshellHint(sources []model.StreamPayloadSource) b
 		}
 		for _, signal := range source.Signals {
 			switch signal {
-			case "antsword_like", "godzilla_like", "aes_webshell_like", "command-exec-function", "script-keyword", "script-after-base64":
+			case "antsword_like", "godzilla_like", "aes_webshell_like", "command-exec-function", "script-keyword", "script-after-base64", "behinder_v2", "behinder-v2-hex-key", "behinder-v2-pass-param":
 				return true
 			}
 		}
@@ -631,13 +1035,16 @@ func shouldKeepPayloadSource(source model.StreamPayloadSource) bool {
 	if source.FamilyHint != "" || source.SourceRole != "" {
 		return true
 	}
-	if signals["antsword_like"] || signals["godzilla_like"] || signals["aes_webshell_like"] || signals["encrypted_blob"] || signals["script_or_command"] {
+	if signals["antsword_like"] || signals["godzilla_like"] || signals["aes_webshell_like"] || signals["encrypted_blob"] || signals["script_or_command"] || signals["behinder_v2"] || signals["key_negotiation"] {
 		return true
 	}
 	if signals["command-exec-function"] || signals["repeat-burst"] {
 		return true
 	}
 	if signals["script-keyword"] || signals["script-after-base64"] || signals["base64-aes-block"] || signals["chr-chain"] || signals["hex-block-cipher"] {
+		return true
+	}
+	if signals["behinder-v2-hex-key"] || signals["behinder-v2-pass-param"] {
 		return true
 	}
 	if source.Confidence >= 45 && (signals["suspicious-param"] || signals["structured-http-field"]) && hasSuspiciousPayloadSourceSignal(source.Signals) {
@@ -654,12 +1061,16 @@ func payloadSourceRank(source model.StreamPayloadSource) int {
 	switch source.FamilyHint {
 	case "antsword_like", "godzilla_like":
 		rank += 60
+	case "behinder_v2":
+		rank += 55
 	case "aes_webshell_like", "hex_cipher":
 		rank += 35
 	}
 	switch source.SourceRole {
 	case "script_or_command":
 		rank += 40
+	case "key_negotiation":
+		rank += 35
 	case "encrypted_blob":
 		rank += 30
 	}
@@ -671,6 +1082,10 @@ func payloadSourceRank(source model.StreamPayloadSource) int {
 			rank += 30
 		case "godzilla-random-param", "numeric-webshell-param":
 			rank += 25
+		case "behinder-v2-hex-key":
+			rank += 25
+		case "behinder-v2-pass-param":
+			rank += 18
 		case "base64-aes-block", "hex-block-cipher":
 			rank += 18
 		case "repeat-burst":
@@ -723,7 +1138,7 @@ func uniquePayloadSourceStrings(values []string) []string {
 func hasSuspiciousPayloadSourceSignal(signals []string) bool {
 	for _, signal := range signals {
 		switch signal {
-		case "suspicious-uri", "suspicious-param", "script-keyword", "script-after-base64", "base64-aes-block", "chr-chain", "hex-block-cipher", "command-exec-function", "repeat-burst", "antsword_like", "godzilla_like", "aes_webshell_like", "encrypted_blob", "script_or_command":
+		case "suspicious-uri", "suspicious-param", "script-keyword", "script-after-base64", "base64-aes-block", "chr-chain", "hex-block-cipher", "command-exec-function", "repeat-burst", "antsword_like", "godzilla_like", "aes_webshell_like", "encrypted_blob", "script_or_command", "behinder_v2", "key_negotiation", "behinder-v2-hex-key", "behinder-v2-pass-param":
 			return true
 		}
 	}

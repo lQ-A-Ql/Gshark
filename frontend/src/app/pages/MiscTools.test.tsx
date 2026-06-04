@@ -23,19 +23,25 @@ const mocks = vi.hoisted(() => ({
   exportWinRMDecryptResult: vi.fn(),
   navigate: vi.fn(),
   sentinelState: {
-    fileMeta: {
-      name: "capture.pcapng",
-      sizeBytes: 2048,
-      path: "C:/captures/capture.pcapng",
-    },
+    fileMeta: { name: "capture.pcapng", sizeBytes: 2048, path: "C:/captures/capture.pcapng" },
     locatePacketById: vi.fn(),
     preparePacketStream: vi.fn(),
     setActiveStream: vi.fn(),
   },
 }));
-
 vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
+}));
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    locatePacketById: mocks.sentinelState.locatePacketById,
+  }),
+}));
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    preparePacketStream: mocks.sentinelState.preparePacketStream,
+    setActiveStream: mocks.sentinelState.setActiveStream,
+  }),
 }));
 vi.mock("../integrations/backendClients", () => ({
   backendClients: {
@@ -45,31 +51,20 @@ vi.mock("../integrations/backendClients", () => ({
     stream: { decodeStreamPayload: mocks.decodeStreamPayload, inspectStreamPayload: mocks.inspectStreamPayload, listStreamPayloadSources: mocks.listStreamPayloadSources },
   },
   bridge: {
-    listMiscModules: mocks.listMiscModules,
-    importMiscModulePackage: mocks.importMiscModulePackage,
-    deleteMiscModule: mocks.deleteMiscModule,
-    runMiscModule: mocks.runMiscModule,
-    getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis,
-    getMySQLAnalysis: mocks.getMySQLAnalysis,
-    getSMTPAnalysis: mocks.getSMTPAnalysis,
-    getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
-    listNTLMSessionMaterials: mocks.listNTLMSessionMaterials,
-    listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
+    listMiscModules: mocks.listMiscModules, importMiscModulePackage: mocks.importMiscModulePackage,
+    deleteMiscModule: mocks.deleteMiscModule, runMiscModule: mocks.runMiscModule,
+    getHTTPLoginAnalysis: mocks.getHTTPLoginAnalysis, getMySQLAnalysis: mocks.getMySQLAnalysis,
+    getSMTPAnalysis: mocks.getSMTPAnalysis, getShiroRememberMeAnalysis: mocks.getShiroRememberMeAnalysis,
+    listNTLMSessionMaterials: mocks.listNTLMSessionMaterials, listSMB3SessionCandidates: mocks.listSMB3SessionCandidates,
     generateSMB3RandomSessionKey: mocks.generateSMB3RandomSessionKey,
-    runWinRMDecrypt: mocks.runWinRMDecrypt,
-    getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
+    runWinRMDecrypt: mocks.runWinRMDecrypt, getWinRMDecryptResultText: mocks.getWinRMDecryptResultText,
     exportWinRMDecryptResult: mocks.exportWinRMDecryptResult,
   },
 }));
-
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
-  return {
-    ...actual,
-    useNavigate: () => mocks.navigate,
-  };
+  return { ...actual, useNavigate: () => mocks.navigate };
 });
-
 import MiscTools from "./MiscTools";
 
 const SAMPLE_BASE64_PAYLOAD = "YXNzZXJ0KCRfUE9TVFsnY21kJ10pOw==";

@@ -12,7 +12,12 @@ import { useWorkspaceFilterProgress } from "../components/workspace/useWorkspace
 import { useWorkspaceFilterHistory } from "../components/workspace/useWorkspaceFilterHistory";
 import { useWorkspaceProtocolSelection } from "../components/workspace/useWorkspaceProtocolSelection";
 import { usePreloadElapsedMs } from "../components/workspace/usePreloadElapsedMs";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
+import { useStream } from "../state/contexts/StreamContext";
+import { useFilter } from "../state/contexts/FilterContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
 import { useWorkspaceFilterAction } from "./useWorkspaceFilterAction";
 import { useWorkspaceStreamNavigation } from "./useWorkspaceStreamNavigation";
 import {
@@ -21,31 +26,31 @@ import {
   shouldShowWorkspaceSwitchFailureBanner,
   shouldShowWorkspaceWelcome,
 } from "./workspaceStatus";
-import {
-  getWorkspacePagerItems,
-  shouldShowWorkspaceFilterLoadingBlankState,
-} from "./workspaceViewRules";
+import { getWorkspacePagerItems, shouldShowWorkspaceFilterLoadingBlankState } from "./workspaceViewRules";
 
 export default function Workspace() {
+  const { backendConnected, backendStatus, tsharkStatus } = useBackend();
   const {
-    displayFilter,
-    setDisplayFilter,
-    applyFilter,
-    clearFilter,
-    filteredPackets,
-    totalPackets,
-    currentPage,
-    totalPages,
     isPreloadingCapture,
     preloadProcessed,
     preloadTotal,
     capturePreloadDiagnostics,
+    captureTransaction,
+    fileMeta,
+    openCapture,
+    stopCapture,
+    retryCapturePreloadConfirm,
+  } = useCapture();
+  const {
+    filteredPackets,
+    totalPackets,
+    currentPage,
+    totalPages,
     hasMorePackets,
     hasPrevPackets,
     isPageLoading,
     isFilterLoading,
     packetPageError,
-    captureTransaction,
     loadMorePackets,
     loadPrevPackets,
     jumpToPage,
@@ -56,15 +61,10 @@ export default function Workspace() {
     selectedPacketId,
     selectPacket,
     protocolTree,
-    fileMeta,
-    openCapture,
-    stopCapture,
-    retryCapturePreloadConfirm,
-    setActiveStream,
-    backendConnected,
-    backendStatus,
-    tsharkStatus,
-  } = useSentinel();
+  } = usePacket();
+  const { setActiveStream } = useStream();
+  const { displayFilter, setDisplayFilter, applyFilter, clearFilter } = useFilter();
+  useAnalysis();
 
   const [capturePath, setCapturePath] = useState(fileMeta.name);
   const [pageInput, setPageInput] = useState("1");

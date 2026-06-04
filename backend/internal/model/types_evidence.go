@@ -19,6 +19,7 @@ type EvidenceRecord struct {
 	Host         string   `json:"host,omitempty"`
 	URI          string   `json:"uri,omitempty"`
 	Tags         []string `json:"tags,omitempty"`
+	TechniqueIDs []string `json:"technique_ids,omitempty"`
 	Caveats      []string `json:"caveats,omitempty"`
 }
 

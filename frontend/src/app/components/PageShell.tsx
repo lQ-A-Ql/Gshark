@@ -29,6 +29,7 @@ export function PageShell({
   return (
     <div className={cn("flex h-full flex-col overflow-auto", className)}>
       <div
+        role="main"
         className={cn(layout === "tiled" ? tiledDensityClassName[density] : densityClassName[density], innerClassName)}
       >
         {children}

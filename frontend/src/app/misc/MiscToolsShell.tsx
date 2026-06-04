@@ -48,11 +48,7 @@ export function MiscToolsShell({
         </StatusHint>
       ) : (
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <MiscModuleSidebar
-            modules={modules}
-            selectedModuleId={selectedModuleId}
-            onSelectModule={onSelectModule}
-          />
+          <MiscModuleSidebar modules={modules} selectedModuleId={selectedModuleId} onSelectModule={onSelectModule} />
           <MiscModuleWorkbench
             modules={modules}
             selectedModuleId={selectedModuleId}

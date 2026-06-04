@@ -109,9 +109,7 @@ export function TranscriptionCell({
           </div>
         </div>
       ) : errorText ? (
-        <div className="meow-soft-fill max-w-[22rem] px-2.5 py-2 text-[11px] leading-5 text-rose-700">
-          {errorText}
-        </div>
+        <div className="meow-soft-fill max-w-[22rem] px-2.5 py-2 text-[11px] leading-5 text-rose-700">{errorText}</div>
       ) : (
         <div className="text-[11px] text-muted-foreground">
           {transcriptionStatus.status === "idle"

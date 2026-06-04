@@ -70,6 +70,24 @@ func HuntThreats(packets []model.Packet, customPrefixes []string) []model.Threat
 	}
 
 	hits = append(hits, findAnomaly404403(packets, seq)...)
+	// Re-seq after anomaly hits to avoid ID conflicts.
+	if len(hits) > 0 {
+		seq = hits[len(hits)-1].ID + 1
+	}
+	// DGA domain detection for DNS packets.
+	dgaHits := detectDGADomains(packets)
+	for i := range dgaHits {
+		dgaHits[i].ID = seq
+		seq++
+	}
+	hits = append(hits, dgaHits...)
+	// Brute force detection for HTTP 401/403 responses.
+	bruteForceHits := DetectBruteForce(packets)
+	for i := range bruteForceHits {
+		bruteForceHits[i].ID = seq
+		seq++
+	}
+	hits = append(hits, bruteForceHits...)
 	sort.Slice(hits, func(i, j int) bool {
 		return hits[i].ID < hits[j].ID
 	})

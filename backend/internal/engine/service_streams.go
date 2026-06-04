@@ -253,6 +253,36 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 	return model.ReassembledStream{StreamID: streamID, Protocol: normalized}
 }
 
+// peekRawStreamInMemory returns a reassembled stream only when it is already
+// available from the in-memory cache or raw-stream index. Unlike RawStream it
+// never triggers the per-stream tshark file-fallback (which costs ~1s+ each),
+// so callers that must process many streams under a wall-clock budget can serve
+// the cheap in-memory streams freely and bound the expensive ones separately.
+// The second return value reports whether an in-memory stream was found.
+func (s *Service) peekRawStreamInMemory(protocol string, streamID int64) (model.ReassembledStream, bool) {
+	normalized := strings.ToUpper(strings.TrimSpace(protocol))
+	key := streamCacheKey(normalized, streamID)
+
+	s.mu.RLock()
+	if cached, ok := s.streamCache[key]; ok {
+		s.mu.RUnlock()
+		stream := s.streamWithOverrides(key, cached)
+		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
+		return stream, true
+	}
+	if indexed, ok := s.rawStreamIndex[key]; ok {
+		s.mu.RUnlock()
+		stream := s.streamWithOverrides(key, indexed)
+		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
+		s.applyOverrideCountToMeta(key, stream.LoadMeta)
+		s.cacheStream(key, stream)
+		return stream, true
+	}
+	s.mu.RUnlock()
+	return model.ReassembledStream{StreamID: streamID, Protocol: normalized}, false
+}
+
 func (s *Service) RawStreamPage(ctx context.Context, protocol string, streamID int64, cursor, limit int) (model.ReassembledStream, int, int) {
 	if ctx == nil {
 		ctx = context.Background()

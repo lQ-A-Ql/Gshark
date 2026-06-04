@@ -30,11 +30,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -44,6 +47,7 @@ import (
 
 const (
 	c2DecryptMaxRecords       = 500
+	c2DecryptMaxStreamRecords = 500
 	c2DecryptPreviewMaxBytes  = 4096
 	c2DecryptKeyStatusNA      = "not_applicable"
 	c2DecryptKeyStatusOK      = "verified"
@@ -89,11 +93,14 @@ func (s *Service) C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (mo
 		Records: []model.C2DecryptedRecord{},
 		Notes:   []string{},
 	}
-	candidates, err := s.collectC2DecryptCandidates(ctx, family, req.Scope)
+	candidates, truncated, err := s.collectC2DecryptCandidates(ctx, family, req.Scope)
 	if err != nil {
 		return result, err
 	}
 	result.TotalCandidates = len(candidates)
+	if truncated {
+		result.Notes = append(result.Notes, "候选流较多，部分尚未重组的流在时间预算内未及读取，结果可能不完整；可缩小 scope 到具体 stream/packet，或等待首屏 enrichment 完成后重试以覆盖全部流。")
+	}
 	if len(candidates) == 0 {
 		result.Notes = append(result.Notes, "当前抓包没有可用于该 family 的候选 payload；请先确认 C2 analysis 已形成候选证据，或 TLS/HTTP payload 已经可见。")
 		return result, nil
@@ -121,10 +128,11 @@ func (s *Service) C2Decrypt(ctx context.Context, req model.C2DecryptRequest) (mo
 	return result, ctx.Err()
 }
 
-func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string, scope model.C2DecryptScope) ([]c2DecryptCandidate, error) {
+func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string, scope model.C2DecryptScope) ([]c2DecryptCandidate, bool, error) {
+	truncated := false
 	analysis, err := s.C2SampleAnalysis(ctx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	packetIDs := map[int64]struct{}{}
 	streamIDs := map[int64]struct{}{}
@@ -183,7 +191,7 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 	packetSeen := map[string]struct{}{}
 	streamRepresentatives := map[int64]model.Packet{}
 	if s.packetStore == nil {
-		return out, nil
+		return out, false, nil
 	}
 	err = s.packetStore.Iterate(nil, func(packet model.Packet) error {
 		if err := ctx.Err(); err != nil {
@@ -214,9 +222,11 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 		return nil
 	})
 	if err == nil && family == "vshell" {
-		if streamErr := s.collectVShellStreamDecryptCandidates(ctx, streamIDs, streamRepresentatives, seen, &out); streamErr != nil {
+		streamTruncated, streamErr := s.collectVShellStreamDecryptCandidates(ctx, streamIDs, streamRepresentatives, seen, &out)
+		if streamErr != nil {
 			err = streamErr
 		}
+		truncated = streamTruncated
 	}
 	if err == nil && family == "cs" {
 		_ = s.collectCSHTTPFieldDecryptCandidates(ctx, seen, &out)
@@ -237,7 +247,7 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 		}
 		return out[i].transform < out[j].transform
 	})
-	return out, err
+	return out, truncated, err
 }
 
 func c2DecryptCandidatePriority(candidate c2DecryptCandidate) int {
@@ -257,8 +267,8 @@ func appendC2DecryptCandidate(out *[]c2DecryptCandidate, seen map[string]struct{
 	return appendC2DecryptCandidateWithLimit(out, seen, candidate, c2DecryptMaxRecords)
 }
 
-func appendC2DecryptCandidateUnbounded(out *[]c2DecryptCandidate, seen map[string]struct{}, candidate c2DecryptCandidate) {
-	appendC2DecryptCandidateWithLimit(out, seen, candidate, 0)
+func appendC2DecryptCandidateBounded(out *[]c2DecryptCandidate, seen map[string]struct{}, candidate c2DecryptCandidate) {
+	appendC2DecryptCandidateWithLimit(out, seen, candidate, c2DecryptMaxStreamRecords)
 }
 
 func appendC2DecryptCandidateWithLimit(out *[]c2DecryptCandidate, seen map[string]struct{}, candidate c2DecryptCandidate, limit int) bool {
@@ -573,9 +583,31 @@ func decodeColonOrPlainHex(raw string) ([]byte, bool) {
 	return decoded, err == nil
 }
 
-func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, streamIDs map[int64]struct{}, representatives map[int64]model.Packet, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
+// vshellStreamCollectBudget bounds the wall-clock time spent pulling streams
+// that are NOT already reassembled in memory. With fast-list first-screen
+// loading the per-stream payload is enriched asynchronously, so a decrypt that
+// runs before enrichment finishes would otherwise trigger a tshark
+// file-fallback (~1s+ each) for every selected stream — hundreds of which blow
+// past the desktop IPC 60s deadline and lose the result entirely. We always
+// serve the cheap in-memory streams, and only spend this budget on the
+// expensive file-fallback ones; once exhausted we stop pulling new streams and
+// the caller surfaces a truncation note.
+func vshellStreamCollectBudget() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_VSHELL_STREAM_COLLECT_BUDGET_MS"))
+	if raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			if parsed > 120000 {
+				parsed = 120000
+			}
+			return time.Duration(parsed) * time.Millisecond
+		}
+	}
+	return 25 * time.Second
+}
+
+func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, streamIDs map[int64]struct{}, representatives map[int64]model.Packet, seen map[string]struct{}, out *[]c2DecryptCandidate) (bool, error) {
 	if len(streamIDs) == 0 {
-		return nil
+		return false, nil
 	}
 	ids := make([]int64, 0, len(streamIDs))
 	for id := range streamIDs {
@@ -584,64 +616,103 @@ func (s *Service) collectVShellStreamDecryptCandidates(ctx context.Context, stre
 		}
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	// Pass 1: serve every stream already reassembled in memory (cache/index).
+	// These cost nothing, so we never skip them regardless of budget. Collect
+	// the misses for the bounded file-fallback pass.
+	fileFallback := make([]int64, 0, len(ids))
 	for _, streamID := range ids {
 		if err := ctx.Err(); err != nil {
-			return err
+			return false, err
 		}
-		stream := s.RawStream(ctx, "TCP", streamID)
+		stream, ok := s.peekRawStreamInMemory("TCP", streamID)
+		if !ok {
+			fileFallback = append(fileFallback, streamID)
+			continue
+		}
 		if len(stream.Chunks) == 0 {
 			continue
 		}
-		for _, assembled := range assembleVShellStreamDirections(stream) {
-			packet := streamRepresentativePacket(streamID, assembled.direction, stream, representatives[streamID])
+		s.emitVShellStreamCandidates(streamID, stream, representatives, seen, out)
+	}
 
-			// WebSocket-aware path: VShell rides AES-GCM frames inside WebSocket
-			// data frames. Client→server frames are XOR-masked, so the raw stream
-			// bytes are undecryptable until the mask is stripped. Decode the
-			// colon-hex body, parse WebSocket framing, and concatenate the unmasked
-			// inner payloads into a single candidate. Each inner payload is itself a
-			// [4-byte LE length][nonce+ct+tag] VShell frame, so the concatenation is
-			// exactly the multi-frame format splitVShellFrames already understands;
-			// the decrypt loop will split it back into per-message frames. Emitting
-			// one candidate per direction (instead of one per WebSocket frame) keeps
-			// the candidate count bounded on long-lived C2 streams with hundreds of
-			// heartbeat frames, which previously caused the decrypt task to time out.
-			if wsInner := wsFrameInnerPayloads(decodeLooseHex(assembled.body)); len(wsInner) > 0 {
-				combined := make([]byte, 0, len(assembled.body)/2)
-				for _, inner := range wsInner {
-					if len(inner) < 8 {
-						continue
-					}
-					combined = append(combined, inner...)
-				}
-				if len(combined) >= 8 {
-					candidate := c2DecryptCandidate{
-						packet:    packet,
-						raw:       combined,
-						label:     fmt.Sprintf("tcp-stream:%d:%s:ws", streamID, assembled.direction),
-						transform: "ws-unmask-" + assembled.direction,
-						direction: streamChunkRecordDirection(assembled.direction),
-					}
-					appendC2DecryptCandidateUnbounded(out, seen, candidate)
-				}
+	// Pass 2: spend a bounded wall-clock budget on streams that require the
+	// per-stream tshark file-fallback. Stop early once the budget is exhausted
+	// and report truncation so the caller can annotate the result.
+	truncated := false
+	if len(fileFallback) > 0 {
+		budget := vshellStreamCollectBudget()
+		start := time.Now()
+		for i, streamID := range fileFallback {
+			if err := ctx.Err(); err != nil {
+				return truncated, err
 			}
-
-			for _, transformed := range decodeC2TransformCandidates(assembled.body, "auto") {
-				if len(transformed.raw) < 8 {
-					continue
-				}
-				candidate := c2DecryptCandidate{
-					packet:    packet,
-					raw:       transformed.raw,
-					label:     fmt.Sprintf("tcp-stream:%d:%s", streamID, assembled.direction),
-					transform: "raw-stream-" + assembled.direction + "-" + transformed.transform,
-					direction: streamChunkRecordDirection(assembled.direction),
-				}
-				appendC2DecryptCandidateUnbounded(out, seen, candidate)
+			if time.Since(start) >= budget {
+				truncated = true
+				log.Printf("engine: vshell stream collect budget exhausted after %d/%d file-fallback streams (budget=%s)", i, len(fileFallback), budget)
+				break
 			}
+			stream := s.RawStream(ctx, "TCP", streamID)
+			if len(stream.Chunks) == 0 {
+				continue
+			}
+			s.emitVShellStreamCandidates(streamID, stream, representatives, seen, out)
 		}
 	}
-	return nil
+	return truncated, nil
+}
+
+// emitVShellStreamCandidates turns one reassembled TCP stream into VShell
+// decrypt candidates (WebSocket-unmask path + raw-stream transforms).
+func (s *Service) emitVShellStreamCandidates(streamID int64, stream model.ReassembledStream, representatives map[int64]model.Packet, seen map[string]struct{}, out *[]c2DecryptCandidate) {
+	for _, assembled := range assembleVShellStreamDirections(stream) {
+		packet := streamRepresentativePacket(streamID, assembled.direction, stream, representatives[streamID])
+
+		// WebSocket-aware path: VShell rides AES-GCM frames inside WebSocket
+		// data frames. Client→server frames are XOR-masked, so the raw stream
+		// bytes are undecryptable until the mask is stripped. Decode the
+		// colon-hex body, parse WebSocket framing, and concatenate the unmasked
+		// inner payloads into a single candidate. Each inner payload is itself a
+		// [4-byte LE length][nonce+ct+tag] VShell frame, so the concatenation is
+		// exactly the multi-frame format splitVShellFrames already understands;
+		// the decrypt loop will split it back into per-message frames. Emitting
+		// one candidate per direction (instead of one per WebSocket frame) keeps
+		// the candidate count bounded on long-lived C2 streams with hundreds of
+		// heartbeat frames, which previously caused the decrypt task to time out.
+		if wsInner := wsFrameInnerPayloads(decodeLooseHex(assembled.body)); len(wsInner) > 0 {
+			combined := make([]byte, 0, len(assembled.body)/2)
+			for _, inner := range wsInner {
+				if len(inner) < 8 {
+					continue
+				}
+				combined = append(combined, inner...)
+			}
+			if len(combined) >= 8 {
+				candidate := c2DecryptCandidate{
+					packet:    packet,
+					raw:       combined,
+					label:     fmt.Sprintf("tcp-stream:%d:%s:ws", streamID, assembled.direction),
+					transform: "ws-unmask-" + assembled.direction,
+					direction: streamChunkRecordDirection(assembled.direction),
+				}
+				appendC2DecryptCandidateBounded(out, seen, candidate)
+			}
+		}
+
+		for _, transformed := range decodeC2TransformCandidates(assembled.body, "auto") {
+			if len(transformed.raw) < 8 {
+				continue
+			}
+			candidate := c2DecryptCandidate{
+				packet:    packet,
+				raw:       transformed.raw,
+				label:     fmt.Sprintf("tcp-stream:%d:%s", streamID, assembled.direction),
+				transform: "raw-stream-" + assembled.direction + "-" + transformed.transform,
+				direction: streamChunkRecordDirection(assembled.direction),
+			}
+			appendC2DecryptCandidateBounded(out, seen, candidate)
+		}
+	}
 }
 
 type vshellStreamDirectionPayload struct {

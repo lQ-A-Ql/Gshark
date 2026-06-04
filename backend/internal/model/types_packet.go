@@ -1,5 +1,12 @@
 package model
 
+type TLSFingerprint struct {
+	JA3Hash  string `json:"ja3_hash,omitempty"`
+	JA3SHash string `json:"ja3s_hash,omitempty"`
+	JA3Raw   string `json:"ja3_raw,omitempty"`
+	JA3SRaw  string `json:"ja3s_raw,omitempty"`
+}
+
 type Packet struct {
 	ID              int64               `json:"id"`
 	Timestamp       string              `json:"timestamp"`
@@ -18,6 +25,7 @@ type Packet struct {
 	IPHeaderLen     int                 `json:"ip_header_len,omitempty"`
 	L4HeaderLen     int                 `json:"l4_header_len,omitempty"`
 	Color           PacketColorFeatures `json:"color_features,omitempty"`
+	TLSFingerprint  *TLSFingerprint     `json:"tls_fingerprint,omitempty"`
 }
 
 type PacketColorFeatures struct {
@@ -64,13 +72,15 @@ type PacketColorFeatures struct {
 }
 
 type ThreatHit struct {
-	ID       int64  `json:"id"`
-	PacketID int64  `json:"packet_id"`
-	Category string `json:"category"`
-	Rule     string `json:"rule"`
-	Level    string `json:"level"`
-	Preview  string `json:"preview"`
-	Match    string `json:"match"`
+	ID           int64    `json:"id"`
+	PacketID     int64    `json:"packet_id"`
+	Category     string   `json:"category"`
+	Rule         string   `json:"rule"`
+	Level        string   `json:"level"`
+	Preview      string   `json:"preview"`
+	Match        string   `json:"match"`
+	TechniqueIDs []string `json:"technique_ids,omitempty"`
+	TacticIDs    []string `json:"tactic_ids,omitempty"`
 }
 
 type ParseOptions struct {

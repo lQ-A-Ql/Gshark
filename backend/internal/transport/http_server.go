@@ -34,6 +34,7 @@ type Server struct {
 	media        MediaService
 	toolRuntime  ToolRuntimeService
 	toolAnalysis ToolAnalysisService
+	playbook     PlaybookService
 
 	hub *Hub
 
@@ -51,7 +52,8 @@ type Server struct {
 	uploadedFiles      map[string]struct{}
 	activeUploadedPCAP string
 
-	mcpServer *mcp.Server
+	mcpServer   *mcp.Server
+	ruleManager *engine.RuleManager
 }
 
 func NewServer(svc *engine.Service, hub *Hub) *Server {
@@ -80,6 +82,8 @@ func NewServerWithOptions(svc *engine.Service, hub *Hub, opts ServerOptions) *Se
 		s.toolRuntime = svc
 		s.toolAnalysis = svc
 	}
+	s.ruleManager = engine.NewRuleManager("")
+	s.ruleManager.LoadBuiltinPacks()
 	s.mcpServer = mcp.NewServer(mcp.Dependencies{
 		Capture:      s.capture,
 		Detection:    s.detection,
@@ -203,6 +207,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tools/shiro-rememberme", s.handleShiroRememberMeAnalysis)
 	mux.HandleFunc("/api/tools/udp-tunnel", s.handleUDPTunnelAnalysis)
 	mux.HandleFunc("/api/tools/bruteforce", s.handleBruteforceAnalysis)
+
+	// Rule management routes.
+	mux.HandleFunc("/api/rules/status", s.handleRulesStatus)
+	mux.HandleFunc("/api/rules/config", s.handleRulesConfig)
+	mux.HandleFunc("/api/rules/pack/toggle", s.handleRulesPackToggle)
+	mux.HandleFunc("/api/rules/check-updates", s.handleRulesCheckUpdates)
+	mux.HandleFunc("/api/rules/download", s.handleRulesDownload)
+	mux.HandleFunc("/api/rules/conflicts", s.handleRulesConflicts)
+	mux.HandleFunc("/api/rules/validate", s.handleRulesValidate)
+
+	// Playbook and hypothesis management routes.
+	mux.HandleFunc("/api/playbooks", s.handlePlaybooks)
+	mux.HandleFunc("/api/playbooks/", s.handlePlaybookRoute)
+	mux.HandleFunc("/api/hunting/saved-searches", s.handleSavedSearches)
+	mux.HandleFunc("/api/hunting/saved-searches/", s.handleSavedSearchRoute)
+	mux.HandleFunc("/api/hunting/hypotheses", s.handleHypotheses)
+	mux.HandleFunc("/api/hunting/hypotheses/", s.handleHypothesisRoute)
 
 	return withRecovery(withCORS(s.withAuth(s.withAudit(mux))))
 }

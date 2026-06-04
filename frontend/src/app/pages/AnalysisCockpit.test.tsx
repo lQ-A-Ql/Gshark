@@ -37,9 +37,21 @@ vi.mock("react-router", async (importOriginal) => {
   };
 });
 
-vi.mock("../state/SentinelContext", () => ({
-  formatBytes: (value: number) => `${value} B`,
-  useSentinel: () => mocks.sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    backendConnected: mocks.sentinelState.backendConnected,
+    backendStatus: mocks.sentinelState.backendStatus,
+    tsharkStatus: mocks.sentinelState.tsharkStatus,
+  }),
+}));
+
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    fileMeta: mocks.sentinelState.fileMeta,
+    captureTransaction: mocks.sentinelState.captureTransaction,
+    recentCaptures: mocks.sentinelState.recentCaptures,
+    openCapture: mocks.sentinelState.openCapture,
+  }),
 }));
 
 vi.mock("../../assets/logo.png", () => ({

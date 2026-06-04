@@ -116,6 +116,60 @@ var RuleRegistry = map[string]RuleMetadata{
 		DefaultConfidence: 45,
 		Caveats:           []string{"可解码不等于可利用，需补充密钥来源或应用指纹确认。"},
 	},
+	"iec104.cmd.unauthorized": {
+		RuleID:            "iec104.cmd.unauthorized",
+		Reason:            "IEC 104 控制方向出现激活命令（COT=act），需回到 packet 复核命令类型、目标地址和操作上下文。",
+		DefaultConfidence: 75,
+		Caveats:           []string{"正常控制任务也会产生激活命令，需结合业务时段、操作站角色和 SCADA 上下文判断。"},
+	},
+	"iec104.cmd.deactivation": {
+		RuleID:            "iec104.cmd.deactivation",
+		Reason:            "IEC 104 控制方向出现去激活命令（COT=deact），可能指示异常停止或服务中断。",
+		DefaultConfidence: 58,
+		Caveats:           []string{"维护操作也可能触发去激活命令，需结合来源和时间窗口复核。"},
+	},
+	"iec104.cmd.reset_process": {
+		RuleID:            "iec104.cmd.reset_process",
+		Reason:            "IEC 104 检测到进程复位命令（C_RP_NA_1），可能用于清除设备状态或规避监控。",
+		DefaultConfidence: 78,
+		Caveats:           []string{"复位命令在设备维护或固件升级后可能正常出现。"},
+	},
+	"iec104.cmd.clock_sync": {
+		RuleID:            "iec104.cmd.clock_sync",
+		Reason:            "IEC 104 检测到时钟同步命令（C_CS_NA_1），可用于篡改事件时间线。",
+		DefaultConfidence: 42,
+		Caveats:           []string{"时钟同步是正常的 IEC 104 维护操作，需结合来源和频率判断。"},
+	},
+	"iec104.cot.init": {
+		RuleID:            "iec104.cot.init",
+		Reason:            "IEC 104 收到初始化原因传输（COT=init），可能指示设备重启或重新上线。",
+		DefaultConfidence: 45,
+		Caveats:           []string{"设备启动或网络恢复后初始化是正常行为。"},
+	},
+	"iec104.cot.abnormal": {
+		RuleID:            "iec104.cot.abnormal",
+		Reason:            "IEC 104 收到异常原因传输值（COT>=44），可能指示协议错误或未知响应。",
+		DefaultConfidence: 52,
+		Caveats:           []string{"部分设备实现可能使用非标准 COT 值，需结合设备型号和固件版本判断。"},
+	},
+	"iec104.seq.tx_gap": {
+		RuleID:            "iec104.seq.tx_gap",
+		Reason:            "IEC 104 发送序列号不连续，可能指示丢包、重传或异常流量注入。",
+		DefaultConfidence: 55,
+		Caveats:           []string{"网络抖动或 TCP 重传也可能导致序列号跳跃。"},
+	},
+	"iec104.seq.rx_mismatch": {
+		RuleID:            "iec104.seq.rx_mismatch",
+		Reason:            "IEC 104 接收序列号与预期不一致，可能指示双向通信异常。",
+		DefaultConfidence: 40,
+		Caveats:           []string{"初始连接阶段或连接重置后序列号可能不匹配。"},
+	},
+	"iec104.anomaly": {
+		RuleID:            "iec104.anomaly",
+		Reason:            "IEC 104 协议检测到通用异常，需回到 packet 复核具体上下文。",
+		DefaultConfidence: 35,
+		Caveats:           []string{"通用异常需要结合具体规则和协议上下文进一步判断。"},
+	},
 }
 
 func ApplyRule(item model.InvestigationReportItem, ruleID string, confidence int) model.InvestigationReportItem {

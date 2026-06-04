@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { buildCaptureOverview, type CaptureRecommendation } from "../core/captureOverview";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
+import { useStream } from "../state/contexts/StreamContext";
+import { useFilter } from "../state/contexts/FilterContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
 import { openCaptureRecommendation } from "./CaptureMissionNavigation";
 import { CaptureMissionOverviewHeader } from "./CaptureMissionOverviewHeader";
 import {
@@ -14,22 +19,12 @@ import { useCaptureMissionOverviewBundle } from "./useCaptureMissionOverviewBund
 
 export function CaptureMissionControl() {
   const navigate = useNavigate();
-  const {
-    packets,
-    totalPackets,
-    selectedPacket,
-    threatHits,
-    extractedObjects,
-    streamIds,
-    setDisplayFilter,
-    applyFilter,
-    locatePacketById,
-    preparePacketStream,
-    setActiveStream,
-    fileMeta,
-    backendConnected,
-    isPreloadingCapture,
-  } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { fileMeta, isPreloadingCapture } = useCapture();
+  const { packets, totalPackets, selectedPacket, locatePacketById } = usePacket();
+  const { streamIds, setActiveStream, preparePacketStream } = useStream();
+  const { setDisplayFilter, applyFilter } = useFilter();
+  const { threatHits, extractedObjects } = useAnalysis();
   const [pendingAction, setPendingAction] = useState("");
   const captureKey = useMemo(
     () => (fileMeta.path ? `${fileMeta.path}::${totalPackets}` : ""),

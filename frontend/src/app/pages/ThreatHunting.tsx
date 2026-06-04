@@ -17,18 +17,17 @@ import {
   routeForPreparedStream,
 } from "../features/hunting/threatHuntingRules";
 import { useThreatHuntingWorkbench } from "../features/hunting/useThreatHuntingWorkbench";
-import { useSentinel } from "../state/SentinelContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { usePacket } from "../state/contexts/PacketContext";
+import { useStream } from "../state/contexts/StreamContext";
 
 export default function ThreatHunting() {
   const navigate = useNavigate();
-  const {
-    threatHits,
-    backendConnected,
-    locatePacketById,
-    preparePacketStream,
-    isThreatAnalysisLoading,
-    threatAnalysisProgress,
-  } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { threatHits, isThreatAnalysisLoading, threatAnalysisProgress } = useAnalysis();
+  const { locatePacketById } = usePacket();
+  const { preparePacketStream } = useStream();
   const [actionBusy, setActionBusy] = useState("");
   const {
     hits,

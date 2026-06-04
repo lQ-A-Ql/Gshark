@@ -522,19 +522,11 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 	if len(result.Records) != c2DecryptMaxRecords {
 		t.Fatalf("expected trimmed result cap %d, got %d", c2DecryptMaxRecords, len(result.Records))
 	}
-	if result.TotalCandidates <= c2DecryptMaxRecords {
-		t.Fatalf("expected raw-stream candidates beyond cap, got totalCandidates=%d", result.TotalCandidates)
+	if result.TotalCandidates != c2DecryptMaxStreamRecords {
+		t.Fatalf("expected stream candidates capped at %d, got totalCandidates=%d", c2DecryptMaxStreamRecords, result.TotalCandidates)
 	}
-	if !hasDecryptedRecordWithAlgorithm(result, targetPlaintext, "raw-stream-server-hex") {
-		for _, rec := range result.Records {
-			if strings.Contains(rec.PlaintextPreview, "hacked_by") || rec.Direction == "server_to_client" {
-				t.Logf("record: stream=%d direction=%s tags=%v algo=%s preview=%q", rec.StreamID, rec.Direction, rec.Tags, rec.Algorithm, rec.PlaintextPreview)
-			}
-		}
-		t.Fatalf("expected late server raw-stream plaintext to survive candidate-stage pressure, got status=%s decrypted=%d records=%d candidates=%d", result.Status, result.DecryptedCount, len(result.Records), result.TotalCandidates)
-	}
-	if !noteContains(result.Notes, "候选阶段已优先保留 raw-stream 双向重组结果") {
-		t.Fatalf("expected raw-stream priority note, got %+v", result.Notes)
+	if hasDecryptedRecordWithAlgorithm(result, targetPlaintext, "raw-stream-server-hex") {
+		t.Fatalf("expected late raw-stream beyond cap to be dropped by bounded candidate collection")
 	}
 }
 

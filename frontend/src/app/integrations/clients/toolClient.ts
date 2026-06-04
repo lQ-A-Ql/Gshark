@@ -52,10 +52,7 @@ import type {
   SMB3RandomSessionKeyResultWireDTO,
   SMB3SessionCandidateWireDTO,
 } from "../wire/sessionMaterialWireDtos";
-import type {
-  DBCProfileWireDTO,
-  DecryptionConfigWireDTO,
-} from "../wire/vehicleWireDtos";
+import type { DBCProfileWireDTO, DecryptionConfigWireDTO } from "../wire/vehicleWireDtos";
 import type { WinRMDecryptResultWireDTO } from "../wire/toolWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;

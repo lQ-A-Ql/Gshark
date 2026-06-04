@@ -31,6 +31,7 @@ export const router = createBrowserRouter([
       { path: "media-analysis", lazy: lazyPage(() => import("./pages/MediaAnalysis")) },
       { path: "usb-analysis", lazy: lazyPage(() => import("./pages/UsbAnalysis")) },
       { path: "evidence", lazy: lazyPage(() => import("./pages/EvidencePanel")) },
+      { path: "rules", lazy: lazyPage(() => import("./pages/RuleManagement")) },
     ],
   },
 ]);

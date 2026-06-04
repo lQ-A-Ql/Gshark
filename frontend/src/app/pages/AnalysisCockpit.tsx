@@ -4,10 +4,10 @@ import { AnalysisHero } from "../components/AnalysisHero";
 import { CaptureMissionControl } from "../components/CaptureMissionControl";
 import { CaptureWelcomePanel } from "../components/CaptureWelcomePanel";
 import { PageShell } from "../components/PageShell";
-import { useSentinel } from "../state/SentinelContext";
+import { useCapture } from "../state/contexts/CaptureContext";
 
 export default function AnalysisCockpit() {
-  const { fileMeta } = useSentinel();
+  const { fileMeta } = useCapture();
   const navigate = useNavigate();
 
   if (!fileMeta.path) {

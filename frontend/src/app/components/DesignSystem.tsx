@@ -98,6 +98,8 @@ export function MetricCard({
 }) {
   return (
     <div
+      role="region"
+      aria-label={label}
       className={cn(
         "meow-tile meow-diffuse-edge meow-evidence-accent flex items-center gap-3 px-3 py-2.5",
         className,

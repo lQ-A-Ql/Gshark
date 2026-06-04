@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { ToolRuntimeConfig } from "../core/types";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
 import { toolRuntimeProbeStateText } from "../state/toolRuntimeProbeState";
 import { TOOL_RUNTIME_CONFIG_FIELDS } from "../state/toolRuntimeStorageConfig";
 import type { ToolRuntimeConfigExplicitFields } from "../state/toolRuntimeStorageConfig";
@@ -12,7 +12,7 @@ import { normalizeConfig } from "./RuntimeSettingsSidebarParts";
 const DEFAULT_MCP_ENDPOINT = "http://127.0.0.1:17891/api/mcp";
 
 export function useRuntimeSettingsSidebarModel() {
-  const runtime = useSentinel();
+  const runtime = useBackend();
   const [form, setForm] = useState<ToolRuntimeConfig>(() => normalizeConfig(runtime.toolRuntimeSnapshot?.config));
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");

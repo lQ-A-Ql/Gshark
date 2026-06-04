@@ -1,0 +1,145 @@
+{
+  "schema_version": 2,
+  "active_work_id": "feature-gap-remediation-cdf90c23",
+  "works": {
+    "feature-gap-remediation-cdf90c23": {
+      "work_id": "feature-gap-remediation-cdf90c23",
+      "active_plan": "C:\\Users\\QAQ\\Desktop\\gshark\\.omo\\plans\\feature-gap-remediation.md",
+      "plan_name": "feature-gap-remediation",
+      "status": "completed",
+      "started_at": "2026-06-03T16:22:57.782Z",
+      "updated_at": "2026-06-03T18:07:33.654Z",
+      "session_ids": [
+        "opencode:ses_17270f9faffeIGbiiHSSdYAR2c"
+      ],
+      "session_origins": {
+        "opencode:ses_17270f9faffeIGbiiHSSdYAR2c": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "JA3/JA3S TLS 指纹提取和匹配",
+          "session_id": "opencode:ses_171b018b0ffesZcYJHbg5EjraH",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-06-03T16:48:32.443Z",
+          "started_at": "2026-06-03T16:38:25.997Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T16:48:32.442Z",
+          "elapsed_ms": 606445
+        },
+        "todo:5": {
+          "task_key": "todo:5",
+          "task_label": "5",
+          "task_title": "China Chopper 流量解码器",
+          "session_id": "opencode:ses_17192ff3dffehVJiGHTueP6xPF",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-03T17:15:24.343Z",
+          "started_at": "2026-06-03T17:11:54.257Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T17:15:24.343Z",
+          "elapsed_ms": 210086
+        },
+        "todo:9": {
+          "task_key": "todo:9",
+          "task_label": "9",
+          "task_title": "DNP3 协议解析",
+          "session_id": "opencode:ses_17183d207ffeB05Gb8dG0JXebT",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-06-03T17:32:29.962Z",
+          "started_at": "2026-06-03T17:25:40.162Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T17:32:29.962Z",
+          "elapsed_ms": 409800
+        },
+        "todo:15": {
+          "task_key": "todo:15",
+          "task_label": "15",
+          "task_title": "统一 WebShell 家族/版本分类",
+          "session_id": "opencode:ses_17173f76fffeeDFqjiiqM3P6uW",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-03T17:59:25.255Z",
+          "started_at": "2026-06-03T17:41:13.342Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T17:59:25.255Z",
+          "elapsed_ms": 1091913
+        }
+      },
+      "ended_at": "2026-06-03T18:07:33.654Z",
+      "elapsed_ms": 6275872
+    }
+  },
+  "active_plan": "C:\\Users\\QAQ\\Desktop\\gshark\\.omo\\plans\\feature-gap-remediation.md",
+  "started_at": "2026-06-03T16:22:57.782Z",
+  "status": "completed",
+  "updated_at": "2026-06-03T18:07:33.654Z",
+  "session_ids": [
+    "opencode:ses_17270f9faffeIGbiiHSSdYAR2c"
+  ],
+  "session_origins": {
+    "opencode:ses_17270f9faffeIGbiiHSSdYAR2c": "direct"
+  },
+  "plan_name": "feature-gap-remediation",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "JA3/JA3S TLS 指纹提取和匹配",
+      "session_id": "opencode:ses_171b018b0ffesZcYJHbg5EjraH",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-03T16:48:32.443Z",
+      "started_at": "2026-06-03T16:38:25.997Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T16:48:32.442Z",
+      "elapsed_ms": 606445
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "China Chopper 流量解码器",
+      "session_id": "opencode:ses_17192ff3dffehVJiGHTueP6xPF",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-03T17:15:24.343Z",
+      "started_at": "2026-06-03T17:11:54.257Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T17:15:24.343Z",
+      "elapsed_ms": 210086
+    },
+    "todo:9": {
+      "task_key": "todo:9",
+      "task_label": "9",
+      "task_title": "DNP3 协议解析",
+      "session_id": "opencode:ses_17183d207ffeB05Gb8dG0JXebT",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-03T17:32:29.962Z",
+      "started_at": "2026-06-03T17:25:40.162Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T17:32:29.962Z",
+      "elapsed_ms": 409800
+    },
+    "todo:15": {
+      "task_key": "todo:15",
+      "task_label": "15",
+      "task_title": "统一 WebShell 家族/版本分类",
+      "session_id": "opencode:ses_17173f76fffeeDFqjiiqM3P6uW",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-03T17:59:25.255Z",
+      "started_at": "2026-06-03T17:41:13.342Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T17:59:25.255Z",
+      "elapsed_ms": 1091913
+    }
+  },
+  "agent": "atlas",
+  "ended_at": "2026-06-03T18:07:33.654Z",
+  "elapsed_ms": 6275872
+}

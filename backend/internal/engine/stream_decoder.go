@@ -47,6 +47,10 @@ func DecodeStreamPayload(req StreamDecodeRequest) (StreamDecodeResult, error) {
 		return decodeAntSwordPayload(req.Payload, req.Options)
 	case "godzilla":
 		return decodeGodzillaPayload(req.Payload, req.Options)
+	case "regeorg":
+		return decodeReGeorgPayload(req.Payload)
+	case "china_chopper":
+		return decodeChinaChopperPayload(req.Payload, req.Options)
 	case "auto":
 		return autoDetectDecode(req.Payload, req.Options)
 	default:
@@ -184,6 +188,197 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 	}
 
 	return buildDecodeResult("godzilla", fmt.Sprintf("哥斯拉流量解密 (%s)", cipherMode), plain, encoding), nil
+}
+
+func decodeChinaChopperPayload(raw string, options map[string]any) (StreamDecodeResult, error) {
+	candidate := extractPayloadCandidate(raw, optionsString(options, "pass"), optionsBool(options, "extractParam"))
+	if candidate == "" {
+		return StreamDecodeResult{}, errors.New("未提取到菜刀载荷")
+	}
+	candidate = applyURLDecodeRounds(candidate, optionsIntDefault(options, "urlDecodeRounds", 1))
+
+	// Try to extract the command from the POST parameter value
+	// China Chopper sends: caidao=<base64_encoded_command>
+	// or the raw payload itself may be the command
+	command := extractChinaChopperCommand(candidate, optionsString(options, "pass"))
+	if command != "" {
+		// Try Base64 decode the command
+		decoded, err := decodeBase64Loose(command)
+		if err == nil && len(decoded) > 0 && looksMostlyPrintable(decoded) {
+			return buildDecodeResult("china_chopper", "菜刀 Base64 命令解码", decoded, "base64"), nil
+		}
+		// If Base64 fails, return as plain text
+		return buildDecodeResult("china_chopper", "菜刀命令提取", []byte(command), "plain"), nil
+	}
+
+	// If no command extracted, try Base64 decode the whole candidate
+	decoded, err := decodeBase64Loose(extractBestBase64Candidate(candidate))
+	if err == nil && len(decoded) > 0 && looksMostlyPrintable(decoded) {
+		return buildDecodeResult("china_chopper", "菜刀 Base64 解码", decoded, "base64"), nil
+	}
+
+	// Return the raw candidate as plain text
+	return buildDecodeResult("china_chopper", "菜刀载荷提取", []byte(candidate), "plain"), nil
+}
+
+func extractChinaChopperCommand(candidate, pass string) string {
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return ""
+	}
+
+	// Only try URL parsing if it looks like a query string
+	if strings.Contains(candidate, "=") && strings.Contains(candidate, "&") || looksLikeHTTPMessage(candidate) {
+		// Try URL-encoded form parameters first
+		if values, err := url.ParseQuery(candidate); err == nil && len(values) > 0 {
+			// Try specified pass first
+			if pass != "" {
+				if value := strings.TrimSpace(values.Get(pass)); value != "" {
+					return value
+				}
+			}
+			// Try common China Chopper parameter names
+			for _, name := range []string{"caidao", "pass", "password", "cmd", "data"} {
+				if value := strings.TrimSpace(values.Get(name)); value != "" {
+					return value
+				}
+			}
+			// Fall back to longest value
+			if value := longestQueryValue(values); value != "" {
+				return value
+			}
+		}
+	}
+
+	// Try multipart
+	if value := extractMultipartValue(candidate, pass); value != "" {
+		return value
+	}
+	if pass == "" {
+		if value := extractMultipartValue(candidate, "caidao"); value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
+// reGeorg / neo-reGeorg HTTP tunnel decoder.
+// Parses X-CMD, X-TARGET, X-STATUS-CODE, X-ERROR headers and extracts tunnel data.
+func decodeReGeorgPayload(raw string) (StreamDecodeResult, error) {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return StreamDecodeResult{}, errors.New("未提取到 reGeorg 隧道载荷")
+	}
+
+	headers, body := splitHTTPHeadersAndBody(text)
+	cmd := extractHTTPHeaderIgnoreCase(headers, "X-CMD")
+	target := extractHTTPHeaderIgnoreCase(headers, "X-TARGET")
+	statusCode := extractHTTPHeaderIgnoreCase(headers, "X-STATUS-CODE")
+	errMsg := extractHTTPHeaderIgnoreCase(headers, "X-ERROR")
+
+	if cmd == "" && target == "" && statusCode == "" {
+		return StreamDecodeResult{}, errors.New("未检测到 reGeorg 隧道特征头 (X-CMD / X-TARGET / X-STATUS-CODE)")
+	}
+
+	var summaryParts []string
+	if cmd != "" {
+		summaryParts = append(summaryParts, "CMD="+cmd)
+	}
+	if target != "" {
+		summaryParts = append(summaryParts, "TARGET="+target)
+	}
+	if statusCode != "" {
+		summaryParts = append(summaryParts, "STATUS="+statusCode)
+	}
+	if errMsg != "" {
+		summaryParts = append(summaryParts, "ERROR="+errMsg)
+	}
+
+	summary := "reGeorg 隧道解码"
+	if len(summaryParts) > 0 {
+		summary += " (" + strings.Join(summaryParts, ", ") + ")"
+	}
+
+	data := []byte(body)
+	signals := []string{"decoder:regeorg", "encoding:tunnel"}
+	if cmd != "" {
+		signals = append(signals, "cmd:"+strings.ToLower(cmd))
+	}
+	if target != "" {
+		signals = append(signals, "target:"+target)
+	}
+
+	return StreamDecodeResult{
+		Decoder:    "regeorg",
+		Summary:    summary,
+		Text:       body,
+		BytesHex:   bytesToColonHex(data),
+		Encoding:   "tunnel",
+		Confidence: confidenceForReGeorg(cmd, target, statusCode),
+		Warnings:   warningsForReGeorg(cmd, target, statusCode, errMsg),
+		Signals:    dedupeDecodeStrings(signals),
+	}, nil
+}
+
+func confidenceForReGeorg(cmd, target, statusCode string) int {
+	score := 30
+	if cmd != "" {
+		score += 25
+		upper := strings.ToUpper(cmd)
+		if upper == "CONNECT" || upper == "READ" || upper == "WRITE" || upper == "DISCONNECT" || upper == "HEADER" || upper == "FORWARD" {
+			score += 10
+		}
+	}
+	if target != "" {
+		score += 20
+	}
+	if statusCode != "" {
+		score += 15
+	}
+	return clampInt(score, 1, 99)
+}
+
+func warningsForReGeorg(cmd, target, statusCode, errMsg string) []string {
+	var warnings []string
+	if cmd == "" {
+		warnings = append(warnings, "缺少 X-CMD 头，隧道命令类型未知。")
+	}
+	if target == "" {
+		warnings = append(warnings, "缺少 X-TARGET 头，隧道目标未知。")
+	}
+	if errMsg != "" {
+		warnings = append(warnings, "隧道返回错误: "+errMsg)
+	}
+	return warnings
+}
+
+func splitHTTPHeadersAndBody(raw string) (headers, body string) {
+	if idx := strings.Index(raw, "\r\n\r\n"); idx >= 0 {
+		return raw[:idx], raw[idx+4:]
+	}
+	if idx := strings.Index(raw, "\n\n"); idx >= 0 {
+		return raw[:idx], raw[idx+2:]
+	}
+	return raw, ""
+}
+
+func extractHTTPHeaderIgnoreCase(headers, name string) string {
+	nameLower := strings.ToLower(name)
+	lines := strings.Split(strings.ReplaceAll(headers, "\r\n", "\n"), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if idx := strings.Index(line, ":"); idx > 0 {
+			key := strings.TrimSpace(line[:idx])
+			if strings.ToLower(key) == nameLower {
+				return strings.TrimSpace(line[idx+1:])
+			}
+		}
+	}
+	return ""
 }
 
 func buildDecodeResult(decoder, summary string, data []byte, encoding string) StreamDecodeResult {

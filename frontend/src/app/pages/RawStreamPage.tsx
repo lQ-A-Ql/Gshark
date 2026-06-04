@@ -1,7 +1,8 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { rawStreamClient } from "../features/raw-stream/rawStreamClient";
-import { useSentinel } from "../state/SentinelContext";
+import { useStream } from "../state/contexts/StreamContext";
+import { usePacket } from "../state/contexts/PacketContext";
 import { downloadText } from "../utils/browserFile";
 import {
   RawStreamControlBar,
@@ -36,7 +37,8 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { tcpStream, udpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const { tcpStream, udpStream, streamIds, setActiveStream, streamSwitchMetrics } = useStream();
+  const { selectedPacket } = usePacket();
   const sourceStream = protocol === "TCP" ? tcpStream : udpStream;
   const streamList = protocol === "TCP" ? streamIds.tcp : streamIds.udp;
   const { enableScrollLoad, loadingText, selectedPanelClass, tone } = getRawStreamProtocolConfig(protocol);
@@ -115,7 +117,7 @@ export function RawStreamPage({ protocol }: { protocol: RawStreamProtocol }) {
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-white text-sm text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
       <RawStreamTitleBar
         chunkCount={streamView.chunks.length}
         from={streamView.from}

@@ -17,7 +17,94 @@ var (
 	c2VShellArchRE        = regexp.MustCompile(`(?i)\b[wl]64\b`)
 	c2DNSNameLikeRE       = regexp.MustCompile(`(?i)(?:query|qry|standard query|response)\s+(?:0x[0-9a-f]+\s+)?(?:A|AAAA|TXT|CNAME|NULL|MX|NS)?\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})`)
 	c2HTTPHeaderUserAgent = regexp.MustCompile(`(?i)^User-Agent$`)
+
+	// knownMaliciousJA3 maps JA3 MD5 hashes to threat labels.
+	// Source: Cobalt Strike default JA3, known RAT families, and C2 frameworks.
+	knownMaliciousJA3 = map[string]string{
+		"72a589da586844d7f0818ce684948eea": "CobaltStrike",
+		"a0e9f5d64349fb13191bc781f81f42e1": "CobaltStrike",
+		"b32309a26951912be7dba376398abc3b": "CobaltStrike",
+		"51c64c77e60f3980eea90869b68c58a8": "CobaltStrike",
+		"3b5074b1b5d032e5620f69f9f700ff0e": "Sliver",
+		"19e29534fd49dd27d09234e639c4057e": "Meterpreter",
+		"baf309487b346df56b66a42bdd023749": "IcedID",
+		"3e5801bdd284407884e7857692af8111": "Emotet",
+		"4d7a28d6f2263ed61de88ca66eb011e3": "Emotet",
+		"c12f54a3f91dc7bafd92c258b5209e74": "TrickBot",
+	}
+
+	// knownMaliciousJA3S maps JA3S MD5 hashes (server-side) to threat labels.
+	knownMaliciousJA3S = map[string]string{
+		"b742b407517bac9536a77a7b0eedbb4e": "CobaltStrike",
+		"ae4edc6faf64d08308082ad26be60767": "CobaltStrike",
+		"39b73a24bc7ea898ae7a884e55028f6b": "Sliver",
+	}
 )
+
+// TLSFingerprintMatch describes a match against a known malicious TLS fingerprint.
+type TLSFingerprintMatch struct {
+	Hash       string `json:"hash"`
+	Family     string `json:"family"`
+	Direction  string `json:"direction"` // "client" (JA3) or "server" (JA3S)
+	Confidence int    `json:"confidence"`
+}
+
+// MatchTLSFingerprint checks a packet's TLS fingerprint against known malicious
+// JA3 and JA3S hashes. Returns all matches found (may be nil).
+func MatchTLSFingerprint(fp *model.TLSFingerprint) []TLSFingerprintMatch {
+	if fp == nil {
+		return nil
+	}
+	var matches []TLSFingerprintMatch
+	if ja3 := strings.ToLower(strings.TrimSpace(fp.JA3Hash)); ja3 != "" {
+		if family, ok := knownMaliciousJA3[ja3]; ok {
+			matches = append(matches, TLSFingerprintMatch{
+				Hash:       ja3,
+				Family:     family,
+				Direction:  "client",
+				Confidence: 88,
+			})
+		}
+	}
+	if ja3s := strings.ToLower(strings.TrimSpace(fp.JA3SHash)); ja3s != "" {
+		if family, ok := knownMaliciousJA3S[ja3s]; ok {
+			matches = append(matches, TLSFingerprintMatch{
+				Hash:       ja3s,
+				Family:     family,
+				Direction:  "server",
+				Confidence: 85,
+			})
+		}
+	}
+	return matches
+}
+
+// inspectTLSPacket checks TLS fingerprint against known malicious JA3/JA3S hashes
+// and emits C2 candidates for matches.
+func (b *c2AnalysisBuilder) inspectTLSPacket(packet model.Packet) {
+	matches := MatchTLSFingerprint(packet.TLSFingerprint)
+	for _, m := range matches {
+		family := strings.ToLower(m.Family)
+		indicatorType := "ja3-match"
+		if m.Direction == "server" {
+			indicatorType = "ja3s-match"
+		}
+		summary := fmt.Sprintf("TLS 指纹命中 %s (%s)", m.Family, m.Direction)
+		evidence := fmt.Sprintf("%s_hash=%s family=%s", strings.ToUpper(m.Direction), m.Hash, m.Family)
+
+		tags := []string{"tls-fingerprint", m.Direction + "-hello", strings.ToLower(m.Family)}
+
+		// Route to CS or VShell bucket based on family label.
+		if strings.Contains(family, "cobalt") || strings.Contains(family, "cs") {
+			b.addCSCandidate(packet, "https", indicatorType, summary, m.Confidence, evidence, tags, nil)
+		} else {
+			// Other C2 families (Sliver, Meterpreter, Emotet, etc.) go to a
+			// generic TLS fingerprint channel on the CS side for visibility,
+			// since the result model only has CS and VShell buckets.
+			b.addCSCandidate(packet, "https", indicatorType, summary, m.Confidence, evidence, tags, nil)
+		}
+	}
+}
 
 type c2AnalysisBuilder struct {
 	result               model.C2SampleAnalysis
@@ -157,6 +244,9 @@ func (b *c2AnalysisBuilder) inspectPacket(packet model.Packet) {
 	}
 	if strings.Contains(protocol, "TCP") || packet.SourcePort > 0 || packet.DestPort > 0 {
 		b.inspectVShellTCPPacket(packet, payloadText)
+	}
+	if packet.TLSFingerprint != nil {
+		b.inspectTLSPacket(packet)
 	}
 }
 
@@ -686,10 +776,12 @@ func (b *c2AnalysisBuilder) inspectPeriodicStream(packets []model.Packet) {
 	confidence := 62
 	if avg >= 8 && avg <= 14 {
 		b.result.VShell.BeaconPatterns = append(b.result.VShell.BeaconPatterns, model.C2BeaconPattern{
-			Name:       "heartbeat-interval",
-			Value:      fmt.Sprintf("%.1fs", avg),
-			Confidence: 70,
-			Summary:    summary,
+			Name:        "heartbeat-interval",
+			Value:       fmt.Sprintf("%.1fs", avg),
+			Confidence:  70,
+			Summary:     summary,
+			SleepTimeMs: int(avg * 1000),
+			JitterPct:   math.Round(jitter*10000) / 100,
 		})
 		b.addVShellCandidate(packet, "tcp", "heartbeat-interval", "VShell 约 10 秒心跳候选", 70,
 			summary, append(tags, "10s-heartbeat"), []string{"SilverFox-compatible-field"}, "ValleyRAT/Winos-compatible", "command-and-control", []string{"periodic-callback"})
@@ -711,10 +803,12 @@ func (b *c2AnalysisBuilder) inspectPeriodicStream(packets []model.Packet) {
 	b.addCSCandidate(packet, httpChannel(packet), "beacon-interval", summary, confidence,
 		fmt.Sprintf("samples=%d avg=%.2fs jitter=%.2f", len(intervals), avg, jitter), tags, []string{"SilverFox-compatible-field"})
 	b.result.CS.BeaconPatterns = append(b.result.CS.BeaconPatterns, model.C2BeaconPattern{
-		Name:       "beacon-interval",
-		Value:      fmt.Sprintf("%.1fs", avg),
-		Confidence: confidence,
-		Summary:    summary,
+		Name:        "beacon-interval",
+		Value:       fmt.Sprintf("%.1fs", avg),
+		Confidence:  confidence,
+		Summary:     summary,
+		SleepTimeMs: int(avg * 1000),
+		JitterPct:   math.Round(jitter*10000) / 100,
 	})
 }
 
@@ -959,6 +1053,17 @@ func (b *c2AnalysisBuilder) finish() {
 	b.result.VShell.RelatedActors = bucketsFromMap(b.vshellRelatedActors, 8)
 	b.result.VShell.DeliveryChains = bucketsFromMap(b.vshellDeliveryChains, 8)
 	b.result.VShell.StreamAggregates = buildVShellStreamAggregates(b.vshellStreamData, 16)
+
+	// ── Malleable C2 profile matching ──
+	if match := MatchMalleableProfile(b.httpObservations); match != nil {
+		b.result.CS.MalleableProfileMatch = match
+	} else if len(b.result.CS.Candidates) > 0 {
+		// Fallback: match from indicator records when raw observations are sparse.
+		b.result.CS.MalleableProfileMatch = MatchMalleableProfileFromIndicators(b.result.CS.Candidates)
+	}
+	if len(b.result.VShell.Candidates) > 0 {
+		b.result.VShell.MalleableProfileMatch = MatchMalleableProfileFromIndicators(b.result.VShell.Candidates)
+	}
 
 	if len(b.result.CS.Candidates) == 0 {
 		b.result.CS.Notes = append(b.result.CS.Notes, "未发现 CS 候选；当前规则会抑制一次性普通 HTTP 请求与浏览器轮询，仅在周期性、GET/POST 互补、默认 profile 形态、非浏览器上下文等多信号组合满足时提升 HTTP 候选。")
@@ -1754,6 +1859,10 @@ func classifyScoreFactor(tag string) (direction string, weight int, summary stri
 		return "negative", -1, "弱信号"
 	case strings.Contains(lower, "malleable-profile-weak"):
 		return "negative", -1, "Malleable C2 弱特征"
+	case strings.Contains(lower, "tls-fingerprint"):
+		return "positive", 12, "TLS 指纹匹配已知恶意 JA3/JA3S"
+	case strings.Contains(lower, "ja3-match") || strings.Contains(lower, "ja3s-match"):
+		return "positive", 12, "JA3/JA3S 指纹命中已知 C2 框架"
 	default:
 		return "", 0, ""
 	}

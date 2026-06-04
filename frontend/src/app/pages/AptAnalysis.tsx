@@ -15,19 +15,20 @@ import {
 } from "../features/apt/APTEvidencePanel";
 import { AttributionExplainer, NotesPanel } from "../features/apt/APTAttributionPanel";
 import {
-  ActorEvidenceNeeds,
-  ActorTab,
-  AptPanel,
-  RegistryTagSection,
-  StatusBadge,
+  ActorEvidenceNeeds, ActorTab, AptPanel,
+  RegistryTagSection, StatusBadge,
 } from "../features/apt/APTDisplayComponents";
 import { EvidenceTimeline } from "../features/apt/APTEvidenceTimeline";
 import { buildAPTDisplayProfiles } from "../features/apt/actorRegistry";
 import { buildAPTAnalysisCacheKey, useAPTAnalysis } from "../features/apt/useAPTAnalysis";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function AptAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { totalPackets } = usePacket();
   const [activeActorId, setActiveActorId] = useState("silver-fox");
   const [activeEvidenceTab, setActiveEvidenceTab] = useState<EvidenceSourceTab>("all");
   const handleActiveActorChange = useCallback((actorId: string) => setActiveActorId(actorId), []);

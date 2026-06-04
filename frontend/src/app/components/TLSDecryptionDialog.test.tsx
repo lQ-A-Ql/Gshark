@@ -23,8 +23,26 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../state/SentinelContext", () => ({
-  useSentinel: () => mocks.sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    decryptionConfig: mocks.sentinelState.decryptionConfig,
+    updateDecryptionConfig: mocks.sentinelState.updateDecryptionConfig,
+  }),
+}));
+
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    fileMeta: mocks.sentinelState.fileMeta,
+    openCapture: mocks.sentinelState.openCapture,
+  }),
+}));
+
+vi.mock("../state/contexts/FilterContext", () => ({
+  useFilter: () => ({
+    displayFilter: mocks.sentinelState.displayFilter,
+    setDisplayFilter: mocks.sentinelState.setDisplayFilter,
+    applyFilter: mocks.sentinelState.applyFilter,
+  }),
 }));
 
 vi.mock("../integrations/backendClients", () => ({

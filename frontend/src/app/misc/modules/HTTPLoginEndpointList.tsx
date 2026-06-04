@@ -41,9 +41,7 @@ export function HTTPLoginEndpointList({
                   {item.method || "HTTP"}
                 </span>
                 {item.possibleBruteforce ? (
-                  <span className="meow-diffuse-chip px-2 py-1 text-[11px] font-semibold text-rose-700">
-                    疑似爆破
-                  </span>
+                  <span className="meow-diffuse-chip px-2 py-1 text-[11px] font-semibold text-rose-700">疑似爆破</span>
                 ) : null}
                 <span className="text-[11px] text-slate-500">{item.attemptCount} 次尝试</span>
               </div>

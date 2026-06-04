@@ -37,6 +37,17 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../state/SentinelContext", () => ({
   useSentinel: () => mocks.sentinelState,
 }));
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    locatePacketById: mocks.sentinelState.locatePacketById,
+  }),
+}));
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    preparePacketStream: mocks.sentinelState.preparePacketStream,
+    setActiveStream: mocks.sentinelState.setActiveStream,
+  }),
+}));
 
 vi.mock("../integrations/backendClients", () => ({
   backendClients: {

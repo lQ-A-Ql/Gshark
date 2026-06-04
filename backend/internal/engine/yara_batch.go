@@ -43,6 +43,78 @@ var defaultYaraRuleMeta = map[string]yaraRuleMeta{
 	"SENSITIVE_CREDENTIAL": {category: "Sensitive", ruleName: "敏感凭证泄露", level: "medium"},
 }
 
+// yarcCacheDir is the directory for storing compiled .yarc cache files.
+// If empty, cache is stored alongside the source .yar file.
+var yarcCacheDir string
+
+// compileYaraRulesToCache compiles a .yar rule file to a .yarc cached file.
+// Returns the path to the .yarc file. If compilation fails, returns the original .yar path.
+func compileYaraRulesToCache(yaraExe, rulePath string) string {
+	if strings.HasSuffix(strings.ToLower(rulePath), ".yarc") || strings.HasSuffix(strings.ToLower(rulePath), ".yarac") {
+		return rulePath
+	}
+
+	cachePath := yarcCachePath(rulePath)
+
+	// Check if cache exists and is newer than source
+	if srcInfo, srcErr := os.Stat(rulePath); srcErr == nil {
+		if cacheInfo, cacheErr := os.Stat(cachePath); cacheErr == nil {
+			if cacheInfo.ModTime().After(srcInfo.ModTime()) || cacheInfo.ModTime().Equal(srcInfo.ModTime()) {
+				return cachePath
+			}
+		}
+	}
+
+	// Try to compile using yarac (same directory as yara)
+	yaracExe := resolveYaracExecutable(yaraExe)
+	if yaracExe == "" {
+		return rulePath
+	}
+
+	cacheDir := filepath.Dir(cachePath)
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return rulePath
+	}
+
+	cmd := exec.Command(yaracExe, rulePath, cachePath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("engine: yarac compilation failed for %s: %v%s", rulePath, err, summarizeYaraOutput(output))
+		return rulePath
+	}
+
+	return cachePath
+}
+
+// yarcCachePath returns the .yarc cache path for a given .yar rule path.
+func yarcCachePath(rulePath string) string {
+	base := filepath.Base(rulePath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	cacheName := name + ".yarc"
+
+	if dir := strings.TrimSpace(yarcCacheDir); dir != "" {
+		return filepath.Join(dir, cacheName)
+	}
+	return filepath.Join(filepath.Dir(rulePath), cacheName)
+}
+
+// resolveYaracExecutable finds the yarac compiler near the yara executable.
+func resolveYaracExecutable(yaraExe string) string {
+	exeDir := filepath.Dir(yaraExe)
+	candidates := []string{"yarac", "yarac64.exe", "yarac.exe"}
+	for _, bin := range candidates {
+		local := filepath.Join(exeDir, bin)
+		if st, err := os.Stat(local); err == nil && !st.IsDir() {
+			return local
+		}
+	}
+	for _, bin := range candidates {
+		if path, err := exec.LookPath(bin); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
 var runYaraCommand = func(ctx context.Context, yaraExe, rulePath, scanPath string) ([]byte, error) {
 	return exec.CommandContext(ctx, yaraExe, "-r", rulePath, scanPath).CombinedOutput()
 }
@@ -80,6 +152,9 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 		return nil, err
 	}
 
+	// Try to compile rules to .yarc cache for faster scanning
+	cachedPath := compileYaraRulesToCache(yaraExe, bundle.path)
+
 	timeout := resolveYaraTimeout(yc.TimeoutMS)
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
@@ -113,7 +188,7 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 			}
 			break
 		}
-		output, runErr := runYaraCommand(ctx, yaraExe, bundle.path, dir)
+		output, runErr := runYaraCommand(ctx, yaraExe, cachedPath, dir)
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 				continue

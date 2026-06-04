@@ -110,3 +110,33 @@ type ToolAnalysisService interface {
 	RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error)
 	WinRMExportFile(resultID string) (string, string, error)
 }
+
+// PlaybookService groups hunting playbook, saved search and hypothesis
+// management methods consumed by the transport layer.
+type PlaybookService interface {
+	// Playbook CRUD:
+	ListPlaybooks() []model.HuntingPlaybook
+	GetPlaybook(id string) (*model.HuntingPlaybook, bool)
+	CreatePlaybook(pb model.HuntingPlaybook) (*model.HuntingPlaybook, error)
+	UpdatePlaybook(pb model.HuntingPlaybook) (*model.HuntingPlaybook, error)
+	DeletePlaybook(id string) bool
+	RunPlaybook(ctx context.Context, playbookID string) (*model.PlaybookRunResult, error)
+	GetPlaybookLastRun(playbookID string) (*model.PlaybookRunResult, bool)
+
+	// Saved search CRUD:
+	ListSavedSearches() []model.SavedSearch
+	GetSavedSearch(id string) (*model.SavedSearch, bool)
+	CreateSavedSearch(ss model.SavedSearch) (*model.SavedSearch, error)
+	UpdateSavedSearch(ss model.SavedSearch) (*model.SavedSearch, error)
+	DeleteSavedSearch(id string) bool
+	ExecuteSavedSearch(id string) (*model.SavedSearch, []model.ThreatHit, error)
+
+	// Hypothesis CRUD:
+	ListHypotheses(statusFilter string) []model.Hypothesis
+	GetHypothesis(id string) (*model.Hypothesis, bool)
+	CreateHypothesis(h model.Hypothesis) (*model.Hypothesis, error)
+	UpdateHypothesis(h model.Hypothesis) (*model.Hypothesis, error)
+	DeleteHypothesis(id string) bool
+	AddHypothesisEvidence(hypothesisID string, evidence model.HypothesisEvidence) (*model.Hypothesis, error)
+	UpdateHypothesisStatus(id string, status model.HypothesisStatus, conclusion string) (*model.Hypothesis, error)
+}

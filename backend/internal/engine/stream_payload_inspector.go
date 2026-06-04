@@ -14,9 +14,69 @@ import (
 var (
 	antSwordChrPattern          = regexp.MustCompile(`(?i)(chr\(\d+\)\s*\.?){3,}`)
 	antSwordEvalPattern         = regexp.MustCompile(`(?i)(assert|eval)\s*\(|base64_decode\s*\(|system\s*\(|exec\s*\(`)
+	chinaChopperEvalPattern     = regexp.MustCompile(`(?i)@eval\s*\(\s*\$_(POST|REQUEST)\s*\[`)
+	chinaChopperAssertPattern   = regexp.MustCompile(`(?i)@assert\s*\(\s*\$_(POST|REQUEST)\s*\[`)
+	chinaChopperParamPattern    = regexp.MustCompile(`(?i)^(caidao|chopper|c)$`)
 	webshellParamPattern        = regexp.MustCompile(`(?i)^(pass|password|pwd|cmd|assert|data|payload|rebeyond|ant|shell|key)$`)
 	numericWebshellParamPattern = regexp.MustCompile(`^\d{1,3}$`)
 	randomHexParamPattern       = regexp.MustCompile(`(?i)^[a-f0-9]{5,16}$`)
+	reGeorgHeaderPattern        = regexp.MustCompile(`(?i)(X-CMD|X-TARGET|X-STATUS-CODE|X-ERROR)\s*:`)
+
+	// Behinder v2.0 key negotiation patterns
+	behinderV2PassDigitsPattern = regexp.MustCompile(`^\d{2,3}$`)
+	behinderV2HexKeyPattern     = regexp.MustCompile(`(?i)^[a-f0-9]{16}$`)
+
+	// Behinder HTTP header fingerprint patterns
+	// Behinder v3.0 ships 25 built-in User-Agent strings; v4.0 ships ~10.
+	// These are the most common ones seen in the wild.
+	behinderUASet = map[string]struct{}{
+		"Java/1.8.0_211": {},
+		"Java/1.8.0_181": {},
+		"Java/1.7.0_67":  {},
+		"Java/1.8.0_121": {},
+		"Java/1.8.0_144": {},
+		"Java/1.8.0_162": {},
+		"Java/1.8.0_191": {},
+		"Java/1.8.0_201": {},
+		"Java/1.8.0_221": {},
+		"Java/1.8.0_231": {},
+		"Java/1.8.0_241": {},
+		"Java/1.8.0_251": {},
+		"Java/1.8.0_261": {},
+		"Java/1.8.0_271": {},
+		"Java/1.8.0_281": {},
+		"Java/1.8.0_291": {},
+		"Java/1.7.0_80":  {},
+		"Java/1.7.0_79":  {},
+		"Java/1.7.0_75":  {},
+		"Java/1.7.0_72":  {},
+		"Java/1.7.0_71":  {},
+		"Java/1.7.0_65":  {},
+		"Java/1.7.0_60":  {},
+		"Java/1.6.0_45":  {},
+		"Java/1.6.0_43":  {},
+		"Java/1.6.0_38":  {},
+		"Java/1.6.0_37":  {},
+		"Java/1.6.0_35":  {},
+		"Java/1.6.0_33":  {},
+		"Java/1.6.0_31":  {},
+		"Java/1.6.0_29":  {},
+		"Java/1.6.0_27":  {},
+		"Java/1.6.0_26":  {},
+		"Java/1.6.0_24":  {},
+		"Java/1.6.0_23":  {},
+		"Java/1.6.0_22":  {},
+		"Java/1.6.0_21":  {},
+		"Java/1.6.0_20":  {},
+		"Java/1.6.0_19":  {},
+		"Java/1.6.0_18":  {},
+		"Java/1.6.0_17":  {},
+		"Java/1.6.0_16":  {},
+		"Java/1.6.0_15":  {},
+		"Java/1.6.0_14":  {},
+	}
+	// Behinder v2.x Accept header — a distinctive, non-standard q-value format.
+	behinderAcceptPattern = regexp.MustCompile(`(?i)^text/html,\s*image/gif,\s*image/jpeg,\s*\*;\s*q=\.2,\s*\*/\*;\s*q=\.2$`)
 )
 
 type payloadFingerprint struct {
@@ -154,6 +214,24 @@ func collectInspectionCandidates(raw, normalized string) []model.StreamPayloadCa
 				label += " (" + variant.label + ")"
 			}
 			add(label, "token", "", token)
+		}
+	}
+
+	// If raw text contains reGeorg tunnel headers, add it as a candidate
+	// so the fingerprinter can detect them even when HTTP body extraction strips headers.
+	if reGeorgHeaderPattern.MatchString(raw) && !reGeorgHeaderPattern.MatchString(normalized) {
+		add("reGeorg 隧道头", "payload", "", raw)
+	}
+
+	// If raw text contains Behinder-specific HTTP headers (User-Agent / Accept),
+	// add it as a candidate so the fingerprinter can detect them.
+	if looksLikeHTTPMessage(raw) {
+		ua := extractHTTPHeaderIgnoreCase(raw, "User-Agent")
+		_, uaMatch := behinderUASet[ua]
+		acceptVal := extractHTTPHeaderIgnoreCase(raw, "Accept")
+		acceptMatch := acceptVal != "" && behinderAcceptPattern.MatchString(acceptVal)
+		if (uaMatch || acceptMatch) && raw != normalized {
+			add("冰蝎 HTTP 头指纹", "payload", "", raw)
 		}
 	}
 
@@ -441,6 +519,88 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 		fp.Fingerprints = append(fp.Fingerprints, "numeric-webshell-param")
 	}
 
+	if reGeorgHeaderPattern.MatchString(text) {
+		fp.Family = "regeorg"
+		fp.Suggested = "regeorg"
+		fp.Confidence = 90
+		if strings.Contains(strings.ToUpper(text), "X-CMD") && strings.Contains(strings.ToUpper(text), "X-TARGET") {
+			fp.Confidence = 96
+		}
+		fp.Reasons = append(fp.Reasons, "存在 reGeorg / neo-reGeorg 隧道特征头 (X-CMD / X-TARGET / X-STATUS-CODE / X-ERROR)。")
+		fp.DecoderHints = append(fp.DecoderHints, "regeorg")
+		fp.Fingerprints = append(fp.Fingerprints, "regeorg-tunnel-headers")
+		fp.FamilyHint = "regeorg"
+		fp.SourceRole = "tunnel"
+		fp.DecoderOptionsHint = map[string]any{"decoder": "regeorg"}
+		return fp
+	}
+
+	// Behinder HTTP header fingerprint (User-Agent / Accept header)
+	if detected, family, versionHint, conf, reasons, fps := behinderHTTPHeaderFingerprint(text); detected {
+		fp.Family = family
+		fp.Suggested = "behinder"
+		fp.Confidence = conf
+		fp.Reasons = append(fp.Reasons, reasons...)
+		fp.Fingerprints = append(fp.Fingerprints, fps...)
+		fp.FamilyHint = family
+		fp.SourceRole = "http_header"
+		fp.DecoderHints = append(fp.DecoderHints, "behinder")
+		fp.DecoderOptionsHint = map[string]any{
+			"decoder":     "behinder",
+			"versionHint": versionHint,
+		}
+		return fp
+	}
+
+	// Behinder v2.0 key negotiation: 16-char hex key response from pass=<digits> query
+	if isBehinderV2HexKey(text) && (candidate.Kind == "query" || candidate.Kind == "form") &&
+		paramName != "" && webshellParamPattern.MatchString(paramName) &&
+		behinderV2PassDigitsPattern.MatchString(text) {
+		// Not likely: hex key won't be digits-only; skip this branch.
+	}
+	if isBehinderV2HexKey(text) && (candidate.Kind == "query" || candidate.Kind == "form" || candidate.Kind == "payload") {
+		fp.Family = "behinder_v2"
+		fp.Suggested = "behinder"
+		fp.Confidence = 92
+		fp.Reasons = append(fp.Reasons, "候选值是 16 位十六进制字符串，符合冰蝎 v2.0 动态密钥协商响应格式 ([a-f0-9]{16})。")
+		fp.DecoderHints = append(fp.DecoderHints, "behinder")
+		fp.Fingerprints = append(fp.Fingerprints, "behinder-v2-hex-key")
+		fp.FamilyHint = "behinder_v2"
+		fp.SourceRole = "key_negotiation"
+		fp.DecoderOptionsHint = map[string]any{
+			"decoder":        "behinder",
+			"versionHint":    "v2.0",
+			"keyNegotiation": true,
+			"keyFormat":      "hex16",
+		}
+		if paramName != "" {
+			fp.DecoderOptionsHint["pass"] = paramName
+			fp.DecoderOptionsHint["extractParam"] = true
+		}
+		return fp
+	}
+
+	// Behinder v2.0 handshake initiation: pass=<digits> on a script URL
+	if (candidate.Kind == "query" || candidate.Kind == "form") && paramName != "" &&
+		strings.EqualFold(paramName, "pass") &&
+		behinderV2PassDigitsPattern.MatchString(text) {
+		fp.Family = "behinder_v2"
+		fp.Suggested = "behinder"
+		fp.Confidence = 75
+		fp.Reasons = append(fp.Reasons, "参数名 'pass' 值为 2-3 位数字，符合冰蝎 v2.0 密钥协商 GET 请求格式。")
+		fp.DecoderHints = append(fp.DecoderHints, "behinder")
+		fp.Fingerprints = append(fp.Fingerprints, "behinder-v2-pass-param")
+		fp.FamilyHint = "behinder_v2"
+		fp.SourceRole = "key_negotiation"
+		fp.DecoderOptionsHint = map[string]any{
+			"decoder":        "behinder",
+			"versionHint":    "v2.0",
+			"keyNegotiation": true,
+			"handshakePhase": "initiation",
+		}
+		return fp
+	}
+
 	if antSwordChrPattern.MatchString(text) {
 		fp.Family = "antsword_like"
 		fp.Suggested = "antsword"
@@ -451,6 +611,34 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 		fp.FamilyHint = "antsword_like"
 		fp.SourceRole = "script_or_command"
 		fp.DecoderOptionsHint = antswordDecoderOptionsHint(paramName)
+		return fp
+	}
+
+	// China Chopper detection: @eval($_POST[...]) or @assert($_POST[...])
+	if chinaChopperEvalPattern.MatchString(text) || chinaChopperAssertPattern.MatchString(text) {
+		fp.Family = "china_chopper"
+		fp.Suggested = "china_chopper"
+		fp.Confidence = 95
+		fp.Reasons = append(fp.Reasons, "存在 @eval($_POST[...]) 或 @assert($_POST[...]) 菜刀一句话特征。")
+		fp.DecoderHints = append(fp.DecoderHints, "china_chopper")
+		fp.Fingerprints = append(fp.Fingerprints, "china-chopper-eval")
+		fp.FamilyHint = "china_chopper"
+		fp.SourceRole = "script_or_command"
+		fp.DecoderOptionsHint = chinaChopperDecoderOptionsHint(paramName)
+		return fp
+	}
+
+	// China Chopper parameter name detection: caidao, chopper, c
+	if chinaChopperParamPattern.MatchString(paramName) {
+		fp.Family = "china_chopper"
+		fp.Suggested = "china_chopper"
+		fp.Confidence = 88
+		fp.Reasons = append(fp.Reasons, "参数名命中菜刀常见字段 (caidao/chopper/c)。")
+		fp.DecoderHints = append(fp.DecoderHints, "china_chopper")
+		fp.Fingerprints = append(fp.Fingerprints, "china-chopper-param")
+		fp.FamilyHint = "china_chopper"
+		fp.SourceRole = "script_or_command"
+		fp.DecoderOptionsHint = chinaChopperDecoderOptionsHint(paramName)
 		return fp
 	}
 
@@ -590,6 +778,59 @@ func fingerprintPayloadCandidate(candidate model.StreamPayloadCandidate) payload
 	return fp
 }
 
+// behinderHTTPHeaderFingerprint checks raw text for Behinder-specific HTTP
+// header patterns (User-Agent from built-in UA library, Accept header from
+// v2.x). Returns (detected, family, versionHint, confidence, reasons,
+// fingerprints).
+func behinderHTTPHeaderFingerprint(text string) (bool, string, string, int, []string, []string) {
+	if !strings.Contains(text, "\n") {
+		return false, "", "", 0, nil, nil
+	}
+
+	acceptValue := extractHTTPHeaderIgnoreCase(text, "Accept")
+	acceptMatch := acceptValue != "" && behinderAcceptPattern.MatchString(acceptValue)
+	uaValue := extractHTTPHeaderIgnoreCase(text, "User-Agent")
+	uaMatch := uaValue != ""
+	if uaMatch {
+		if _, ok := behinderUASet[uaValue]; !ok {
+			uaMatch = false
+		}
+	}
+
+	if !acceptMatch && !uaMatch {
+		return false, "", "", 0, nil, nil
+	}
+
+	var family, versionHint string
+	var confidence int
+	var reasons, fingerprints []string
+
+	if uaMatch && acceptMatch {
+		family = "behinder"
+		versionHint = "v2.x-v3.x"
+		confidence = 95
+		reasons = []string{
+			fmt.Sprintf("User-Agent '%s' 命中冰蝎内置 UA 库。", uaValue),
+			"Accept 头命中冰蝎 v2.x 固定特征。",
+		}
+		fingerprints = []string{"behinder-ua", "behinder-accept"}
+	} else if acceptMatch {
+		family = "behinder"
+		versionHint = "v2.x"
+		confidence = 88
+		reasons = []string{"Accept 头命中冰蝎 v2.x 固定特征。"}
+		fingerprints = []string{"behinder-accept"}
+	} else {
+		family = "behinder"
+		versionHint = "v3.x"
+		confidence = 80
+		reasons = []string{fmt.Sprintf("User-Agent '%s' 命中冰蝎内置 UA 库。", uaValue)}
+		fingerprints = []string{"behinder-ua"}
+	}
+
+	return true, family, versionHint, confidence, reasons, fingerprints
+}
+
 func antswordDecoderOptionsHint(paramName string) map[string]any {
 	hint := map[string]any{
 		"decoder":         "antsword",
@@ -598,6 +839,20 @@ func antswordDecoderOptionsHint(paramName string) map[string]any {
 	}
 	if strings.TrimSpace(paramName) != "" {
 		hint["pass"] = strings.TrimSpace(paramName)
+	}
+	return hint
+}
+
+func chinaChopperDecoderOptionsHint(paramName string) map[string]any {
+	hint := map[string]any{
+		"decoder":         "china_chopper",
+		"extractParam":    true,
+		"urlDecodeRounds": 1,
+	}
+	if strings.TrimSpace(paramName) != "" {
+		hint["pass"] = strings.TrimSpace(paramName)
+	} else {
+		hint["pass"] = "caidao"
 	}
 	return hint
 }
@@ -637,6 +892,10 @@ func isLikelyGodzillaParam(paramName string) bool {
 		return false
 	}
 	return randomHexParamPattern.MatchString(paramName)
+}
+
+func isBehinderV2HexKey(text string) bool {
+	return len(text) == 16 && behinderV2HexKeyPattern.MatchString(text)
 }
 
 func removeDecodeHint(items []string, target string) []string {

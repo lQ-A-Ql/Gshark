@@ -22,10 +22,29 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../state/SentinelContext", () => ({
-  useSentinel: () => mocks.sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    backendConnected: mocks.sentinelState.backendConnected,
+  }),
 }));
-
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    isPreloadingCapture: mocks.sentinelState.isPreloadingCapture,
+    fileMeta: mocks.sentinelState.fileMeta,
+    captureRevision: mocks.sentinelState.captureRevision,
+  }),
+}));
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    totalPackets: mocks.sentinelState.totalPackets,
+    locatePacketById: mocks.sentinelState.locatePacketById,
+  }),
+}));
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    preparePacketStream: mocks.sentinelState.preparePacketStream,
+  }),
+}));
 vi.mock("../integrations/backendClients", () => ({
   backendClients: {
     analysis: {
@@ -34,15 +53,10 @@ vi.mock("../integrations/backendClients", () => ({
     },
   },
 }));
-
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
-  return {
-    ...actual,
-    useNavigate: () => mocks.navigate,
-  };
+  return { ...actual, useNavigate: () => mocks.navigate };
 });
-
 import C2Analysis from "./C2Analysis";
 
 describe("C2Analysis candidate interactions", () => {

@@ -46,11 +46,13 @@ import type { EventHandlers } from "./clients/eventClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
 import type { MiscModuleClient } from "./miscModuleClientTypes";
+import type { PlaybookClient } from "./clients/playbookClient";
 export type { DesktopTransportBinding } from "./desktopTransportBinding";
 export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
 export type { MiscModuleClient } from "./miscModuleClientTypes";
+export type { PlaybookClient } from "./clients/playbookClient";
 export type { EventHandlers, EventType } from "./clients/eventClient";
 export interface RuntimeClient {
   isAvailable(): Promise<boolean>;
@@ -206,4 +208,5 @@ export interface BackendClients {
   vehicleDBC: VehicleDBCClient;
   securityMaterial: SecurityMaterialClient;
   miscModule: MiscModuleClient;
+  playbook: PlaybookClient;
 }

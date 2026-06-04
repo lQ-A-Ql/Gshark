@@ -1,6 +1,7 @@
 import { Clapperboard } from "lucide-react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
+import { StatusHint } from "../components/DesignSystem";
 import {
   BatchTranscriptionStatusPanel,
   MediaAnalysisProgressPanel,
@@ -18,13 +19,18 @@ import { MediaSessionTable } from "../features/media/MediaSessionTable";
 import { MediaTranscriptionSummaryPanel } from "../features/media/MediaTranscriptionSummaryPanel";
 import { useMediaAnalysis } from "../features/media/useMediaAnalysis";
 import { useMediaTranscriptionWorkflow } from "../features/media/useMediaTranscriptionWorkflow";
-import { useSentinel } from "../state/SentinelContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 const MEDIA_PROTOCOL_TAGS = ["RTP", "RTSP", "Moonlight", "GameStream"];
 
 export default function MediaAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, mediaAnalysisProgress, captureRevision } =
-    useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { mediaAnalysisProgress } = useAnalysis();
+  const { totalPackets } = usePacket();
   const {
     analysis,
     loading,
@@ -77,9 +83,7 @@ export default function MediaAnalysis() {
 
       <MediaAnalysisProgressPanel progress={mediaAnalysisProgress} />
 
-      {!loading && error && (
-        <div className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">{error}</div>
-      )}
+      {!loading && error && <StatusHint tone="amber">{error}</StatusHint>}
 
       <BatchTranscriptionStatusPanel batchStatus={batchStatus} />
 

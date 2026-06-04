@@ -21,10 +21,7 @@ export function C2BeaconPatternList({
   return (
     <div className="space-y-2">
       {patterns.map((item) => (
-        <div
-          key={`${item.name}-${item.value}`}
-          className="meow-tile border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
-        >
+        <div key={`${item.name}-${item.value}`} className="meow-tile border-slate-100 bg-slate-50/70 px-3 py-2 text-xs">
           <div className="flex items-center justify-between gap-3">
             <span className="font-semibold text-slate-800">{item.name}</span>
             <span className="font-mono text-slate-500">{item.value}</span>

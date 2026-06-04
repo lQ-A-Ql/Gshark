@@ -27,10 +27,14 @@ import {
   buildVShellEvidenceSummary,
 } from "../features/c2/c2EvidenceModel";
 import { useC2Analysis } from "../features/c2/useC2Analysis";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function C2Analysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { totalPackets } = usePacket();
   const [activeTab, setActiveTab] = useState<C2Tab>("cs");
   const { analysis, loading, error, refreshAnalysis } = useC2Analysis({
     backendConnected,

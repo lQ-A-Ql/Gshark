@@ -816,3 +816,221 @@ func pkcs7PadForTest(data []byte, blockSize int) []byte {
 	}
 	return append(bytes.Clone(data), bytes.Repeat([]byte{byte(padding)}, padding)...)
 }
+
+func TestDecodeStreamPayloadChinaChopperEval(t *testing.T) {
+	// China Chopper sends: caidao=<base64_encoded_command>
+	// The command is typically PHP code like: system("whoami");
+	command := `system("whoami");`
+	encodedCommand := base64.StdEncoding.EncodeToString([]byte(command))
+	payload := "caidao=" + url.QueryEscape(encodedCommand)
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "china_chopper",
+		Payload: payload,
+		Options: map[string]any{
+			"pass":            "caidao",
+			"extractParam":    true,
+			"urlDecodeRounds": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(china_chopper eval) error = %v", err)
+	}
+	if result.Text != command {
+		t.Fatalf("unexpected china_chopper eval text: %q", result.Text)
+	}
+	if result.Decoder != "china_chopper" {
+		t.Fatalf("unexpected decoder: %q", result.Decoder)
+	}
+}
+
+func TestDecodeStreamPayloadChinaChopperAssert(t *testing.T) {
+	// China Chopper with assert pattern: @assert($_POST['pass'])
+	// The payload itself is the base64-encoded command (after extraction)
+	command := `echo("flag{test}");`
+	encodedCommand := base64.StdEncoding.EncodeToString([]byte(command))
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "china_chopper",
+		Payload: encodedCommand,
+		Options: map[string]any{
+			"pass":            "pass",
+			"extractParam":    false,
+			"urlDecodeRounds": 0,
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(china_chopper assert) error = %v", err)
+	}
+	if result.Text != command {
+		t.Fatalf("unexpected china_chopper assert text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadChinaChopperEmptyPayload(t *testing.T) {
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "china_chopper",
+		Payload: "   ",
+		Options: map[string]any{
+			"pass":         "caidao",
+			"extractParam": true,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty china_chopper payload")
+	}
+	if !strings.Contains(err.Error(), "未提取到菜刀载荷") {
+		t.Fatalf("expected '未提取到菜刀载荷' error, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadChinaChopperWithHTTPMessage(t *testing.T) {
+	// Simulate a full HTTP POST request with China Chopper payload
+	command := `file_get_contents("/etc/passwd");`
+	encodedCommand := base64.StdEncoding.EncodeToString([]byte(command))
+	payload := "POST /shell.php HTTP/1.1\r\nHost: target.com\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\ncaidao=" + url.QueryEscape(encodedCommand)
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "china_chopper",
+		Payload: payload,
+		Options: map[string]any{
+			"pass":            "caidao",
+			"extractParam":    true,
+			"urlDecodeRounds": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(china_chopper HTTP) error = %v", err)
+	}
+	if result.Text != command {
+		t.Fatalf("unexpected china_chopper HTTP text: %q", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgCONNECT(t *testing.T) {
+	payload := "GET /tunnel.php HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: CONNECT\r\n" +
+		"X-TARGET: 192.168.1.100:3389\r\n" +
+		"\r\n"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(regeorg CONNECT) error = %v", err)
+	}
+	if result.Decoder != "regeorg" {
+		t.Fatalf("Decoder = %q, want regeorg", result.Decoder)
+	}
+	if !strings.Contains(result.Summary, "CMD=CONNECT") {
+		t.Fatalf("Summary = %q, want CMD=CONNECT", result.Summary)
+	}
+	if !strings.Contains(result.Summary, "TARGET=192.168.1.100:3389") {
+		t.Fatalf("Summary = %q, want TARGET=192.168.1.100:3389", result.Summary)
+	}
+	if result.Encoding != "tunnel" {
+		t.Fatalf("Encoding = %q, want tunnel", result.Encoding)
+	}
+	if result.Confidence < 60 {
+		t.Fatalf("Confidence = %d, want >= 60", result.Confidence)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgREADWithStatus(t *testing.T) {
+	payload := "POST /tunnel.aspx HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: READ\r\n" +
+		"X-TARGET: 10.0.0.5:8080\r\n" +
+		"X-STATUS-CODE: 200\r\n" +
+		"\r\n" +
+		"Hello from tunnel"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(regeorg READ) error = %v", err)
+	}
+	if !strings.Contains(result.Summary, "CMD=READ") {
+		t.Fatalf("Summary = %q, want CMD=READ", result.Summary)
+	}
+	if !strings.Contains(result.Summary, "STATUS=200") {
+		t.Fatalf("Summary = %q, want STATUS=200", result.Summary)
+	}
+	if result.Text != "Hello from tunnel" {
+		t.Fatalf("Text = %q, want 'Hello from tunnel'", result.Text)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgWithXError(t *testing.T) {
+	payload := "POST /tunnel.php HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: CONNECT\r\n" +
+		"X-TARGET: 10.0.0.1:22\r\n" +
+		"X-ERROR: Connection refused\r\n" +
+		"\r\n"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(regeorg error) error = %v", err)
+	}
+	if len(result.Warnings) == 0 {
+		t.Fatal("expected warning for X-ERROR")
+	}
+	foundErrorWarning := false
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "Connection refused") {
+			foundErrorWarning = true
+		}
+	}
+	if !foundErrorWarning {
+		t.Fatalf("expected warning about 'Connection refused', got warnings: %v", result.Warnings)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgEmptyPayload(t *testing.T) {
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: "   ",
+	})
+	if err == nil {
+		t.Fatal("expected empty payload error")
+	}
+	if !strings.Contains(err.Error(), "未提取到 reGeorg") {
+		t.Fatalf("expected reGeorg empty error, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgMissingHeaders(t *testing.T) {
+	_, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: "GET /index.html HTTP/1.1\r\nHost: test\r\n\r\n",
+	})
+	if err == nil {
+		t.Fatal("expected missing headers error")
+	}
+	if !strings.Contains(err.Error(), "未检测到 reGeorg") {
+		t.Fatalf("expected reGeorg missing headers error, got: %v", err)
+	}
+}
+
+func TestDecodeStreamPayloadReGeorgNeoVariant(t *testing.T) {
+	payload := "GET /tunnel.jsp HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: FORWARD\r\n" +
+		"X-TARGET: 172.16.0.1:443\r\n" +
+		"\r\n"
+	result, err := DecodeStreamPayload(StreamDecodeRequest{
+		Decoder: "regeorg",
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("DecodeStreamPayload(neo-reGeorg) error = %v", err)
+	}
+	if result.Decoder != "regeorg" {
+		t.Fatalf("Decoder = %q, want regeorg", result.Decoder)
+	}
+	if !strings.Contains(result.Summary, "CMD=FORWARD") {
+		t.Fatalf("Summary = %q, want CMD=FORWARD", result.Summary)
+	}
+}

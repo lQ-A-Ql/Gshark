@@ -27,10 +27,12 @@ type C2IndicatorRecord struct {
 }
 
 type C2BeaconPattern struct {
-	Name       string `json:"name"`
-	Value      string `json:"value"`
-	Confidence int    `json:"confidence,omitempty"`
-	Summary    string `json:"summary"`
+	Name        string  `json:"name"`
+	Value       string  `json:"value"`
+	Confidence  int     `json:"confidence,omitempty"`
+	Summary     string  `json:"summary"`
+	SleepTimeMs int     `json:"sleep_time_ms,omitempty"`
+	JitterPct   float64 `json:"jitter_pct,omitempty"`
 }
 
 type C2ScoreFactor struct {
@@ -104,21 +106,31 @@ type C2StreamAggregate struct {
 	Summary         string          `json:"summary"`
 }
 
+// MalleableProfileMatch describes a positive match against a known C2 malleable profile.
+type MalleableProfileMatch struct {
+	ProfileName string   `json:"profile_name"`
+	Family      string   `json:"family"`
+	Confidence  int      `json:"confidence"`
+	MatchReason string   `json:"match_reason"`
+	MatchedOn   []string `json:"matched_on"`
+}
+
 type C2FamilyAnalysis struct {
-	CandidateCount    int                       `json:"candidate_count"`
-	MatchedRuleCount  int                       `json:"matched_rule_count"`
-	Channels          []TrafficBucket           `json:"channels"`
-	Indicators        []TrafficBucket           `json:"indicators"`
-	Conversations     []AnalysisConversation    `json:"conversations"`
-	BeaconPatterns    []C2BeaconPattern         `json:"beacon_patterns,omitempty"`
-	HostURIAggregates []C2HTTPEndpointAggregate `json:"host_uri_aggregates,omitempty"`
-	DNSAggregates     []C2DNSAggregate          `json:"dns_aggregates,omitempty"`
-	StreamAggregates  []C2StreamAggregate       `json:"stream_aggregates,omitempty"`
-	Candidates        []C2IndicatorRecord       `json:"candidates"`
-	Notes             []string                  `json:"notes"`
-	RelatedActors     []TrafficBucket           `json:"related_actors,omitempty"`
-	DeliveryChains    []TrafficBucket           `json:"delivery_chains,omitempty"`
-	Report            InvestigationReport       `json:"report,omitempty"`
+	CandidateCount        int                       `json:"candidate_count"`
+	MatchedRuleCount      int                       `json:"matched_rule_count"`
+	Channels              []TrafficBucket           `json:"channels"`
+	Indicators            []TrafficBucket           `json:"indicators"`
+	Conversations         []AnalysisConversation    `json:"conversations"`
+	BeaconPatterns        []C2BeaconPattern         `json:"beacon_patterns,omitempty"`
+	HostURIAggregates     []C2HTTPEndpointAggregate `json:"host_uri_aggregates,omitempty"`
+	DNSAggregates         []C2DNSAggregate          `json:"dns_aggregates,omitempty"`
+	StreamAggregates      []C2StreamAggregate       `json:"stream_aggregates,omitempty"`
+	Candidates            []C2IndicatorRecord       `json:"candidates"`
+	Notes                 []string                  `json:"notes"`
+	RelatedActors         []TrafficBucket           `json:"related_actors,omitempty"`
+	DeliveryChains        []TrafficBucket           `json:"delivery_chains,omitempty"`
+	MalleableProfileMatch *MalleableProfileMatch    `json:"malleable_profile_match,omitempty"`
+	Report                InvestigationReport       `json:"report,omitempty"`
 }
 
 type C2SampleAnalysis struct {

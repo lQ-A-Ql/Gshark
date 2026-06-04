@@ -1,6 +1,7 @@
 import { Binary, BookOpenText, FolderOpen, History, Radar, ShieldAlert } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
 import { formatBytes } from "../state/formatBytes";
 import { MeowEmptyState } from "./MeowEmptyState";
 import logoImg from "../../assets/logo.png";
@@ -24,8 +25,8 @@ interface CaptureWelcomePanelProps {
 }
 
 export function CaptureWelcomePanel({ onCaptureOpened }: CaptureWelcomePanelProps = {}) {
-  const { backendConnected, backendStatus, captureTransaction, tsharkStatus, recentCaptures, openCapture } =
-    useSentinel();
+  const { backendConnected, backendStatus, tsharkStatus } = useBackend();
+  const { captureTransaction, recentCaptures, openCapture } = useCapture();
   const [capturePath, setCapturePath] = useState("");
   const captureActionsDisabled = !backendConnected || !tsharkStatus.available;
   const recentItems = useMemo(() => recentCaptures, [recentCaptures]);

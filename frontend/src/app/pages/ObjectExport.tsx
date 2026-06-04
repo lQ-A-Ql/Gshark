@@ -5,7 +5,8 @@ import { InvestigationReportPanel } from "../components/InvestigationReportPanel
 import { AnalysisPanel } from "../components/analysis/AnalysisPrimitives";
 import { PageShell } from "../components/PageShell";
 import { buildObjectInvestigationReport } from "../features/object/objectInvestigationReport";
-import { useSentinel } from "../state/SentinelContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
+import { useBackend } from "../state/contexts/BackendContext";
 import {
   ObjectExportFooter,
   ObjectExportToolbar,
@@ -18,7 +19,8 @@ import { useObjectExport } from "../features/object/useObjectExport";
 const OBJECT_EXPORT_TAGS = ["HTTP", "FTP", "文件对象", "Magic 分类", "批量导出"];
 
 export default function ObjectExport() {
-  const { extractedObjects, backendConnected } = useSentinel();
+  const { extractedObjects } = useAnalysis();
+  const { backendConnected } = useBackend();
   const { objects: sourceObjects, downloadZip } = useObjectExport({ backendConnected, extractedObjects });
   const [selected, setSelected] = useState<number[]>([]);
   const [query, setQuery] = useState("");

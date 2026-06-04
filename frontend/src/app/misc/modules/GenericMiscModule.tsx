@@ -122,8 +122,7 @@ export function GenericMiscModule({ module, onModuleDeleted, surfaceVariant = "c
           </div>
           {module.docsPath ? (
             <div className="mt-1 break-all">
-              文档:{" "}
-              <span className="meow-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.docsPath}</span>
+              文档: <span className="meow-diffuse-chip px-1.5 py-0.5 font-mono text-slate-700">{module.docsPath}</span>
             </div>
           ) : null}
           <div className="mt-3 leading-relaxed">

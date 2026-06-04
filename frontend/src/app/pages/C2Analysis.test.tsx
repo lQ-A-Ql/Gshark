@@ -22,10 +22,29 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../state/SentinelContext", () => ({
-  useSentinel: () => mocks.sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    backendConnected: mocks.sentinelState.backendConnected,
+  }),
 }));
-
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    isPreloadingCapture: mocks.sentinelState.isPreloadingCapture,
+    fileMeta: mocks.sentinelState.fileMeta,
+    captureRevision: mocks.sentinelState.captureRevision,
+  }),
+}));
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    totalPackets: mocks.sentinelState.totalPackets,
+    locatePacketById: mocks.sentinelState.locatePacketById,
+  }),
+}));
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    preparePacketStream: mocks.sentinelState.preparePacketStream,
+  }),
+}));
 vi.mock("../integrations/backendClients", () => ({
   backendClients: {
     analysis: {
@@ -34,15 +53,10 @@ vi.mock("../integrations/backendClients", () => ({
     },
   },
 }));
-
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
-  return {
-    ...actual,
-    useNavigate: () => mocks.navigate,
-  };
+  return { ...actual, useNavigate: () => mocks.navigate };
 });
-
 import C2Analysis from "./C2Analysis";
 
 describe("C2Analysis", () => {
@@ -59,18 +73,14 @@ describe("C2Analysis", () => {
       name: `c2-${seed}.pcapng`,
       sizeBytes: 4096,
     };
-    mocks.getC2SampleAnalysis.mockReset();
-    mocks.decryptC2Traffic.mockReset();
-    mocks.navigate.mockReset();
-    mocks.clipboardWriteText.mockReset();
+    mocks.getC2SampleAnalysis.mockReset(); mocks.decryptC2Traffic.mockReset();
+    mocks.navigate.mockReset(); mocks.clipboardWriteText.mockReset();
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: mocks.clipboardWriteText },
       configurable: true,
     });
-    mocks.sentinelState.locatePacketById.mockReset();
-    mocks.sentinelState.preparePacketStream.mockReset();
-    mocks.sentinelState.locatePacketById.mockResolvedValue(null);
-    mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "HTTP", streamId: 7 });
+    mocks.sentinelState.locatePacketById.mockReset(); mocks.sentinelState.preparePacketStream.mockReset();
+    mocks.sentinelState.locatePacketById.mockResolvedValue(null); mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "HTTP", streamId: 7 });
     mocks.getC2SampleAnalysis.mockResolvedValue(createAnalysis({
       totalMatchedPackets: 1,
       families: [{ label: "CS", count: 1 }],
@@ -82,23 +92,11 @@ describe("C2Analysis", () => {
         indicators: [{ label: "beacon-like", count: 1 }],
         hostUriAggregates: [
           {
-            host: "c2.example.test",
-            uri: "/submit.php?id=42",
-            channel: "https",
-            total: 4,
-            getCount: 2,
-            postCount: 2,
-            methods: [
-              { label: "GET", count: 2 },
-              { label: "POST", count: 2 },
-            ],
-            firstTime: "12:00:00.000000",
-            lastTime: "12:03:00.000000",
-            avgInterval: "60.0s",
-            jitter: "0%",
-            intervals: [60, 60, 60],
-            streams: [7],
-            packets: [42, 43, 44, 45],
+            host: "c2.example.test", uri: "/submit.php?id=42", channel: "https",
+            total: 4, getCount: 2, postCount: 2,
+            methods: [{ label: "GET", count: 2 }, { label: "POST", count: 2 }],
+            firstTime: "12:00:00.000000", lastTime: "12:03:00.000000", avgInterval: "60.0s", jitter: "0%",
+            intervals: [60, 60, 60], streams: [7], packets: [42, 43, 44, 45],
             confidence: 76,
             signalTags: ["stable-interval", "get-post-tasking-shape", "non-browser-context"],
             scoreFactors: [

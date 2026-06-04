@@ -160,9 +160,9 @@ export function createStreamClient(request: JsonRequest): StreamClient {
       });
       const ids = Array.isArray(payload.ids) ? payload.ids : [];
       return ids
-        .map((id: unknown) => Number(id))
-        .filter((id: number) => Number.isFinite(id) && id >= 0)
-        .sort((a: number, b: number) => a - b);
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id >= 0)
+        .sort((a, b) => a - b);
     },
 
     async getPacketRawHex(packetId: number, signal?: AbortSignal) {

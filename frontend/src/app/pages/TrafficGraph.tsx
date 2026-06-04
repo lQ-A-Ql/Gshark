@@ -5,19 +5,17 @@ import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
 import { TrafficGraphOverview, TrafficGraphPanels } from "../features/traffic/TrafficGraphPanels";
 import { useTrafficGraph } from "../features/traffic/useTrafficGraph";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { useFilter } from "../state/contexts/FilterContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function TrafficGraph() {
   const navigate = useNavigate();
-  const {
-    totalPackets,
-    backendConnected,
-    isPreloadingCapture,
-    fileMeta,
-    setDisplayFilter,
-    applyFilter,
-    captureRevision,
-  } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { setDisplayFilter, applyFilter } = useFilter();
+  const { totalPackets } = usePacket();
   const { stats, loading, error, refreshStats } = useTrafficGraph({
     backendConnected,
     isPreloadingCapture,

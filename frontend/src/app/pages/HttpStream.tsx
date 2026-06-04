@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { useSentinel } from "../state/SentinelContext";
+import { useStream } from "../state/contexts/StreamContext";
+import { usePacket } from "../state/contexts/PacketContext";
 import { downloadText } from "../utils/browserFile";
 import {
   buildHTTPChunks,
@@ -16,7 +17,8 @@ import { renderHTTPChunk, type HTTPViewMode } from "./HttpStreamUtils";
 export default function HttpStream() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { httpStream, selectedPacket, streamIds, setActiveStream, streamSwitchMetrics } = useSentinel();
+  const { httpStream, streamIds, setActiveStream, streamSwitchMetrics } = useStream();
+  const { selectedPacket } = usePacket();
   const [viewMode, setViewMode] = useState<HTTPViewMode>("formatted");
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -82,7 +84,7 @@ export default function HttpStream() {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-white text-sm text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background text-sm text-foreground">
       <HttpStreamTitleBar
         client={httpStream.client}
         hasNext={hasNext}

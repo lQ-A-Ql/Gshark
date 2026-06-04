@@ -2,7 +2,8 @@ import { Crosshair, Network } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
-import { useSentinel } from "../state/SentinelContext";
+import { usePacket } from "../state/contexts/PacketContext";
+import { useStream } from "../state/contexts/StreamContext";
 
 type EvidenceAction = "" | "packet" | "stream";
 type EvidenceProtocol = "HTTP" | "TCP" | "UDP";
@@ -21,7 +22,8 @@ export function EvidenceActions({
   className = "",
 }: EvidenceActionsProps) {
   const navigate = useNavigate();
-  const { locatePacketById, preparePacketStream } = useSentinel();
+  const { locatePacketById } = usePacket();
+  const { preparePacketStream } = useStream();
   const [pending, setPending] = useState<EvidenceAction>("");
   const normalizedPacketId = Number.isFinite(Number(packetId)) ? Math.floor(Number(packetId)) : 0;
   const actionDisabled = disabled || normalizedPacketId <= 0 || pending !== "";

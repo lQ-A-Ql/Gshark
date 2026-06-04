@@ -6,7 +6,7 @@ rule OWASP_SQL_INJECTION {
     $s4 = "sleep(" nocase
     $s5 = "extractvalue(" nocase
   condition:
-    any of them
+    filesize < 10MB and any of them
 }
 
 rule OWASP_XSS {
@@ -15,7 +15,7 @@ rule OWASP_XSS {
     $x2 = "onerror=" nocase
     $x3 = "javascript:" nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }
 
 rule OWASP_RCE {
@@ -25,7 +25,7 @@ rule OWASP_RCE {
     $r3 = "cmd.exe" nocase
     $r4 = "powershell" nocase
   condition:
-    any of them
+    filesize < 10MB and any of them
 }
 
 rule OWASP_WEBSHELL {
@@ -37,7 +37,7 @@ rule OWASP_WEBSHELL {
     $w5 = "passthru(" nocase
     $w6 = "php://input" nocase
   condition:
-    any of them
+    filesize < 1MB and any of them
 }
 
 rule SENSITIVE_CREDENTIAL {
@@ -45,5 +45,5 @@ rule SENSITIVE_CREDENTIAL {
     $c1 = /AKIA[0-9A-Z]{16}/ nocase
     $c2 = /eyJ[A-Za-z0-9_-]+\./ nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }

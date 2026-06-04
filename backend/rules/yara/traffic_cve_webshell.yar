@@ -19,7 +19,7 @@ rule TRAFFIC_CVE_2024_1709_SCREENCONNECT_SETUPWIZARD_AUTH_BYPASS
     $u2 = "GET /SetupWizard.aspx" nocase
     $u3 = "POST /SetupWizard.aspx" nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }
 
 rule TRAFFIC_CVE_2024_27198_TEAMCITY_AUTH_BYPASS
@@ -37,7 +37,7 @@ rule TRAFFIC_CVE_2024_27198_TEAMCITY_AUTH_BYPASS
     $u2 = "/hax?jsp=/app/rest/server" nocase
     $u3 = "/app/rest/users/id:1/tokens" nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }
 
 rule TRAFFIC_CVE_2024_3400_PANOS_GLOBALPROTECT_RCE
@@ -57,7 +57,7 @@ rule TRAFFIC_CVE_2024_3400_PANOS_GLOBALPROTECT_RCE
     $u4 = "curl " nocase
     $u5 = "wget " nocase
   condition:
-    $u1 and 1 of ($u2, $u3, $u4, $u5)
+    filesize < 5MB and $u1 and 1 of ($u2, $u3, $u4, $u5)
 }
 
 rule TRAFFIC_CVE_2024_36401_GEOSERVER_PROPERTY_RCE
@@ -79,7 +79,7 @@ rule TRAFFIC_CVE_2024_36401_GEOSERVER_PROPERTY_RCE
     $x2 = "java.lang.Runtime" nocase
     $x3 = "ProcessBuilder" nocase
   condition:
-    1 of ($u*) and 1 of ($p*) and 1 of ($x*)
+    filesize < 5MB and 1 of ($u*) and 1 of ($p*) and 1 of ($x*)
 }
 
 rule TRAFFIC_CVE_2024_4577_PHP_CGI_ARGUMENT_INJECTION
@@ -99,7 +99,7 @@ rule TRAFFIC_CVE_2024_4577_PHP_CGI_ARGUMENT_INJECTION
     $q4 = "php://input" nocase
     $q5 = "allow_url_include=1" nocase
   condition:
-    any of ($q1, $q2, $q3) or ($q4 and $q5)
+    filesize < 5MB and (any of ($q1, $q2, $q3) or ($q4 and $q5))
 }
 
 rule TRAFFIC_CVE_2025_24813_TOMCAT_PARTIAL_PUT_RCE
@@ -118,7 +118,7 @@ rule TRAFFIC_CVE_2025_24813_TOMCAT_PARTIAL_PUT_RCE
     $s1 = ".session" nocase
     $s2 = "JSESSIONID" nocase
   condition:
-    $m1 and $h1 and 1 of ($s*)
+    filesize < 5MB and $m1 and $h1 and 1 of ($s*)
 }
 
 rule TRAFFIC_CVE_2025_49704_49706_SHAREPOINT_TOOLSHELL
@@ -138,7 +138,7 @@ rule TRAFFIC_CVE_2025_49704_49706_SHAREPOINT_TOOLSHELL
     $u4 = "/_layouts/SignOut.aspx" nocase
     $u5 = "X-RequestDigest:" nocase
   condition:
-    $u1 and 1 of ($u2, $u3, $u4, $u5)
+    filesize < 5MB and $u1 and 1 of ($u2, $u3, $u4, $u5)
 }
 
 rule TRAFFIC_CVE_2025_53770_SHAREPOINT_TOOLSHELL_PATCH_BYPASS
@@ -157,7 +157,7 @@ rule TRAFFIC_CVE_2025_53770_SHAREPOINT_TOOLSHELL_PATCH_BYPASS
     $f2 = "spinstall1.aspx" nocase
     $f3 = "debug_dev.js" nocase
   condition:
-    $u1 or any of ($f*)
+    filesize < 5MB and ($u1 or any of ($f*))
 }
 
 rule TRAFFIC_CVE_2025_47952_TRAEFIK_URLENCODED_TRAVERSAL
@@ -175,7 +175,7 @@ rule TRAFFIC_CVE_2025_47952_TRAEFIK_URLENCODED_TRAVERSAL
     $t2 = "/public/%2e%2e/private" nocase
     $t3 = "/service/%2e%2e/" nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }
 
 rule TRAFFIC_CVE_2025_55752_TOMCAT_REWRITEVALVE_TRAVERSAL
@@ -195,7 +195,7 @@ rule TRAFFIC_CVE_2025_55752_TOMCAT_REWRITEVALVE_TRAVERSAL
     $u4 = "path=%2Fuploads%2F" nocase
     $u5 = "WEB-INF/web.xml" nocase
   condition:
-    any of them
+    filesize < 5MB and any of them
 }
 
 rule TRAFFIC_CVE_2025_24893_XWIKI_SOLRSEARCH_RCE
@@ -215,7 +215,7 @@ rule TRAFFIC_CVE_2025_24893_XWIKI_SOLRSEARCH_RCE
     $x4 = "{{groovy}}" nocase
     $x5 = "{{async async=false}}" nocase
   condition:
-    ($x1 and 1 of ($x2, $x3, $x4, $x5)) or (all of ($x2, $x3, $x4))
+    filesize < 5MB and (($x1 and 1 of ($x2, $x3, $x4, $x5)) or (all of ($x2, $x3, $x4)))
 }
 
 rule TRAFFIC_CVE_2025_64111_GOGS_SYMLINK_SHIMMY_RCE
@@ -236,7 +236,7 @@ rule TRAFFIC_CVE_2025_64111_GOGS_SYMLINK_SHIMMY_RCE
     $g5 = "core.editor" nocase
     $g6 = "\"content\":" nocase
   condition:
-    ($g1 and $g2 and 1 of ($g3, $g4, $g5)) or (all of ($g3, $g4, $g6))
+    filesize < 5MB and (($g1 and $g2 and 1 of ($g3, $g4, $g5)) or (all of ($g3, $g4, $g6)))
 }
 
 rule TRAFFIC_CVE_2025_GIT_CONFIG_QUOTING_RCE_CLONE_CHAIN
@@ -256,7 +256,7 @@ rule TRAFFIC_CVE_2025_GIT_CONFIG_QUOTING_RCE_CLONE_CHAIN
     $c4 = "bundle-uri" nocase
     $c5 = "core.sshCommand" nocase
   condition:
-    3 of them
+    filesize < 5MB and 3 of them
 }
 
 rule TRAFFIC_CVE_2025_6466_RUOYI_AI_AUDIO_UPLOAD
@@ -281,7 +281,7 @@ rule TRAFFIC_CVE_2025_6466_RUOYI_AI_AUDIO_UPLOAD
     $r7 = ".ashx" nocase
     $r8 = ".aspx" nocase
   condition:
-    $r1 and $r2 and $r3 and 1 of ($r4, $r5, $r6, $r7, $r8)
+    filesize < 5MB and $r1 and $r2 and $r3 and 1 of ($r4, $r5, $r6, $r7, $r8)
 }
 
 rule TRAFFIC_CVE_2025_51825_JEECGBOOT_PARSESQL_SQLI
@@ -304,7 +304,7 @@ rule TRAFFIC_CVE_2025_51825_JEECGBOOT_PARSESQL_SQLI
     $j5 = "sleep(" nocase
     $j6 = "benchmark(" nocase
   condition:
-    $j1 and 1 of ($j2, $j3, $j4, $j5, $j6)
+    filesize < 5MB and $j1 and 1 of ($j2, $j3, $j4, $j5, $j6)
 }
 
 rule TRAFFIC_CVE_2025_7787_XXLJOB_HTTPJOBHANDLER_SSRF
@@ -327,7 +327,7 @@ rule TRAFFIC_CVE_2025_7787_XXLJOB_HTTPJOBHANDLER_SSRF
     $x5 = "http://localhost" nocase
     $x6 = "https://" nocase
   condition:
-    1 of ($x1, $x2) and 1 of ($x3, $x4, $x5, $x6)
+    filesize < 5MB and 1 of ($x1, $x2) and 1 of ($x3, $x4, $x5, $x6)
 }
 
 rule TRAFFIC_CVE_2025_XXLJOB_COMMANDJOBHANDLER_RCE
@@ -350,7 +350,7 @@ rule TRAFFIC_CVE_2025_XXLJOB_COMMANDJOBHANDLER_RCE
     $c5 = "powershell " nocase
     $c6 = "bash -c " nocase
   condition:
-    1 of ($c1, $c2) and 1 of ($c3, $c4, $c5, $c6)
+    filesize < 5MB and 1 of ($c1, $c2) and 1 of ($c3, $c4, $c5, $c6)
 }
 
 rule TRAFFIC_WEBSHELL_CHINA_CHOPPER
@@ -367,7 +367,7 @@ rule TRAFFIC_WEBSHELL_CHINA_CHOPPER
     $a4 = "base64_decode($_POST" nocase
     $a5 = "echo(md5(" nocase
   condition:
-    any of them
+    filesize < 1MB and any of them
 }
 
 rule TRAFFIC_WEBSHELL_BEHINDER
@@ -385,7 +385,7 @@ rule TRAFFIC_WEBSHELL_BEHINDER
     $b4 = "pass=" nocase
     $b5 = "eval(base64_decode(" nocase
   condition:
-    2 of them
+    filesize < 1MB and 2 of them
 }
 
 rule TRAFFIC_WEBSHELL_GODZILLA
@@ -404,7 +404,7 @@ rule TRAFFIC_WEBSHELL_GODZILLA
     $g5 = "md5(pass" nocase
     $g6 = "gzip" nocase
   condition:
-    3 of them
+    filesize < 1MB and 3 of them
 }
 
 rule TRAFFIC_WEBSHELL_ANTSWORD_GENERIC
@@ -422,7 +422,7 @@ rule TRAFFIC_WEBSHELL_ANTSWORD_GENERIC
     $a4 = "shell_exec($_POST" nocase
     $a5 = "passthru($_POST" nocase
   condition:
-    2 of them
+    filesize < 1MB and 2 of them
 }
 
 rule TRAFFIC_WEBSHELL_REGEORG_TUNNEL
@@ -441,7 +441,7 @@ rule TRAFFIC_WEBSHELL_REGEORG_TUNNEL
     $r5 = "CONNECT " nocase
     $r6 = "FORWARD " nocase
   condition:
-    2 of ($r1, $r2, $r3, $r4) or ($r5 and $r6)
+    filesize < 1MB and (2 of ($r1, $r2, $r3, $r4) or ($r5 and $r6))
 }
 
 rule TRAFFIC_C2_VSHELL_WEBSOCKET_LISTENER
@@ -459,7 +459,7 @@ rule TRAFFIC_C2_VSHELL_WEBSOCKET_LISTENER
     $v4 = "&t=ws_" nocase
     $v6 = "GET /ws " nocase
   condition:
-    ($v1 and 1 of ($v2, $v3) and $v4) or ($v6 and $v1)
+    filesize < 1MB and (($v1 and 1 of ($v2, $v3) and $v4) or ($v6 and $v1))
 }
 
 rule TRAFFIC_C2_VSHELL_TCP_ONLINE_MARKER
@@ -474,7 +474,7 @@ rule TRAFFIC_C2_VSHELL_TCP_ONLINE_MARKER
     $t1 = "l64"
     $t2 = "w64"
   condition:
-    any of them
+    filesize < 1MB and any of them
 }
 
 rule TRAFFIC_C2_VSHELL_DOH_TASKING
@@ -492,7 +492,7 @@ rule TRAFFIC_C2_VSHELL_DOH_TASKING
     $d4 = "type\":\"A\"" nocase
     $d5 = "type\":\"TXT\"" nocase
   condition:
-    ($d1 and 1 of ($d2, $d3)) or ($d1 and $d4 and $d5)
+    filesize < 1MB and (($d1 and 1 of ($d2, $d3)) or ($d1 and $d4 and $d5))
 }
 
 rule TRAFFIC_WEBSHELL_GENERIC_PHP_JSP_CMD_EXEC
@@ -511,5 +511,5 @@ rule TRAFFIC_WEBSHELL_GENERIC_PHP_JSP_CMD_EXEC
     $p6 = "passthru(" nocase
     $p7 = "system(" nocase
   condition:
-    any of them
+    filesize < 1MB and any of them
 }

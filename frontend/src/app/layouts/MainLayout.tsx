@@ -1,6 +1,11 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
+import { useStream } from "../state/contexts/StreamContext";
+import { useFilter } from "../state/contexts/FilterContext";
+import { useAnalysis } from "../state/contexts/AnalysisContext";
 import { SidebarProvider } from "../components/ui/sidebar";
 import { TLSDecryptionDialog } from "../components/TLSDecryptionDialog";
 import { copyTextToClipboard, downloadText } from "../utils/browserFile";
@@ -34,19 +39,12 @@ export function MainLayout() {
   const [backgroundFade, setBackgroundFade] = useState<BackgroundFadeState | null>(null);
   const backgroundRouteRef = useRef(location.pathname);
   const backgroundThemeStyleRef = useRef<CSSProperties | null>(null);
-  const {
-    fileMeta,
-    filteredPackets,
-    packets,
-    totalPackets,
-    decryptionConfig,
-    backendConnected,
-    backendStatus,
-    openCapture,
-    selectedPacket,
-    setDisplayFilter,
-    applyFilter,
-  } = useSentinel();
+  const { backendConnected, backendStatus, decryptionConfig } = useBackend();
+  const { fileMeta, openCapture } = useCapture();
+  const { filteredPackets, packets, totalPackets, selectedPacket } = usePacket();
+  useStream();
+  const { setDisplayFilter, applyFilter } = useFilter();
+  useAnalysis();
 
   const exportPacketsJson = () => {
     downloadText(

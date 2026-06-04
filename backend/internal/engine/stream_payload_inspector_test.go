@@ -500,3 +500,550 @@ func hasCandidate(items []model.StreamPayloadCandidate, kind, paramName string) 
 	}
 	return false
 }
+
+func TestInspectStreamPayloadSuggestsChinaChopperFromEval(t *testing.T) {
+	raw := `@eval($_POST['caidao']);`
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "china_chopper" {
+		t.Fatalf("SuggestedDecoder = %q, want china_chopper", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "china_chopper" {
+		t.Fatalf("SuggestedFamily = %q, want china_chopper", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 90 {
+		t.Fatalf("Confidence = %d, want >= 90", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadSuggestsChinaChopperFromAssert(t *testing.T) {
+	raw := `@assert($_POST['pass']);`
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "china_chopper" {
+		t.Fatalf("SuggestedDecoder = %q, want china_chopper", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "china_chopper" {
+		t.Fatalf("SuggestedFamily = %q, want china_chopper", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 90 {
+		t.Fatalf("Confidence = %d, want >= 90", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadSuggestsChinaChopperFromParamName(t *testing.T) {
+	// When parameter name is "caidao", suggest china_chopper
+	command := `system("whoami");`
+	encodedCommand := base64.StdEncoding.EncodeToString([]byte(command))
+	raw := "caidao=" + url.QueryEscape(encodedCommand)
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "china_chopper" {
+		t.Fatalf("SuggestedDecoder = %q, want china_chopper", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "china_chopper" {
+		t.Fatalf("SuggestedFamily = %q, want china_chopper", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 85 {
+		t.Fatalf("Confidence = %d, want >= 85", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadSuggestsReGeorgFromHeaders(t *testing.T) {
+	raw := "GET /tunnel.php HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: CONNECT\r\n" +
+		"X-TARGET: 192.168.1.100:3389\r\n" +
+		"\r\n"
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "regeorg" {
+		t.Fatalf("SuggestedDecoder = %q, want regeorg", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "regeorg" {
+		t.Fatalf("SuggestedFamily = %q, want regeorg", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 90 {
+		t.Fatalf("Confidence = %d, want >= 90", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadSuggestsReGeorgFromResponseStatus(t *testing.T) {
+	raw := "HTTP/1.1 200 OK\r\n" +
+		"X-STATUS-CODE: 200\r\n" +
+		"X-CMD: READ\r\n" +
+		"\r\n" +
+		"data from tunnel"
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "regeorg" {
+		t.Fatalf("SuggestedDecoder = %q, want regeorg", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "regeorg" {
+		t.Fatalf("SuggestedFamily = %q, want regeorg", inspection.SuggestedFamily)
+	}
+}
+
+func TestInspectStreamPayloadReGeorgHighConfidenceWithBothHeaders(t *testing.T) {
+	raw := "POST /tunnel.jsp HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"X-CMD: CONNECT\r\n" +
+		"X-TARGET: 10.0.0.5:22\r\n" +
+		"\r\n"
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.Confidence < 95 {
+		t.Fatalf("Confidence = %d, want >= 95 with both X-CMD and X-TARGET", inspection.Confidence)
+	}
+	if inspection.SuggestedFamily != "regeorg" {
+		t.Fatalf("SuggestedFamily = %q, want regeorg", inspection.SuggestedFamily)
+	}
+}
+
+// ── Behinder v2.0 key negotiation tests ────────────────────────────────────
+
+func TestInspectStreamPayloadBehinderV2HexKeyResponse(t *testing.T) {
+	// Behinder v2.0 returns a 16-char hex key from the pass=<digits> GET request.
+	raw := "GET /shell.php?pass=645 HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"\r\n" +
+		"a1b2c3d4e5f67890"
+
+	inspection := InspectStreamPayload(raw)
+
+	found := false
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" && containsString(candidate.Fingerprints, "behinder-v2-hex-key") {
+			found = true
+			if candidate.SourceRole != "key_negotiation" {
+				t.Fatalf("SourceRole = %q, want key_negotiation", candidate.SourceRole)
+			}
+			if candidate.Confidence < 90 {
+				t.Fatalf("Confidence = %d, want >= 90", candidate.Confidence)
+			}
+			if !containsString(candidate.DecoderHints, "behinder") {
+				t.Fatalf("DecoderHints = %#v, want behinder", candidate.DecoderHints)
+			}
+			if candidate.DecoderOptionsHint["keyNegotiation"] != true {
+				t.Fatalf("keyNegotiation hint = %#v, want true", candidate.DecoderOptionsHint["keyNegotiation"])
+			}
+			if candidate.DecoderOptionsHint["keyFormat"] != "hex16" {
+				t.Fatalf("keyFormat hint = %#v, want hex16", candidate.DecoderOptionsHint["keyFormat"])
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 hex key candidate, got %#v", inspection.Candidates)
+	}
+}
+
+func TestInspectStreamPayloadBehinderV2PassParamInitiation(t *testing.T) {
+	// Phase 1 initiation: GET /shell.php?pass=645
+	raw := "pass=645"
+
+	inspection := InspectStreamPayload(raw)
+	found := false
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" && containsString(candidate.Fingerprints, "behinder-v2-pass-param") {
+			found = true
+			if candidate.SourceRole != "key_negotiation" {
+				t.Fatalf("SourceRole = %q, want key_negotiation", candidate.SourceRole)
+			}
+			if candidate.Confidence < 70 {
+				t.Fatalf("Confidence = %d, want >= 70", candidate.Confidence)
+			}
+			if !containsString(candidate.DecoderHints, "behinder") {
+				t.Fatalf("DecoderHints = %#v, want behinder", candidate.DecoderHints)
+			}
+			if candidate.DecoderOptionsHint["handshakePhase"] != "initiation" {
+				t.Fatalf("handshakePhase hint = %#v, want initiation", candidate.DecoderOptionsHint["handshakePhase"])
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 pass param candidate, got %#v", inspection.Candidates)
+	}
+}
+
+func TestInspectStreamPayloadBehinderV2PassParam123(t *testing.T) {
+	// Phase 2: GET /shell.php?pass=123
+	raw := "pass=123"
+
+	inspection := InspectStreamPayload(raw)
+	found := false
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" && containsString(candidate.Fingerprints, "behinder-v2-pass-param") {
+			found = true
+			if candidate.DecoderOptionsHint["handshakePhase"] != "initiation" {
+				t.Fatalf("handshakePhase hint = %#v, want initiation", candidate.DecoderOptionsHint["handshakePhase"])
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 pass=123 candidate, got %#v", inspection.Candidates)
+	}
+}
+
+func TestInspectStreamPayloadBehinderV2FullHTTPRequest(t *testing.T) {
+	// Full HTTP request with hex key response body
+	key := "e45e329feb5d925b"
+	raw := "GET /shell.php?pass=645 HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"Accept: text/html\r\n" +
+		"\r\n" +
+		key
+
+	inspection := InspectStreamPayload(raw)
+
+	// The suggested family should be behinder_v2 with high confidence
+	if inspection.SuggestedFamily != "behinder_v2" {
+		t.Fatalf("SuggestedFamily = %q, want behinder_v2", inspection.SuggestedFamily)
+	}
+	if inspection.SuggestedDecoder != "behinder" {
+		t.Fatalf("SuggestedDecoder = %q, want behinder", inspection.SuggestedDecoder)
+	}
+	if inspection.Confidence < 90 {
+		t.Fatalf("Confidence = %d, want >= 90", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadBehinderV2DefaultKeyDetection(t *testing.T) {
+	// The default Behinder v3/v4 key "e45e329feb5d925b" is also 16 hex chars.
+	// As a standalone hex token, it should be detected as Behinder v2.0 key.
+	raw := "e45e329feb5d925b"
+
+	inspection := InspectStreamPayload(raw)
+	found := false
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" && containsString(candidate.Fingerprints, "behinder-v2-hex-key") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 hex key for default key, got %#v", inspection.Candidates)
+	}
+}
+
+func TestInspectStreamPayloadNotBehinderV2ShortHex(t *testing.T) {
+	// 8-char hex should NOT match Behinder v2.0 key
+	raw := "a1b2c3d4"
+
+	inspection := InspectStreamPayload(raw)
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" {
+			t.Fatalf("unexpected Behinder v2.0 match for short hex: %+v", candidate)
+		}
+	}
+}
+
+func TestInspectStreamPayloadNotBehinderV2SingleDigitPass(t *testing.T) {
+	// pass=5 (single digit) should NOT match Behinder v2.0 (requires 2-3 digits)
+	raw := "pass=5"
+
+	inspection := InspectStreamPayload(raw)
+	for _, candidate := range inspection.Candidates {
+		if candidate.FamilyHint == "behinder_v2" {
+			t.Fatalf("unexpected Behinder v2.0 match for single digit pass: %+v", candidate)
+		}
+	}
+}
+
+func TestListStreamPayloadSourcesDetectsBehinderV2HexKey(t *testing.T) {
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{
+			ID:         200,
+			Timestamp:  "2026-06-04T10:00:00Z",
+			Protocol:   "HTTP",
+			Info:       "GET /shell.php?pass=645 HTTP/1.1",
+			Payload:    "GET /shell.php?pass=645 HTTP/1.1\r\nHost: target.test\r\n\r\na1b2c3d4e5f67890",
+			StreamID:   50,
+			DestIP:     "10.0.0.2",
+			DestPort:   80,
+			SourceIP:   "10.0.0.1",
+			SourcePort: 52000,
+		},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	sources, err := svc.ListStreamPayloadSources(20)
+	if err != nil {
+		t.Fatalf("ListStreamPayloadSources() error = %v", err)
+	}
+
+	found := false
+	for _, source := range sources {
+		if source.FamilyHint == "behinder_v2" {
+			found = true
+			if source.SourceRole != "key_negotiation" {
+				t.Fatalf("SourceRole = %q, want key_negotiation", source.SourceRole)
+			}
+			if !containsString(source.Signals, "behinder-v2-hex-key") {
+				t.Fatalf("Signals = %#v, want behinder-v2-hex-key", source.Signals)
+			}
+			if source.Confidence < 90 {
+				t.Fatalf("Confidence = %d, want >= 90", source.Confidence)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 payload source, got %#v", sources)
+	}
+}
+
+func TestListStreamPayloadSourcesDetectsBehinderV2PassParam(t *testing.T) {
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{
+			ID:         201,
+			Timestamp:  "2026-06-04T10:00:01Z",
+			Protocol:   "HTTP",
+			Info:       "GET /shell.php?pass=645 HTTP/1.1",
+			Payload:    "GET /shell.php?pass=645 HTTP/1.1\r\nHost: target.test\r\n\r\n",
+			StreamID:   51,
+			DestIP:     "10.0.0.2",
+			DestPort:   80,
+			SourceIP:   "10.0.0.1",
+			SourcePort: 52001,
+		},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	sources, err := svc.ListStreamPayloadSources(20)
+	if err != nil {
+		t.Fatalf("ListStreamPayloadSources() error = %v", err)
+	}
+
+	found := false
+	for _, source := range sources {
+		if source.FamilyHint == "behinder_v2" && containsString(source.Signals, "behinder-v2-pass-param") {
+			found = true
+			if source.SourceRole != "key_negotiation" {
+				t.Fatalf("SourceRole = %q, want key_negotiation", source.SourceRole)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder v2.0 pass param source, got %#v", sources)
+	}
+}
+
+func TestListStreamPayloadSourcesBehinderV2TwoPhaseCorrelation(t *testing.T) {
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+
+	// Simulate Behinder v2.0 two-phase handshake:
+	// Phase 1: GET /shell.php?pass=645 → key response
+	// Phase 2: GET /shell.php?pass=123 → second request
+	if err := svc.packetStore.Append([]model.Packet{
+		{
+			ID:         300,
+			Timestamp:  "2026-06-04T10:00:00Z",
+			Protocol:   "HTTP",
+			Info:       "GET /shell.php?pass=645 HTTP/1.1",
+			Payload:    "GET /shell.php?pass=645 HTTP/1.1\r\nHost: target.test\r\n\r\ne45e329feb5d925b",
+			StreamID:   60,
+			DestIP:     "10.0.0.2",
+			DestPort:   80,
+			SourceIP:   "10.0.0.1",
+			SourcePort: 53000,
+		},
+		{
+			ID:         301,
+			Timestamp:  "2026-06-04T10:00:01Z",
+			Protocol:   "HTTP",
+			Info:       "GET /shell.php?pass=123 HTTP/1.1",
+			Payload:    "GET /shell.php?pass=123 HTTP/1.1\r\nHost: target.test\r\n\r\n",
+			StreamID:   61,
+			DestIP:     "10.0.0.2",
+			DestPort:   80,
+			SourceIP:   "10.0.0.1",
+			SourcePort: 53001,
+		},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	sources, err := svc.ListStreamPayloadSources(20)
+	if err != nil {
+		t.Fatalf("ListStreamPayloadSources() error = %v", err)
+	}
+
+	hexKeyFound := false
+	passParamFound := false
+	for _, source := range sources {
+		if source.FamilyHint == "behinder_v2" && containsString(source.Signals, "behinder-v2-hex-key") {
+			hexKeyFound = true
+		}
+		if source.FamilyHint == "behinder_v2" && containsString(source.Signals, "behinder-v2-pass-param") {
+			passParamFound = true
+		}
+	}
+	if !hexKeyFound {
+		t.Fatalf("expected Behinder v2.0 hex key source in two-phase correlation, got %#v", sources)
+	}
+	if !passParamFound {
+		t.Fatalf("expected Behinder v2.0 pass param source in two-phase correlation, got %#v", sources)
+	}
+}
+
+// ── Behinder HTTP header fingerprint tests ────────────────────────────────
+
+func TestInspectStreamPayloadBehinderUAFromJava1_8_0_211(t *testing.T) {
+	raw := "POST /shell.jsp HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"User-Agent: Java/1.8.0_211\r\n" +
+		"Content-Type: application/octet-stream\r\n" +
+		"\r\n" +
+		base64.StdEncoding.EncodeToString([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "behinder" {
+		t.Fatalf("SuggestedDecoder = %q, want behinder", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "behinder" {
+		t.Fatalf("SuggestedFamily = %q, want behinder", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 78 {
+		t.Fatalf("Confidence = %d, want >= 78", inspection.Confidence)
+	}
+	if !containsString(inspection.Reasons, "User-Agent 'Java/1.8.0_211' 命中冰蝎内置 UA 库。") {
+		t.Fatalf("Reasons = %#v, want Behinder UA reason", inspection.Reasons)
+	}
+}
+
+func TestInspectStreamPayloadBehinderUAFromJava1_6_0_45(t *testing.T) {
+	raw := "POST /api.jsp HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"User-Agent: Java/1.6.0_45\r\n" +
+		"\r\n" +
+		"AAECAwQFBgcICQoLDA0ODw=="
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "behinder" {
+		t.Fatalf("SuggestedDecoder = %q, want behinder", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "behinder" {
+		t.Fatalf("SuggestedFamily = %q, want behinder", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 78 {
+		t.Fatalf("Confidence = %d, want >= 78", inspection.Confidence)
+	}
+}
+
+func TestInspectStreamPayloadBehinderAcceptHeader(t *testing.T) {
+	raw := "POST /shell.php HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"Accept: text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2\r\n" +
+		"Content-Type: application/octet-stream\r\n" +
+		"\r\n" +
+		base64.StdEncoding.EncodeToString([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "behinder" {
+		t.Fatalf("SuggestedDecoder = %q, want behinder", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "behinder" {
+		t.Fatalf("SuggestedFamily = %q, want behinder", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 86 {
+		t.Fatalf("Confidence = %d, want >= 86", inspection.Confidence)
+	}
+	if !containsString(inspection.Reasons, "Accept 头命中冰蝎 v2.x 固定特征。") {
+		t.Fatalf("Reasons = %#v, want Behinder Accept reason", inspection.Reasons)
+	}
+}
+
+func TestInspectStreamPayloadBehinderUAAndAcceptCombined(t *testing.T) {
+	raw := "POST /shell.php HTTP/1.1\r\n" +
+		"Host: target.test\r\n" +
+		"User-Agent: Java/1.8.0_211\r\n" +
+		"Accept: text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2\r\n" +
+		"Content-Type: application/octet-stream\r\n" +
+		"\r\n" +
+		base64.StdEncoding.EncodeToString([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedDecoder != "behinder" {
+		t.Fatalf("SuggestedDecoder = %q, want behinder", inspection.SuggestedDecoder)
+	}
+	if inspection.SuggestedFamily != "behinder" {
+		t.Fatalf("SuggestedFamily = %q, want behinder", inspection.SuggestedFamily)
+	}
+	if inspection.Confidence < 93 {
+		t.Fatalf("Confidence = %d, want >= 93", inspection.Confidence)
+	}
+	if !containsString(inspection.Reasons, "User-Agent 'Java/1.8.0_211' 命中冰蝎内置 UA 库。") {
+		t.Fatalf("Reasons = %#v, want Behinder UA reason", inspection.Reasons)
+	}
+	if !containsString(inspection.Reasons, "Accept 头命中冰蝎 v2.x 固定特征。") {
+		t.Fatalf("Reasons = %#v, want Behinder Accept reason", inspection.Reasons)
+	}
+}
+
+func TestInspectStreamPayloadBenignUANotBehinder(t *testing.T) {
+	raw := "POST /login HTTP/1.1\r\n" +
+		"Host: example.test\r\n" +
+		"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n" +
+		"Content-Type: application/x-www-form-urlencoded\r\n" +
+		"\r\n" +
+		"username=alice&password=secret"
+
+	inspection := InspectStreamPayload(raw)
+	if inspection.SuggestedFamily == "behinder" {
+		t.Fatalf("SuggestedFamily = %q, should not be behinder for benign UA", inspection.SuggestedFamily)
+	}
+}
+
+func TestInspectStreamPayloadBehinderHTTPFingerprintDetectedViaSourceList(t *testing.T) {
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+
+	if err := svc.packetStore.Append([]model.Packet{
+		{
+			ID:         400,
+			Timestamp:  "2026-06-04T11:00:00Z",
+			Protocol:   "HTTP",
+			Info:       "POST /shell.php HTTP/1.1",
+			Payload:    "POST /shell.php HTTP/1.1\r\nHost: target.test\r\nUser-Agent: Java/1.8.0_211\r\nAccept: text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2\r\n\r\n" + base64.StdEncoding.EncodeToString([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}),
+			StreamID:   80,
+			DestIP:     "10.0.0.2",
+			DestPort:   80,
+			SourceIP:   "10.0.0.1",
+			SourcePort: 54000,
+		},
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	sources, err := svc.ListStreamPayloadSources(20)
+	if err != nil {
+		t.Fatalf("ListStreamPayloadSources() error = %v", err)
+	}
+
+	found := false
+	for _, source := range sources {
+		if source.FamilyHint == "behinder" && containsString(source.Signals, "behinder-ua") {
+			found = true
+			if source.SourceRole != "http_header" {
+				t.Fatalf("SourceRole = %q, want http_header", source.SourceRole)
+			}
+			if source.Confidence < 90 {
+				t.Fatalf("Confidence = %d, want >= 90", source.Confidence)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Behinder HTTP header payload source, got %#v", sources)
+	}
+}

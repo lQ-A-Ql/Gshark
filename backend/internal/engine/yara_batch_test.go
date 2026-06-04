@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
@@ -248,5 +249,137 @@ func TestBuildYaraScanTargetsRespectsCanceledContext(t *testing.T) {
 	}
 	if len(targets) != 0 {
 		t.Fatalf("expected no stream targets after cancel, got %+v", targets)
+	}
+}
+
+func TestYarcCachePath(t *testing.T) {
+	tests := []struct {
+		name      string
+		rulePath  string
+		cacheDir  string
+		wantName  string
+		wantDirFn func() string
+	}{
+		{
+			name:     "default same directory",
+			rulePath: filepath.Join(string(os.PathSeparator), "rules", "default.yar"),
+			wantName: "default.yarc",
+			wantDirFn: func() string {
+				return filepath.Join(string(os.PathSeparator), "rules")
+			},
+		},
+		{
+			name:     "custom cache dir",
+			rulePath: filepath.Join(string(os.PathSeparator), "rules", "default.yar"),
+			cacheDir: filepath.Join(string(os.PathSeparator), "tmp", "cache"),
+			wantName: "default.yarc",
+			wantDirFn: func() string {
+				return filepath.Join(string(os.PathSeparator), "tmp", "cache")
+			},
+		},
+		{
+			name:     "traffic rules",
+			rulePath: filepath.Join(string(os.PathSeparator), "some", "path", "traffic_cve_webshell.yar"),
+			wantName: "traffic_cve_webshell.yarc",
+			wantDirFn: func() string {
+				return filepath.Join(string(os.PathSeparator), "some", "path")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldDir := yarcCacheDir
+			yarcCacheDir = tt.cacheDir
+			t.Cleanup(func() { yarcCacheDir = oldDir })
+
+			got := yarcCachePath(tt.rulePath)
+			gotBase := filepath.Base(got)
+			gotDir := filepath.Dir(got)
+
+			if gotBase != tt.wantName {
+				t.Errorf("yarcCachePath() base = %q, want %q", gotBase, tt.wantName)
+			}
+			wantDir := tt.wantDirFn()
+			if gotDir != wantDir {
+				t.Errorf("yarcCachePath() dir = %q, want %q", gotDir, wantDir)
+			}
+		})
+	}
+}
+
+func TestCompileYaraRulesToCacheReturnsYarcUnchanged(t *testing.T) {
+	// If the rule path is already a .yarc file, return it unchanged.
+	rulePath := "/some/rules/compiled.yarc"
+	got := compileYaraRulesToCache("yara", rulePath)
+	if got != rulePath {
+		t.Errorf("compileYaraRulesToCache(.yarc) = %q, want %q", got, rulePath)
+	}
+}
+
+func TestCompileYaraRulesToCacheReturnsOriginalWhenNoYarac(t *testing.T) {
+	// When yarac is not available, the original .yar path should be returned.
+	dir := t.TempDir()
+	rulePath := filepath.Join(dir, "test.yar")
+	if err := os.WriteFile(rulePath, []byte(`
+rule TEST {
+  strings:
+    $a = "test"
+  condition:
+    $a
+}
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Use a non-existent yara exe directory so yarac won't be found
+	got := compileYaraRulesToCache(filepath.Join(dir, "nonexistent-yara.exe"), rulePath)
+	if got != rulePath {
+		t.Errorf("compileYaraRulesToCache(no yarac) = %q, want %q", got, rulePath)
+	}
+}
+
+func TestCompileYaraRulesToCacheUsesCacheWhenNewer(t *testing.T) {
+	dir := t.TempDir()
+	rulePath := filepath.Join(dir, "test.yar")
+	cachePath := filepath.Join(dir, "test.yarc")
+
+	if err := os.WriteFile(rulePath, []byte(`
+rule TEST {
+  strings:
+    $a = "test"
+  condition:
+    $a
+}
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile(yar) error = %v", err)
+	}
+
+	// Create a fake .yarc cache file (newer than source)
+	if err := os.WriteFile(cachePath, []byte("cached"), 0o644); err != nil {
+		t.Fatalf("WriteFile(yarc) error = %v", err)
+	}
+
+	// Touch the source file to be older
+	oldTime := time.Now().Add(-1 * time.Hour)
+	os.Chtimes(rulePath, oldTime, oldTime)
+
+	got := compileYaraRulesToCache("yara", rulePath)
+	if got != cachePath {
+		t.Errorf("compileYaraRulesToCache(cached) = %q, want %q", got, cachePath)
+	}
+}
+
+func TestYarcCacheDirSetting(t *testing.T) {
+	oldDir := yarcCacheDir
+	t.Cleanup(func() { yarcCacheDir = oldDir })
+
+	customDir := filepath.Join(string(os.PathSeparator), "custom", "cache")
+	yarcCacheDir = customDir
+	rulePath := filepath.Join(string(os.PathSeparator), "rules", "test.yar")
+	got := yarcCachePath(rulePath)
+	want := filepath.Join(customDir, "test.yarc")
+	if got != want {
+		t.Errorf("yarcCachePath() with custom dir = %q, want %q", got, want)
 	}
 }

@@ -20,8 +20,31 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../state/SentinelContext", () => ({
-  useSentinel: () => mocks.sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    backendConnected: mocks.sentinelState.backendConnected,
+  }),
+}));
+
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    isPreloadingCapture: mocks.sentinelState.isPreloadingCapture,
+    fileMeta: mocks.sentinelState.fileMeta,
+    captureRevision: mocks.sentinelState.captureRevision,
+  }),
+}));
+
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    totalPackets: mocks.sentinelState.totalPackets,
+    locatePacketById: mocks.sentinelState.locatePacketById,
+  }),
+}));
+
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    preparePacketStream: mocks.sentinelState.preparePacketStream,
+  }),
 }));
 
 vi.mock("../integrations/backendClients", () => ({

@@ -210,6 +210,11 @@ func autoDetectDecode(raw string, options map[string]any) (StreamDecodeResult, e
 			decoder: "godzilla",
 			fn:      func() (StreamDecodeResult, error) { return decodeGodzillaPayload(raw, mergedOptions) },
 		},
+		{
+			name:    "China Chopper",
+			decoder: "china_chopper",
+			fn:      func() (StreamDecodeResult, error) { return decodeChinaChopperPayload(raw, mergedOptions) },
+		},
 	}
 	if hintedDecoder != "" {
 		attempts = prioritizeDecodeAttempts(attempts, hintedDecoder)
@@ -287,7 +292,7 @@ func hintedDecoderFromInspection(inspection model.StreamPayloadInspection) strin
 
 func webshellDecoderHint(decoder string) string {
 	switch decoder {
-	case "behinder", "antsword", "godzilla":
+	case "behinder", "antsword", "godzilla", "china_chopper":
 		return decoder
 	default:
 		return ""

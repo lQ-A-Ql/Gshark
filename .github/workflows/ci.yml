@@ -33,6 +33,9 @@ jobs:
       - name: Backend governance register check
         run: go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
 
+      - name: Feature gap remediation tests
+        run: go test ./internal/engine -run "TestDNP3|TestIEC104|TestRTP|TestIOC|TestMITRE|TestRuleManager|TestMalleable|TestBruteForce|TestDataExfiltration|TestDNSTunnel|TestPlaybook" -count=1 -v
+
       - name: Go test
         run: go test ./...
 

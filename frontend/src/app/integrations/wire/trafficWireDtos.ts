@@ -1,15 +1,18 @@
+export interface TrafficBucketWireDTO { label: string; count: number; }
+
+export interface TrafficProtocolTreeNodeWireDTO {
+  name: string; count: number; children?: TrafficProtocolTreeNodeWireDTO[];
+}
+
 export interface GlobalTrafficStatsWireDTO extends Record<string, unknown> {
-  total_packets?: unknown;
-  protocol_kinds?: unknown;
-  timeline?: unknown;
-  protocol_dist?: unknown;
-  top_talkers?: unknown;
-  top_hostnames?: unknown;
-  top_domains?: unknown;
-  top_src_ips?: unknown;
-  top_dst_ips?: unknown;
-  top_computer_names?: unknown;
-  top_dest_ports?: unknown;
-  top_src_ports?: unknown;
-  protocol_hierarchy?: unknown;
+  total_packets?: number; protocol_kinds?: number;
+  timeline?: TrafficBucketWireDTO[]; protocol_dist?: TrafficBucketWireDTO[];
+  top_talkers?: TrafficBucketWireDTO[];
+  top_hostnames?: TrafficBucketWireDTO[];
+  top_domains?: TrafficBucketWireDTO[];
+  top_src_ips?: TrafficBucketWireDTO[];
+  top_dst_ips?: TrafficBucketWireDTO[];
+  top_computer_names?: TrafficBucketWireDTO[];
+  top_dest_ports?: TrafficBucketWireDTO[]; top_src_ports?: TrafficBucketWireDTO[];
+  protocol_hierarchy?: TrafficProtocolTreeNodeWireDTO[];
 }

@@ -97,3 +97,22 @@ type mcpState struct {
 	mcpMu     sync.RWMutex
 	mcpConfig model.MCPConfig
 }
+
+// playbookState groups hunting playbook storage and execution results.
+type playbookStatePB struct {
+	playbookMu sync.RWMutex
+	playbooks  map[string]*model.HuntingPlaybook
+	lastRun    map[string]*model.PlaybookRunResult
+}
+
+// savedSearchState groups saved search storage.
+type savedSearchStateSS struct {
+	searchMu      sync.RWMutex
+	savedSearches map[string]*model.SavedSearch
+}
+
+// hypothesisState groups hypothesis tracking storage.
+type hypothesisStateHT struct {
+	hypothesisMu sync.RWMutex
+	hypotheses   map[string]*model.Hypothesis
+}

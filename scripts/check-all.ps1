@@ -52,6 +52,11 @@ Invoke-Step "Backend governance register check" {
   go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
 }
 
+Invoke-Step "Backend feature gap remediation tests" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/engine -run "TestDNP3|TestIEC104|TestRTP|TestIOC|TestMITRE|TestRuleManager|TestMalleable|TestBruteForce|TestDataExfiltration|TestDNSTunnel|TestPlaybook" -count=1 -v
+}
+
 Invoke-Step "Backend tests" {
   Set-Location (Join-Path $root "backend")
   go test ./...

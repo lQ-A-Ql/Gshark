@@ -50,8 +50,69 @@ const sentinelState = vi.hoisted(() => ({
   tsharkStatus: { available: true, path: "tshark", message: "ok" },
 }));
 
-vi.mock("../state/SentinelContext", () => ({
-  useSentinel: () => sentinelState,
+vi.mock("../state/contexts/BackendContext", () => ({
+  useBackend: () => ({
+    backendConnected: sentinelState.backendConnected,
+    backendStatus: sentinelState.backendStatus,
+    tsharkStatus: sentinelState.tsharkStatus,
+  }),
+}));
+
+vi.mock("../state/contexts/CaptureContext", () => ({
+  useCapture: () => ({
+    isPreloadingCapture: sentinelState.isPreloadingCapture,
+    preloadProcessed: sentinelState.preloadProcessed,
+    preloadTotal: sentinelState.preloadTotal,
+    capturePreloadDiagnostics: sentinelState.capturePreloadDiagnostics,
+    captureTransaction: sentinelState.captureTransaction,
+    fileMeta: sentinelState.fileMeta,
+    openCapture: sentinelState.openCapture,
+    stopCapture: sentinelState.stopCapture,
+    retryCapturePreloadConfirm: sentinelState.retryCapturePreloadConfirm,
+  }),
+}));
+
+vi.mock("../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
+    filteredPackets: sentinelState.filteredPackets,
+    totalPackets: sentinelState.totalPackets,
+    currentPage: sentinelState.currentPage,
+    totalPages: sentinelState.totalPages,
+    hasMorePackets: sentinelState.hasMorePackets,
+    hasPrevPackets: sentinelState.hasPrevPackets,
+    isPageLoading: sentinelState.isPageLoading,
+    isFilterLoading: sentinelState.isFilterLoading,
+    packetPageError: sentinelState.packetPageError,
+    loadMorePackets: sentinelState.loadMorePackets,
+    loadPrevPackets: sentinelState.loadPrevPackets,
+    jumpToPage: sentinelState.jumpToPage,
+    retryPacketPage: sentinelState.retryPacketPage,
+    locatePacketById: sentinelState.locatePacketById,
+    selectedPacket: sentinelState.selectedPacket,
+    selectedPacketRawHex: sentinelState.selectedPacketRawHex,
+    selectedPacketId: sentinelState.selectedPacketId,
+    selectPacket: sentinelState.selectPacket,
+    protocolTree: sentinelState.protocolTree,
+  }),
+}));
+
+vi.mock("../state/contexts/StreamContext", () => ({
+  useStream: () => ({
+    setActiveStream: sentinelState.setActiveStream,
+  }),
+}));
+
+vi.mock("../state/contexts/FilterContext", () => ({
+  useFilter: () => ({
+    displayFilter: sentinelState.displayFilter,
+    setDisplayFilter: sentinelState.setDisplayFilter,
+    applyFilter: sentinelState.applyFilter,
+    clearFilter: sentinelState.clearFilter,
+  }),
+}));
+
+vi.mock("../state/contexts/AnalysisContext", () => ({
+  useAnalysis: () => ({}),
 }));
 
 describe("Workspace", () => {

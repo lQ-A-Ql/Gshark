@@ -3,17 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
+import { StatusHint } from "../components/DesignSystem";
 import type { USBAnalysis as USBAnalysisData, USBHIDSourceMode, USBMassStorageOperation } from "../core/types";
-import { Banner } from "../features/usb/UsbAnalysisControls";
 import { UsbHidPanel } from "../features/usb/UsbHidPanel";
 import { UsbMassStoragePanel, type MassStorageSubTab } from "../features/usb/UsbMassStoragePanel";
 import { UsbOtherPanel, type OtherSubTab } from "../features/usb/UsbOtherPanel";
 import { UsbOverviewPanel, USB_PROTOCOL_TAGS, type UsbPrimaryTab } from "../features/usb/UsbOverviewPanel";
 import { useUsbAnalysis } from "../features/usb/useUsbAnalysis";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function UsbAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { totalPackets } = usePacket();
   const [hidSource, setHidSource] = useState<USBHIDSourceMode>("auto");
   const [hidEventLimit, setHidEventLimit] = useState(20000);
   const { analysis, loading, error, refreshAnalysis } = useUsbAnalysis({
@@ -82,10 +86,7 @@ export default function UsbAnalysis() {
     [activeMassStorageDevice, activeMassStorageLUN],
   );
   const filteredReadOperations = useMemo(() => massStorageFilter(readOperations), [massStorageFilter, readOperations]);
-  const filteredWriteOperations = useMemo(
-    () => massStorageFilter(writeOperations),
-    [massStorageFilter, writeOperations],
-  );
+  const filteredWriteOperations = useMemo(() => massStorageFilter(writeOperations), [massStorageFilter, writeOperations]);
 
   return (
     <PageShell>
@@ -100,8 +101,8 @@ export default function UsbAnalysis() {
         onRefresh={() => refreshAnalysis(true)}
       />
 
-      {loading && <Banner tone="muted">正在解析 USB / HID / Mass Storage 数据...</Banner>}
-      {!loading && error && <Banner tone="warning">{error}</Banner>}
+      {loading && <StatusHint tone="slate">正在解析 USB / HID / Mass Storage 数据...</StatusHint>}
+      {!loading && error && <StatusHint tone="amber">{error}</StatusHint>}
 
       <UsbOverviewPanel
         analysis={analysis}

@@ -11,10 +11,14 @@ import { VehicleProtocolPanels } from "../features/vehicle/VehicleProtocolPanels
 import { VehicleUdsTransactionsPanel } from "../features/vehicle/VehicleUdsTransactionsPanel";
 import { useVehicleAnalysis } from "../features/vehicle/useVehicleAnalysis";
 import { useVehicleDbcProfiles } from "../features/vehicle/useVehicleDbcProfiles";
-import { useSentinel } from "../state/SentinelContext";
+import { useBackend } from "../state/contexts/BackendContext";
+import { useCapture } from "../state/contexts/CaptureContext";
+import { usePacket } from "../state/contexts/PacketContext";
 
 export default function VehicleAnalysis() {
-  const { backendConnected, isPreloadingCapture, fileMeta, totalPackets, captureRevision } = useSentinel();
+  const { backendConnected } = useBackend();
+  const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
+  const { totalPackets } = usePacket();
   const {
     profiles: dbcProfiles,
     pathInput: dbcPathInput,

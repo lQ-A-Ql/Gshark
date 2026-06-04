@@ -141,6 +141,7 @@ export function AnalysisHero({
               <div className="flex items-center justify-start sm:justify-end">
                 <button
                   type="button"
+                  aria-label="刷新分析"
                   onClick={onRefresh}
                   className={cn(
                     "meow-diffuse-chip inline-flex h-9 items-center gap-2 px-3 text-xs font-semibold transition-all active:scale-[0.98]",

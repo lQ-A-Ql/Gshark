@@ -3,9 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { C2HTTPEndpointAggregate } from "../../core/types";
 import { CSHostURIAggregates } from "./CSHostURIAggregates";
 
-vi.mock("../../state/SentinelContext", () => ({
-  useSentinel: () => ({
+vi.mock("../../state/contexts/PacketContext", () => ({
+  usePacket: () => ({
     locatePacketById: vi.fn(),
+  }),
+}));
+
+vi.mock("../../state/contexts/StreamContext", () => ({
+  useStream: () => ({
     preparePacketStream: vi.fn(),
   }),
 }));
