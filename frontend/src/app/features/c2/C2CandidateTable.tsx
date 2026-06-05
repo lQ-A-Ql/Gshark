@@ -130,6 +130,7 @@ export function C2CandidateTable({ candidates }: { candidates: C2IndicatorRecord
             <div className="flex flex-col items-start gap-2">
               <EvidenceActions
                 packetId={item.packetId}
+                streamId={item.streamId}
                 preferredProtocol={preferredProtocolForCandidate(item)}
                 className="flex-col items-start"
               />

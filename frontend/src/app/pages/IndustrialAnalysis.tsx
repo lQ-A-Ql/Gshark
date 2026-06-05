@@ -16,7 +16,7 @@ import { usePacket } from "../state/contexts/PacketContext";
 import { useIndustrialAnalysis } from "../features/industrial/useIndustrialAnalysis";
 import { IndustrialModbusPanels } from "../features/industrial/IndustrialModbusPanels";
 import {
-  IndustrialControlCommandsPanel, IndustrialProtocolDetailsPanel, IndustrialRuleHitsPanel,
+  IndustrialControlCommandsPanel, IndustrialDnp3Panel, IndustrialProtocolDetailsPanel, IndustrialRuleHitsPanel,
 } from "../features/industrial/IndustrialAuxiliaryPanels";
 const INDUSTRIAL_PROTOCOL_TAGS = ["Modbus", "S7", "DNP3", "CIP", "BACnet", "IEC104", "OPC UA", "PROFINET"];
 
@@ -159,6 +159,12 @@ export default function IndustrialAnalysis() {
         functionFilter={modbusFunctionFilter}
         onUnitFilterChange={setModbusUnitFilter}
         onFunctionFilterChange={setModbusFunctionFilter}
+      />
+
+      <IndustrialDnp3Panel
+        details={analysis.details}
+        commands={analysis.controlCommands ?? []}
+        ruleHits={analysis.ruleHits ?? []}
       />
 
       <IndustrialControlCommandsPanel commands={analysis.controlCommands ?? []} />

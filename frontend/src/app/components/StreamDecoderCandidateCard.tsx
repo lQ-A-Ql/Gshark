@@ -1,5 +1,6 @@
 import type { StreamDecoderKind, StreamPayloadCandidate } from "../core/types";
 import { asKnownDecoder, candidateHintBadges } from "./StreamDecoderWorkbenchUtils";
+import { getWebShellMetadataSummary } from "./webShellMetadata";
 
 export function CandidateCard({
   candidate,
@@ -12,6 +13,7 @@ export function CandidateCard({
   onSelectCandidate: (candidateId: string) => void;
   onRunDecoder: (decoder: StreamDecoderKind) => void;
 }) {
+  const metadata = getWebShellMetadataSummary(candidate, candidate.confidence);
   return (
     <div
       onClick={() => onSelectCandidate(candidate.id)}
@@ -43,14 +45,14 @@ export function CandidateCard({
             {candidate.paramName}
           </span>
         )}
-        {candidate.familyHint && (
+        {metadata.familyLabel && (
           <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
-            {candidate.familyHint}
+            {metadata.familyLabel}
           </span>
         )}
-        {candidate.sourceRole && (
+        {metadata.roleLabel !== "未标注" && (
           <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-            {candidate.sourceRole}
+            {metadata.roleLabel}
           </span>
         )}
         {candidateHintBadges(candidate).map((badge) => (
@@ -66,20 +68,37 @@ export function CandidateCard({
       <div className="mt-1 line-clamp-3 break-all font-mono text-[11px] text-muted-foreground">
         {candidate.preview || candidate.value || "(empty)"}
       </div>
+      <div className="mt-2 grid gap-1 rounded-md border border-border bg-background/80 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground sm:grid-cols-2">
+        {metadata.fields.slice(1).map((field) => (
+          <span key={`${candidate.id}-${field.key}`} className="truncate">
+            <span className="font-semibold text-foreground">{field.label}:</span>{" "}
+            <span>{field.value}</span>
+          </span>
+        ))}
+      </div>
       {(candidate.decoderHints?.length ?? 0) > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {candidate.decoderHints!.map((hint) => (
-            <button
-              key={`${candidate.id}-${hint}`}
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                runSuggestedDecoder(hint, onRunDecoder);
-              }}
-              className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700 hover:bg-blue-100"
-            >
-              {hint}
-            </button>
+            asKnownDecoder(hint) ? (
+              <button
+                key={`${candidate.id}-${hint}`}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  runSuggestedDecoder(hint, onRunDecoder);
+                }}
+                className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700 hover:bg-blue-100"
+              >
+                {hint}
+              </button>
+            ) : (
+              <span
+                key={`${candidate.id}-${hint}`}
+                className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+              >
+                {hint}
+              </span>
+            )
           ))}
         </div>
       )}

@@ -241,6 +241,7 @@ export function useStreamDecoderWorkbench({
 
   return {
     activeSettings,
+    activeHintSource,
     applyMessage,
     applyMode,
     batchCount,

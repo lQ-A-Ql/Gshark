@@ -1,5 +1,10 @@
 import type { AnalysisTone } from "../../components/analysis/AnalysisPrimitives";
 import type { StreamPayloadSource } from "../../core/types";
+import {
+  getWebShellConfidenceTone,
+  getWebShellMetadataSummary,
+  isChinaChopperMetadata,
+} from "../../components/webShellMetadata";
 
 export interface PayloadWebShellSourceBadge {
   key: string;
@@ -31,10 +36,7 @@ export function getPayloadWebShellPreviewText(source: StreamPayloadSource) {
 }
 
 export function getPayloadWebShellConfidenceTone(confidence?: number): "emerald" | "cyan" | "amber" {
-  const value = confidence ?? 0;
-  if (value >= 80) return "emerald";
-  if (value >= 55) return "cyan";
-  return "amber";
+  return getWebShellConfidenceTone(confidence);
 }
 
 export function getPayloadWebShellDecoderName(options?: Record<string, unknown>) {
@@ -43,6 +45,7 @@ export function getPayloadWebShellDecoderName(options?: Record<string, unknown>)
 }
 
 export function getPayloadWebShellSourceBadges(source: StreamPayloadSource): PayloadWebShellSourceBadge[] {
+  const metadata = getWebShellMetadataSummary(source, source.confidence);
   const badges: PayloadWebShellSourceBadge[] = [
     {
       key: "confidence",
@@ -58,19 +61,25 @@ export function getPayloadWebShellSourceBadges(source: StreamPayloadSource): Pay
       tone: "blue",
     });
   }
-  if (source.familyHint) {
-    badges.push({ key: "family", label: source.familyHint, tone: "cyan" });
+  if (metadata.familyLabel) {
+    badges.push({
+      key: "family",
+      label: metadata.familyLabel,
+      tone: isChinaChopperMetadata(source) ? "cyan" : "blue",
+    });
   }
-  if (source.sourceRole) {
-    badges.push({ key: "role", label: source.sourceRole, tone: "emerald" });
+  if (metadata.roleLabel !== "未标注") {
+    badges.push({ key: "role", label: metadata.roleLabel, tone: "emerald" });
   }
 
-  const decoderName = getPayloadWebShellDecoderName(source.decoderOptionsHint);
-  if (decoderName) {
-    badges.push({ key: "decoder", label: decoderName, tone: "amber" });
+  if (metadata.decoderLabel !== "未提供") {
+    badges.push({ key: "decoder", label: metadata.decoderLabel, tone: "amber" });
   }
 
   for (const hint of (source.decoderHints ?? []).slice(0, 2)) {
+    if (hint === metadata.decoderLabel || hint === source.familyHint) {
+      continue;
+    }
     badges.push({ key: `hint-${hint}`, label: hint, tone: "blue" });
   }
   if (source.occurrenceCount && source.occurrenceCount > 1) {
@@ -86,6 +95,10 @@ export function getPayloadWebShellRuleReasons(source: StreamPayloadSource) {
 
 export function getPayloadWebShellSignals(source: StreamPayloadSource) {
   return (source.signals ?? []).slice(0, 6);
+}
+
+export function getPayloadWebShellMetadata(source: StreamPayloadSource) {
+  return getWebShellMetadataSummary(source, source.confidence);
 }
 
 export function formatPayloadWebShellPacketList(values?: number[], fallback?: number) {

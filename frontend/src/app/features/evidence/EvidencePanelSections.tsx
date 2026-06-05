@@ -1,3 +1,3 @@
 export { EvidenceCaveats } from "./EvidenceCaveats";
-export { EvidenceSeveritySummary, EvidenceToolbar } from "./EvidenceFilters";
-export { EvidenceStatusMessage, EvidenceTable } from "./EvidenceResults";
+export { EvidenceFacetSidebar, EvidenceSeveritySummary, EvidenceToolbar } from "./EvidenceFilters";
+export { EvidenceDetailEmptyNotice, EvidenceDetailPanel, EvidenceStatusMessage, EvidenceTable } from "./EvidenceResults";

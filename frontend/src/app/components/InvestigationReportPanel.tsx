@@ -124,7 +124,7 @@ function ReportSection({
                 </div>
               ) : null}
               {item.packetId ? (
-                <EvidenceActions className="mt-3" packetId={item.packetId} preferredProtocol={preferredProtocol} />
+                <EvidenceActions className="mt-3" packetId={item.packetId} streamId={item.streamId} preferredProtocol={preferredProtocol} />
               ) : null}
             </div>
           ))}

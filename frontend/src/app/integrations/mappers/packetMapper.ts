@@ -1,5 +1,5 @@
 import type { Packet } from "../../core/types";
-import type { PacketColorFeaturesWireDTO, PacketWireDTO } from "../wire/captureWireDtos";
+import type { PacketColorFeaturesWireDTO, PacketWireDTO, TLSFingerprintWireDTO } from "../wire/captureWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
 
 const VALID_PROTOCOLS = new Set(["TCP", "UDP", "HTTP", "HTTPS", "DNS", "SSHv2", "TLS", "ARP", "ICMP", "ICMPV6", "USB"]);
@@ -12,6 +12,7 @@ function asProtocol(raw: unknown): Packet["proto"] {
 export function asPacket(input: unknown): Packet {
   const payload: PacketWireDTO = asPlainObject(input) ?? {};
   const color: PacketColorFeaturesWireDTO = asPlainObject(payload.color_features) ?? {};
+  const tlsFingerprint: TLSFingerprintWireDTO = asPlainObject(payload.tls_fingerprint) ?? {};
   return {
     id: Number(payload.id ?? 0),
     time: normalizePacketTime(payload.timestamp),
@@ -29,6 +30,21 @@ export function asPacket(input: unknown): Packet {
     ipHeaderLen: Number(payload.ip_header_len ?? 0) || undefined,
     l4HeaderLen: Number(payload.l4_header_len ?? 0) || undefined,
     colorFeatures: asColorFeatures(color),
+    tlsFingerprint: asTLSFingerprint(tlsFingerprint),
+  };
+}
+
+function asTLSFingerprint(fingerprint: TLSFingerprintWireDTO) {
+  const ja3Hash = asOptionalString(fingerprint.ja3_hash);
+  const ja3sHash = asOptionalString(fingerprint.ja3s_hash);
+  const ja3Raw = asOptionalString(fingerprint.ja3_raw);
+  const ja3sRaw = asOptionalString(fingerprint.ja3s_raw);
+  if (!ja3Hash && !ja3sHash && !ja3Raw && !ja3sRaw) return undefined;
+  return {
+    ja3Hash,
+    ja3sHash,
+    ja3Raw,
+    ja3sRaw,
   };
 }
 
@@ -90,4 +106,9 @@ function normalizePacketTime(value: unknown): string {
     return parsed.toISOString().slice(11, 23);
   }
   return raw.length > 16 ? `${raw.slice(0, 13)}...` : raw;
+}
+
+function asOptionalString(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
 }

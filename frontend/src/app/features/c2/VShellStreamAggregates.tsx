@@ -153,7 +153,11 @@ export function VShellStreamAggregates({ items }: { items: C2StreamAggregate[] }
                     label={`VShell Stream 聚合详情 ${item.streamId}`}
                     onClick={() => toggleExpanded(item.streamId)}
                   />
-                  <EvidenceActions packetId={firstNumber(item.packets)} preferredProtocol="TCP" />
+                  <EvidenceActions
+                    packetId={firstNumber(item.packets)}
+                    streamId={item.streamId}
+                    preferredProtocol="TCP"
+                  />
                   <FilterActions protocol="tcp" streamId={item.streamId} />
                 </div>
               </>

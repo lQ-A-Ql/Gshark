@@ -40,7 +40,11 @@ export function ShiroRememberMeKeyResultsPanel({ selectedCandidate }: ShiroRemem
                 color={selectedCandidate.possibleGCM ? "sky" : "slate"}
               />
             </div>
-            <EvidenceActions packetId={selectedCandidate.packetId} preferredProtocol="HTTP" />
+            <EvidenceActions
+              packetId={selectedCandidate.packetId}
+              streamId={selectedCandidate.streamId}
+              preferredProtocol="HTTP"
+            />
 
             <div className="meow-tile border-slate-200 bg-slate-50/70 p-3">
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">

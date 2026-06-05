@@ -1,4 +1,10 @@
-import type { HuntingPlaybook, PlaybookRunResult, SavedSearch, Hypothesis } from "../../core/types/huntingPlaybook";
+import type {
+  HuntingPlaybook,
+  PlaybookRunResult,
+  SavedSearch,
+  Hypothesis,
+  HypothesisStatus,
+} from "../../core/types/huntingPlaybook";
 
 // ---------------------------------------------------------------------------
 // Playbook list panel
@@ -265,7 +271,7 @@ export function SavedSearchPanel({ searches, onExecute, onDelete }: SavedSearchP
 
 interface HypothesisPanelProps {
   hypotheses: Hypothesis[];
-  onUpdateStatus: (id: string, status: string, conclusion?: string) => void;
+  onUpdateStatus: (id: string, status: HypothesisStatus, conclusion?: string) => void;
 }
 
 export function HypothesisPanel({ hypotheses, onUpdateStatus }: HypothesisPanelProps) {

@@ -140,6 +140,7 @@ export function CSHostURIAggregates({ items }: { items: C2HTTPEndpointAggregate[
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <EvidenceActions
                   packetId={item.representativePacket || firstNumber(item.packets)}
+                  streamId={firstNumber(item.streams)}
                   preferredProtocol="HTTP"
                 />
                 <FilterActions

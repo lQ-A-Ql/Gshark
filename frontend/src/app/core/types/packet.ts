@@ -43,6 +43,13 @@ export interface PacketColorFeatures {
   hasPim?: boolean;
 }
 
+export interface TLSFingerprint {
+  ja3Hash?: string;
+  ja3sHash?: string;
+  ja3Raw?: string;
+  ja3sRaw?: string;
+}
+
 export interface Packet {
   id: number;
   time: string;
@@ -62,6 +69,7 @@ export interface Packet {
   ipHeaderLen?: number;
   l4HeaderLen?: number;
   colorFeatures?: PacketColorFeatures;
+  tlsFingerprint?: TLSFingerprint;
 }
 
 export interface ProtocolTreeNode {

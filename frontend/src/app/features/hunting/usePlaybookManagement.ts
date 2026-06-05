@@ -26,10 +26,17 @@ export function usePlaybookManagement({
 
   // Saved search state
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [savedSearchesLoading, setSavedSearchesLoading] = useState(false);
+  const [savedSearchesError, setSavedSearchesError] = useState("");
 
   // Hypothesis state
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [hypothesisFilter, setHypothesisFilter] = useState<HypothesisStatus | "">("");
+  const [hypothesesLoading, setHypothesesLoading] = useState(false);
+  const [hypothesesError, setHypothesesError] = useState("");
+
+  const [playbooksLoading, setPlaybooksLoading] = useState(false);
+  const [playbooksError, setPlaybooksError] = useState("");
 
   // Status
   const [statusText, setStatusText] = useState("");
@@ -38,35 +45,57 @@ export function usePlaybookManagement({
   // Load playbooks
   const loadPlaybooks = useCallback(async () => {
     if (!backendConnected) return;
+    setPlaybooksLoading(true);
+    setPlaybooksError("");
     try {
       const list = await playbookClient.listPlaybooks();
       setPlaybooks(list);
     } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "加载剧本失败");
+      const message = error instanceof Error ? error.message : "加载剧本失败";
+      setPlaybooksError(message);
+      setStatusText(message);
+    } finally {
+      setPlaybooksLoading(false);
     }
   }, [backendConnected, playbookClient]);
 
   // Load saved searches
   const loadSavedSearches = useCallback(async () => {
     if (!backendConnected) return;
+    setSavedSearchesLoading(true);
+    setSavedSearchesError("");
     try {
       const list = await playbookClient.listSavedSearches();
       setSavedSearches(list);
     } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "加载保存的搜索失败");
+      const message = error instanceof Error ? error.message : "加载保存的搜索失败";
+      setSavedSearchesError(message);
+      setStatusText(message);
+    } finally {
+      setSavedSearchesLoading(false);
     }
   }, [backendConnected, playbookClient]);
 
   // Load hypotheses
   const loadHypotheses = useCallback(async () => {
     if (!backendConnected) return;
+    setHypothesesLoading(true);
+    setHypothesesError("");
     try {
       const list = await playbookClient.listHypotheses(hypothesisFilter || undefined);
       setHypotheses(list);
     } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "加载假设失败");
+      const message = error instanceof Error ? error.message : "加载假设失败";
+      setHypothesesError(message);
+      setStatusText(message);
+    } finally {
+      setHypothesesLoading(false);
     }
   }, [backendConnected, playbookClient, hypothesisFilter]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadPlaybooks(), loadSavedSearches(), loadHypotheses()]);
+  }, [loadHypotheses, loadPlaybooks, loadSavedSearches]);
 
   // Run playbook
   const runPlaybook = useCallback(
@@ -158,6 +187,20 @@ export function usePlaybookManagement({
     [backendConnected, playbookClient],
   );
 
+  const deleteSavedSearch = useCallback(
+    async (id: string) => {
+      if (!backendConnected) return;
+      try {
+        await playbookClient.deleteSavedSearch(id);
+        await loadSavedSearches();
+        setStatusText("保存的搜索已删除");
+      } catch (error) {
+        setStatusText(error instanceof Error ? error.message : "删除保存的搜索失败");
+      }
+    },
+    [backendConnected, playbookClient, loadSavedSearches],
+  );
+
   // Create hypothesis
   const createHypothesis = useCallback(
     async (hypothesis: Partial<Hypothesis>) => {
@@ -225,6 +268,8 @@ export function usePlaybookManagement({
   return {
     // Playbook
     playbooks,
+    playbooksLoading,
+    playbooksError,
     selectedPlaybook,
     playbookRunning,
     lastRunResult,
@@ -235,16 +280,27 @@ export function usePlaybookManagement({
 
     // Saved search
     savedSearches,
+    savedSearchesLoading,
+    savedSearchesError,
     createSavedSearch,
     executeSavedSearch,
+    deleteSavedSearch,
 
     // Hypothesis
     hypotheses,
+    hypothesesLoading,
+    hypothesesError,
     hypothesisFilter,
     setHypothesisFilter,
     createHypothesis,
     updateHypothesisStatus,
     addHypothesisEvidence,
+
+    // Reloads
+    loadPlaybooks,
+    loadSavedSearches,
+    loadHypotheses,
+    refreshAll,
 
     // Status
     statusText,

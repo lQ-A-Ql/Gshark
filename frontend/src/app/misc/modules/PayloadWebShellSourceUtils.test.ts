@@ -4,6 +4,7 @@ import {
   formatPayloadWebShellPacketList,
   getPayloadWebShellConfidenceTone,
   getPayloadWebShellDecoderName,
+  getPayloadWebShellMetadata,
   getPayloadWebShellLocationLabel,
   getPayloadWebShellMethodLabel,
   getPayloadWebShellPreviewText,
@@ -69,12 +70,13 @@ describe("PayloadWebShellSourceUtils", () => {
     expect(getPayloadWebShellConfidenceTone(60)).toBe("cyan");
     expect(getPayloadWebShellConfidenceTone(20)).toBe("amber");
     expect(getPayloadWebShellDecoderName(source.decoderOptionsHint)).toBe("behinder");
+    expect(getPayloadWebShellMetadata(source).versionLabel).toBe("未提供");
     expect(getPayloadWebShellSourceBadges(source).map((badge) => badge.label)).toEqual([
       "91%",
       "form:pass",
-      "webshell_like",
+      "通用 WebShell",
       "request-body",
-      "behinder",
+      "Behinder",
       "behinder",
       "antsword",
       "重复 3 次",
@@ -87,5 +89,18 @@ describe("PayloadWebShellSourceUtils", () => {
     expect(formatPayloadWebShellPacketList([1, 2, 3], 42)).toBe("1, 2, 3");
     expect(formatPayloadWebShellPacketList([1, 2, 3, 4, 5, 6], 42)).toBe("1, 2, 3, 4, 5 +1");
     expect(formatPayloadWebShellPacketList([], undefined)).toBe("--");
+  });
+
+  it("normalizes China Chopper family and version hints", () => {
+    const source = createSource({
+      familyHint: "caidao",
+      decoderHints: ["china_chopper"],
+      decoderOptionsHint: { decoder: "china_chopper", versionHint: "v2.0" },
+    });
+
+    const metadata = getPayloadWebShellMetadata(source);
+    expect(metadata.familyLabel).toBe("菜刀 / China Chopper");
+    expect(metadata.decoderLabel).toBe("菜刀 / China Chopper");
+    expect(metadata.versionLabel).toBe("v2.0");
   });
 });

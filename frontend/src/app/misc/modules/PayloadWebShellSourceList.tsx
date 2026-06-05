@@ -6,6 +6,7 @@ import { FilterActions } from "../FilterActions";
 import {
   formatPayloadWebShellPacketList,
   getPayloadWebShellLocationLabel,
+  getPayloadWebShellMetadata,
   getPayloadWebShellMethodLabel,
   getPayloadWebShellPreviewText,
   getPayloadWebShellRuleReasons,
@@ -72,6 +73,7 @@ export function PayloadWebShellSourceList({
       <div className="max-h-72 divide-y divide-slate-100 overflow-auto">
         {sources.map((source) => {
           const selected = isPayloadWebShellSourceSelected(source, selectedSource);
+          const metadata = getPayloadWebShellMetadata(source);
           return (
             <div
               key={getPayloadWebShellSourceKey(source)}
@@ -90,6 +92,14 @@ export function PayloadWebShellSourceList({
                   </div>
                   <div className="mt-1 line-clamp-2 font-mono text-[11px] leading-5 text-slate-500">
                     {getPayloadWebShellPreviewText(source)}
+                  </div>
+                  <div className="mt-2 grid gap-1 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 text-[10px] leading-4 text-slate-600 sm:grid-cols-2 xl:grid-cols-5">
+                    {metadata.fields.map((field) => (
+                      <span key={`${source.id}-${field.key}`} className="truncate">
+                        <span className="font-semibold text-slate-500">{field.label}:</span>{" "}
+                        <span className={field.unavailable ? "text-slate-400" : "text-slate-700"}>{field.value}</span>
+                      </span>
+                    ))}
                   </div>
                   {getPayloadWebShellRuleReasons(source).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1">
@@ -116,6 +126,7 @@ export function PayloadWebShellSourceList({
                 <div className="flex shrink-0 flex-col items-start gap-2">
                   <EvidenceActions
                     packetId={source.packetId}
+                    streamId={source.streamId}
                     preferredProtocol="HTTP"
                     className="flex-col items-start"
                   />

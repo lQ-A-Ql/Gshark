@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvidenceRecord } from "../core/evidenceTypes";
 
@@ -70,6 +70,32 @@ vi.mock("react-router", async (importOriginal) => {
 
 import EvidencePanel from "./EvidencePanel";
 
+function clickEvidenceRow(summary: string) {
+  const table = screen.getByRole("columnheader", { name: "调查摘要" }).closest("table");
+  expect(table).not.toBeNull();
+  const cell = within(table!).getAllByText(summary)[0];
+  const row = cell.closest("tr");
+  expect(row).not.toBeNull();
+  fireEvent.click(row!);
+}
+
+function getDetailPanel(summary: string) {
+  const match = screen.getAllByText(summary).find((node) => {
+    const section = node.closest("section");
+    return section != null && within(section).queryByText("Actions") != null;
+  });
+  expect(match).not.toBeUndefined();
+  return match!.closest("section")!;
+}
+
+function getDetailActionsSection(summary: string) {
+  const panel = getDetailPanel(summary);
+  const actionsHeading = within(panel).getByText("Actions");
+  const section = actionsHeading.closest("section");
+  expect(section).not.toBeNull();
+  return section!;
+}
+
 function createRecord(overrides: Partial<UnifiedEvidenceRecord>): UnifiedEvidenceRecord {
   return {
     id: "record-1",
@@ -92,6 +118,7 @@ describe("EvidencePanel", () => {
     mocks.navigate.mockReset();
     mocks.sentinelState.locatePacketById.mockReset();
     mocks.sentinelState.preparePacketStream.mockReset();
+    mocks.sentinelState.captureRevision = 1;
     mocks.sentinelState.locatePacketById.mockResolvedValue(null);
     mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "TCP", streamId: 1 });
     mocks.getEvidenceWithFilter.mockImplementation(async (modules?: string[]) => {
@@ -157,7 +184,7 @@ describe("EvidencePanel", () => {
       expect(mocks.getEvidenceWithFilter).toHaveBeenLastCalledWith(["vehicle"], expect.anything());
     });
 
-    fireEvent.change(screen.getByPlaceholderText("搜索摘要、值、标签..."), {
+    fireEvent.change(screen.getByPlaceholderText("搜索摘要、IOC、规则、主机、URI、标签..."), {
       target: { value: "安全访问" },
     });
     fireEvent.click(screen.getByRole("button", { name: "高危 · 1" }));
@@ -167,5 +194,150 @@ describe("EvidencePanel", () => {
     const [, payload] = mocks.downloadText.mock.calls[0];
     expect(payload).toContain("安全访问被拒");
     expect(payload).not.toContain("USB 存储写入");
+  });
+
+  it("renders sparse optional-contract records without undefined text or invented fallback rows", async () => {
+    mocks.sentinelState.captureRevision = 2;
+    mocks.getEvidenceWithFilter.mockImplementation(async () => [
+      createRecord({
+        id: "misc:webshell-minimal",
+        module: "misc",
+        sourceType: "webshell",
+        summary: "WebShell candidate without exposed version",
+        family: "china_chopper",
+        value: undefined,
+        confidence: undefined,
+        confidenceLabel: "unknown",
+        packetId: undefined,
+        streamId: undefined,
+        tags: [],
+        caveats: [],
+      }),
+      createRecord({
+        id: "hunt:rule-minimal",
+        module: "hunting",
+        sourceType: "ioc",
+        summary: "Rule evidence without packet binding",
+        value: undefined,
+        confidence: undefined,
+        confidenceLabel: "unknown",
+        packetId: undefined,
+        streamId: undefined,
+        tags: [],
+        caveats: [],
+      }),
+    ]);
+
+    render(<EvidencePanel />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("WebShell candidate without exposed version").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Rule evidence without packet binding").length).toBeGreaterThan(0);
+    });
+
+    clickEvidenceRow("WebShell candidate without exposed version");
+
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+    expect(screen.queryByText("china_chopper")).not.toBeInTheDocument();
+    expect(
+      within(getDetailPanel("WebShell candidate without exposed version")).getByText("菜刀 / China Chopper"),
+    ).toBeInTheDocument();
+    expect(
+      within(getDetailPanel("WebShell candidate without exposed version")).getAllByText("WebShell").length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(getDetailPanel("WebShell candidate without exposed version")).getAllByText("未提供").length,
+    ).toBeGreaterThan(0);
+
+    clickEvidenceRow("Rule evidence without packet binding");
+    expect(
+      within(getDetailPanel("Rule evidence without packet binding")).getByText("IOC API unavailable"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("evil.example")).not.toBeInTheDocument();
+    expect(screen.queryByText("packet #")).not.toBeInTheDocument();
+    expect(screen.getAllByText("--").length).toBeGreaterThan(0);
+  });
+
+  it("renders packet and stream actions only when valid navigation context exists", async () => {
+    mocks.sentinelState.captureRevision = 4;
+    mocks.getEvidenceWithFilter.mockImplementation(async () => [
+      createRecord({
+        id: "hunt:packet-only",
+        module: "hunting",
+        sourceType: "ja3",
+        summary: "JA3 packet-only evidence",
+        packetId: 88,
+        streamId: undefined,
+        ja3Hash: "72a589da586844d7f0818ce684948eea",
+      }),
+      createRecord({
+        id: "hunt:no-context",
+        module: "hunting",
+        sourceType: "playbook",
+        summary: "Playbook evidence without navigation context",
+        packetId: undefined,
+        streamId: undefined,
+      }),
+    ]);
+
+    render(<EvidencePanel />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("JA3 packet-only evidence").length).toBeGreaterThan(0);
+    });
+
+    expect(
+      within(getDetailActionsSection("JA3 packet-only evidence")).getByRole("button", { name: "定位到包" }),
+    ).toBeInTheDocument();
+    expect(
+      within(getDetailActionsSection("JA3 packet-only evidence")).queryByRole("button", { name: "打开关联流" }),
+    ).not.toBeInTheDocument();
+
+    clickEvidenceRow("Playbook evidence without navigation context");
+
+    await waitFor(() => {
+      expect(
+        within(getDetailActionsSection("Playbook evidence without navigation context")).getByText(
+          "当前记录未提供有效的包号或关联流 ID，因此不显示跳转操作。",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(
+      within(getDetailActionsSection("Playbook evidence without navigation context")).queryByRole("button", {
+        name: "定位到包",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getDetailActionsSection("Playbook evidence without navigation context")).queryByRole("button", {
+        name: "打开关联流",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getDetailPanel("Playbook evidence without navigation context")).getAllByText("Playbook").length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(getDetailPanel("Playbook evidence without navigation context")).getByText("Playbook 未提供"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an empty evidence state without fake rows and exports an empty result safely", async () => {
+    mocks.sentinelState.captureRevision = 3;
+    mocks.getEvidenceWithFilter.mockImplementation(async () => []);
+
+    render(<EvidencePanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("当前抓包未产生证据记录")).toBeInTheDocument();
+      expect(screen.getByText("共 0 条证据 / 模块 0 个")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("UDS 负响应: 0x27 Security Access / 安全访问被拒")).not.toBeInTheDocument();
+    expect(screen.queryByText("USB 存储写入: WRITE(10) / Bus 1 Device 2 / LUN 0")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /JSON/ }));
+
+    expect(mocks.downloadText).toHaveBeenCalledTimes(1);
+    const [, payload] = mocks.downloadText.mock.calls[0];
+    expect(payload).toBe("[]");
   });
 });

@@ -48,6 +48,7 @@ export function StreamDecoderWorkbench({
         inspection={state.inspection}
         inspectionLoading={state.inspectionLoading}
         inspectionError={state.inspectionError}
+        hintSource={state.activeHintSource}
         selectedCandidate={state.selectedCandidate}
         applyMode={state.applyMode}
         canOverwrite={state.canOverwrite}

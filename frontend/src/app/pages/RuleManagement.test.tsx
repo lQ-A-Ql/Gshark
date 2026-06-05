@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuleStatus, RulePack, RuleUpdateResult } from "../features/rules/useRuleManagement";
 
 const mocks = vi.hoisted(() => ({
+  status: undefined as RuleStatus | undefined,
+  loading: false,
+  error: undefined as string | undefined,
   fetchStatus: vi.fn(),
   togglePack: vi.fn(),
   checkUpdates: vi.fn(),

@@ -146,23 +146,17 @@ export function createPlaybookClient(request: JsonRequest): PlaybookClient {
     },
 
     async addHypothesisEvidence(hypothesisId, evidence) {
-      return request<Hypothesis>(
-        `/api/hunting/hypotheses/${encodeURIComponent(hypothesisId)}/evidence`,
-        {
-          method: "POST",
-          body: JSON.stringify(evidence),
-        },
-      );
+      return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(hypothesisId)}/evidence`, {
+        method: "POST",
+        body: JSON.stringify(evidence),
+      });
     },
 
     async updateHypothesisStatus(id, status, conclusion) {
-      return request<Hypothesis>(
-        `/api/hunting/hypotheses/${encodeURIComponent(id)}/status`,
-        {
-          method: "POST",
-          body: JSON.stringify({ status, conclusion }),
-        },
-      );
+      return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(id)}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status, conclusion }),
+      });
     },
   };
 }

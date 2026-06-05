@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
+import { PlaybookWorkspaceSection } from "../features/hunting/PlaybookWorkspaceSection";
 import { buildThreatHuntingInvestigationReport } from "../features/hunting/threatHuntingInvestigationReport";
 import { ThreatHuntingMetricCards } from "../features/hunting/ThreatHuntingMetricCards";
 import {
@@ -131,6 +132,8 @@ export default function ThreatHunting() {
           onYaraTimeoutMsChange={setYaraTimeoutMs}
         />
       </div>
+
+      <PlaybookWorkspaceSection backendConnected={backendConnected} />
     </PageShell>
   );
 }

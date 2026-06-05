@@ -1,12 +1,16 @@
 import type { StreamDecoderKind, StreamPayloadCandidate, StreamPayloadInspection } from "../core/types";
+import type { DecoderHintSource } from "./StreamDecoderTypes";
 import { CandidateCard, runSuggestedDecoder } from "./StreamDecoderCandidateCard";
 import { ApplyModeButton } from "./StreamDecoderWorkbenchParts";
 import type { DecoderApplyMode } from "./StreamDecoderWorkbenchUtils";
+import { asKnownDecoder } from "./StreamDecoderWorkbenchUtils";
+import { getWebShellMetadataSummary } from "./webShellMetadata";
 
 export function StreamDecoderCandidatePanel({
   inspection,
   inspectionLoading,
   inspectionError,
+  hintSource,
   selectedCandidate,
   applyMode,
   canOverwrite,
@@ -17,6 +21,7 @@ export function StreamDecoderCandidatePanel({
   inspection: StreamPayloadInspection | null;
   inspectionLoading: boolean;
   inspectionError: string;
+  hintSource?: DecoderHintSource;
   selectedCandidate: StreamPayloadCandidate | null;
   applyMode: DecoderApplyMode;
   canOverwrite: boolean;
@@ -25,6 +30,11 @@ export function StreamDecoderCandidatePanel({
   onRunDecoder: (decoder: StreamDecoderKind) => void;
 }) {
   const candidateCount = inspection?.candidates.length ?? 0;
+  const metadata = getWebShellMetadataSummary(
+    hintSource ?? selectedCandidate ?? { familyHint: inspection?.suggestedFamily },
+    inspection?.confidence ?? selectedCandidate?.confidence,
+  );
+  const supportedSuggestedDecoder = asKnownDecoder(inspection?.suggestedDecoder);
 
   return (
     <div className="mt-4 rounded-lg border border-border bg-background/80 p-4">
@@ -36,19 +46,24 @@ export function StreamDecoderCandidatePanel({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {inspection?.suggestedFamily && (
+          {metadata.familyLabel && (
             <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
-              家族：{inspection.suggestedFamily}
+              家族：{metadata.familyLabel}
             </span>
           )}
-          {inspection?.suggestedDecoder && (
+          {inspection?.suggestedDecoder && supportedSuggestedDecoder && (
             <button
               type="button"
               className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100"
               onClick={() => runSuggestedDecoder(inspection.suggestedDecoder, onRunDecoder)}
             >
-              推荐解码：{inspection.suggestedDecoder}
+              推荐解码：{metadata.decoderLabel}
             </button>
+          )}
+          {inspection?.suggestedDecoder && !supportedSuggestedDecoder && (
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+              解码提示：{metadata.decoderLabel}
+            </span>
           )}
           {typeof inspection?.confidence === "number" && inspection.confidence > 0 && (
             <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
@@ -56,6 +71,15 @@ export function StreamDecoderCandidatePanel({
             </span>
           )}
         </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 rounded-md border border-border bg-card px-3 py-2 text-[11px] leading-5 text-muted-foreground md:grid-cols-2 xl:grid-cols-5">
+        {metadata.fields.map((field) => (
+          <span key={field.key} className="truncate">
+            <span className="font-semibold text-foreground">{field.label}:</span>{" "}
+            <span>{field.value}</span>
+          </span>
+        ))}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -19,6 +19,11 @@ describe("asPacket", () => {
       stream_id: 9,
       ip_header_len: 20,
       l4_header_len: 32,
+      tls_fingerprint: {
+        ja3_hash: "72a589da586844d7f0818ce684948eea",
+        ja3s_hash: "b742b407517bac9536a77a7b0fee28e9",
+        ja3_raw: "771,4865-4866,0-23-65281,29-23-24,0",
+      },
       color_features: {
         tcp_syn: true,
         tcp_fin: false,
@@ -44,6 +49,11 @@ describe("asPacket", () => {
       streamId: 9,
       ipHeaderLen: 20,
       l4HeaderLen: 32,
+      tlsFingerprint: {
+        ja3Hash: "72a589da586844d7f0818ce684948eea",
+        ja3sHash: "b742b407517bac9536a77a7b0fee28e9",
+        ja3Raw: "771,4865-4866,0-23-65281,29-23-24,0",
+      },
     });
     expect(packet.colorFeatures).toMatchObject({
       tcpSyn: true,
@@ -52,5 +62,18 @@ describe("asPacket", () => {
       ipv4Ttl: 64,
       hasSmb: true,
     });
+  });
+
+  it("omits empty tls fingerprint fields", () => {
+    const packet = asPacket({
+      id: 8,
+      protocol: "TLS",
+      tls_fingerprint: {
+        ja3_hash: "   ",
+        ja3s_hash: "",
+      },
+    });
+
+    expect(packet.tlsFingerprint).toBeUndefined();
   });
 });

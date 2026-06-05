@@ -25,6 +25,14 @@ export interface PacketWireDTO extends Record<string, unknown> {
   l4_header_len?: number;
   color_features?: PacketColorFeaturesWireDTO;
   udp_payload_hex?: string;
+  tls_fingerprint?: TLSFingerprintWireDTO;
+}
+
+export interface TLSFingerprintWireDTO extends Record<string, unknown> {
+  ja3_hash?: string;
+  ja3s_hash?: string;
+  ja3_raw?: string;
+  ja3s_raw?: string;
 }
 
 export interface PacketColorFeaturesWireDTO extends Record<string, unknown> {

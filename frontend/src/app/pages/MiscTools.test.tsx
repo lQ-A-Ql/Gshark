@@ -153,9 +153,10 @@ describe("MiscTools payload and session analysis", () => {
     });
     expect(screen.getByDisplayValue(SAMPLE_BASE64_PAYLOAD)).toBeInTheDocument();
     expect(screen.getByText(/当前输入来自 packet #81/)).toBeInTheDocument();
-    expect((await screen.findAllByText("antsword_like")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("AntSword")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("script_or_command").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("antsword").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("AntSword").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("未提供").length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "AntSword" }));
     await waitFor(() => {
@@ -170,6 +171,41 @@ describe("MiscTools payload and session analysis", () => {
         expect.any(AbortSignal),
       );
     });
+  });
+
+  it("surfaces China Chopper metadata with an explicit unavailable version state", async () => {
+    mocks.listStreamPayloadSources.mockResolvedValueOnce([
+      {
+        id: "pkt-91-form-caidao",
+        method: "POST",
+        host: "web.test",
+        uri: "/cmd.aspx",
+        packetId: 91,
+        streamId: 12,
+        sourceType: "form",
+        paramName: "caidao",
+        payload: "password=Y21kPWlwY29uZmln",
+        preview: "@eval($_POST['caidao']);",
+        confidence: 94,
+        signals: ["china-chopper-eval"],
+        decoderHints: ["china_chopper", "base64"],
+        familyHint: "caidao",
+        sourceRole: "script_or_command",
+        decoderOptionsHint: {
+          decoder: "china_chopper",
+        },
+      },
+    ]);
+
+    render(<MiscTools />);
+
+    await expandModule("payload-webshell-decoder", () => {
+      expect(screen.getByPlaceholderText(/POST \/shell\.php/)).toBeInTheDocument();
+    });
+
+    expect((await screen.findAllByText("菜刀 / China Chopper")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("未提供").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole("button", { name: "China Chopper" })).not.toBeInTheDocument();
   });
 
   it("keeps manual payload workflow available when no capture is loaded", async () => {

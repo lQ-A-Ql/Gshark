@@ -2,6 +2,7 @@ import { useMemo, type Ref } from "react";
 import { Panel } from "react-resizable-panels";
 import { FileText } from "lucide-react";
 import type { Packet } from "../../core/types";
+import { StatusHint, WorkbenchChip } from "../DesignSystem";
 
 export function HexAsciiPanel({
   packet,
@@ -19,6 +20,8 @@ export function HexAsciiPanel({
   onSelectByte: (offset: number) => void;
 }) {
   const rows = useMemo(() => buildHexRows(frameBytes), [frameBytes]);
+  const fingerprintRows = packet ? buildFingerprintRows(packet) : [];
+  const showFingerprintUnavailable = packet ? isTLSLikePacket(packet) && fingerprintRows.length === 0 : false;
 
   return (
     <Panel defaultSize={50} minSize={20} className="meow-tile flex flex-col">
@@ -33,6 +36,30 @@ export function HexAsciiPanel({
           </span>
         )}
       </div>
+      {packet ? (
+        <div className="border-b border-[var(--meow-tile-divider)] px-3 py-2.5">
+          {fingerprintRows.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <WorkbenchChip>JA3 / JA3S</WorkbenchChip>
+                <span className="text-[11px] text-slate-500">TLS 指纹来自当前选中数据包已有字段。</span>
+              </div>
+              <div className="grid gap-2">
+                {fingerprintRows.map((row) => (
+                  <div key={row.label} className="meow-soft-fill flex flex-col gap-1 px-3 py-2">
+                    <div className="text-[11px] font-medium tracking-[0.12em] text-slate-500">{row.label}</div>
+                    <div className="break-all font-mono text-[12px] leading-5 text-slate-800">{row.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : showFingerprintUnavailable ? (
+            <StatusHint tone="slate" className="px-3 py-2">
+              当前 TLS / HTTPS 数据包未提供 JA3 或 JA3S 指纹；仅在后端已解析到 `tls_fingerprint` 时显示。
+            </StatusHint>
+          ) : null}
+        </div>
+      ) : null}
       <div ref={panelRef} className="flex-1 overflow-auto p-3 font-mono text-[12.5px] leading-5">
         {frameBytes.length === 0 ? (
           <div className="meow-soft-fill px-4 py-6 text-sm text-slate-500">暂无 hex 数据</div>
@@ -52,6 +79,22 @@ export function HexAsciiPanel({
       </div>
     </Panel>
   );
+}
+
+function buildFingerprintRows(packet: Packet) {
+  const fingerprint = packet.tlsFingerprint;
+  if (!fingerprint) return [];
+  return [
+    { label: "JA3 Hash", value: fingerprint.ja3Hash },
+    { label: "JA3S Hash", value: fingerprint.ja3sHash },
+    { label: "JA3 Raw", value: fingerprint.ja3Raw },
+    { label: "JA3S Raw", value: fingerprint.ja3sRaw },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value));
+}
+
+function isTLSLikePacket(packet: Packet) {
+  const protocolText = `${packet.proto} ${packet.displayProtocol ?? ""}`.toLowerCase();
+  return protocolText.includes("tls") || protocolText.includes("https");
 }
 
 function HexAsciiRow({

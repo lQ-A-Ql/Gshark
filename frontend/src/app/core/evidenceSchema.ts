@@ -136,6 +136,7 @@ function normalizeEvidenceModule(sourceModule: string | undefined, fallback: Evi
   if (normalized.includes("industrial")) return "industrial";
   if (normalized.includes("vehicle")) return "vehicle";
   if (normalized.includes("usb")) return "usb";
+  if (normalized.includes("media") || normalized.includes("speech") || normalized.includes("rtp")) return "media";
   if (normalized.includes("object")) return "object";
   if (normalized.includes("misc") || normalized.includes("webshell") || normalized.includes("decoder")) return "misc";
   if (normalized.includes("stream")) return "stream";

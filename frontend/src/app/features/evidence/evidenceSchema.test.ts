@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { confidenceLabel, confidenceLabelText, fromAPTEvidence, fromC2Indicator, fromThreatHit } from "./evidenceSchema";
+import {
+  confidenceLabel,
+  confidenceLabelText,
+  fromAPTEvidence,
+  fromC2Indicator,
+  fromThreatHit,
+} from "./evidenceSchema";
 
 describe("evidenceSchema", () => {
   it("normalizes confidence labels and labels text", () => {
@@ -34,6 +40,17 @@ describe("evidenceSchema", () => {
     expect(record.tags).toContain("missing:missing-object");
     expect(record.caveats.join(" ")).toContain("中置信");
     expect(record.caveats.join(" ")).toContain("缺失对象证据");
+  });
+
+  it("keeps media source modules in the unified evidence module set", () => {
+    const record = fromAPTEvidence({
+      packetId: 77,
+      sourceModule: "media-speech",
+      evidenceType: "speech-transcript",
+      summary: "Speech transcript evidence",
+    });
+
+    expect(record.module).toBe("media");
   });
 
   it("converts C2 indicators and threat hits without claiming attribution", () => {

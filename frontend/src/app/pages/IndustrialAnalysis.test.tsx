@@ -347,4 +347,121 @@ describe("IndustrialAnalysis", () => {
     expect(screen.getByText("Write B")).toBeInTheDocument();
     expect(screen.queryByText("Read Coils")).not.toBeInTheDocument();
   });
+
+  it("renders a DNP3-specific section from generic industrial details, commands, and rules", async () => {
+    mocks.getIndustrialAnalysis.mockResolvedValue(createAnalysis({
+      totalIndustrialPackets: 12,
+      protocols: [{ label: "DNP3", count: 12 }],
+      controlCommands: [
+        {
+          packetId: 301,
+          time: "4.100000",
+          protocol: "DNP3",
+          source: "172.16.0.10",
+          destination: "172.16.0.20",
+          operation: "operate",
+          target: "index=12",
+          value: "trip",
+          result: "success",
+          summary: "DNP3 operate command",
+        },
+      ],
+      ruleHits: [
+        {
+          rule: "dnp3-operate-burst",
+          level: "high",
+          packetId: 302,
+          time: "4.200000",
+          source: "172.16.0.10",
+          destination: "172.16.0.20",
+          functionName: "operate",
+          target: "outstation-7",
+          evidence: "fc=5 count=3",
+          summary: "Repeated DNP3 operate requests",
+        },
+      ],
+      details: [
+        {
+          name: "DNP3 outstation",
+          totalFrames: 9,
+          operations: [{ label: "select", count: 2 }],
+          targets: [{ label: "index=12", count: 2 }],
+          results: [{ label: "ack", count: 1 }],
+          records: [
+            {
+              packetId: 300,
+              time: "4.000000",
+              source: "172.16.0.10",
+              destination: "172.16.0.20",
+              operation: "select",
+              target: "index=12",
+              result: "ack",
+              value: "trip",
+              summary: "DNP3 select before operate",
+            },
+          ],
+        },
+      ],
+    }));
+
+    render(<IndustrialAnalysis />);
+
+    await waitFor(() => {
+      expect(screen.getByText("DNP3 专项 (3)")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明细记录")).toBeInTheDocument();
+    expect(screen.getByText("控制指令")).toBeInTheDocument();
+    expect(screen.getByText("规则命中")).toBeInTheDocument();
+    expect(screen.getAllByText("操作类型").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("DNP3 select before operate").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("DNP3 operate command").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Repeated DNP3 operate requests").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("index=12").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("fc=5 count=3").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("控制指令 (1)")).toBeInTheDocument();
+    expect(screen.getByText("DNP3 outstation 明细 (1)")).toBeInTheDocument();
+  });
+
+  it("does not render a DNP3-specific section when no DNP3 data exists", async () => {
+    mocks.getIndustrialAnalysis.mockResolvedValue(createAnalysis({
+      totalIndustrialPackets: 5,
+      protocols: [{ label: "Modbus/TCP", count: 5 }],
+      controlCommands: [
+        {
+          packetId: 401,
+          time: "5.100000",
+          protocol: "IEC104",
+          source: "10.1.0.10",
+          destination: "10.1.0.20",
+          operation: "single command",
+          target: "ioa=7",
+          value: "on",
+          result: "ack",
+          summary: "IEC104 single command",
+        },
+      ],
+      ruleHits: [{ rule: "modbus-write", level: "high", packetId: 402, summary: "Modbus burst write" }],
+      details: [
+        {
+          name: "IEC104",
+          totalFrames: 2,
+          operations: [{ label: "single command", count: 1 }],
+          targets: [{ label: "ioa=7", count: 1 }],
+          results: [{ label: "ack", count: 1 }],
+          records: [{ packetId: 401, time: "5.100000", source: "10.1.0.10", destination: "10.1.0.20", operation: "single command", target: "ioa=7", result: "ack", summary: "IEC104 record" }],
+        },
+      ],
+    }));
+
+    render(<IndustrialAnalysis />);
+
+    await waitFor(() => {
+      expect(screen.getByText("控制指令 (1)")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/DNP3 专项/)).not.toBeInTheDocument();
+    expect(screen.getByText("IEC104 明细 (1)")).toBeInTheDocument();
+    expect(screen.getByText("IEC104 single command")).toBeInTheDocument();
+  });
 });
