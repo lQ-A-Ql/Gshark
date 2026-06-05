@@ -212,7 +212,6 @@ export function MainLayout() {
               />
             ) : null}
             <div
-              key={`route-${location.pathname}`}
               data-route-motion={routeMotion}
               className="meow-route-transition flex min-h-0 flex-1 flex-col overflow-hidden"
             >

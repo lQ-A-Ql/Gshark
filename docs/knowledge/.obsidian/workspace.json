@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "c2-traffic-analysis-reference.md",
+                "file": "vshell_technical_analysis.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "c2-traffic-analysis-reference"
+              "title": "vshell_technical_analysis"
             }
           }
         ]
@@ -185,9 +185,10 @@
   },
   "active": "3b661b46dd85bdd7",
   "lastOpenFiles": [
+    "pcap-network-forensics-reference.md",
+    "c2-traffic-analysis-reference.md",
     "behinder-webshell-reference.md",
     "industrial-vehicle-protocol-reference.md",
-    "pcap-network-forensics-reference.md",
     "pcap-tshark-network-forensics-resources.md",
     "usb-media-forensics-reference.md",
     "vshell_technical_analysis.md",

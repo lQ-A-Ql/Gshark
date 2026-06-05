@@ -1,0 +1,4 @@
+Atlas verification cleanup:
+- Temporary Vite/Playwright harness files were removed from the worktree before accepting Task 3.
+- Localized error-state coverage remains in `PlaybookWorkspaceSection.test.tsx` and `ThreatHunting.test.tsx`.
+- Re-run target command after cleanup: `cd frontend && pnpm run test:run -- ThreatHunting Playbook`.

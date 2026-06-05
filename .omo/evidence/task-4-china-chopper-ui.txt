@@ -1,0 +1,19 @@
+Task 4 evidence log: China Chopper metadata UI
+
+Date: 2026-06-05
+Scope: frontend only
+
+What changed:
+- Added shared WebShell metadata normalization helper in `frontend/src/app/components/webShellMetadata.ts`.
+- Normalized China Chopper aliases from `familyHint`, `decoderHints`, and `decoderOptionsHint` to `菜刀 / China Chopper`.
+- Surfaced normalized family/decoder/role/confidence/version metadata in both payload source cards and StreamDecoder candidate/workbench metadata rows.
+- Kept the existing decode workflow intact: no new China Chopper decode button was added to the frontend toolbar.
+
+Verification evidence:
+- `pnpm run test:run -- MiscTools PayloadWebShellSourceUtils StreamDecoder webShellMetadata`
+- Result: 12 test files passed, 50 tests passed.
+- `src/app/pages/MiscTools.test.tsx` now asserts China Chopper metadata is visible and that no dedicated `China Chopper` decoder button is rendered.
+
+Behavior note:
+- The label shown to the analyst is `菜刀 / China Chopper`.
+- This label appears as normalized metadata only; it does not claim the frontend introduced a dedicated China Chopper decoder control.

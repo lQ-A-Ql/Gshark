@@ -1,0 +1,14 @@
+Command: cd frontend && pnpm run test:run -- evidenceMapper evidencePanelRules EvidencePanel
+Result: PASS
+
+Summary:
+- Test Files: 3 passed (3)
+- Tests: 14 passed (14)
+- Files covered:
+  - src/app/features/evidence/evidencePanelRules.test.ts
+  - src/app/integrations/mappers/evidenceMapper.test.ts
+  - src/app/pages/EvidencePanel.test.tsx
+
+Notes:
+- LSP diagnostics could not run because `typescript-language-server` is not installed in this environment.
+- Grep for anti-patterns did not find new matches in changed evidence test files.

@@ -1,0 +1,5 @@
+Atlas verification cleanup:
+- Removed temporary QA harness files that were outside Task 3 scope:
+  - frontend/qa-playbook-harness.html
+  - frontend/src/qa-playbook-harness.tsx
+- Re-ran target command after cleanup: `cd frontend && pnpm run test:run -- ThreatHunting Playbook`

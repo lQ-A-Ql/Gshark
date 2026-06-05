@@ -1,0 +1,34 @@
+TASK 3 Evidence IPC Verification
+Generated: 2026-06-05T20:31:08.3709877+08:00
+
+## Frontend: pnpm run test:run -- desktopBridge
+
+
+> @meow-traffic/sentinel-frontend@0.0.1 test:run C:\Users\QAQ\Desktop\gshark\frontend
+> vitest run "desktopBridge"
+
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90mC:/Users/QAQ/Desktop/gshark/frontend[39m
+
+ [32m鉁?[39m src/app/integrations/desktopBridge.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 135[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m28 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 20:31:10
+[2m   Duration [22m 5.07s[2m (transform 903ms, setup 940ms, collect 1.32s, tests 135ms, environment 1.85s, prepare 303ms)[22m
+
+
+## Backend: go test ./internal/engine -run TestGatherEvidence -count=1 -v
+
+=== RUN   TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc
+--- PASS: TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc (0.05s)
+=== RUN   TestGatherEvidenceReturnsCanceledContext
+--- PASS: TestGatherEvidenceReturnsCanceledContext (0.05s)
+=== RUN   TestGatherEvidenceEmitsCollectorTimingStatuses
+--- PASS: TestGatherEvidenceEmitsCollectorTimingStatuses (0.05s)
+=== RUN   TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules
+--- PASS: TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules (0.05s)
+=== RUN   TestGatherEvidenceKeepsBenignImageObjectsInformational
+--- PASS: TestGatherEvidenceKeepsBenignImageObjectsInformational (0.04s)
+PASS
+ok  	github.com/gshark/sentinel/backend/internal/engine	0.271s

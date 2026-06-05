@@ -1,0 +1,4 @@
+2026-06-06
+- Verified `cd frontend && pnpm run test:run -- EvidencePanel evidencePanelRules` after aligning `EvidencePanel.test.tsx` with the current investigation-center search placeholder (`搜索摘要、IOC、规则、主机、URI、标签...`).
+- Result: PASS. `evidencePanelRules.test.ts` and `EvidencePanel.test.tsx` both passed; 2 test files, 10 tests total.
+- Coverage preserved: module filter + search + severity narrowing still runs before JSON export, and exported payload still contains the vehicle security-access record while excluding the USB write row.

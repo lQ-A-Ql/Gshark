@@ -17,10 +17,14 @@ import (
 )
 
 type yaraRuleMeta struct {
-	category string
-	ruleName string
-	level    string
-	cveID    string
+	category      string
+	ruleName      string
+	level         string
+	cveID         string
+	rulePack      string
+	ruleOrigin    string
+	ruleSource    string
+	communityRule bool
 }
 
 type yaraRuleBundle struct {
@@ -36,11 +40,11 @@ type yaraScanTarget struct {
 }
 
 var defaultYaraRuleMeta = map[string]yaraRuleMeta{
-	"OWASP_SQL_INJECTION":  {category: "OWASP", ruleName: "SQL 注入", level: "high"},
-	"OWASP_XSS":            {category: "OWASP", ruleName: "XSS", level: "high"},
-	"OWASP_RCE":            {category: "OWASP", ruleName: "命令执行 RCE", level: "critical"},
-	"OWASP_WEBSHELL":       {category: "OWASP", ruleName: "WebShell 特征", level: "critical"},
-	"SENSITIVE_CREDENTIAL": {category: "Sensitive", ruleName: "敏感凭证泄露", level: "medium"},
+	"OWASP_SQL_INJECTION":  {category: "OWASP", ruleName: "SQL 注入", level: "high", rulePack: "default", ruleOrigin: "builtin", ruleSource: "meow-traffic/default", communityRule: false},
+	"OWASP_XSS":            {category: "OWASP", ruleName: "XSS", level: "high", rulePack: "default", ruleOrigin: "builtin", ruleSource: "meow-traffic/default", communityRule: false},
+	"OWASP_RCE":            {category: "OWASP", ruleName: "命令执行 RCE", level: "critical", rulePack: "default", ruleOrigin: "builtin", ruleSource: "meow-traffic/default", communityRule: false},
+	"OWASP_WEBSHELL":       {category: "OWASP", ruleName: "WebShell 特征", level: "critical", rulePack: "default", ruleOrigin: "builtin", ruleSource: "meow-traffic/default", communityRule: false},
+	"SENSITIVE_CREDENTIAL": {category: "Sensitive", ruleName: "敏感凭证泄露", level: "medium", rulePack: "default", ruleOrigin: "builtin", ruleSource: "meow-traffic/default", communityRule: false},
 }
 
 // yarcCacheDir is the directory for storing compiled .yarc cache files.
@@ -234,6 +238,7 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 				Level:    meta.level,
 				Preview:  previewText(preview),
 				Match:    ruleID,
+				Metadata: yaraThreatHitMetadata(meta),
 			})
 			seq++
 		}
@@ -605,10 +610,14 @@ func parseYaraMetaAssignment(line string) (string, string, bool) {
 
 func ruleMetaFromFields(ruleID string, fields map[string]string) (yaraRuleMeta, bool) {
 	meta := yaraRuleMeta{
-		category: strings.TrimSpace(fields["family"]),
-		ruleName: strings.TrimSpace(fields["description"]),
-		level:    normalizeYaraLevel(fields["severity"]),
-		cveID:    strings.TrimSpace(fields["cve"]),
+		category:      strings.TrimSpace(fields["family"]),
+		ruleName:      strings.TrimSpace(fields["description"]),
+		level:         normalizeYaraLevel(fields["severity"]),
+		cveID:         strings.TrimSpace(fields["cve"]),
+		rulePack:      strings.TrimSpace(firstNonEmpty(fields["rule_pack"], fields["ruleset"], fields["pack"], fields["source"])),
+		ruleOrigin:    strings.TrimSpace(firstNonEmpty(fields["rule_origin"], fields["origin"])),
+		ruleSource:    strings.TrimSpace(firstNonEmpty(fields["rule_source"], fields["source"], fields["author"], fields["reference"])),
+		communityRule: parseYaraMetaBool(fields["community_rule"]),
 	}
 	if meta.category == "" {
 		meta.category = strings.TrimSpace(fields["project"])
@@ -619,6 +628,7 @@ func ruleMetaFromFields(ruleID string, fields map[string]string) (yaraRuleMeta, 
 	if meta.level == "" {
 		meta.level = "medium"
 	}
+	applyYaraRuleOriginDefaults(&meta)
 	if meta.category == "" {
 		meta.category = inferredYaraCategory(ruleID)
 	}
@@ -668,10 +678,64 @@ func fallbackYaraRuleMeta(ruleID string) yaraRuleMeta {
 		category = "OWASP"
 	}
 	return yaraRuleMeta{
-		category: category,
-		ruleName: ruleID,
-		level:    "medium",
+		category:      category,
+		ruleName:      ruleID,
+		level:         "medium",
+		rulePack:      "custom",
+		ruleOrigin:    "custom",
+		ruleSource:    "custom-yara",
+		communityRule: false,
 	}
+}
+
+func parseYaraMetaBool(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "y", "community":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyYaraRuleOriginDefaults(meta *yaraRuleMeta) {
+	probe := strings.ToLower(strings.Join([]string{meta.rulePack, meta.ruleOrigin, meta.ruleSource}, " "))
+	if strings.Contains(probe, "signature-base") || strings.Contains(probe, "neo23x0") || strings.Contains(probe, "community") {
+		meta.communityRule = true
+	}
+	if meta.communityRule {
+		if meta.ruleOrigin == "" {
+			meta.ruleOrigin = "community"
+		}
+		if meta.rulePack == "" {
+			meta.rulePack = "signature-base"
+		}
+		if meta.ruleSource == "" {
+			meta.ruleSource = "Neo23x0/signature-base"
+		}
+		return
+	}
+	if meta.rulePack == "" {
+		meta.rulePack = "custom"
+	}
+	if meta.ruleOrigin == "" {
+		meta.ruleOrigin = "custom"
+	}
+	if meta.ruleSource == "" {
+		meta.ruleSource = "custom-yara"
+	}
+}
+
+func yaraThreatHitMetadata(meta yaraRuleMeta) map[string]string {
+	metadata := map[string]string{
+		"rule_pack":      meta.rulePack,
+		"rule_origin":    meta.ruleOrigin,
+		"rule_source":    meta.ruleSource,
+		"community_rule": fmt.Sprintf("%t", meta.communityRule),
+	}
+	if meta.cveID != "" {
+		metadata["cve"] = meta.cveID
+	}
+	return metadata
 }
 
 func newYaraWarningHit(message string) model.ThreatHit {

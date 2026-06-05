@@ -1,0 +1,9 @@
+> @meow-traffic/sentinel-frontend@0.0.1 test:run C:\Users\QAQ\Desktop\gshark\frontend
+> vitest run "IndustrialAnalysis" "-t" "does not render a DNP3-specific section when no DNP3 data exists"
+
+RUN v3.2.4 C:/Users/QAQ/Desktop/gshark/frontend
+
+PASS src/app/pages/IndustrialAnalysis.test.tsx (7 tests | 6 skipped)
+
+Test Files 1 passed (1)
+Tests 1 passed | 6 skipped (7)

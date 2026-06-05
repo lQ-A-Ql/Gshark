@@ -1,0 +1,26 @@
+Task 4 verification summary
+
+Changed files:
+- frontend/src/app/features/evidence/evidencePanelRules.ts
+- frontend/src/app/features/evidence/useEvidencePanelModel.ts
+- frontend/src/app/pages/EvidencePanel.tsx
+- frontend/src/app/pages/EvidencePanel.test.tsx
+- frontend/src/app/features/evidence/evidencePanelRules.test.ts
+
+Commands run:
+1. cd frontend && pnpm run test:run -- EvidencePanel evidencePanelRules
+   - Result: PASS
+   - Coverage focus: initial 200-row cap, show-next expansion to 400 rows, filtering over all fetched records, export over all filtered records, selection reset when visible slice changes.
+
+2. cd frontend && pnpm run typecheck
+   - Result: PASS
+
+3. LSP diagnostics on changed TS/TSX files
+   - Result: no diagnostics found for all changed files.
+
+Behavior verified:
+- Initial evidence render caps visible rows at 200 while preserving full filtered counts.
+- UI shows capped status text when filtered rows exceed the visible slice.
+- `Show next 200` expands the rendered slice without changing export semantics.
+- Export continues to use all currently filtered fetched records instead of only visible rows.
+- Selection resets to the first visible record when the prior selection falls outside the visible slice after filter/search changes.

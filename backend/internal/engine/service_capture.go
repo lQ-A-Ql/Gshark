@@ -785,6 +785,7 @@ func (s *Service) resetAnalysisCachesLocked() {
 	s.usbAnalysisBySource = nil
 	s.c2Analysis = nil
 	s.aptAnalysis = nil
+	s.inFlightAnalysis = analysisInFlightGroup{}
 	s.mediaArtifacts = map[string]string{}
 	s.mediaPlayback = map[string]string{}
 	s.mediaSpeech = map[string]model.MediaTranscription{}

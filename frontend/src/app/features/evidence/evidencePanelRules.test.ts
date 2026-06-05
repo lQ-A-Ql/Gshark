@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UnifiedEvidenceRecord } from "./evidenceSchema";
 import {
+  EVIDENCE_VISIBLE_PAGE_SIZE,
   buildEvidenceCsv,
   collectEvidenceCaveats,
   countEvidenceSeverity,
@@ -268,5 +269,9 @@ describe("evidence panel rules", () => {
     expect(hasValidStreamId(undefined)).toBe(false);
     expect(hasValidStreamId(-1)).toBe(false);
     expect(hasValidStreamId(7)).toBe(true);
+  });
+
+  it("exports the shared visible page size for capped evidence rendering", () => {
+    expect(EVIDENCE_VISIBLE_PAGE_SIZE).toBe(200);
   });
 });

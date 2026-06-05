@@ -43,6 +43,7 @@ type globalTrafficStatsAccumulator struct {
 	timelineMap     map[string]int
 	protocolMap     map[string]int
 	talkerMap       map[string]int
+	conversationMap map[trafficConversationKey]int
 	domainMap       map[string]int
 	srcIPMap        map[string]int
 	dstIPMap        map[string]int
@@ -66,6 +67,7 @@ func newGlobalTrafficStatsAccumulator() *globalTrafficStatsAccumulator {
 		timelineMap:     map[string]int{},
 		protocolMap:     map[string]int{},
 		talkerMap:       map[string]int{},
+		conversationMap: map[trafficConversationKey]int{},
 		domainMap:       map[string]int{},
 		srcIPMap:        map[string]int{},
 		dstIPMap:        map[string]int{},
@@ -80,6 +82,11 @@ type protocolTreeNode struct {
 	name     string
 	count    int
 	children map[string]*protocolTreeNode
+}
+
+type trafficConversationKey struct {
+	src string
+	dst string
 }
 
 func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
@@ -121,6 +128,9 @@ func (a *globalTrafficStatsAccumulator) consumeRow(parts []string) {
 	}
 	if dst != "" {
 		a.dstIPMap[dst]++
+	}
+	if src != "" && dst != "" {
+		a.conversationMap[trafficConversationKey{src: src, dst: dst}]++
 	}
 
 	domain := normalizeDomain(FirstNonEmpty(
@@ -181,6 +191,7 @@ func (a *globalTrafficStatsAccumulator) finish() model.GlobalTrafficStats {
 	stats.Timeline = sortTimelineBuckets(a.timelineMap, 0)
 	stats.ProtocolDist = topBuckets(a.protocolMap, 0)
 	stats.TopTalkers = topBuckets(a.talkerMap, 0)
+	stats.TopConversations = topConversations(a.conversationMap, 200)
 	stats.TopHostnames = topBuckets(a.domainMap, 0)
 	stats.TopDomains = topBuckets(a.domainMap, 0)
 	stats.TopSrcIPs = topBuckets(a.srcIPMap, 0)
@@ -190,6 +201,26 @@ func (a *globalTrafficStatsAccumulator) finish() model.GlobalTrafficStats {
 	stats.TopSrcPorts = topBuckets(a.srcPortMap, 0)
 	stats.ProtocolHierarchy = buildProtocolTree(a.protocolTree)
 	return stats
+}
+
+func topConversations(input map[trafficConversationKey]int, limit int) []model.TrafficConversation {
+	items := make([]model.TrafficConversation, 0, len(input))
+	for key, count := range input {
+		items = append(items, model.TrafficConversation{Src: key.src, Dst: key.dst, Count: count})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+		if items[i].Src != items[j].Src {
+			return items[i].Src < items[j].Src
+		}
+		return items[i].Dst < items[j].Dst
+	})
+	if limit > 0 && len(items) > limit {
+		return items[:limit]
+	}
+	return items
 }
 
 func buildProtocolTree(nodes map[string]*protocolTreeNode) []model.ProtocolTreeNode {

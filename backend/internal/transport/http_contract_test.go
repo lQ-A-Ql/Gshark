@@ -418,12 +418,24 @@ func TestGlobalTrafficStatsContract(t *testing.T) {
 
 	requireStatus(t, rec, http.StatusOK)
 	payload := decodeJSONMap(t, rec)
-	requireJSONKeys(t, payload, "total_packets", "protocol_kinds", "timeline", "protocol_dist", "top_talkers", "top_hostnames", "top_domains", "top_src_ips", "top_dst_ips", "top_computer_names", "top_dest_ports", "top_src_ports")
+	requireJSONKeys(t, payload, "total_packets", "protocol_kinds", "timeline", "protocol_dist", "top_talkers", "top_conversations", "top_hostnames", "top_domains", "top_src_ips", "top_dst_ips", "top_computer_names", "top_dest_ports", "top_src_ports")
 	requireJSONNumber(t, payload, "total_packets")
 	requireJSONNumber(t, payload, "protocol_kinds")
 	requireJSONArray(t, payload, "timeline")
 	requireJSONArray(t, payload, "protocol_dist")
 	requireJSONArray(t, payload, "top_talkers")
+	conversations := requireJSONArray(t, payload, "top_conversations")
+	if len(conversations) != 1 {
+		t.Fatalf("top_conversations = %#v, want one item", conversations)
+	}
+	conversation, ok := conversations[0].(map[string]any)
+	if !ok {
+		t.Fatalf("top_conversations[0] = %#v, want object", conversations[0])
+	}
+	requireJSONKeys(t, conversation, "src", "dst", "count")
+	requireJSONString(t, conversation, "src")
+	requireJSONString(t, conversation, "dst")
+	requireJSONNumber(t, conversation, "count")
 }
 
 func TestPacketInlineContractRejectsInvalidID(t *testing.T) {
@@ -682,17 +694,18 @@ func (contractAnalysisService) GlobalTrafficStats() (model.GlobalTrafficStats, e
 
 func (contractAnalysisService) GlobalTrafficStatsWithContext(context.Context) (model.GlobalTrafficStats, error) {
 	return model.GlobalTrafficStats{
-		TotalPackets:  1,
-		ProtocolKinds: 1,
-		Timeline:      []model.TrafficBucket{{Label: "2026-05-14T23:25:00+08:00", Count: 1}},
-		ProtocolDist:  []model.TrafficBucket{{Label: "HTTP", Count: 1}},
-		TopTalkers:    []model.TrafficBucket{{Label: "10.0.0.1 -> 10.0.0.2", Count: 1}},
-		TopHostnames:  []model.TrafficBucket{},
-		TopDomains:    []model.TrafficBucket{},
-		TopSrcIPs:     []model.TrafficBucket{{Label: "10.0.0.1", Count: 1}},
-		TopDstIPs:     []model.TrafficBucket{{Label: "10.0.0.2", Count: 1}},
-		TopDestPorts:  []model.TrafficBucket{{Label: "80", Count: 1}},
-		TopSrcPorts:   []model.TrafficBucket{},
+		TotalPackets:     1,
+		ProtocolKinds:    1,
+		Timeline:         []model.TrafficBucket{{Label: "2026-05-14T23:25:00+08:00", Count: 1}},
+		ProtocolDist:     []model.TrafficBucket{{Label: "HTTP", Count: 1}},
+		TopTalkers:       []model.TrafficBucket{{Label: "10.0.0.1", Count: 1}, {Label: "10.0.0.2", Count: 1}},
+		TopConversations: []model.TrafficConversation{{Src: "10.0.0.1", Dst: "10.0.0.2", Count: 1}},
+		TopHostnames:     []model.TrafficBucket{},
+		TopDomains:       []model.TrafficBucket{},
+		TopSrcIPs:        []model.TrafficBucket{{Label: "10.0.0.1", Count: 1}},
+		TopDstIPs:        []model.TrafficBucket{{Label: "10.0.0.2", Count: 1}},
+		TopDestPorts:     []model.TrafficBucket{{Label: "80", Count: 1}},
+		TopSrcPorts:      []model.TrafficBucket{},
 	}, nil
 }
 

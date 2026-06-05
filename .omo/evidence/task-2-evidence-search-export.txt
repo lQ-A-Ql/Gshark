@@ -1,0 +1,3 @@
+Command: cd frontend && pnpm run test:run -- evidenceMapper evidencePanelRules evidenceSchema
+Result: PASS
+Summary: Search now covers JA3/JA3S hashes, IOC values, protocol, playbook names, rule names, and tags. CSV export now covers displayName, family, version, protocol, rule, playbook, IOC, JA3/JA3S hash, metadata, summary, packetId, and tags without undefined text.

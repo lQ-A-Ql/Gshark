@@ -70,13 +70,34 @@ vi.mock("react-router", async (importOriginal) => {
 
 import EvidencePanel from "./EvidencePanel";
 
+const LARGE_RECORD_COUNT = 500;
+
 function clickEvidenceRow(summary: string) {
-  const table = screen.getByRole("columnheader", { name: "调查摘要" }).closest("table");
-  expect(table).not.toBeNull();
-  const cell = within(table!).getAllByText(summary)[0];
+  const table = getEvidenceTable();
+  const cell = within(table).getByText(summary);
   const row = cell.closest("tr");
   expect(row).not.toBeNull();
   fireEvent.click(row!);
+}
+
+function getEvidenceTable() {
+  const table = screen.getByRole("columnheader", { name: "调查摘要" }).closest("table");
+  expect(table).not.toBeNull();
+  return table!;
+}
+
+function getEvidenceTableRowCount() {
+  return getEvidenceTable().querySelectorAll("tbody tr").length;
+}
+
+function getEvidenceSummaryFromRow(rowIndex: number) {
+  const table = getEvidenceTable();
+  const rows = table.querySelectorAll("tbody tr");
+  const row = rows.item(rowIndex);
+  expect(row).not.toBeNull();
+  const summaryText = row!.querySelector("td:nth-child(3) .truncate")?.textContent?.trim() ?? "";
+  expect(summaryText).not.toBe("");
+  return summaryText;
 }
 
 function getDetailPanel(summary: string) {
@@ -109,6 +130,23 @@ function createRecord(overrides: Partial<UnifiedEvidenceRecord>): UnifiedEvidenc
     caveats: ["中置信信号，不应单独作为强归因结论。"],
     ...overrides,
   };
+}
+
+function createLargeEvidenceSet(count = LARGE_RECORD_COUNT): UnifiedEvidenceRecord[] {
+  return Array.from({ length: count }, (_, index) =>
+    createRecord({
+      id: `bulk-${index + 1}`,
+      module: index % 2 === 0 ? "vehicle" : "usb",
+      sourceType: index % 2 === 0 ? "uds-transaction" : "mass-storage-write",
+      summary: `Bulk evidence ${index + 1}`,
+      severity: index % 5 === 0 ? "high" : "medium",
+      confidence: 90 - (index % 40),
+      confidenceLabel: index % 5 === 0 ? "high" : "medium",
+      packetId: index + 1,
+      value: index === count - 1 ? "needle-match" : `value-${index + 1}`,
+      tags: index === count - 1 ? ["bulk", "needle-tag"] : ["bulk"],
+    }),
+  );
 }
 
 describe("EvidencePanel", () => {
@@ -339,5 +377,81 @@ describe("EvidencePanel", () => {
     expect(mocks.downloadText).toHaveBeenCalledTimes(1);
     const [, payload] = mocks.downloadText.mock.calls[0];
     expect(payload).toBe("[]");
+  });
+
+  it("caps initial rendering to 200 rows, expands by 200, and exports all filtered records", async () => {
+    mocks.sentinelState.captureRevision = 5;
+    const records = createLargeEvidenceSet();
+    mocks.getEvidenceWithFilter.mockImplementation(async () => records);
+
+    render(<EvidencePanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Showing 200 of 500 evidence records")).toBeInTheDocument();
+      expect(screen.getAllByText("Bulk evidence 1").length).toBeGreaterThan(0);
+    });
+
+    expect(getEvidenceTableRowCount()).toBe(200);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next 200" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Showing 400 of 500 evidence records")).toBeInTheDocument();
+    });
+
+    expect(getEvidenceTableRowCount()).toBe(400);
+
+    fireEvent.change(screen.getByPlaceholderText("搜索摘要、IOC、规则、主机、URI、标签..."), {
+      target: { value: "needle-match" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Showing 200 of 500 evidence records")).not.toBeInTheDocument();
+      expect(screen.getAllByText("Bulk evidence 500").length).toBeGreaterThan(0);
+      expect(screen.queryByText("Bulk evidence 1")).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /JSON/ }));
+
+    expect(mocks.downloadText).toHaveBeenCalledTimes(1);
+    const [, payload] = mocks.downloadText.mock.calls[0];
+    expect(payload).toContain("Bulk evidence 500");
+    expect(payload).not.toContain("Bulk evidence 1");
+    expect(mocks.getEvidenceWithFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets selection to the first visible record when filters move the prior selection outside the visible slice", async () => {
+    mocks.sentinelState.captureRevision = 6;
+    const records = createLargeEvidenceSet();
+    mocks.getEvidenceWithFilter.mockImplementation(async () => records);
+
+    render(<EvidencePanel />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Bulk evidence 1").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next 200" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Showing 400 of 500 evidence records")).toBeInTheDocument();
+    });
+
+    const selectedSummary = getEvidenceSummaryFromRow(399);
+    clickEvidenceRow(selectedSummary);
+
+    await waitFor(() => {
+      expect(getDetailPanel(selectedSummary)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("搜索摘要、IOC、规则、主机、URI、标签..."), {
+      target: { value: "Bulk evidence 1" },
+    });
+
+    await waitFor(() => {
+      expect(getDetailPanel("Bulk evidence 1")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(selectedSummary)).not.toBeInTheDocument();
   });
 });

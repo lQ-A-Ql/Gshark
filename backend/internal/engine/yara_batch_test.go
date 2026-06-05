@@ -66,6 +66,29 @@ rule SECOND_RULE {
 	}
 }
 
+func TestParseYaraRuleMetaKeepsCommunityOrigin(t *testing.T) {
+	meta := parseYaraRuleMetaFromSource(`
+rule COMMUNITY_RULE {
+  meta:
+    family = "Malware"
+    severity = "high"
+    description = "社区规则命中"
+    rule_pack = "signature-base"
+    rule_source = "Neo23x0/signature-base"
+    community_rule = "true"
+  strings:
+    $a = "evil"
+  condition:
+    $a
+}
+`)
+
+	got := meta["COMMUNITY_RULE"]
+	if got.rulePack != "signature-base" || got.ruleOrigin != "community" || got.ruleSource != "Neo23x0/signature-base" || !got.communityRule {
+		t.Fatalf("expected community yara metadata, got %+v", got)
+	}
+}
+
 func TestCachedYaraHitsIncludesWarningWhenYaraFails(t *testing.T) {
 	oldRun := runYaraCommand
 	t.Cleanup(func() {
@@ -220,6 +243,9 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 			}
 			if hit.Category != "CVE" || hit.Level != "critical" {
 				t.Fatalf("unexpected stream hit meta: %+v", hit)
+			}
+			if hit.Metadata["rule_origin"] != "custom" || hit.Metadata["community_rule"] != "false" {
+				t.Fatalf("expected custom yara metadata, got %+v", hit.Metadata)
 			}
 		}
 	}

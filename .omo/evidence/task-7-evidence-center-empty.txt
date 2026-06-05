@@ -1,0 +1,3 @@
+2026-06-06
+- Verified the same targeted command `cd frontend && pnpm run test:run -- EvidencePanel evidencePanelRules` covers the empty/unavailable Evidence states successfully.
+- Result: PASS. `EvidencePanel.test.tsx` still confirms sparse optional-contract rows render without `undefined` or invented fallback text, and the empty state shows `当前抓包未产生证据记录` with safe `[]` JSON export.

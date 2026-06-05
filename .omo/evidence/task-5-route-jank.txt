@@ -1,0 +1,25 @@
+Task 5: Reduce route-switch jank from forced remount and heavy CSS filters
+
+Files changed:
+- frontend/src/app/layouts/MainLayout.tsx
+- frontend/src/styles/theme.css
+- frontend/src/app/layouts/MainLayout.test.ts
+- .omo/notepads/frontend-performance-stability-repair/learnings.md
+
+Source changes:
+- Removed `key={`route-${location.pathname}`}` from the route content wrapper around `<Outlet />`, keeping the layout shell and route wrapper stable across navigation.
+- Removed `filter`/`blur` usage from `@keyframes meow-route-in` and the route transition wrapper's `will-change` list.
+- Removed `filter`/`blur` usage from the background fade keyframes and reduced-motion cleanup so route/background transition work stays opacity/transform-only.
+- Preserved lightweight route opacity/transform animation and forward/back `data-route-motion` offsets.
+- Added static MainLayout tests that assert no pathname-keyed route wrapper exists and route transition CSS excludes `filter`, `blur`, and `backdrop-filter` while preserving opacity/transform.
+
+Verification commands:
+- `pnpm run test:run -- MainLayout` from `frontend`: first run failed because the new static test resolved `theme.css` one directory too high; fixed the path.
+- `pnpm run test:run -- MainLayout` from `frontend`: passed, 1 test file, 7 tests.
+- `pnpm run lint` from `frontend`: passed with `--max-warnings=0`.
+- LSP diagnostics for `frontend/src/app/layouts/MainLayout.tsx`: no diagnostics.
+- LSP diagnostics for `frontend/src/app/layouts/MainLayout.test.ts`: no diagnostics.
+
+Focused grep checks:
+- `route-${location.pathname}` / `key={`route-` in `MainLayout.tsx`: no matches after the change.
+- Remaining `filter`, `blur`, and `backdrop-filter` matches in `theme.css` are static/non-route-transition styles or unrelated non-route keyframes; `meow-route-in` and `.meow-route-transition` no longer contain them.

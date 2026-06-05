@@ -85,6 +85,12 @@ export interface TrafficBucket {
   count: number;
 }
 
+export interface TrafficConversation {
+  src: string;
+  dst: string;
+  count: number;
+}
+
 export interface TrafficProtocolTreeNode {
   name: string;
   count: number;
@@ -97,6 +103,7 @@ export interface GlobalTrafficStats {
   timeline: TrafficBucket[];
   protocolDist: TrafficBucket[];
   topTalkers: TrafficBucket[];
+  topConversations: TrafficConversation[];
   topHostnames: TrafficBucket[];
   topDomains: TrafficBucket[];
   topSrcIPs: TrafficBucket[];

@@ -17,6 +17,8 @@ export const EVIDENCE_SEVERITIES = ["critical", "high", "medium", "low", "info"]
 
 export const EVIDENCE_CONFIDENCE_LABELS = ["high", "medium", "low", "unknown"] as const;
 
+export const EVIDENCE_VISIBLE_PAGE_SIZE = 200;
+
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 
 export interface EvidenceFacetState {

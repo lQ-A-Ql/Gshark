@@ -1,9 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { PageShell } from "../components/PageShell";
-import { TrafficGraphOverview, TrafficGraphPanels } from "../features/traffic/TrafficGraphPanels";
+import { useEvidence } from "../features/evidence/useEvidence";
+import { TrafficGraphOverview, TrafficGraphPanels, type TrafficGraphSection } from "../features/traffic/TrafficGraphPanels";
+import type { TrafficTimelineRangeSelection, TrafficTimelineSelection } from "../features/traffic/trafficTimeline";
 import { useTrafficGraph } from "../features/traffic/useTrafficGraph";
 import { useBackend } from "../state/contexts/BackendContext";
 import { useCapture } from "../state/contexts/CaptureContext";
@@ -11,6 +13,12 @@ import { useFilter } from "../state/contexts/FilterContext";
 import { usePacket } from "../state/contexts/PacketContext";
 
 export default function TrafficGraph() {
+  const [selectedSection, setSelectedSection] = useState<TrafficGraphSection>("overview");
+  const [timelineSelection, setTimelineSelection] = useState<TrafficTimelineSelection>({
+    hoveredLabel: null,
+    lockedLabel: null,
+    selectedRange: null,
+  });
   const navigate = useNavigate();
   const { backendConnected } = useBackend();
   const { isPreloadingCapture, fileMeta, captureRevision } = useCapture();
@@ -22,6 +30,18 @@ export default function TrafficGraph() {
     filePath: fileMeta.path,
     totalPackets,
     captureRevision,
+  });
+  const {
+    evidence: huntingEvidence,
+    loading: evidenceLoading,
+    error: evidenceError,
+  } = useEvidence({
+    backendConnected,
+    isPreloadingCapture,
+    filePath: fileMeta.path,
+    totalPackets,
+    captureRevision,
+    modules: ["hunting"],
   });
 
   const timeline = useMemo(() => stats.timeline, [stats.timeline]);
@@ -36,6 +56,7 @@ export default function TrafficGraph() {
   const topDestPorts = useMemo(() => stats.topDestPorts || [], [stats.topDestPorts]);
   const topSrcPorts = useMemo(() => stats.topSrcPorts || [], [stats.topSrcPorts]);
   const topTalkers = useMemo(() => stats.topTalkers || [], [stats.topTalkers]);
+  const topConversations = useMemo(() => stats.topConversations || [], [stats.topConversations]);
   const protocolHierarchy = useMemo(() => stats.protocolHierarchy || [], [stats.protocolHierarchy]);
 
   const jumpWithFilter = useCallback(
@@ -47,6 +68,23 @@ export default function TrafficGraph() {
     },
     [applyFilter, navigate, setDisplayFilter],
   );
+
+  const setTimelineHoverLabel = useCallback((label: string | null) => {
+    setTimelineSelection((current) => ({ ...current, hoveredLabel: label }));
+  }, []);
+
+  const setTimelineLockedLabel = useCallback((label: string | null) => {
+    setTimelineSelection((current) => ({ ...current, lockedLabel: label }));
+  }, []);
+
+  const setTimelineRange = useCallback((range: TrafficTimelineRangeSelection | null) => {
+    setTimelineSelection((current) => ({ ...current, selectedRange: range }));
+  }, []);
+
+  const clearTimelineSelection = useCallback(() => {
+    setTimelineSelection({ hoveredLabel: null, lockedLabel: null, selectedRange: null });
+  }, []);
+
   return (
     <PageShell>
       <AnalysisHero
@@ -77,7 +115,18 @@ export default function TrafficGraph() {
         topSrcIPs={topSrcIPs}
         topSrcPorts={topSrcPorts}
         topTalkers={topTalkers}
+        topConversations={topConversations}
         protocolHierarchy={protocolHierarchy}
+        evidenceRecords={huntingEvidence}
+        evidenceLoading={evidenceLoading}
+        evidenceError={evidenceError || null}
+        selectedSection={selectedSection}
+        timelineSelection={timelineSelection}
+        onSelectSection={setSelectedSection}
+        onTimelineHoverLabel={setTimelineHoverLabel}
+        onTimelineLockedLabel={setTimelineLockedLabel}
+        onTimelineRangeSelect={setTimelineRange}
+        onTimelineClearSelection={clearTimelineSelection}
         onJumpFilter={jumpWithFilter}
       />
     </PageShell>

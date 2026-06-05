@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -219,5 +220,57 @@ func TestUSBAnalysisConcurrentRequestsShareOneRawScan(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&scans); got != 1 {
 		t.Fatalf("expected concurrent USB requests to share one scan, got %d", got)
+	}
+}
+
+func TestUSBAnalysisWithOptionsSingleflightKeepsDifferentOptionKeysIsolated(t *testing.T) {
+	oldBuilder := buildUSBAnalysisFromFileWithOptionsFn
+	t.Cleanup(func() { buildUSBAnalysisFromFileWithOptionsFn = oldBuilder })
+
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var calls int32
+	buildUSBAnalysisFromFileWithOptionsFn = func(filePath string, opts model.USBAnalysisOptions) (model.USBAnalysis, error) {
+		atomic.AddInt32(&calls, 1)
+		started <- struct{}{}
+		<-release
+		return model.USBAnalysis{HIDSourceMode: string(opts.HIDSourceMode), HIDEventLimit: opts.HIDEventLimit}, nil
+	}
+
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+	svc.pcap = "capture.pcapng"
+
+	errs := make(chan error, 2)
+	go func() {
+		analysis, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{HIDSourceMode: model.USBHIDSourceUSBHID, HIDEventLimit: 500})
+		if err == nil && analysis.HIDEventLimit != 500 {
+			err = errors.New("unexpected 500-limit analysis result")
+		}
+		errs <- err
+	}()
+	go func() {
+		analysis, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{HIDSourceMode: model.USBHIDSourceUSBHID, HIDEventLimit: 1000})
+		if err == nil && analysis.HIDEventLimit != 1000 {
+			err = errors.New("unexpected 1000-limit analysis result")
+		}
+		errs <- err
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatalf("expected both USB option builders to start, calls=%d", atomic.LoadInt32(&calls))
+		}
+	}
+	close(release)
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("USBAnalysisWithOptions() error = %v", err)
+		}
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("expected different USB option keys to use separate builders, got %d", got)
 	}
 }

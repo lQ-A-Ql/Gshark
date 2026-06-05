@@ -37,14 +37,86 @@ describe("buildStatsFromPackets", () => {
 
     expect(stats.totalPackets).toBe(2);
     expect(stats.protocolKinds).toBe(2);
+    expect(stats.timeline).toEqual([{ label: "12:00:00", count: 2 }]);
     expect(stats.topDomains[0]).toEqual({ label: "example.com", count: 2 });
     expect(stats.topHostnames[0]).toEqual({ label: "example.com", count: 2 });
     expect(stats.topComputerNames[0]).toEqual({ label: "WS-01", count: 1 });
+    expect(stats.topTalkers).toEqual([
+      { label: "10.0.0.2", count: 2 },
+      { label: "93.184.216.34", count: 2 },
+    ]);
+    expect(stats.topConversations).toEqual([
+      { src: "10.0.0.2", dst: "93.184.216.34", count: 2 },
+    ]);
     expect(stats.topSrcIPs[0]).toEqual({ label: "10.0.0.2", count: 2 });
     expect(stats.topDstIPs[0]).toEqual({ label: "93.184.216.34", count: 2 });
-    expect(stats.topDestPorts.map((item: any) => item.label)).toContain("443");
-    expect(stats.topDestPorts.map((item: any) => item.label)).toContain("80");
-    expect(stats.topSrcPorts.map((item: any) => item.label)).toContain("52344");
-    expect(stats.topSrcPorts.map((item: any) => item.label)).toContain("52345");
+    expect(stats.topDestPorts.map((item) => item.label)).toContain("443");
+    expect(stats.topDestPorts.map((item) => item.label)).toContain("80");
+    expect(stats.topSrcPorts.map((item) => item.label)).toContain("52344");
+    expect(stats.topSrcPorts.map((item) => item.label)).toContain("52345");
+  });
+
+  it("builds a sorted per-second fallback timeline from mixed packet time formats", () => {
+    const packets: Packet[] = [
+      {
+        id: 1,
+        time: "1717588802000",
+        src: "10.0.0.1",
+        srcPort: 1111,
+        dst: "10.0.0.2",
+        dstPort: 80,
+        proto: "HTTP",
+        displayProtocol: "HTTP",
+        length: 64,
+        info: "",
+        payload: "",
+      },
+      {
+        id: 2,
+        time: "12:00:00.900",
+        src: "10.0.0.1",
+        srcPort: 1112,
+        dst: "10.0.0.3",
+        dstPort: 80,
+        proto: "HTTP",
+        displayProtocol: "HTTP",
+        length: 64,
+        info: "",
+        payload: "",
+      },
+      {
+        id: 3,
+        time: "bad-time",
+        src: "10.0.0.1",
+        srcPort: 1113,
+        dst: "10.0.0.4",
+        dstPort: 80,
+        proto: "HTTP",
+        displayProtocol: "HTTP",
+        length: 64,
+        info: "",
+        payload: "",
+      },
+      {
+        id: 4,
+        time: "12:00:00.100",
+        src: "10.0.0.1",
+        srcPort: 1114,
+        dst: "10.0.0.5",
+        dstPort: 80,
+        proto: "HTTP",
+        displayProtocol: "HTTP",
+        length: 64,
+        info: "",
+        payload: "",
+      },
+    ];
+
+    const stats = buildStatsFromPackets(packets);
+
+    expect(stats.timeline).toEqual([
+      { label: "12:00:00", count: 2 },
+      { label: "12:00:02", count: 1 },
+    ]);
   });
 });

@@ -1,0 +1,40 @@
+Task 9 full frontend verification - 2026-06-05
+
+Required command results from frontend/:
+
+1. pnpm run test:run
+   - Initial result: failed, 1 failed / 823 passed tests.
+   - Failure: src/app/features/hunting/PlaybookWorkspaceSection.test.tsx expected old localized error text while the rendered component showed the current Playbook-prefixed unavailable messages.
+   - Fix: updated the test expectations to match the rendered Playbook error copy.
+   - Rerun result: passed, 246 test files passed, 824 tests passed, duration 67.06s.
+
+2. pnpm run typecheck
+   - Initial result: failed.
+   - Failures fixed:
+     - src/app/features/c2/CSDNSAggregates.tsx referenced non-existent DNS aggregate streams; removed stream action for DNS aggregates while preserving packet action.
+     - src/app/features/evidence/EvidenceResults.tsx indexed optional metadata type directly; used EvidenceMetadataValue.
+     - src/app/features/industrial/IndustrialAuxiliaryPanels.tsx called mergeBuckets with multiple derived label arrays; changed helper to accept derived label groups.
+     - src/app/pages/EvidencePanel.test.tsx passed nullable section to within(); narrowed selection before returning the detail section.
+     - src/app/pages/RuleManagement.test.tsx had mock state fields missing from the hoisted mock type; added typed status/loading/error fields.
+   - Rerun result: passed, tsc --noEmit --noUnusedLocals --noUnusedParameters completed with exit code 0.
+
+3. pnpm run lint
+   - Initial result: passed, ESLint completed with exit code 0.
+   - Rerun result: passed, ESLint completed with exit code 0.
+
+4. pnpm run format:check
+   - Initial result: failed on src/app/features/c2/CSDNSAggregates.tsx and src/app/features/c2/VShellStreamAggregates.tsx.
+   - Follow-up result after formatting touched files: failed on src/app/integrations/clients/playbookClient.ts.
+   - Follow-up result after formatting playbook client: failed on src/app/misc/modules/ShiroRememberMeKeyResultsPanel.tsx.
+   - Fix: ran Prettier on only the changed frontend files reported by format:check and directly related touched files.
+   - Final result: passed, all matched files use Prettier code style.
+
+5. pnpm run build
+   - Initial result: passed, Vite build completed in 38.34s.
+   - Rerun result: passed, Vite build completed in 31.14s.
+
+LSP diagnostics:
+- Not run because this environment does not have typescript-language-server installed; per inherited project note, CLI verification was used as the authoritative frontend gate.
+
+Manual QA surface:
+- The required Task 9 surface is the full frontend verification suite. Full Vitest, typecheck, lint, format, and production build were run through the actual frontend package scripts after scoped fixes.

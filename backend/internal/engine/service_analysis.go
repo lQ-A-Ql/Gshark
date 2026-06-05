@@ -20,7 +20,86 @@ type analysisCacheInput[T any] struct {
 	getCached func() *T
 	setCached func(*T)
 	builder   func(pcap string) (T, error)
+	inFlight  *analysisInFlightGroup
+	key       string
+	isCurrent func(string) bool
 }
+
+type analysisInFlightGroup struct {
+	mu    sync.Mutex
+	calls map[string]*analysisInFlightCall
+}
+
+type analysisInFlightCall struct {
+	done   chan struct{}
+	result any
+	err    error
+}
+
+func (g *analysisInFlightGroup) do(ctx context.Context, key string, fn func() (any, error)) (any, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if g == nil || strings.TrimSpace(key) == "" {
+		return fn()
+	}
+
+	g.mu.Lock()
+	if g.calls == nil {
+		g.calls = map[string]*analysisInFlightCall{}
+	}
+	call := g.calls[key]
+	if call == nil {
+		call = &analysisInFlightCall{done: make(chan struct{})}
+		g.calls[key] = call
+		go func() {
+			result, err := fn()
+			g.mu.Lock()
+			call.result = result
+			call.err = err
+			delete(g.calls, key)
+			close(call.done)
+			g.mu.Unlock()
+		}()
+	}
+	g.mu.Unlock()
+
+	select {
+	case <-call.done:
+		return call.result, call.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func doInFlightAnalysis[T any](ctx context.Context, group *analysisInFlightGroup, key string, builder func() (T, error)) (T, error) {
+	var zero T
+	result, err := group.do(ctx, key, func() (any, error) {
+		return builder()
+	})
+	if err != nil {
+		return zero, err
+	}
+	typed, ok := result.(T)
+	if !ok {
+		return zero, fmt.Errorf("analysis singleflight returned unexpected result type for %q", key)
+	}
+	return typed, nil
+}
+
+var (
+	buildGlobalTrafficStatsFromFileFn      = tshark.BuildGlobalTrafficStatsFromFile
+	buildIndustrialAnalysisFromFileFn      = tshark.BuildIndustrialAnalysisFromFile
+	buildVehicleAnalysisFromFileFn         = tshark.BuildVehicleAnalysisFromFile
+	buildUSBAnalysisFromFileWithOptionsFn  = tshark.BuildUSBAnalysisFromFileWithOptions
+	buildMediaAnalysisFromFileWithConfigFn = tshark.BuildMediaAnalysisFromFileWithConfig
+	buildMediaAnalysisFromPacketStreamFn   = tshark.BuildMediaAnalysisFromPacketStream
+	buildC2SampleAnalysisFromPacketsFn     = buildC2SampleAnalysisFromPackets
+	warmSpecializedFieldCacheFn            = tshark.WarmSpecializedFieldCache
+)
 
 func cachedAnalysis[T any](ctx context.Context, mu *sync.RWMutex, pcap string, input analysisCacheInput[T]) (T, error) {
 	var zero T
@@ -46,18 +125,39 @@ func cachedAnalysis[T any](ctx context.Context, mu *sync.RWMutex, pcap string, i
 		return zero, err
 	}
 
-	result, err := input.builder(currentPCAP)
+	build := func() (T, error) { return input.builder(currentPCAP) }
+	var (
+		result T
+		err    error
+	)
+	if input.inFlight != nil && strings.TrimSpace(input.key) != "" {
+		result, err = doInFlightAnalysis(ctx, input.inFlight, input.key, build)
+	} else {
+		result, err = build()
+	}
 	if err != nil {
 		return zero, err
 	}
 
 	mu.Lock()
-	if input.getCached() == nil && pcap == currentPCAP {
+	isCurrent := input.isCurrent
+	if isCurrent == nil {
+		isCurrent = func(string) bool { return true }
+	}
+	if input.getCached() == nil && isCurrent(currentPCAP) {
 		input.setCached(&result)
 	}
-	out := *input.getCached()
+	cached = input.getCached()
 	mu.Unlock()
+	if cached == nil {
+		return zero, context.Canceled
+	}
+	out := *cached
 	return out, nil
+}
+
+func analysisInFlightKey(pcap, operation string) string {
+	return strings.TrimSpace(pcap) + "\x00" + strings.TrimSpace(operation)
 }
 
 func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
@@ -65,10 +165,16 @@ func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
 }
 
 func (s *Service) GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error) {
-	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.GlobalTrafficStats]{
+	s.mu.RLock()
+	pcap := s.pcap
+	s.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.GlobalTrafficStats]{
 		getCached: func() *model.GlobalTrafficStats { return s.globalTrafficStats },
 		setCached: func(v *model.GlobalTrafficStats) { s.globalTrafficStats = v },
-		builder:   tshark.BuildGlobalTrafficStatsFromFile,
+		builder:   buildGlobalTrafficStatsFromFileFn,
+		inFlight:  &s.inFlightAnalysis,
+		key:       analysisInFlightKey(pcap, "global-traffic-stats"),
+		isCurrent: func(candidate string) bool { return s.pcap == candidate },
 	})
 }
 
@@ -77,20 +183,26 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 }
 
 func (s *Service) IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error) {
-	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.IndustrialAnalysis]{
+	s.mu.RLock()
+	pcap := s.pcap
+	s.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.IndustrialAnalysis]{
 		getCached: func() *model.IndustrialAnalysis { return s.industrialAnalysis },
 		setCached: func(v *model.IndustrialAnalysis) { s.industrialAnalysis = v },
 		builder: func(pcap string) (model.IndustrialAnalysis, error) {
-			if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+			if err := warmSpecializedFieldCacheFn(pcap); err != nil {
 				log.Printf("engine: specialized field cache warm failed for industrial analysis: %v", err)
 			}
-			analysis, err := tshark.BuildIndustrialAnalysisFromFile(pcap)
+			analysis, err := buildIndustrialAnalysisFromFileFn(pcap)
 			if err != nil {
 				return analysis, err
 			}
 			analysis.Report = buildIndustrialInvestigationReport(analysis)
 			return analysis, nil
 		},
+		inFlight:  &s.inFlightAnalysis,
+		key:       analysisInFlightKey(pcap, "industrial"),
+		isCurrent: func(candidate string) bool { return s.pcap == candidate },
 	})
 }
 
@@ -99,24 +211,30 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 }
 
 func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error) {
-	return cachedAnalysis(ctx, &s.mu, s.pcap, analysisCacheInput[model.VehicleAnalysis]{
+	s.mu.RLock()
+	pcap := s.pcap
+	s.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.VehicleAnalysis]{
 		getCached: func() *model.VehicleAnalysis { return s.vehicleAnalysis },
 		setCached: func(v *model.VehicleAnalysis) { s.vehicleAnalysis = v },
 		builder: func(pcap string) (model.VehicleAnalysis, error) {
-			if err := tshark.WarmSpecializedFieldCache(pcap); err != nil {
+			if err := warmSpecializedFieldCacheFn(pcap); err != nil {
 				log.Printf("engine: specialized field cache warm failed for vehicle analysis: %v", err)
 			}
 			s.mu.RLock()
 			dbcDefs := append([]*tshark.DBCDatabase(nil), s.vehicleDBCDefs...)
 			s.mu.RUnlock()
 
-			analysis, err := tshark.BuildVehicleAnalysisFromFile(pcap, dbcDefs...)
+			analysis, err := buildVehicleAnalysisFromFileFn(pcap, dbcDefs...)
 			if err != nil {
 				return analysis, err
 			}
 			analysis.Report = buildVehicleInvestigationReport(analysis)
 			return analysis, nil
 		},
+		inFlight:  &s.inFlightAnalysis,
+		key:       analysisInFlightKey(pcap, "vehicle"),
+		isCurrent: func(candidate string) bool { return s.pcap == candidate },
 	})
 }
 
@@ -140,6 +258,21 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	if strings.TrimSpace(pcap) == "" {
 		return model.MediaAnalysis{}, errors.New("no capture loaded")
 	}
+	if !force {
+		return doInFlightAnalysis(context.Background(), &s.inFlightAnalysis, analysisInFlightKey(pcap, "media"), func() (model.MediaAnalysis, error) {
+			s.mu.RLock()
+			cached := s.mediaAnalysis
+			s.mu.RUnlock()
+			if cached != nil {
+				return *cached, nil
+			}
+			return s.mediaAnalysisCold(pcap, false)
+		})
+	}
+	return s.mediaAnalysisCold(pcap, true)
+}
+
+func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysis, error) {
 	s.emitStatus("__progress__:media:0:3:准备媒体流分析")
 	cfg := s.buildMediaScanConfig(pcap)
 
@@ -160,7 +293,7 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 
 	if s.packetStore != nil && s.packetStore.Count() > 0 {
 		packetCount := s.packetStore.Count()
-		analysis, artifacts, err = tshark.BuildMediaAnalysisFromPacketStream(tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
+		analysis, artifacts, err = buildMediaAnalysisFromPacketStreamFn(tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
 			return s.packetStore.Iterate(nil, onPacket)
 		})
 		if err != nil {
@@ -174,7 +307,7 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	}
 
 	if err == nil && analysis.TotalMediaPackets == 0 && len(analysis.Sessions) == 0 {
-		analysis, artifacts, err = tshark.BuildMediaAnalysisFromFileWithConfig(pcap, tempDir, cfg, progressFn)
+		analysis, artifacts, err = buildMediaAnalysisFromFileWithConfigFn(pcap, tempDir, cfg, progressFn)
 	}
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
@@ -183,6 +316,11 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 	}
 
 	s.mu.Lock()
+	if s.pcap != pcap {
+		s.mu.Unlock()
+		_ = os.RemoveAll(tempDir)
+		return model.MediaAnalysis{}, context.Canceled
+	}
 	if force {
 		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
 			_ = os.RemoveAll(s.mediaExportDir)
@@ -332,11 +470,17 @@ func (s *Service) USBAnalysisWithOptions(ctx context.Context, opts model.USBAnal
 		return model.USBAnalysis{}, err
 	}
 
-	analysis, err := tshark.BuildUSBAnalysisFromFileWithOptions(pcap, model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
+	analysis, err := doInFlightAnalysis(ctx, &s.inFlightAnalysis, analysisInFlightKey(pcap, "usb:"+cacheKey), func() (model.USBAnalysis, error) {
+		analysis, err := buildUSBAnalysisFromFileWithOptionsFn(pcap, model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
+		if err != nil {
+			return model.USBAnalysis{}, err
+		}
+		analysis.Report = buildUSBInvestigationReport(analysis)
+		return analysis, nil
+	})
 	if err != nil {
 		return model.USBAnalysis{}, err
 	}
-	analysis.Report = buildUSBInvestigationReport(analysis)
 
 	s.mu.Lock()
 	if s.pcap != pcap {
@@ -367,6 +511,9 @@ func usbAnalysisCacheKey(mode model.USBHIDSourceMode, hidEventLimit int) string 
 }
 
 func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := ctx.Err(); err != nil {
 		return model.C2SampleAnalysis{}, err
 	}
@@ -380,6 +527,27 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 		return *cached, nil
 	}
 
+	analysis, err := doInFlightAnalysis(ctx, &s.inFlightAnalysis, analysisInFlightKey(pcap, "c2-sample"), func() (model.C2SampleAnalysis, error) {
+		return s.buildC2SampleAnalysisCold(pcap)
+	})
+	if err != nil {
+		return model.C2SampleAnalysis{}, err
+	}
+
+	s.mu.Lock()
+	if s.c2Analysis == nil && strings.TrimSpace(s.pcap) == pcap {
+		s.c2Analysis = &analysis
+	}
+	cached = s.c2Analysis
+	s.mu.Unlock()
+	if cached == nil {
+		return model.C2SampleAnalysis{}, context.Canceled
+	}
+	out := *cached
+	return out, nil
+}
+
+func (s *Service) buildC2SampleAnalysisCold(pcap string) (model.C2SampleAnalysis, error) {
 	var analysis model.C2SampleAnalysis
 	if pcap == "" {
 		analysis = emptyC2SampleAnalysis()
@@ -392,7 +560,7 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 		if err != nil {
 			return model.C2SampleAnalysis{}, err
 		}
-		analysis, err = buildC2SampleAnalysisFromPackets(ctx, packets)
+		analysis, err = buildC2SampleAnalysisFromPacketsFn(context.Background(), packets)
 		if err != nil {
 			return model.C2SampleAnalysis{}, err
 		}
@@ -401,20 +569,9 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 			"Silver Fox / 银狐相关字段已预埋为归因扩展口，后续独立 APT 页面可复用这里的技术证据。",
 		)
 	}
-
-	if err := ctx.Err(); err != nil {
-		return model.C2SampleAnalysis{}, err
-	}
 	analysis.CS.Report = buildC2FamilyInvestigationReport("cs", analysis.CS)
 	analysis.VShell.Report = buildC2FamilyInvestigationReport("vshell", analysis.VShell)
-
-	s.mu.Lock()
-	if s.c2Analysis == nil {
-		s.c2Analysis = &analysis
-	}
-	out := *s.c2Analysis
-	s.mu.Unlock()
-	return out, nil
+	return analysis, nil
 }
 
 func emptyC2SampleAnalysis() model.C2SampleAnalysis {

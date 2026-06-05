@@ -1,0 +1,19 @@
+Task 4 evidence log: WebShell version unavailable state
+
+Date: 2026-06-05
+Scope: frontend only
+
+No-version behavior:
+- Version is read only from existing metadata (`decoderOptionsHint.versionHint` or `decoderOptionsHint.version`).
+- When neither field is present, the UI shows the explicit unavailable label `未提供`.
+- The UI does not synthesize Behinder/AntSword/Godzilla/China Chopper versions from family guesses, decoder hints, or fingerprints.
+
+Touched surfaces:
+- `frontend/src/app/misc/modules/PayloadWebShellSourceList.tsx`
+- `frontend/src/app/components/StreamDecoderCandidatePanel.tsx`
+- `frontend/src/app/components/StreamDecoderCandidateCard.tsx`
+
+Test coverage:
+- `frontend/src/app/components/webShellMetadata.test.ts` verifies `未提供` when no version hint exists.
+- `frontend/src/app/misc/modules/PayloadWebShellSourceUtils.test.ts` verifies version display stays unavailable for sparse metadata and uses `v2.0` when explicitly provided.
+- `frontend/src/app/pages/MiscTools.test.tsx` verifies the rendered China Chopper source shows the explicit unavailable version state.

@@ -3,10 +3,22 @@ package engine
 import (
 	"context"
 	"errors"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+type recordingEvidenceEmitter struct {
+	statuses []string
+}
+
+func (e *recordingEvidenceEmitter) EmitPacket(model.Packet) {}
+func (e *recordingEvidenceEmitter) EmitStatus(status string) {
+	e.statuses = append(e.statuses, status)
+}
+func (e *recordingEvidenceEmitter) EmitError(string) {}
 
 func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 	svc := NewService(nil)
@@ -78,7 +90,8 @@ func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 }
 
 func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
-	svc := NewService(nil)
+	emitter := &recordingEvidenceEmitter{}
+	svc := NewService(emitter)
 	t.Cleanup(func() {
 		_ = svc.packetStore.Close()
 	})
@@ -89,6 +102,48 @@ func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
+	if len(emitter.statuses) != 1 {
+		t.Fatalf("expected one canceled timing status, got %+v", emitter.statuses)
+	}
+	assertEvidenceTimingStatus(t, emitter.statuses[0], "industrial", "canceled")
+}
+
+func TestGatherEvidenceEmitsCollectorTimingStatuses(t *testing.T) {
+	emitter := &recordingEvidenceEmitter{}
+	svc := NewService(emitter)
+	t.Cleanup(func() {
+		_ = svc.packetStore.Close()
+	})
+
+	svc.vehicleAnalysis = &model.VehicleAnalysis{
+		UDS: model.UDSAnalysis{
+			Transactions: []model.UDSTransaction{{
+				RequestPacketID:  101,
+				ResponsePacketID: 102,
+				ServiceID:        "0x27",
+				ServiceName:      "Security Access",
+				Status:           "negative",
+				NegativeCode:     "0x33",
+				RequestSummary:   "security access request",
+				ResponseSummary:  "security access denied",
+			}},
+		},
+	}
+
+	result, err := svc.GatherEvidence(context.Background(), model.EvidenceFilter{Modules: []string{"vehicle", "apt"}})
+	if err != nil {
+		t.Fatalf("GatherEvidence() error = %v", err)
+	}
+	if result.Total != 1 {
+		t.Fatalf("expected one vehicle evidence record, got %d", result.Total)
+	}
+	if len(emitter.statuses) != 2 {
+		t.Fatalf("expected two timing statuses, got %+v", emitter.statuses)
+	}
+	assertEvidenceTimingStatus(t, emitter.statuses[0], "apt", "ok")
+	assertEvidenceTimingStatus(t, emitter.statuses[1], "vehicle", "ok")
+	assertEvidenceTimingRecordCount(t, emitter.statuses[0], "0")
+	assertEvidenceTimingRecordCount(t, emitter.statuses[1], "1")
 }
 
 func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
@@ -387,6 +442,26 @@ func containsEvidenceString(items []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func assertEvidenceTimingStatus(t *testing.T, status, module, wantState string) {
+	t.Helper()
+	pattern := regexp.MustCompile(`^__evidence_timing__:[a-z]+:[0-9]+:[0-9]+:(ok|error|canceled)$`)
+	if !pattern.MatchString(status) {
+		t.Fatalf("expected parseable evidence timing status, got %q", status)
+	}
+	parts := strings.Split(status, ":")
+	if parts[1] != module || parts[4] != wantState {
+		t.Fatalf("expected module=%s status=%s, got %q", module, wantState, status)
+	}
+}
+
+func assertEvidenceTimingRecordCount(t *testing.T, status, want string) {
+	t.Helper()
+	parts := strings.Split(status, ":")
+	if parts[3] != want {
+		t.Fatalf("expected evidence timing record count %s, got %q", want, status)
+	}
 }
 
 func TestExtractObjectsDetectsMagicAndRefinesMIME(t *testing.T) {

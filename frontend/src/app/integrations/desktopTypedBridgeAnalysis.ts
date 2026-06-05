@@ -13,6 +13,8 @@ import { asUSBAnalysis } from "./mappers/usbMapper";
 import { asVehicleAnalysis } from "./mappers/vehicleMapper";
 import type { C2DecryptResultWireDTO } from "./wire/c2DecryptWireDtos";
 
+export const EVIDENCE_TYPED_IPC_TIMEOUT_MS = 30000;
+
 export function createAnalysisEvidenceTypedOverrides(desktopApp: DesktopTransportBinding): Partial<BackendBridge> {
   return {
     async getGlobalTrafficStats(signal) {
@@ -60,7 +62,9 @@ export function createAnalysisEvidenceTypedOverrides(desktopApp: DesktopTranspor
       return asAPTAnalysis(await typedCall(() => desktopApp.GetAPTAnalysis!(), "DesktopApp.GetAPTAnalysis", signal));
     },
     async getEvidence(signal) {
-      return parseEvidenceRecords(await typedCall(() => desktopApp.GetEvidence!(), "DesktopApp.GetEvidence", signal));
+      return parseEvidenceRecords(
+        await typedCall(() => desktopApp.GetEvidence!(), "DesktopApp.GetEvidence", signal, EVIDENCE_TYPED_IPC_TIMEOUT_MS),
+      );
     },
     async getEvidenceWithFilter(modules, signal) {
       return parseEvidenceRecords(
@@ -68,6 +72,7 @@ export function createAnalysisEvidenceTypedOverrides(desktopApp: DesktopTranspor
           () => desktopApp.GetEvidenceWithFilter!(Array.isArray(modules) ? modules : []),
           "DesktopApp.GetEvidenceWithFilter",
           signal,
+          EVIDENCE_TYPED_IPC_TIMEOUT_MS,
         ),
       );
     },

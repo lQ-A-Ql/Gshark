@@ -16,6 +16,7 @@ const EMPTY_STATS: GlobalTrafficStats = {
   timeline: [],
   protocolDist: [],
   topTalkers: [],
+  topConversations: [],
   topHostnames: [],
   topDomains: [],
   topSrcIPs: [],

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GlobalTrafficStats, Packet } from "../../core/types";
+import type { GlobalTrafficStats, Packet, TrafficConversation } from "../../core/types";
 import { isAbortLikeError, useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
+import { buildTimelineBucketsFromPacketTimes } from "./trafficTimeline";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
@@ -9,6 +10,7 @@ export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   timeline: [],
   protocolDist: [],
   topTalkers: [],
+  topConversations: [],
   topHostnames: [],
   topDomains: [],
   topSrcIPs: [],
@@ -142,7 +144,8 @@ function extractComputerName(packet: Packet): string {
 
 export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
   const protocolCounts = new Map<string, number>();
-  const talkerCounts = new Map<string, number>();
+  const endpointCounts = new Map<string, number>();
+  const conversationCounts = new Map<string, number>();
   const domainCounts = new Map<string, number>();
   const srcIPCounts = new Map<string, number>();
   const dstIPCounts = new Map<string, number>();
@@ -152,10 +155,21 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
 
   for (const packet of packets) {
     protocolCounts.set(packet.proto, (protocolCounts.get(packet.proto) ?? 0) + 1);
-    const talker = `${packet.src} → ${packet.dst}`;
-    talkerCounts.set(talker, (talkerCounts.get(talker) ?? 0) + 1);
-    srcIPCounts.set(packet.src, (srcIPCounts.get(packet.src) ?? 0) + 1);
-    dstIPCounts.set(packet.dst, (dstIPCounts.get(packet.dst) ?? 0) + 1);
+    const src = packet.src.trim();
+    const dst = packet.dst.trim();
+
+    if (src) {
+      endpointCounts.set(src, (endpointCounts.get(src) ?? 0) + 1);
+      srcIPCounts.set(src, (srcIPCounts.get(src) ?? 0) + 1);
+    }
+    if (dst) {
+      endpointCounts.set(dst, (endpointCounts.get(dst) ?? 0) + 1);
+      dstIPCounts.set(dst, (dstIPCounts.get(dst) ?? 0) + 1);
+    }
+    if (src && dst) {
+      const conversationKey = `${src}\u0000${dst}`;
+      conversationCounts.set(conversationKey, (conversationCounts.get(conversationKey) ?? 0) + 1);
+    }
     if (packet.dstPort > 0) {
       dstPortCounts.set(String(packet.dstPort), (dstPortCounts.get(String(packet.dstPort)) ?? 0) + 1);
     }
@@ -178,12 +192,25 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
       .slice(0, limit)
       .map(([label, count]) => ({ label, count }));
 
+  const topConversations: TrafficConversation[] = Array.from(conversationCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 200)
+    .map(([conversationKey, count]) => {
+      const [src, dst] = conversationKey.split("\u0000");
+      return {
+        src: src ?? "",
+        dst: dst ?? "",
+        count,
+      };
+    });
+
   return {
     totalPackets: packets.length,
     protocolKinds: protocolCounts.size,
-    timeline: [],
+    timeline: buildTimelineBucketsFromPacketTimes(packets.map((packet) => packet.time)),
     protocolDist: toBuckets(protocolCounts, 20),
-    topTalkers: toBuckets(talkerCounts),
+    topTalkers: toBuckets(endpointCounts),
+    topConversations,
     topHostnames: toBuckets(domainCounts),
     topDomains: toBuckets(domainCounts),
     topSrcIPs: toBuckets(srcIPCounts),

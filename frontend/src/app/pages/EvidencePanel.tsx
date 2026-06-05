@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, FileSearch, Network, Shield } from "lucide-react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { MetricCard, SurfacePanel } from "../components/DesignSystem";
@@ -50,14 +50,27 @@ export default function EvidencePanel() {
     modules: selectedModules.length > 0 ? selectedModules : undefined,
   });
 
-  const { sorted, severityCounts, report, facetGroups, summaryMetrics, selectedRecord, exportCSV, exportJSON } =
-    useEvidencePanelModel(
-      evidence,
-      query,
-      severityFilter,
-      facets,
-      selectedRecordId,
-    );
+  const {
+    sorted,
+    visibleRecords,
+    visibleLimit,
+    hasMoreVisibleRecords,
+    severityCounts,
+    report,
+    facetGroups,
+    summaryMetrics,
+    selectedRecord,
+    effectiveSelectedRecordId,
+    showNextVisibleRecords,
+    exportCSV,
+    exportJSON,
+  } = useEvidencePanelModel(evidence, query, severityFilter, facets, selectedRecordId);
+
+  useEffect(() => {
+    if (selectedRecordId !== effectiveSelectedRecordId) {
+      setSelectedRecordId(effectiveSelectedRecordId);
+    }
+  }, [effectiveSelectedRecordId, selectedRecordId]);
 
   const toggleModule = (module: string) =>
     setSelectedModules((prev) => (prev.includes(module) ? prev.filter((item) => item !== module) : [...prev, module]));
@@ -121,14 +134,37 @@ export default function EvidencePanel() {
           description="高密度列表支持选中单条证据，并在右侧查看结构化细节。"
           className="min-w-0"
           bodyClassName="space-y-3"
-          actions={<span className="meow-diffuse-chip px-2 py-1 text-[10px] text-slate-500">Investigation Center</span>}
+          actions={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {sorted.length > visibleRecords.length ? (
+                <span className="meow-diffuse-chip px-2 py-1 text-[10px] text-slate-500">
+                  Showing {visibleRecords.length} of {sorted.length} evidence records
+                </span>
+              ) : null}
+              <span className="meow-diffuse-chip px-2 py-1 text-[10px] text-slate-500">Investigation Center</span>
+            </div>
+          }
         >
           <EvidenceTable
             loading={loading}
-            records={sorted}
+            records={visibleRecords}
             selectedId={selectedRecord?.id ?? null}
             onSelect={setSelectedRecordId}
           />
+          {hasMoreVisibleRecords ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500">
+                已加载 {visibleRecords.length} / {sorted.length} 条筛选结果，点击继续显示后续 {Math.min(visibleLimit + 200, sorted.length) - visibleRecords.length} 条。
+              </div>
+              <button
+                type="button"
+                onClick={showNextVisibleRecords}
+                className="meow-control-ghost rounded border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-indigo-200 hover:text-indigo-700"
+              >
+                Show next 200
+              </button>
+            </div>
+          ) : null}
           <EvidenceCaveats records={sorted} />
         </SurfacePanel>
         <div className="min-w-0 space-y-3">

@@ -9,6 +9,7 @@ describe("TrafficGraphOverview", () => {
     timeline: [],
     protocolDist: [],
     topTalkers: [],
+    topConversations: [],
     topHostnames: [],
     topDomains: [],
     topSrcIPs: [],

@@ -1,0 +1,6 @@
+Task 6 JA3 empty-state evidence
+
+- Missing fingerprint data does not render fake hashes or empty placeholder values.
+- For TLS / HTTPS packets with no `tls_fingerprint`, the selected-packet pane shows: `当前 TLS / HTTPS 数据包未提供 JA3 或 JA3S 指纹；仅在后端已解析到 tls_fingerprint 时显示。`
+- For non-TLS packets with no fingerprint data, no JA3 availability note is shown.
+- Locked by tests in `frontend/src/app/components/workspace/HexAsciiPanel.test.tsx`.

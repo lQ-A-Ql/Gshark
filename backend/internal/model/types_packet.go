@@ -72,15 +72,16 @@ type PacketColorFeatures struct {
 }
 
 type ThreatHit struct {
-	ID           int64    `json:"id"`
-	PacketID     int64    `json:"packet_id"`
-	Category     string   `json:"category"`
-	Rule         string   `json:"rule"`
-	Level        string   `json:"level"`
-	Preview      string   `json:"preview"`
-	Match        string   `json:"match"`
-	TechniqueIDs []string `json:"technique_ids,omitempty"`
-	TacticIDs    []string `json:"tactic_ids,omitempty"`
+	ID           int64             `json:"id"`
+	PacketID     int64             `json:"packet_id"`
+	Category     string            `json:"category"`
+	Rule         string            `json:"rule"`
+	Level        string            `json:"level"`
+	Preview      string            `json:"preview"`
+	Match        string            `json:"match"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	TechniqueIDs []string          `json:"technique_ids,omitempty"`
+	TacticIDs    []string          `json:"tactic_ids,omitempty"`
 }
 
 type ParseOptions struct {
@@ -184,6 +185,12 @@ type TrafficBucket struct {
 	Count int    `json:"count"`
 }
 
+type TrafficConversation struct {
+	Src   string `json:"src"`
+	Dst   string `json:"dst"`
+	Count int    `json:"count"`
+}
+
 type ProtocolTreeNode struct {
 	Name     string             `json:"name"`
 	Count    int                `json:"count"`
@@ -191,19 +198,20 @@ type ProtocolTreeNode struct {
 }
 
 type GlobalTrafficStats struct {
-	TotalPackets      int                `json:"total_packets"`
-	ProtocolKinds     int                `json:"protocol_kinds"`
-	Timeline          []TrafficBucket    `json:"timeline"`
-	ProtocolDist      []TrafficBucket    `json:"protocol_dist"`
-	TopTalkers        []TrafficBucket    `json:"top_talkers"`
-	TopHostnames      []TrafficBucket    `json:"top_hostnames"`
-	TopDomains        []TrafficBucket    `json:"top_domains"`
-	TopSrcIPs         []TrafficBucket    `json:"top_src_ips"`
-	TopDstIPs         []TrafficBucket    `json:"top_dst_ips"`
-	TopComputerNames  []TrafficBucket    `json:"top_computer_names"`
-	TopDestPorts      []TrafficBucket    `json:"top_dest_ports"`
-	TopSrcPorts       []TrafficBucket    `json:"top_src_ports"`
-	ProtocolHierarchy []ProtocolTreeNode `json:"protocol_hierarchy,omitempty"`
+	TotalPackets      int                   `json:"total_packets"`
+	ProtocolKinds     int                   `json:"protocol_kinds"`
+	Timeline          []TrafficBucket       `json:"timeline"`
+	ProtocolDist      []TrafficBucket       `json:"protocol_dist"`
+	TopTalkers        []TrafficBucket       `json:"top_talkers"`
+	TopConversations  []TrafficConversation `json:"top_conversations"`
+	TopHostnames      []TrafficBucket       `json:"top_hostnames"`
+	TopDomains        []TrafficBucket       `json:"top_domains"`
+	TopSrcIPs         []TrafficBucket       `json:"top_src_ips"`
+	TopDstIPs         []TrafficBucket       `json:"top_dst_ips"`
+	TopComputerNames  []TrafficBucket       `json:"top_computer_names"`
+	TopDestPorts      []TrafficBucket       `json:"top_dest_ports"`
+	TopSrcPorts       []TrafficBucket       `json:"top_src_ports"`
+	ProtocolHierarchy []ProtocolTreeNode    `json:"protocol_hierarchy,omitempty"`
 }
 
 type AnalysisConversation struct {

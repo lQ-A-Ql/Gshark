@@ -1,0 +1,407 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img "Logo" [ref=e8]
+        - navigation [ref=e9]:
+          - button "文件" [ref=e11]
+          - button "编辑" [ref=e13]
+          - button "视图" [ref=e15]
+          - button "解密" [ref=e17]
+          - button "分析" [ref=e19]
+          - button "统计" [ref=e21]
+      - generic [ref=e22]:
+        - button "打开设置侧栏" [ref=e23]:
+          - img [ref=e24]
+        - generic [ref=e27]:
+          - img [ref=e28]
+          - text: OWASP
+        - generic [ref=e30]:
+          - img [ref=e31]
+          - text: CTF
+        - button "解密" [ref=e33]:
+          - img [ref=e34]
+          - text: 解密
+  - generic [ref=e37]:
+    - complementary [ref=e38]:
+      - link "主工作区" [ref=e39] [cursor=pointer]:
+        - /url: /
+        - img [ref=e40]
+      - link "分析驾驶舱" [ref=e45] [cursor=pointer]:
+        - /url: /analysis-cockpit
+        - img [ref=e46]
+      - link "C2 样本分析" [ref=e53] [cursor=pointer]:
+        - /url: /c2-analysis
+        - img [ref=e54]
+      - link "APT 组织画像" [ref=e63] [cursor=pointer]:
+        - /url: /apt-analysis
+        - img [ref=e64]
+      - link "证据链总览" [ref=e66] [cursor=pointer]:
+        - /url: /evidence
+        - img [ref=e67]
+      - link "流量图" [ref=e71] [cursor=pointer]:
+        - /url: /traffic-graph
+        - img [ref=e72]
+      - link "工控分析" [ref=e74] [cursor=pointer]:
+        - /url: /industrial-analysis
+        - img [ref=e75]
+      - link "车机分析" [ref=e77] [cursor=pointer]:
+        - /url: /vehicle-analysis
+        - img [ref=e78]
+      - link "媒体流还原" [ref=e82] [cursor=pointer]:
+        - /url: /media-analysis
+        - img [ref=e83]
+      - link "USB 分析" [ref=e88] [cursor=pointer]:
+        - /url: /usb-analysis
+        - img [ref=e89]
+      - link "威胁狩猎中心" [ref=e97] [cursor=pointer]:
+        - /url: /hunting
+        - img [ref=e98]
+      - link "附件提取" [ref=e100] [cursor=pointer]:
+        - /url: /objects
+        - img [ref=e101]
+      - link "MISC 工具箱" [ref=e105] [cursor=pointer]:
+        - /url: /misc
+        - img [ref=e106]
+      - link "检查更新" [ref=e108] [cursor=pointer]:
+        - /url: /updates
+        - img [ref=e109]
+    - main [ref=e114]:
+      - main [ref=e117]:
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - img [ref=e123]
+            - generic [ref=e126]:
+              - heading "证据链总览" [level=1] [ref=e127]
+              - generic [ref=e128]: UNIFIED EVIDENCE
+          - generic [ref=e130]:
+            - paragraph [ref=e131]: "将现有 Evidence 路由提升为调查中心: 左侧切面、中央高密度结果、右侧详情面板，并保留报告、导出与搜索能力。"
+            - generic [ref=e132]:
+              - generic [ref=e133]: 证据域
+              - generic [ref=e134]: 威胁狩猎
+              - generic [ref=e135]: C2
+              - generic [ref=e136]: APT
+              - generic [ref=e137]: 工控
+              - generic [ref=e138]: 车机
+              - generic [ref=e139]: USB
+              - generic [ref=e140]: 对象
+              - generic [ref=e141]: 统一 Schema
+        - generic [ref=e142]:
+          - region "全部证据" [ref=e143]:
+            - img [ref=e145]
+            - generic [ref=e150]:
+              - generic [ref=e151]: 全部证据
+              - generic [ref=e152]: "0"
+              - generic [ref=e153]: 当前显示 0 条
+          - region "严重 / 高危" [ref=e154]:
+            - img [ref=e156]
+            - generic [ref=e158]:
+              - generic [ref=e159]: 严重 / 高危
+              - generic [ref=e160]: "0"
+              - generic [ref=e161]: 优先建立调查链
+          - region "原始包绑定" [ref=e162]:
+            - img [ref=e164]
+            - generic [ref=e166]:
+              - generic [ref=e167]: 原始包绑定
+              - generic [ref=e168]: "0"
+              - generic [ref=e169]: 可直接回跳定位
+          - region "关联流绑定" [ref=e170]:
+            - img [ref=e172]
+            - generic [ref=e177]:
+              - generic [ref=e178]: 关联流绑定
+              - generic [ref=e179]: "0"
+              - generic [ref=e180]: 0 个模块参与聚合
+        - generic [ref=e181]:
+          - generic [ref=e184]:
+            - generic [ref=e186]: 检索与快筛
+            - generic [ref=e187]: 现有搜索、模块筛选、严重级别和导出能力全部保留。
+          - generic [ref=e188]:
+            - generic [ref=e189]:
+              - button "严重 · 0" [ref=e190]
+              - button "高危 · 0" [ref=e191]
+              - button "中危 · 0" [ref=e192]
+              - button "低危 · 0" [ref=e193]
+              - button "信息 · 0" [ref=e194]
+            - generic [ref=e195]:
+              - generic [ref=e196]:
+                - generic [ref=e197]:
+                  - img [ref=e198]
+                  - textbox "搜索摘要、IOC、规则、主机、URI、标签..." [ref=e201]
+                - generic [ref=e202]:
+                  - generic [ref=e203]: 0 / 0 条
+                  - button "JSON" [ref=e204]:
+                    - img [ref=e205]
+                    - text: JSON
+                  - button "CSV" [ref=e208]:
+                    - img [ref=e209]
+                    - text: CSV
+              - generic [ref=e212]:
+                - img [ref=e213]
+                - button "威胁狩猎" [ref=e215]
+                - button "C2 分析" [ref=e216]
+                - button "APT 画像" [ref=e217]
+                - button "工控分析" [ref=e218]
+                - button "对象导出" [ref=e219]
+                - button "车机分析" [ref=e220]
+                - button "USB 分析" [ref=e221]
+                - button "媒体分析" [ref=e222]
+                - button "MISC 分析" [ref=e223]
+        - generic [ref=e224]:
+          - generic [ref=e225]:
+            - generic [ref=e226]:
+              - generic [ref=e227]: report schema
+              - heading "统一证据调查报告" [level=3] [ref=e228]
+            - generic [ref=e229]: 摘要 / 证据 / 明细 / 建议
+          - generic [ref=e230]:
+            - generic [ref=e231]:
+              - generic [ref=e232]: 摘要
+              - generic [ref=e233]:
+                - generic [ref=e234]:
+                  - generic [ref=e236]:
+                    - generic [ref=e237]: 统一证据概览
+                    - generic [ref=e238]: 共 0 条证据 / 模块 0 个
+                  - generic [ref=e239]:
+                    - generic [ref=e240]: evidence
+                    - generic [ref=e241]: summary
+                - generic [ref=e242]:
+                  - generic [ref=e244]:
+                    - generic [ref=e245]: 高危分布
+                    - generic [ref=e246]: 严重 0 / 高危 0 / 中危 0
+                  - generic [ref=e247]:
+                    - generic [ref=e248]: evidence
+                    - generic [ref=e249]: severity
+            - generic [ref=e250]:
+              - generic [ref=e251]: 证据
+              - generic [ref=e252]: 当前分段暂无条目。
+            - generic [ref=e253]:
+              - generic [ref=e254]: 明细
+              - generic [ref=e255]: 当前分段暂无条目。
+            - generic [ref=e256]:
+              - generic [ref=e257]: 建议
+              - generic [ref=e259]: 当前尚未聚合到主线证据，可先从威胁狩猎、协议分析和对象导出结果中回溯可复核线索。
+        - generic [ref=e260]:
+          - generic [ref=e262]:
+            - generic [ref=e264]:
+              - generic [ref=e265]:
+                - generic [ref=e267]: 调查切面
+                - generic [ref=e268]: 按现有证据字段组合筛选结果，未提供的字段不会伪造补全。
+              - button "清空切面" [ref=e270]
+            - generic [ref=e272]: 当前证据未提供更多 feature/entity 字段，侧栏仅展示已支持的切面。
+          - generic [ref=e274]:
+            - generic [ref=e276]:
+              - generic [ref=e277]:
+                - generic [ref=e279]: 证据结果 (0)
+                - generic [ref=e280]: 高密度列表支持选中单条证据，并在右侧查看结构化细节。
+              - generic [ref=e281]: Investigation Center
+            - table [ref=e284]:
+              - rowgroup [ref=e285]:
+                - row "等级 模块 / 类型 调查摘要 上下文 置信" [ref=e286]:
+                  - columnheader "等级" [ref=e287]
+                  - columnheader "模块 / 类型" [ref=e288]
+                  - columnheader "调查摘要" [ref=e289]
+                  - columnheader "上下文" [ref=e290]
+                  - columnheader "置信" [ref=e291]
+              - rowgroup [ref=e292]:
+                - row "当前抓包未产生证据记录" [ref=e293]:
+                  - cell "当前抓包未产生证据记录" [ref=e294]
+          - generic [ref=e295]:
+            - generic [ref=e296]:
+              - img [ref=e297]
+              - text: "详情面板仅展示当前证据实际提供的字段，缺失内容会显示 `--` 或提示未提供。"
+            - generic [ref=e299]:
+              - generic [ref=e302]:
+                - generic [ref=e304]: 详细面板
+                - generic [ref=e305]: 选择一条证据后查看完整上下文。
+              - generic [ref=e307]: 当前没有可选证据，详情面板保持空白且不会生成虚构记录。
+  - generic [ref=e309]:
+    - generic [ref=e311]:
+      - generic [ref=e312]:
+        - generic [ref=e313]:
+          - generic [ref=e314]:
+            - generic [ref=e315]: Runtime Settings
+            - generic [ref=e316]: 运行时组件设置
+            - paragraph [ref=e317]: 输入框只代表显式配置路径；下方状态卡显示当前探测路径。保存后会立即重新检测。
+          - button "收起设置侧栏" [ref=e318]:
+            - img [ref=e319]
+        - generic [ref=e322]:
+          - generic [ref=e323]:
+            - generic [ref=e324]: TShark
+            - generic [ref=e325]: 就绪
+          - generic [ref=e326]:
+            - generic [ref=e327]: FFmpeg
+            - generic [ref=e328]: 就绪
+          - generic [ref=e329]:
+            - generic [ref=e330]: Speech
+            - generic [ref=e331]: 缺失
+          - generic [ref=e332]:
+            - generic [ref=e333]: YARA
+            - generic [ref=e334]: 缺失
+      - generic [ref=e335]:
+        - generic [ref=e336]:
+          - button "重新探测工具" [ref=e337]:
+            - img [ref=e338]
+            - text: 重新探测工具
+          - button "保存并应用" [disabled] [ref=e343]:
+            - img [ref=e344]
+            - text: 保存并应用
+        - generic [ref=e348]:
+          - generic [ref=e349]:
+            - generic [ref=e350]:
+              - img [ref=e352]
+              - text: MCP 本地接口
+            - generic [ref=e355]:
+              - generic [ref=e356]:
+                - generic [ref=e357]: 启用本机只读 MCP
+                - generic [ref=e358]: 仅监听 127.0.0.1，复用当前后端 bearer token，不提供远程绑定和 stdio bridge。
+              - generic [ref=e359]:
+                - checkbox "已启用" [ref=e360]
+                - text: 已启用
+            - generic [ref=e361]:
+              - generic [ref=e362]:
+                - generic [ref=e363]: 运行状态
+                - generic [ref=e364]: 本地 MCP 已关闭
+              - generic [ref=e365]:
+                - generic [ref=e366]: 传输层
+                - generic [ref=e367]: streamable-http
+              - generic [ref=e368]:
+                - generic [ref=e369]: 鉴权要求
+                - generic [ref=e370]: Bearer token
+              - generic [ref=e371]:
+                - generic [ref=e372]: 访问范围
+                - generic [ref=e373]: 仅本机 loopback
+              - generic [ref=e374]:
+                - generic [ref=e375]: 写入能力
+                - generic [ref=e376]: 只读分析
+              - generic [ref=e377]:
+                - generic [ref=e378]: 远程 / stdio
+                - generic [ref=e379]: remote:off / stdio:off
+            - generic [ref=e381]:
+              - generic [ref=e382]:
+                - generic [ref=e383]: MCP 端点
+                - generic [ref=e384]: http://127.0.0.1:17891/api/mcp
+              - button "复制端点" [ref=e385]:
+                - img [ref=e386]
+                - text: 复制端点
+            - generic [ref=e390]:
+              - generic [ref=e391]:
+                - generic [ref=e392]: Bearer Token
+                - generic [ref=e393]: qa-token
+              - button "复制 Token" [ref=e394]:
+                - img [ref=e395]
+                - text: 复制 Token
+            - button "刷新 MCP 状态" [ref=e399]:
+              - img [ref=e400]
+              - text: 刷新 MCP 状态
+          - generic [ref=e405]:
+            - generic [ref=e406]:
+              - img [ref=e408]
+              - text: 抓包与解析
+            - generic [ref=e413]:
+              - generic [ref=e414]: 显式配置：tshark 路径
+              - textbox "显式配置：tshark 路径 留空时使用后端进程的 PATH 或 Windows 默认 Wireshark 目录探测结果。 TShark 当前通过 PATH/默认路径探测到：C:\\Program Files\\Wireshark\\tshark.exe。填写并保存后才会固定为显式配置。" [ref=e415]:
+                - /placeholder: C:\\Program Files\\Wireshark\\tshark.exe
+              - generic [ref=e416]: 留空时使用后端进程的 PATH 或 Windows 默认 Wireshark 目录探测结果。 TShark 当前通过 PATH/默认路径探测到：C:\Program Files\Wireshark\tshark.exe。填写并保存后才会固定为显式配置。
+            - generic [ref=e417]:
+              - generic [ref=e418]:
+                - generic [ref=e419]: TShark
+                - generic [ref=e420]: 已就绪
+              - generic [ref=e421]: C:\Program Files\Wireshark\tshark.exe
+            - generic [ref=e422]:
+              - generic [ref=e423]:
+                - generic [ref=e424]: "版本: TShark (Wireshark) 4.6.5 (v4.6.5-0-gb40c46f83867)."
+                - generic [ref=e425]: "字段档案: full"
+                - generic [ref=e426]: "字段数: 269396"
+              - generic [ref=e427]: 能力探测：ok
+          - generic [ref=e428]:
+            - generic [ref=e429]:
+              - img [ref=e431]
+              - text: YARA 狩猎
+            - generic [ref=e433]:
+              - generic [ref=e434]:
+                - generic [ref=e435]: 启用 YARA 狩猎
+                - generic [ref=e436]: 关闭后会保留路径配置，只是不再参与对象与重组流内容的狩猎扫描。
+              - generic [ref=e437]:
+                - checkbox "已启用" [checked] [ref=e438]
+                - text: 已启用
+            - generic [ref=e439]:
+              - generic [ref=e440]:
+                - generic [ref=e441]: 显式配置：YARA 可执行路径
+                - textbox "显式配置：YARA 可执行路径 留空时使用 PATH 探测，保存不会自动把探测路径写入配置。" [ref=e442]:
+                  - /placeholder: C:\\tools\\yara64.exe
+                - generic [ref=e443]: 留空时使用 PATH 探测，保存不会自动把探测路径写入配置。
+              - generic [ref=e444]:
+                - generic [ref=e445]: 显式配置：YARA 规则文件
+                - textbox "显式配置：YARA 规则文件 留空时使用内置规则资源或默认规则目录，保存只提交输入框中的显式值。" [ref=e446]:
+                  - /placeholder: C:\\rules\\default.yar 或 C:\\rules\\traffic-pack\\
+                - generic [ref=e447]: 留空时使用内置规则资源或默认规则目录，保存只提交输入框中的显式值。
+              - generic [ref=e448]:
+                - generic [ref=e449]: YARA 超时（毫秒）
+                - spinbutton "YARA 超时（毫秒）" [ref=e450]: "25000"
+            - generic [ref=e451]:
+              - generic [ref=e452]:
+                - generic [ref=e453]: YARA
+                - generic [ref=e454]: 未就绪
+              - generic [ref=e455]: yara executable not found
+          - generic [ref=e456]:
+            - generic [ref=e457]:
+              - img [ref=e459]
+              - text: 媒体播放与转码
+            - generic [ref=e460]:
+              - generic [ref=e461]: 显式配置：ffmpeg 路径
+              - textbox "显式配置：ffmpeg 路径 留空时优先使用后端进程的 GSHARK_FFMPEG，未设置时再走 PATH 探测；保存只提交输入框中的显式值。 FFmpeg 当前通过 PATH/默认路径探测到：C:\\Users\\QAQ\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-full_build\\bin\\ffmpeg.exe。填写并保存后才会固定为显式配置。" [ref=e462]:
+                - /placeholder: C:\\ffmpeg\\bin\\ffmpeg.exe
+              - generic [ref=e463]: 留空时优先使用后端进程的 GSHARK_FFMPEG，未设置时再走 PATH 探测；保存只提交输入框中的显式值。 FFmpeg 当前通过 PATH/默认路径探测到：C:\Users\QAQ\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe。填写并保存后才会固定为显式配置。
+            - generic [ref=e464]:
+              - generic [ref=e465]:
+                - generic [ref=e466]: FFmpeg
+                - generic [ref=e467]: 已就绪
+              - generic [ref=e468]: C:\Users\QAQ\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe
+          - generic [ref=e469]:
+            - generic [ref=e470]:
+              - img [ref=e472]
+              - text: 离线语音转写
+            - generic [ref=e475]:
+              - generic [ref=e476]:
+                - generic [ref=e477]: 显式配置：Python 路径
+                - textbox "显式配置：Python 路径 留空时优先使用后端进程的 GSHARK_PYTHON，未设置时再尝试默认 Python 3。 Python 当前通过 PATH/默认路径探测到：python。填写并保存后才会固定为显式配置。" [ref=e478]:
+                  - /placeholder: C:\\Users\\QAQ\\AppData\\Local\\Programs\\Python\\Python311\\python.exe
+                - generic [ref=e479]: 留空时优先使用后端进程的 GSHARK_PYTHON，未设置时再尝试默认 Python 3。 Python 当前通过 PATH/默认路径探测到：python。填写并保存后才会固定为显式配置。
+              - generic [ref=e480]:
+                - generic [ref=e481]: 显式配置：Vosk 模型目录
+                - textbox "显式配置：Vosk 模型目录 留空时优先使用后端进程的 GSHARK_VOSK_MODEL，未设置时再检查默认模型目录。" [ref=e482]:
+                  - /placeholder: C:\\Users\\QAQ\\AppData\\Local\\meow-traffic\\models\\vosk\\zh-CN
+                - generic [ref=e483]: 留空时优先使用后端进程的 GSHARK_VOSK_MODEL，未设置时再检查默认模型目录。
+            - generic [ref=e484]:
+              - generic [ref=e485]:
+                - generic [ref=e486]: Speech To Text
+                - generic [ref=e487]: 未就绪
+              - generic [ref=e488]: 当前未就绪项：Vosk 模型目录缺失
+            - generic [ref=e490]: 缺少：Vosk 模型目录缺失
+            - generic [ref=e491]:
+              - generic [ref=e492]:
+                - generic [ref=e493]:
+                  - img [ref=e494]
+                  - text: Python
+                - generic [ref=e505]: python
+              - generic [ref=e506]:
+                - generic [ref=e507]:
+                  - img [ref=e508]
+                  - text: Vosk 模型
+                - generic [ref=e512]: C:\Users\QAQ\AppData\Local\meow-traffic\models\vosk\zh-CN
+      - generic [ref=e514]:
+        - img [ref=e515]
+        - generic [ref=e517]: "探测模式：完整；状态 full_ready；组件耗时：config 0ms / ffmpeg 4ms / speech 565ms / tshark 184ms / yara 20ms；提示：speech: 未检测到 Vosk 中文模型，请在设置中配置模型目录或放置到默认模型目录。 / yara: yara executable not found"
+    - button "Toggle Sidebar" [ref=e518]
+  - contentinfo [ref=e519]:
+    - generic [ref=e520]:
+      - generic [ref=e521]:
+        - generic "等待中" [ref=e522]
+        - text: "当前: (0 B)"
+      - generic [ref=e523]: "显示: 0 / 缓存: 0 / 后端总计: 0"
+    - generic [ref=e524]:
+      - generic [ref=e525]:
+        - img [ref=e526]
+        - text: "TLS 解密: 未配置"
+      - generic [ref=e529]:
+        - img [ref=e530]
+        - text: "引擎: 后端连接断开，16s 后重连..."

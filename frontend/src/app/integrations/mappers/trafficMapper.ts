@@ -1,5 +1,6 @@
-import type { GlobalTrafficStats, TrafficProtocolTreeNode } from "../../core/types";
-import type { GlobalTrafficStatsWireDTO } from "../wire/trafficWireDtos";
+import type { GlobalTrafficStats, TrafficConversation, TrafficProtocolTreeNode } from "../../core/types";
+import { normalizeTrafficTimelineBuckets } from "../../features/traffic/trafficTimeline";
+import type { GlobalTrafficStatsWireDTO, TrafficConversationWireDTO } from "../wire/trafficWireDtos";
 import { asArray, asBucket, asPlainObject } from "./mapperPrimitives";
 
 function asTrafficProtocolTreeNode(input: unknown): TrafficProtocolTreeNode {
@@ -11,14 +12,33 @@ function asTrafficProtocolTreeNode(input: unknown): TrafficProtocolTreeNode {
   };
 }
 
+function asTrafficConversation(input: unknown): TrafficConversation | undefined {
+  const payload: TrafficConversationWireDTO = asPlainObject(input) ?? {};
+  const src = String(payload.src ?? "").trim();
+  const dst = String(payload.dst ?? "").trim();
+
+  if (!src || !dst) {
+    return undefined;
+  }
+
+  return {
+    src,
+    dst,
+    count: Number(payload.count ?? 0),
+  };
+}
+
 export function asGlobalTrafficStats(input: unknown): GlobalTrafficStats {
   const payload: GlobalTrafficStatsWireDTO = asPlainObject(input) ?? {};
   return {
     totalPackets: Number(payload.total_packets ?? 0),
     protocolKinds: Number(payload.protocol_kinds ?? 0),
-    timeline: asArray(payload.timeline).map(asBucket),
+    timeline: normalizeTrafficTimelineBuckets(asArray(payload.timeline).map(asBucket)),
     protocolDist: asArray(payload.protocol_dist).map(asBucket),
     topTalkers: asArray(payload.top_talkers).map(asBucket),
+    topConversations: asArray(payload.top_conversations)
+      .map(asTrafficConversation)
+      .filter((entry): entry is TrafficConversation => Boolean(entry)),
     topHostnames: asArray(payload.top_hostnames).map(asBucket),
     topDomains: asArray(payload.top_domains).map(asBucket),
     topSrcIPs: asArray(payload.top_src_ips).map(asBucket),

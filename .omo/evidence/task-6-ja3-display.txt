@@ -1,0 +1,8 @@
+Task 6 JA3 display evidence
+
+- Chosen seam: existing workspace selected-packet detail pane in `frontend/src/app/components/workspace/HexAsciiPanel.tsx`.
+- Contract path: backend `Packet.tls_fingerprint` -> frontend `Packet.tlsFingerprint` via `captureWireDtos.ts` and `packetMapper.ts`.
+- Rendered fields when present: `JA3 Hash`, `JA3S Hash`, `JA3 Raw`, `JA3S Raw`.
+- UI pattern reused: existing `WorkbenchChip`, `StatusHint`, `meow-soft-fill` tiles; no new route or TLS decryption dependency introduced.
+- Verification command: `cd frontend && pnpm run test:run -- packetMapper HexAsciiPanel C2Analysis TLS`
+- Verification result: passed (`9` files, `23` tests).

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createDesktopBridge, resolveDesktopGenericIpcPolicy } from "./desktopBridge";
+import { DEFAULT_TYPED_IPC_TIMEOUT_MS } from "./desktopTypedBridgeCore";
+import { EVIDENCE_TYPED_IPC_TIMEOUT_MS } from "./desktopTypedBridgeAnalysis";
 import { EventsOn } from "../../../wailsjs/runtime";
 
 vi.mock("../../../wailsjs/runtime", () => ({
@@ -837,6 +839,49 @@ describe("createDesktopBridge", () => {
 
     await expectation;
     expect(fallbackBridge.getCaptureStatus).not.toHaveBeenCalled();
+  });
+
+  it("uses a 30000ms typed IPC timeout for evidence without changing the default", async () => {
+    vi.useFakeTimers();
+    const fallbackBridge = createFallbackBridge({
+      getEvidence: vi.fn(async () => []),
+      getEvidenceWithFilter: vi.fn(async () => []),
+    });
+    const bridge = createDesktopBridge({
+      desktopApp: {
+        GetEvidence: vi.fn(async () => new Promise<unknown>(() => undefined)),
+        GetEvidenceWithFilter: vi.fn(async () => new Promise<unknown>(() => undefined)),
+      },
+      fallbackBridge,
+    });
+
+    expect(DEFAULT_TYPED_IPC_TIMEOUT_MS).toBe(10000);
+    expect(EVIDENCE_TYPED_IPC_TIMEOUT_MS).toBe(30000);
+
+    const allEvidence = bridge.getEvidence();
+    const filteredEvidence = bridge.getEvidenceWithFilter(["vehicle"]);
+
+    await vi.advanceTimersByTimeAsync(10000);
+    await Promise.resolve();
+    await expect(Promise.race([allEvidence, Promise.resolve("pending")])).resolves.toBe("pending");
+    await expect(Promise.race([filteredEvidence, Promise.resolve("pending")])).resolves.toBe("pending");
+
+    const allExpectation = expect(allEvidence).rejects.toMatchObject({
+      code: "ipc_timeout",
+      endpoint: "DesktopApp.GetEvidence",
+      transport: "desktop-ipc",
+    });
+    const filteredExpectation = expect(filteredEvidence).rejects.toMatchObject({
+      code: "ipc_timeout",
+      endpoint: "DesktopApp.GetEvidenceWithFilter",
+      transport: "desktop-ipc",
+    });
+    await vi.advanceTimersByTimeAsync(20000);
+
+    await allExpectation;
+    await filteredExpectation;
+    expect(fallbackBridge.getEvidence).not.toHaveBeenCalled();
+    expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
   });
 
   it("fails with generic_ipc_disabled instead of invoking legacy adapter failures", async () => {

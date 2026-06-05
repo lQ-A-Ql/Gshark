@@ -29,9 +29,21 @@ func (s *Service) gatherThreatEvidence(ctx context.Context) ([]model.EvidenceRec
 			Severity:     severity,
 			Tags:         dedupeStrings([]string{hit.Category, hit.Level, hit.Rule}),
 			Caveats:      []string{"规则命中仅代表检测信号，需要结合上下文、payload 与会话行为复核。"},
+			Metadata:     copyStringMap(hit.Metadata),
 		})
 	}
 	return records, nil
+}
+
+func copyStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }
 
 func (s *Service) gatherC2Evidence(ctx context.Context) ([]model.EvidenceRecord, error) {
