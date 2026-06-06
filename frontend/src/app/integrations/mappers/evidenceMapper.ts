@@ -1,20 +1,11 @@
 import { confidenceLabel } from "../../core/types";
-import type {
-  EvidenceMetadata,
-  EvidenceMetadataValue,
-  EvidenceModule,
-  EvidenceSeverity,
-  UnifiedEvidenceRecord,
-} from "../../core/types";
+import type { UnifiedEvidenceRecord } from "../../core/types";
 import type { EvidenceListWireDTO, UnifiedEvidenceRecordWireDTO } from "../wire/evidenceWireDtos";
 import { asArray, asPlainObject, asStringList } from "./mapperPrimitives";
-
-const VALID_SEVERITIES = new Set<string>(["critical", "high", "medium", "low", "info"]);
-
-function asEvidenceSeverity(raw: unknown): EvidenceSeverity {
-  const s = String(raw ?? "info").toLowerCase();
-  return VALID_SEVERITIES.has(s) ? (s as EvidenceSeverity) : "info";
-}
+import { asEvidenceMetadata } from "./evidenceMetadataMapper";
+export { normalizeEvidenceModule } from "./evidenceModuleMapper";
+import { normalizeEvidenceModule } from "./evidenceModuleMapper";
+import { asEvidenceSeverity } from "./evidenceSeverityMapper";
 
 export function parseEvidenceRecords(input: unknown): UnifiedEvidenceRecord[] {
   const payload: EvidenceListWireDTO | undefined = asPlainObject(input);
@@ -60,48 +51,4 @@ function asEvidenceRecord(input: unknown): UnifiedEvidenceRecord {
     tags: asStringList(item?.tags),
     caveats: asStringList(item?.caveats),
   };
-}
-
-function asEvidenceMetadata(input: unknown): EvidenceMetadata | undefined {
-  const raw = asPlainObject(input);
-  if (!raw) return undefined;
-
-  const metadata: EvidenceMetadata = {};
-  for (const [key, value] of Object.entries(raw)) {
-    const normalized = asEvidenceMetadataValue(value);
-    if (normalized !== undefined) {
-      metadata[key] = normalized;
-    }
-  }
-  return Object.keys(metadata).length > 0 ? metadata : undefined;
-}
-
-function asEvidenceMetadataValue(value: unknown): EvidenceMetadataValue | undefined {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return value;
-  }
-  if (!Array.isArray(value)) return undefined;
-
-  const strings = value.filter((item): item is string => typeof item === "string");
-  if (strings.length === value.length) return strings;
-  const numbers = value.filter((item): item is number => typeof item === "number");
-  if (numbers.length === value.length) return numbers;
-  const booleans = value.filter((item): item is boolean => typeof item === "boolean");
-  if (booleans.length === value.length) return booleans;
-  return undefined;
-}
-
-export function normalizeEvidenceModule(raw: string): EvidenceModule {
-  const lower = raw.toLowerCase();
-  if (lower.includes("c2")) return "c2";
-  if (lower.includes("apt")) return "apt";
-  if (lower.includes("hunting") || lower.includes("yara") || lower.includes("threat")) return "hunting";
-  if (lower.includes("industrial")) return "industrial";
-  if (lower.includes("vehicle")) return "vehicle";
-  if (lower.includes("usb")) return "usb";
-  if (lower.includes("media") || lower.includes("speech") || lower.includes("rtp")) return "media";
-  if (lower.includes("object")) return "object";
-  if (lower.includes("misc") || lower.includes("webshell") || lower.includes("decoder")) return "misc";
-  if (lower.includes("stream")) return "stream";
-  return "unknown";
 }

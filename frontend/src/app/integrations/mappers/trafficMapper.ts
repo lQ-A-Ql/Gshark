@@ -1,32 +1,9 @@
-import type { GlobalTrafficStats, TrafficConversation, TrafficProtocolTreeNode } from "../../core/types";
+import type { GlobalTrafficStats, TrafficConversation } from "../../core/types";
 import { normalizeTrafficTimelineBuckets } from "../../features/traffic/trafficTimeline";
-import type { GlobalTrafficStatsWireDTO, TrafficConversationWireDTO } from "../wire/trafficWireDtos";
+import type { GlobalTrafficStatsWireDTO } from "../wire/trafficWireDtos";
 import { asArray, asBucket, asPlainObject } from "./mapperPrimitives";
-
-function asTrafficProtocolTreeNode(input: unknown): TrafficProtocolTreeNode {
-  const obj = asPlainObject(input) ?? {};
-  return {
-    name: String(obj.name ?? ""),
-    count: Number(obj.count ?? 0),
-    children: asArray(obj.children).map(asTrafficProtocolTreeNode),
-  };
-}
-
-function asTrafficConversation(input: unknown): TrafficConversation | undefined {
-  const payload: TrafficConversationWireDTO = asPlainObject(input) ?? {};
-  const src = String(payload.src ?? "").trim();
-  const dst = String(payload.dst ?? "").trim();
-
-  if (!src || !dst) {
-    return undefined;
-  }
-
-  return {
-    src,
-    dst,
-    count: Number(payload.count ?? 0),
-  };
-}
+import { asTrafficConversation } from "./trafficConversationMapper";
+import { asTrafficProtocolTreeNode } from "./trafficProtocolHierarchyMapper";
 
 export function asGlobalTrafficStats(input: unknown): GlobalTrafficStats {
   const payload: GlobalTrafficStatsWireDTO = asPlainObject(input) ?? {};

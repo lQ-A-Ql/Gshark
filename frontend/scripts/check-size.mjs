@@ -192,6 +192,56 @@ export const sourceSizeBudgets = [
     reason: "UDP tunnel and bruteforce detection mapper should stay focused on wire-to-domain conversion",
   },
   {
+    path: "src/app/integrations/mappers/udpTunnelMapper.ts",
+    maxLines: 45,
+    reason: "UDP tunnel mapper should only normalize DNS and UDP tunnel hit payloads",
+  },
+  {
+    path: "src/app/integrations/mappers/bruteforceMapper.ts",
+    maxLines: 45,
+    reason: "bruteforce mapper should only normalize port scan and directory bruteforce hit payloads",
+  },
+  {
+    path: "src/app/integrations/mappers/evidenceMetadataMapper.ts",
+    maxLines: 40,
+    reason: "evidence metadata mapper should only normalize scalar and homogeneous list metadata values",
+  },
+  {
+    path: "src/app/integrations/mappers/evidenceModuleMapper.ts",
+    maxLines: 20,
+    reason: "evidence module mapper should only normalize backend module names to frontend module ids",
+  },
+  {
+    path: "src/app/integrations/mappers/evidenceSeverityMapper.ts",
+    maxLines: 15,
+    reason: "evidence severity mapper should only normalize severity enum values",
+  },
+  {
+    path: "src/app/integrations/mappers/packetColorFeatureMapper.ts",
+    maxLines: 70,
+    reason: "packet color feature mapper should only normalize TLS fingerprint and packet color feature fields",
+  },
+  {
+    path: "src/app/integrations/mappers/packetProtocolMapper.ts",
+    maxLines: 15,
+    reason: "packet protocol mapper should only normalize protocol enum values",
+  },
+  {
+    path: "src/app/integrations/mappers/packetTimeMapper.ts",
+    maxLines: 20,
+    reason: "packet time mapper should only normalize packet timestamp display strings",
+  },
+  {
+    path: "src/app/integrations/mappers/trafficConversationMapper.ts",
+    maxLines: 25,
+    reason: "traffic conversation mapper should only normalize conversation endpoints and counts",
+  },
+  {
+    path: "src/app/integrations/mappers/trafficProtocolHierarchyMapper.ts",
+    maxLines: 15,
+    reason: "traffic protocol hierarchy mapper should only normalize protocol tree nodes recursively",
+  },
+  {
     path: "src/app/integrations/wire/toolWireDtos.ts",
     maxLines: 35,
     reason: "tool wire DTOs should only describe raw backend payload fields before mapper normalization",
@@ -201,6 +251,21 @@ export const sourceSizeBudgets = [
     maxLines: 85,
     reason:
       "capture wire DTOs should only describe capture status, packet, color features, page, and locate payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/captureStatusWireDtos.ts",
+    maxLines: 15,
+    reason: "capture status wire DTOs should only describe raw capture status fields",
+  },
+  {
+    path: "src/app/integrations/wire/packetWireDtos.ts",
+    maxLines: 70,
+    reason: "packet wire DTOs should only describe raw packet, TLS fingerprint, and color feature fields",
+  },
+  {
+    path: "src/app/integrations/wire/capturePageWireDtos.ts",
+    maxLines: 20,
+    reason: "capture page wire DTOs should only describe packet page and locate payload fields",
   },
   {
     path: "src/app/integrations/wire/protocolToolWireDtos.ts",
@@ -259,6 +324,16 @@ export const sourceSizeBudgets = [
       "evidence wire DTOs should only describe raw evidence and object payload fields before mapper normalization",
   },
   {
+    path: "src/app/integrations/wire/evidenceRecordWireDtos.ts",
+    maxLines: 45,
+    reason: "evidence record wire DTOs should only describe raw evidence list and record fields",
+  },
+  {
+    path: "src/app/integrations/wire/objectEvidenceWireDtos.ts",
+    maxLines: 15,
+    reason: "object evidence wire DTOs should only describe raw extracted object evidence fields",
+  },
+  {
     path: "src/app/integrations/wire/reportWireDtos.ts",
     maxLines: 25,
     reason: "report wire DTOs should only describe raw investigation report payload fields",
@@ -277,6 +352,16 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/wire/trafficWireDtos.ts",
     maxLines: 20,
     reason: "traffic wire DTOs should only describe raw global traffic stats payload fields",
+  },
+  {
+    path: "src/app/integrations/wire/trafficBucketWireDtos.ts",
+    maxLines: 15,
+    reason: "traffic bucket wire DTOs should only describe raw bucket and conversation fields",
+  },
+  {
+    path: "src/app/integrations/wire/trafficProtocolWireDtos.ts",
+    maxLines: 30,
+    reason: "traffic protocol wire DTOs should only describe raw protocol tree and global stats fields",
   },
   {
     path: "src/app/integrations/wire/mediaWireDtos.ts",
@@ -2486,9 +2571,34 @@ export const testSizeBudgets = [
     reason: "object export rule tests should stay focused on classification, filtering, and grouping",
   },
   {
-    path: "src/app/features/evidence/evidencePanelRules.test.ts",
-    maxLines: 80,
-    reason: "evidence panel rule tests should stay focused on filtering, sorting, counts, and exports",
+    path: "src/app/features/evidence/evidencePanelRules.testFixtures.ts",
+    maxLines: 35,
+    reason: "evidence rule fixtures should only build compact unified evidence records",
+  },
+  {
+    path: "src/app/features/evidence/evidenceFilterRules.test.ts",
+    maxLines: 35,
+    reason: "evidence filter tests should only cover search, severity, and optional contract fields",
+  },
+  {
+    path: "src/app/features/evidence/evidenceSortRules.test.ts",
+    maxLines: 25,
+    reason: "evidence sort tests should only cover severity and confidence ordering",
+  },
+  {
+    path: "src/app/features/evidence/evidenceCountRules.test.ts",
+    maxLines: 25,
+    reason: "evidence count tests should only cover severity, caveat, facet, and summary counts",
+  },
+  {
+    path: "src/app/features/evidence/evidenceExportRules.test.ts",
+    maxLines: 55,
+    reason: "evidence export tests should only cover CSV escaping and sparse optional fields",
+  },
+  {
+    path: "src/app/features/evidence/evidenceRecordLabels.test.ts",
+    maxLines: 55,
+    reason: "evidence label tests should only cover label normalization and navigation guards",
   },
   {
     path: "src/app/components/RuntimeSettingsSidebarParts.test.tsx",

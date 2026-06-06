@@ -1,5 +1,4 @@
 import { Factory, Workflow } from "lucide-react";
-import { useMemo, useState } from "react";
 import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
@@ -18,6 +17,7 @@ import { IndustrialModbusPanels } from "../features/industrial/IndustrialModbusP
 import {
   IndustrialControlCommandsPanel, IndustrialDnp3Panel, IndustrialProtocolDetailsPanel, IndustrialRuleHitsPanel,
 } from "../features/industrial/IndustrialAuxiliaryPanels";
+import { useIndustrialModbusFilters } from "./useIndustrialModbusFilters";
 const INDUSTRIAL_PROTOCOL_TAGS = ["Modbus", "S7", "DNP3", "CIP", "BACnet", "IEC104", "OPC UA", "PROFINET"];
 
 export default function IndustrialAnalysis() {
@@ -32,26 +32,7 @@ export default function IndustrialAnalysis() {
     captureRevision,
   });
 
-  const [modbusUnitFilter, setModbusUnitFilter] = useState("all");
-  const [modbusFunctionFilter, setModbusFunctionFilter] = useState("all");
-
-  const modbusUnitOptions = useMemo(() => {
-    const units = new Set(analysis.modbus.transactions.map((t) => String(t.unitId)));
-    return ["all", ...Array.from(units).sort()];
-  }, [analysis.modbus.transactions]);
-
-  const modbusFunctionOptions = useMemo(() => {
-    const fns = new Set(analysis.modbus.transactions.map((t) => String(t.functionCode)));
-    return ["all", ...Array.from(fns).sort()];
-  }, [analysis.modbus.transactions]);
-
-  const filteredModbusTransactions = useMemo(() => {
-    return analysis.modbus.transactions.filter((t) => {
-      if (modbusUnitFilter !== "all" && String(t.unitId) !== modbusUnitFilter) return false;
-      if (modbusFunctionFilter !== "all" && String(t.functionCode) !== modbusFunctionFilter) return false;
-      return true;
-    });
-  }, [analysis.modbus.transactions, modbusUnitFilter, modbusFunctionFilter]);
+  const modbusFilters = useIndustrialModbusFilters(analysis);
 
   return (
     <PageShell>
@@ -152,13 +133,13 @@ export default function IndustrialAnalysis() {
       <IndustrialModbusPanels
         suspiciousWrites={analysis.suspiciousWrites ?? []}
         decodedInputs={analysis.modbus.decodedInputs ?? []}
-        transactions={filteredModbusTransactions}
-        unitOptions={modbusUnitOptions}
-        functionOptions={modbusFunctionOptions}
-        unitFilter={modbusUnitFilter}
-        functionFilter={modbusFunctionFilter}
-        onUnitFilterChange={setModbusUnitFilter}
-        onFunctionFilterChange={setModbusFunctionFilter}
+        transactions={modbusFilters.filteredModbusTransactions}
+        unitOptions={modbusFilters.modbusUnitOptions}
+        functionOptions={modbusFilters.modbusFunctionOptions}
+        unitFilter={modbusFilters.modbusUnitFilter}
+        functionFilter={modbusFilters.modbusFunctionFilter}
+        onUnitFilterChange={modbusFilters.setModbusUnitFilter}
+        onFunctionFilterChange={modbusFilters.setModbusFunctionFilter}
       />
 
       <IndustrialDnp3Panel
