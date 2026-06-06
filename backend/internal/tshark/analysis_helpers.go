@@ -52,7 +52,7 @@ type FieldScanFallback struct {
 }
 
 func scanFieldRows(filePath string, fields []string, onRow func([]string)) error {
-	return scanFieldRowsWithOptions(filePath, fields, fieldScanOptions{}, onRow)
+	return scanFieldRowsWithOptionsContext(context.Background(), filePath, fields, fieldScanOptions{}, onRow)
 }
 
 // ScanFieldRowsWithDisplayFilter is the exported wrapper that applies a
@@ -116,6 +116,16 @@ func fieldScanRowsHaveRequiredValues(rows [][]string, required []int) bool {
 // capability plan and cache, and either replays cached rows or spawns tshark
 // once and stores the result for future callers.
 func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOptions, onRow func([]string)) error {
+	return scanFieldRowsWithOptionsContext(context.Background(), filePath, fields, opts, onRow)
+}
+
+func scanFieldRowsWithOptionsContext(ctx context.Context, filePath string, fields []string, opts fieldScanOptions, onRow func([]string)) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	normalizedFields := normalizeFieldScanFields(fields)
 	if len(normalizedFields) == 0 {
 		return nil
@@ -154,7 +164,7 @@ func scanFieldRowsWithOptions(filePath string, fields []string, opts fieldScanOp
 		args = append(args, "-e", field)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cmd, err := CommandContext(ctx, args...)
 	if err != nil {

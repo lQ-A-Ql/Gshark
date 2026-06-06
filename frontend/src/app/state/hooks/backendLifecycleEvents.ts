@@ -8,6 +8,7 @@ import {
   type ThreatAnalysisProgress,
 } from "./useAnalysisProgress";
 import {
+  isInternalTelemetryStatusMessage,
   isProgressStatusMessage,
   shouldIgnoreCaptureErrorWithoutActiveCapture,
   shouldIgnoreCaptureStatusWithoutActiveCapture,
@@ -78,6 +79,9 @@ export function createBackendLifecycleEventHandlers({
       if (isProgressStatusMessage(msg)) {
         updateProgressFromStatusRef.current(msg);
         wakeCaptureWaiters();
+        return;
+      }
+      if (isInternalTelemetryStatusMessage(msg)) {
         return;
       }
       if (shouldMarkParseFinishedFromStatus(msg)) {

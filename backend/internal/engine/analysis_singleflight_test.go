@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/servicecontract"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
@@ -60,7 +61,7 @@ func TestIndustrialAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 		buildIndustrialAnalysisFromFileFn = oldBuilder
 		warmSpecializedFieldCacheFn = oldWarmer
 	})
-	warmSpecializedFieldCacheFn = func(string) error { return nil }
+	warmSpecializedFieldCacheFn = func(context.Context, string) error { return nil }
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -103,7 +104,7 @@ func TestVehicleAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 		buildVehicleAnalysisFromFileFn = oldBuilder
 		warmSpecializedFieldCacheFn = oldWarmer
 	})
-	warmSpecializedFieldCacheFn = func(string) error { return nil }
+	warmSpecializedFieldCacheFn = func(context.Context, string) error { return nil }
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -219,6 +220,62 @@ func TestC2SampleAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 	assertNoConcurrentErrors(t, errs, 4)
 	if got := atomic.LoadInt32(&calls); got != 1 {
 		t.Fatalf("expected one C2 builder call, got %d", got)
+	}
+}
+
+func TestWarmupAndUserAnalysisShareNormalSingleflightBuilder(t *testing.T) {
+	oldBuilder := buildC2SampleAnalysisFromPacketsFn
+	t.Cleanup(func() { buildC2SampleAnalysisFromPacketsFn = oldBuilder })
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var calls int32
+	buildC2SampleAnalysisFromPacketsFn = func(context.Context, []model.Packet) (model.C2SampleAnalysis, error) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			close(started)
+		}
+		<-release
+		return model.C2SampleAnalysis{TotalMatchedPackets: 23}, nil
+	}
+
+	svc := NewService(NopEmitter{})
+	defer svc.packetStore.Close()
+	svc.pcap = "capture.pcapng"
+
+	userErr := make(chan error, 1)
+	go func() {
+		analysis, err := svc.C2SampleAnalysis(context.Background())
+		if err == nil && analysis.TotalMatchedPackets != 23 {
+			err = errors.New("unexpected user C2 analysis result")
+		}
+		userErr <- err
+	}()
+	waitForSingleflightStart(t, started, &calls)
+
+	warmupCtx := servicecontract.WithAnalysisRequestMeta(context.Background(), servicecontract.AnalysisRequestMeta{
+		Source:   servicecontract.AnalysisRequestSourceWarmup,
+		Priority: servicecontract.AnalysisRequestPriorityBackground,
+		Target:   "c2",
+	})
+	warmupErr := make(chan error, 1)
+	go func() {
+		analysis, err := svc.C2SampleAnalysis(warmupCtx)
+		if err == nil && analysis.TotalMatchedPackets != 23 {
+			err = errors.New("unexpected warmup C2 analysis result")
+		}
+		warmupErr <- err
+	}()
+	time.Sleep(25 * time.Millisecond)
+
+	close(release)
+	if err := <-userErr; err != nil {
+		t.Fatalf("user analysis error = %v", err)
+	}
+	if err := <-warmupErr; err != nil {
+		t.Fatalf("warmup analysis error = %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected user and warmup to share one builder, got %d calls", got)
 	}
 }
 

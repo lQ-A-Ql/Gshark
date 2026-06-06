@@ -17,6 +17,7 @@ import (
 
 	"github.com/gshark/sentinel/backend/internal/engine"
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/servicecontract"
 )
 
 type usbQueryAnalysisService struct {
@@ -578,6 +579,37 @@ func TestHandleC2AnalysisUsesCanceledRequestContext(t *testing.T) {
 	if analysis.ctxErr != context.Canceled {
 		t.Fatalf("analysis ctx error = %v, want %v", analysis.ctxErr, context.Canceled)
 	}
+}
+
+func TestHandleC2AnalysisMarksWarmupMeta(t *testing.T) {
+	analysis := &recordingC2AnalysisService{}
+	server := &Server{analysis: analysis}
+	req := httptest.NewRequest(http.MethodGet, "/api/c2-analysis?warmup=1", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleC2Analysis(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected warmup c2 analysis request to succeed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if analysis.source != "warmup" || analysis.priority != "background" || analysis.target != "c2" {
+		t.Fatalf("unexpected warmup meta source=%q priority=%q target=%q", analysis.source, analysis.priority, analysis.target)
+	}
+}
+
+type recordingC2AnalysisService struct {
+	contractAnalysisService
+	source   string
+	priority string
+	target   string
+}
+
+func (s *recordingC2AnalysisService) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis, error) {
+	meta := servicecontract.AnalysisRequestMetaFromContext(ctx)
+	s.source = string(meta.Source)
+	s.priority = string(meta.Priority)
+	s.target = meta.Target
+	return model.C2SampleAnalysis{}, nil
 }
 
 type canceledC2AnalysisService struct {

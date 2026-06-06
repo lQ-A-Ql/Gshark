@@ -89,6 +89,15 @@ const methodGroups = {
   ],
   "typed-hunting": ["ListThreatHits", "GetHuntingRuntimeConfig", "UpdateHuntingRuntimeConfig"],
   "typed-vehicle-dbc": ["ListVehicleDBCProfiles", "AddVehicleDBC", "RemoveVehicleDBC"],
+  "typed-rules": [
+    "GetRuleStatus",
+    "ToggleRulePack",
+    "CheckRuleUpdates",
+    "DownloadRulePack",
+    "UpdateRuleConfig",
+    "GetRuleConflicts",
+    "ValidateRules",
+  ],
   "typed-misc": [
     "ListMiscModules",
     "ImportMiscModulePackageFromPath",
@@ -106,6 +115,7 @@ const bridgeTypeFiles = [
   "desktopTransportBindingStream.ts",
   "desktopTransportBindingTooling.ts",
   "desktopTransportBindingAnalysis.ts",
+  "desktopTransportBindingRules.ts",
 ];
 const bridgeTypes = bridgeTypeFiles
   .map((file) => readFileSync(resolve(root, "src/app/integrations", file), "utf8"))

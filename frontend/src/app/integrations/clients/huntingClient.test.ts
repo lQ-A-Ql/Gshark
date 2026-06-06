@@ -41,7 +41,7 @@ describe("huntingClient", () => {
 
   it("maps runtime config and update payload shape", async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
-      if (path === "/api/hunting/config" && !init) {
+      if (path === "/api/hunting/config" && init?.method !== "POST") {
         return {
           prefixes: ["flag{", "ctf{"],
           yara_enabled: false,

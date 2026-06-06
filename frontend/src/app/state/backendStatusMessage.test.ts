@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isCaptureLifecycleMessage,
+  isInternalTelemetryStatusMessage,
   isProgressStatusMessage,
   shouldIgnoreCaptureErrorWithoutActiveCapture,
   shouldIgnoreCaptureStatusWithoutActiveCapture,
@@ -18,6 +19,13 @@ describe("backendStatusMessage helpers", () => {
     expect(isCaptureLifecycleMessage("正在预加载全部数据")).toBe(true);
     expect(isCaptureLifecycleMessage("__progress__:media:1:2:test")).toBe(true);
     expect(isCaptureLifecycleMessage("后端已连接")).toBe(false);
+  });
+
+  it("detects internal telemetry status messages", () => {
+    expect(isInternalTelemetryStatusMessage("__evidence_timing__:hunting:1:2:ok")).toBe(true);
+    expect(isInternalTelemetryStatusMessage("__analysis_warmup__:c2:0:1:20:ok")).toBe(true);
+    expect(isInternalTelemetryStatusMessage("__analysis_request__:c2:20:ok")).toBe(true);
+    expect(isInternalTelemetryStatusMessage("后端已连接")).toBe(false);
   });
 
   it("ignores capture status and errors when no active capture exists", () => {

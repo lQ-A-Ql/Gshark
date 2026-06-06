@@ -18,13 +18,19 @@ import { asVehicleAnalysis } from "../mappers/vehicleMapper";
 import type { EvidenceListWireDTO } from "../wire/evidenceWireDtos";
 
 type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
+export type AnalysisRequestOptions = { source?: "user" | "warmup" };
 
 export interface AnalysisClient {
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
-  getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
-  getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
-  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number): Promise<USBAnalysis>;
-  getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
+  getIndustrialAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions): Promise<IndustrialAnalysis>;
+  getVehicleAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions): Promise<VehicleAnalysis>;
+  getUSBAnalysis(
+    signal?: AbortSignal,
+    hidSource?: USBHIDSourceMode,
+    hidEventLimit?: number,
+    options?: AnalysisRequestOptions,
+  ): Promise<USBAnalysis>;
+  getC2SampleAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions): Promise<C2SampleAnalysis>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
   getEvidence(signal?: AbortSignal): Promise<UnifiedEvidenceRecord[]>;
   getEvidenceWithFilter(modules?: string[], signal?: AbortSignal): Promise<UnifiedEvidenceRecord[]>;
@@ -37,26 +43,34 @@ export function createAnalysisClient(request: JsonRequest): AnalysisClient {
       return asGlobalTrafficStats(payload);
     },
 
-    async getIndustrialAnalysis(signal?: AbortSignal) {
-      const payload = await request<unknown>("/api/analysis/industrial", { signal });
+    async getIndustrialAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions) {
+      const payload = await request<unknown>(withAnalysisRequestOptions("/api/analysis/industrial", options), {
+        signal,
+      });
       return asIndustrialAnalysis(payload);
     },
 
-    async getVehicleAnalysis(signal?: AbortSignal) {
-      const payload = await request<unknown>("/api/analysis/vehicle", { signal });
+    async getVehicleAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions) {
+      const payload = await request<unknown>(withAnalysisRequestOptions("/api/analysis/vehicle", options), { signal });
       return asVehicleAnalysis(payload);
     },
 
-    async getUSBAnalysis(signal?: AbortSignal, hidSource: USBHIDSourceMode = "auto", hidEventLimit = 20000) {
+    async getUSBAnalysis(
+      signal?: AbortSignal,
+      hidSource: USBHIDSourceMode = "auto",
+      hidEventLimit = 20000,
+      options?: AnalysisRequestOptions,
+    ) {
       const params = new URLSearchParams();
       params.set("hid_source", hidSource);
       params.set("hid_event_limit", String(hidEventLimit));
+      appendAnalysisRequestOptions(params, options);
       const payload = await request<unknown>(`/api/analysis/usb?${params.toString()}`, { signal });
       return asUSBAnalysis(payload);
     },
 
-    async getC2SampleAnalysis(signal?: AbortSignal) {
-      const payload = await request<unknown>("/api/c2-analysis", { signal });
+    async getC2SampleAnalysis(signal?: AbortSignal, options?: AnalysisRequestOptions) {
+      const payload = await request<unknown>(withAnalysisRequestOptions("/api/c2-analysis", options), { signal });
       return asC2SampleAnalysis(payload);
     },
 
@@ -81,4 +95,18 @@ export function createAnalysisClient(request: JsonRequest): AnalysisClient {
       return parseEvidenceRecords(payload);
     },
   };
+}
+
+function withAnalysisRequestOptions(path: string, options?: AnalysisRequestOptions) {
+  const params = new URLSearchParams();
+  appendAnalysisRequestOptions(params, options);
+  const qs = params.toString();
+  if (!qs) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}${qs}`;
+}
+
+function appendAnalysisRequestOptions(params: URLSearchParams, options?: AnalysisRequestOptions) {
+  if (options?.source === "warmup") {
+    params.set("warmup", "1");
+  }
 }

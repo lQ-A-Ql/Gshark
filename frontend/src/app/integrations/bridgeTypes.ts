@@ -47,12 +47,14 @@ import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
 import type { MiscModuleClient } from "./miscModuleClientTypes";
 import type { PlaybookClient } from "./clients/playbookClient";
+import type { RuleClient } from "./clients/ruleClient";
 export type { DesktopTransportBinding } from "./desktopTransportBinding";
 export type { CaptureStatus, OpenFileResult } from "./clients/captureClient";
 export type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 export type { HuntingRuntimeConfig } from "./clients/huntingClient";
 export type { MiscModuleClient } from "./miscModuleClientTypes";
 export type { PlaybookClient } from "./clients/playbookClient";
+export type { RuleClient } from "./clients/ruleClient";
 export type { EventHandlers, EventType } from "./clients/eventClient";
 export interface RuntimeClient {
   isAvailable(): Promise<boolean>;
@@ -94,7 +96,7 @@ export interface PacketClient {
 
 export interface HuntingClient {
   listThreatHits(prefixes?: string[], signal?: AbortSignal): Promise<ThreatHit[]>;
-  getHuntingRuntimeConfig(): Promise<HuntingRuntimeConfig>;
+  getHuntingRuntimeConfig(signal?: AbortSignal): Promise<HuntingRuntimeConfig>;
   updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
 }
 
@@ -132,10 +134,10 @@ export interface StreamClient {
 
 export interface AnalysisClient {
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
-  getIndustrialAnalysis(signal?: AbortSignal): Promise<IndustrialAnalysis>;
-  getVehicleAnalysis(signal?: AbortSignal): Promise<VehicleAnalysis>;
-  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number): Promise<USBAnalysis>;
-  getC2SampleAnalysis(signal?: AbortSignal): Promise<C2SampleAnalysis>;
+  getIndustrialAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<IndustrialAnalysis>;
+  getVehicleAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<VehicleAnalysis>;
+  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number, options?: { source?: "user" | "warmup" }): Promise<USBAnalysis>;
+  getC2SampleAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<C2SampleAnalysis>;
   decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal): Promise<C2DecryptResult>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
   getHTTPLoginAnalysis(signal?: AbortSignal): Promise<HTTPLoginAnalysis>;
@@ -193,7 +195,8 @@ export interface BackendBridge
     MediaClient,
     VehicleDBCClient,
     SecurityMaterialClient,
-    MiscModuleClient {}
+    MiscModuleClient,
+    RuleClient {}
 
 export interface BackendClients {
   runtime: RuntimeClient;
@@ -209,4 +212,5 @@ export interface BackendClients {
   securityMaterial: SecurityMaterialClient;
   miscModule: MiscModuleClient;
   playbook: PlaybookClient;
+  rules: RuleClient;
 }

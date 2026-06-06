@@ -15,9 +15,9 @@ export function createHuntingTypedOverrides(desktopApp: DesktopTransportBinding)
       );
       return Array.isArray(rows) ? rows.map(asThreatHit) : [];
     },
-    async getHuntingRuntimeConfig() {
+    async getHuntingRuntimeConfig(signal) {
       return asHuntingRuntimeConfig(
-        await typedCall(() => desktopApp.GetHuntingRuntimeConfig!(), "DesktopApp.GetHuntingRuntimeConfig"),
+        await typedCall(() => desktopApp.GetHuntingRuntimeConfig!(), "DesktopApp.GetHuntingRuntimeConfig", signal),
       );
     },
     async updateHuntingRuntimeConfig(config) {

@@ -10,6 +10,10 @@ export function CheckAppUpdate() {
   return window['go']['main']['DesktopApp']['CheckAppUpdate']();
 }
 
+export function CheckRuleUpdates() {
+  return window['go']['main']['DesktopApp']['CheckRuleUpdates']();
+}
+
 export function CloseCapture() {
   return window['go']['main']['DesktopApp']['CloseCapture']();
 }
@@ -32,6 +36,10 @@ export function DownloadMediaArtifact(token) {
 
 export function DownloadObjectsZip(ids) {
   return window['go']['main']['DesktopApp']['DownloadObjectsZip'](ids);
+}
+
+export function DownloadRulePack(packID, remoteURL) {
+  return window['go']['main']['DesktopApp']['DownloadRulePack'](packID, remoteURL);
 }
 
 export function ExportMediaBatchTranscription(format) {
@@ -58,8 +66,8 @@ export function GetCaptureStatus() {
   return window['go']['main']['DesktopApp']['GetCaptureStatus']();
 }
 
-export function GetC2SampleAnalysis() {
-  return window['go']['main']['DesktopApp']['GetC2SampleAnalysis']();
+export function GetC2SampleAnalysis(warmup) {
+  return window['go']['main']['DesktopApp']['GetC2SampleAnalysis'](warmup);
 }
 
 export function GetDesktopWebviewSmokeConfig() {
@@ -86,8 +94,8 @@ export function GetHttpStream(streamID) {
   return window['go']['main']['DesktopApp']['GetHttpStream'](streamID);
 }
 
-export function GetIndustrialAnalysis() {
-  return window['go']['main']['DesktopApp']['GetIndustrialAnalysis']();
+export function GetIndustrialAnalysis(warmup) {
+  return window['go']['main']['DesktopApp']['GetIndustrialAnalysis'](warmup);
 }
 
 export function GetMCPStatus() {
@@ -128,6 +136,14 @@ export function GetRawStream(protocol, streamID) {
 
 export function GetRawStreamPage(protocol, streamID, cursor, limit) {
   return window['go']['main']['DesktopApp']['GetRawStreamPage'](protocol, streamID, cursor, limit);
+}
+
+export function GetRuleConflicts() {
+  return window['go']['main']['DesktopApp']['GetRuleConflicts']();
+}
+
+export function GetRuleStatus() {
+  return window['go']['main']['DesktopApp']['GetRuleStatus']();
 }
 
 export function GetSMTPAnalysis() {
@@ -234,12 +250,12 @@ export function GetToolRuntimeSnapshotFull() {
   return window['go']['main']['DesktopApp']['GetToolRuntimeSnapshotFull']();
 }
 
-export function GetUSBAnalysis(hidSource, hidEventLimit) {
-  return window['go']['main']['DesktopApp']['GetUSBAnalysis'](hidSource, hidEventLimit);
+export function GetUSBAnalysis(hidSource, hidEventLimit, warmup) {
+  return window['go']['main']['DesktopApp']['GetUSBAnalysis'](hidSource, hidEventLimit, warmup);
 }
 
-export function GetVehicleAnalysis() {
-  return window['go']['main']['DesktopApp']['GetVehicleAnalysis']();
+export function GetVehicleAnalysis(warmup) {
+  return window['go']['main']['DesktopApp']['GetVehicleAnalysis'](warmup);
 }
 
 export function GetWinRMDecryptResultText(resultID) {
@@ -340,6 +356,18 @@ export function UpdateToolRuntimeConfigFull(cfg) {
 
 export function TogglePlugin(id) {
   return window['go']['main']['DesktopApp']['TogglePlugin'](id);
+}
+
+export function ToggleRulePack(packID, enabled) {
+  return window['go']['main']['DesktopApp']['ToggleRulePack'](packID, enabled);
+}
+
+export function UpdateRuleConfig(config) {
+  return window['go']['main']['DesktopApp']['UpdateRuleConfig'](config);
+}
+
+export function ValidateRules(content) {
+  return window['go']['main']['DesktopApp']['ValidateRules'](content);
 }
 
 export function WriteDesktopWebviewSmokeResult(payload) {

@@ -3,6 +3,7 @@ import type { GlobalTrafficStats, Packet, TrafficConversation } from "../../core
 import { isAbortLikeError, useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { buildTimelineBucketsFromPacketTimes } from "./trafficTimeline";
+import type { FeaturePreloadContract } from "../../preload/preloadContracts";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
@@ -22,6 +23,7 @@ export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
 };
 
 const trafficStatsCache = new Map<string, GlobalTrafficStats>();
+const trafficStatsInflight = new Map<string, Promise<GlobalTrafficStats>>();
 
 export interface UseTrafficGraphOptions {
   backendConnected: boolean;
@@ -30,6 +32,11 @@ export interface UseTrafficGraphOptions {
   totalPackets: number;
   captureRevision: number;
 }
+
+export type TrafficStatsPreloadInput = Pick<
+  UseTrafficGraphOptions,
+  "backendConnected" | "filePath" | "totalPackets" | "captureRevision"
+>;
 
 export function useTrafficGraph({
   backendConnected,
@@ -64,20 +71,7 @@ export function useTrafficGraph({
     setLoading(true);
     setError("");
     return runStatsRequest({
-      request: async (signal) => {
-        try {
-          return await backendClients.analysis.getGlobalTrafficStats(signal);
-        } catch (fetchError) {
-          if (isAbortLikeError(fetchError, signal)) {
-            throw fetchError;
-          }
-          const packets = await backendClients.packet.listPackets();
-          if (signal.aborted) {
-            throw new DOMException("The operation was aborted.", "AbortError");
-          }
-          return buildStatsFromPackets(packets);
-        }
-      },
+      request: (signal) => requestTrafficStats(captureCacheKey, signal, { force, allowPacketFallback: true }),
       onSuccess: (payload) => {
         if (captureCacheKey) {
           trafficStatsCache.set(captureCacheKey, payload);
@@ -104,6 +98,75 @@ export function buildTrafficStatsCacheKey(captureRevision: number, filePath: str
   const normalizedPath = filePath.trim();
   if (!normalizedPath) return "";
   return `${captureRevision}::${normalizedPath}::${totalPackets}`;
+}
+
+export const trafficStatsPreloadContract: FeaturePreloadContract<TrafficStatsPreloadInput, GlobalTrafficStats> = {
+  getCacheKey(input) {
+    return buildTrafficStatsCacheKey(input.captureRevision, input.filePath, input.totalPackets);
+  },
+  readCache(key) {
+    return trafficStatsCache.get(key);
+  },
+  writeCache(key, data) {
+    if (key) trafficStatsCache.set(key, data);
+  },
+  getInflight(key) {
+    return trafficStatsInflight.get(key);
+  },
+  async prefetch(input, signal) {
+    if (!input.backendConnected) return EMPTY_TRAFFIC_STATS;
+    const key = trafficStatsPreloadContract.getCacheKey(input);
+    return requestTrafficStats(key, signal, { force: false, allowPacketFallback: false });
+  },
+};
+
+export function resetTrafficStatsPreloadForTest() {
+  trafficStatsCache.clear();
+  trafficStatsInflight.clear();
+}
+
+function requestTrafficStats(
+  cacheKey: string,
+  signal: AbortSignal,
+  options: { force: boolean; allowPacketFallback: boolean },
+): Promise<GlobalTrafficStats> {
+  if (!options.force && cacheKey) {
+    const cached = trafficStatsCache.get(cacheKey);
+    if (cached) return Promise.resolve(cached);
+    const existing = trafficStatsInflight.get(cacheKey);
+    if (existing) return existing;
+  }
+
+  const promise = fetchTrafficStats(signal, options.allowPacketFallback).then((payload) => {
+    if (cacheKey && !signal.aborted) {
+      trafficStatsCache.set(cacheKey, payload);
+    }
+    return payload;
+  });
+
+  if (!options.force && cacheKey) {
+    trafficStatsInflight.set(cacheKey, promise);
+    promise.then(
+      () => trafficStatsInflight.delete(cacheKey),
+      () => trafficStatsInflight.delete(cacheKey),
+    );
+  }
+  return promise;
+}
+
+async function fetchTrafficStats(signal: AbortSignal, allowPacketFallback: boolean): Promise<GlobalTrafficStats> {
+  try {
+    return await backendClients.analysis.getGlobalTrafficStats(signal);
+  } catch (fetchError) {
+    if (!allowPacketFallback || isAbortLikeError(fetchError, signal)) {
+      throw fetchError;
+    }
+    const packets = await backendClients.packet.listPackets();
+    if (signal.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    return buildStatsFromPackets(packets);
+  }
 }
 
 function extractDomain(packet: Packet): string {

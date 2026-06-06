@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UnifiedEvidenceRecord } from "./evidenceSchema";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
+import type { FeaturePreloadContract } from "../../preload/preloadContracts";
 import { LRUCache } from "../../utils/lruCache";
 
 const evidenceCache = new LRUCache<string, UnifiedEvidenceRecord[]>(10);
+const evidenceInflight = new Map<string, Promise<UnifiedEvidenceRecord[]>>();
 
 export interface UseEvidenceOptions {
   backendConnected: boolean;
@@ -14,6 +16,11 @@ export interface UseEvidenceOptions {
   captureRevision: number;
   modules?: string[];
 }
+
+export type EvidencePreloadInput = Pick<
+  UseEvidenceOptions,
+  "backendConnected" | "filePath" | "totalPackets" | "captureRevision" | "modules"
+>;
 
 export function useEvidence({
   backendConnected,
@@ -53,7 +60,7 @@ export function useEvidence({
       setLoading(true);
       setError("");
       return runRequest({
-        request: (signal) => backendClients.evidence.getEvidenceWithFilter(modules, signal),
+        request: (signal) => requestEvidence(cacheKey, modules, signal, { force }),
         onSuccess: (payload) => {
           if (cacheKey) {
             evidenceCache.set(cacheKey, payload);
@@ -90,4 +97,62 @@ export function buildEvidenceCacheKey(captureRevision: number, filePath: string,
     return `${base}::${[...modules].sort().join(",")}`;
   }
   return base;
+}
+
+export const evidencePreloadContract: FeaturePreloadContract<EvidencePreloadInput, UnifiedEvidenceRecord[]> = {
+  getCacheKey(input) {
+    return buildEvidenceCacheKey(input.captureRevision, input.filePath, input.totalPackets, input.modules);
+  },
+  readCache(key) {
+    return evidenceCache.get(key);
+  },
+  writeCache(key, data) {
+    if (key) evidenceCache.set(key, data);
+  },
+  getInflight(key) {
+    return evidenceInflight.get(key);
+  },
+  prefetch(input, signal) {
+    if (!input.backendConnected || !input.filePath) return Promise.resolve([]);
+    if (!input.modules || input.modules.length === 0) {
+      return Promise.reject(new Error("evidence preload requires explicit modules"));
+    }
+    const cacheKey = evidencePreloadContract.getCacheKey(input);
+    return requestEvidence(cacheKey, input.modules, signal, { force: false });
+  },
+};
+
+export function resetEvidencePreloadForTest() {
+  evidenceCache.clear();
+  evidenceInflight.clear();
+}
+
+function requestEvidence(
+  cacheKey: string,
+  modules: string[] | undefined,
+  signal: AbortSignal,
+  options: { force: boolean },
+): Promise<UnifiedEvidenceRecord[]> {
+  if (!options.force && cacheKey) {
+    const cached = evidenceCache.get(cacheKey);
+    if (cached) return Promise.resolve(cached);
+    const existing = evidenceInflight.get(cacheKey);
+    if (existing) return existing;
+  }
+
+  const promise = backendClients.evidence.getEvidenceWithFilter(modules, signal).then((payload) => {
+    if (cacheKey && !signal.aborted) {
+      evidenceCache.set(cacheKey, payload);
+    }
+    return payload;
+  });
+
+  if (!options.force && cacheKey) {
+    evidenceInflight.set(cacheKey, promise);
+    promise.then(
+      () => evidenceInflight.delete(cacheKey),
+      () => evidenceInflight.delete(cacheKey),
+    );
+  }
+  return promise;
 }

@@ -1,5 +1,7 @@
 package tshark
 
+import "context"
+
 // Field-scan cache warm-up helpers.
 //
 // Warming up the field-scan cache runs representative tshark invocations
@@ -21,7 +23,11 @@ type fieldScanWarmPlan struct {
 // side-effect (cache fill) — rows are replayed later when a real analyst
 // request arrives.
 func WarmFieldScanCache(filePath string, fields []string, opts fieldScanOptions) error {
-	return scanFieldRowsWithOptions(filePath, fields, opts, nil)
+	return WarmFieldScanCacheContext(context.Background(), filePath, fields, opts)
+}
+
+func WarmFieldScanCacheContext(ctx context.Context, filePath string, fields []string, opts fieldScanOptions) error {
+	return scanFieldRowsWithOptionsContext(ctx, filePath, fields, opts, nil)
 }
 
 // WarmSpecializedFieldCache runs every warm plan in specializedFieldWarmPlans
@@ -29,8 +35,12 @@ func WarmFieldScanCache(filePath string, fields []string, opts fieldScanOptions)
 // remaining plans are skipped — a degraded cache is still safer than a bad
 // cache entry from a partial run.
 func WarmSpecializedFieldCache(filePath string) error {
+	return WarmSpecializedFieldCacheWithContext(context.Background(), filePath)
+}
+
+func WarmSpecializedFieldCacheWithContext(ctx context.Context, filePath string) error {
 	for _, plan := range specializedFieldWarmPlans() {
-		if err := WarmFieldScanCache(filePath, plan.fields, plan.opts); err != nil {
+		if err := WarmFieldScanCacheContext(ctx, filePath, plan.fields, plan.opts); err != nil {
 			return err
 		}
 	}

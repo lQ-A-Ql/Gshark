@@ -2,8 +2,11 @@ import { Link } from "react-router";
 import { cn } from "../components/ui/utils";
 import { NAV_ITEMS } from "./mainLayoutConfig";
 import type { MainLayoutChromeProps } from "./mainLayoutChromeTypes";
+import { useSidebarPreloadHandlers } from "./useSidebarPreloadHandlers";
 
 export function MainSidebarNav({ activeTheme, pathname }: Pick<MainLayoutChromeProps, "activeTheme" | "pathname">) {
+  const preload = useSidebarPreloadHandlers(pathname);
+
   return (
     <aside className="meow-nav-rail z-40 flex w-16 shrink-0 flex-col items-center gap-4 py-4">
       {NAV_ITEMS.map((item) => {
@@ -18,6 +21,10 @@ export function MainSidebarNav({ activeTheme, pathname }: Pick<MainLayoutChromeP
               "group meow-nav-rail-item relative p-3 transition-all",
               isActive ? cn("meow-nav-rail-active", activeTheme.active) : "text-muted-foreground hover:text-slate-900",
             )}
+            onMouseEnter={() => preload.onEnter(item.path)}
+            onMouseLeave={() => preload.onLeave(item.path)}
+            onBlur={() => preload.onLeave(item.path)}
+            onFocus={() => preload.onFocus(item.path)}
           >
             <Icon className="h-5 w-5" />
             {isActive && (

@@ -6,6 +6,7 @@ import { createMediaTypedOverrides } from "./desktopTypedBridgeMedia";
 import { createMiscTypedOverrides } from "./desktopTypedBridgeMisc";
 import { createObjectToolingTypedOverrides } from "./desktopTypedBridgeTooling";
 import { createPacketTypedOverrides } from "./desktopTypedBridgePacket";
+import { createRuleTypedOverrides } from "./desktopTypedBridgeRules";
 import { createStreamTypedOverrides } from "./desktopTypedBridgeStream";
 import { createVehicleDbcTypedOverrides } from "./desktopTypedBridgeVehicleDbc";
 
@@ -19,6 +20,7 @@ export function createTypedDesktopOverrides(desktopApp: DesktopTransportBinding)
     ...createHuntingTypedOverrides(desktopApp),
     ...createVehicleDbcTypedOverrides(desktopApp),
     ...createMiscTypedOverrides(desktopApp),
+    ...createRuleTypedOverrides(desktopApp),
   };
   for (const [bridgeMethod, bindingMethod] of Object.entries(typedBindingRequirements)) {
     if (!desktopApp[bindingMethod]) {

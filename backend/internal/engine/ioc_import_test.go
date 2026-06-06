@@ -288,12 +288,12 @@ func TestSeverityFromLabels_Extended(t *testing.T) {
 		labels []string
 		want   string
 	}{
-		{[]string{"critical", "malicious"}, "critical"},    // critical takes priority
-		{[]string{"unknown", "high"}, "high"},              // second label matches
-		{[]string{"benign"}, "low"},                        // benign → low
-		{[]string{"UNKNOWN_LABEL"}, "medium"},              // default
-		{[]string{"CRITICAL"}, "critical"},                 // case-insensitive
-		{[]string{"Malicious"}, "high"},                    // mixed case
+		{[]string{"critical", "malicious"}, "critical"}, // critical takes priority
+		{[]string{"unknown", "high"}, "high"},           // second label matches
+		{[]string{"benign"}, "low"},                     // benign → low
+		{[]string{"UNKNOWN_LABEL"}, "medium"},           // default
+		{[]string{"CRITICAL"}, "critical"},              // case-insensitive
+		{[]string{"Malicious"}, "high"},                 // mixed case
 	}
 	for _, tt := range tests {
 		got := severityFromLabels(tt.labels)

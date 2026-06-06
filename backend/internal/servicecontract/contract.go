@@ -10,6 +10,63 @@ import (
 	"github.com/gshark/sentinel/backend/internal/model"
 )
 
+type AnalysisRequestSource string
+
+const (
+	AnalysisRequestSourceUser   AnalysisRequestSource = "user"
+	AnalysisRequestSourceWarmup AnalysisRequestSource = "warmup"
+)
+
+type AnalysisRequestPriority string
+
+const (
+	AnalysisRequestPriorityNormal     AnalysisRequestPriority = "normal"
+	AnalysisRequestPriorityBackground AnalysisRequestPriority = "background"
+)
+
+type AnalysisRequestMeta struct {
+	Source      AnalysisRequestSource
+	Priority    AnalysisRequestPriority
+	Target      string
+	CapturePath string
+	TimeoutMS   int
+}
+
+type analysisRequestMetaKey struct{}
+
+func WithAnalysisRequestMeta(ctx context.Context, meta AnalysisRequestMeta) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if meta.Source == "" {
+		meta.Source = AnalysisRequestSourceUser
+	}
+	if meta.Priority == "" {
+		meta.Priority = AnalysisRequestPriorityNormal
+	}
+	return context.WithValue(ctx, analysisRequestMetaKey{}, meta)
+}
+
+func AnalysisRequestMetaFromContext(ctx context.Context) AnalysisRequestMeta {
+	if ctx == nil {
+		return AnalysisRequestMeta{Source: AnalysisRequestSourceUser, Priority: AnalysisRequestPriorityNormal}
+	}
+	if meta, ok := ctx.Value(analysisRequestMetaKey{}).(AnalysisRequestMeta); ok {
+		if meta.Source == "" {
+			meta.Source = AnalysisRequestSourceUser
+		}
+		if meta.Priority == "" {
+			meta.Priority = AnalysisRequestPriorityNormal
+		}
+		return meta
+	}
+	return AnalysisRequestMeta{Source: AnalysisRequestSourceUser, Priority: AnalysisRequestPriorityNormal}
+}
+
+func IsAnalysisWarmup(ctx context.Context) bool {
+	return AnalysisRequestMetaFromContext(ctx).Source == AnalysisRequestSourceWarmup
+}
+
 // CaptureReadService defines the read-only capture and packet/stream query
 // methods shared across consumers.
 type CaptureReadService interface {

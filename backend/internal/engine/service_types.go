@@ -53,6 +53,8 @@ type analysisCache struct {
 	aptAnalysis         *model.APTAnalysis
 	vehicleDBCDefs      []*tshark.DBCDatabase
 	inFlightAnalysis    analysisInFlightGroup
+	analysisLimiter     *analysisLimiter
+	analysisMetrics     *analysisMetrics
 }
 
 // objectState groups exported object metadata and directory.

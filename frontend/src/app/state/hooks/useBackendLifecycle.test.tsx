@@ -709,6 +709,24 @@ describe("useBackendLifecycle", () => {
     unmount();
   });
 
+  it("drops internal telemetry statuses without changing user-visible backend status", async () => {
+    const { result, unmount } = await renderConnectedLifecycle({
+      activeCapturePath: "C:/captures/sample.pcapng",
+    });
+    const waiter = vi.fn();
+
+    act(() => {
+      result.current.captureWaitersRef.current.add(waiter);
+      bridgeMocks.handlers?.status?.("__analysis_warmup__:c2:0:0:12:ok");
+    });
+
+    expect(result.current.updateProgressFromStatus).not.toHaveBeenCalledWith("__analysis_warmup__:c2:0:0:12:ok");
+    expect(waiter).not.toHaveBeenCalled();
+    expect(result.current.backendStatus).toBe("后端已连接，等待打开文件");
+
+    unmount();
+  });
+
   it("forwards preload progress before the first capture has an active path", async () => {
     const { result, unmount } = await renderConnectedLifecycle({ preloading: true });
     const waiter = vi.fn();

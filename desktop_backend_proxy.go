@@ -136,6 +136,20 @@ type desktopHuntingRuntimeConfig struct {
 	YaraTimeoutMS int      `json:"yara_timeout_ms"`
 }
 
+type desktopRulePackToggleRequest struct {
+	PackID  string `json:"pack_id"`
+	Enabled bool   `json:"enabled"`
+}
+
+type desktopRulePackDownloadRequest struct {
+	PackID string `json:"pack_id"`
+	URL    string `json:"url"`
+}
+
+type desktopRuleValidationRequest struct {
+	Content string `json:"content"`
+}
+
 type desktopVehicleDBCRequest struct {
 	Path string `json:"path"`
 }
@@ -783,6 +797,42 @@ func (a *DesktopApp) UpdateHuntingRuntimeConfig(config desktopHuntingRuntimeConf
 	return a.desktopPostJSON("/api/hunting/config", config, 15*time.Second)
 }
 
+func (a *DesktopApp) GetRuleStatus() (any, error) {
+	return a.desktopGetJSON("/api/rules/status", 15*time.Second)
+}
+
+func (a *DesktopApp) ToggleRulePack(packID string, enabled bool) (any, error) {
+	return a.desktopPostJSON("/api/rules/pack/toggle", desktopRulePackToggleRequest{
+		PackID:  strings.TrimSpace(packID),
+		Enabled: enabled,
+	}, 15*time.Second)
+}
+
+func (a *DesktopApp) CheckRuleUpdates() (any, error) {
+	return a.desktopPostJSON("/api/rules/check-updates", map[string]any{}, 30*time.Second)
+}
+
+func (a *DesktopApp) DownloadRulePack(packID, remoteURL string) (any, error) {
+	return a.desktopPostJSON("/api/rules/download", desktopRulePackDownloadRequest{
+		PackID: strings.TrimSpace(packID),
+		URL:    strings.TrimSpace(remoteURL),
+	}, 60*time.Second)
+}
+
+func (a *DesktopApp) UpdateRuleConfig(config map[string]any) (any, error) {
+	return a.desktopPostJSON("/api/rules/config", config, 15*time.Second)
+}
+
+func (a *DesktopApp) GetRuleConflicts() (any, error) {
+	return a.desktopGetJSON("/api/rules/conflicts", 15*time.Second)
+}
+
+func (a *DesktopApp) ValidateRules(content string) (any, error) {
+	return a.desktopPostJSON("/api/rules/validate", desktopRuleValidationRequest{
+		Content: content,
+	}, 30*time.Second)
+}
+
 func (a *DesktopApp) ListVehicleDBCProfiles() (any, error) {
 	return a.desktopGetJSON("/api/analysis/vehicle/dbc", 10*time.Second)
 }
@@ -1003,12 +1053,12 @@ func (a *DesktopApp) GetGlobalTrafficStats() (any, error) {
 	return a.desktopGetJSON("/api/stats/traffic/global", 30*time.Second)
 }
 
-func (a *DesktopApp) GetIndustrialAnalysis() (any, error) {
-	return a.desktopGetJSON("/api/analysis/industrial", 30*time.Second)
+func (a *DesktopApp) GetIndustrialAnalysis(warmup bool) (any, error) {
+	return a.desktopGetJSON(analysisWarmupPath("/api/analysis/industrial", warmup), 30*time.Second)
 }
 
-func (a *DesktopApp) GetVehicleAnalysis() (any, error) {
-	return a.desktopGetJSON("/api/analysis/vehicle", 30*time.Second)
+func (a *DesktopApp) GetVehicleAnalysis(warmup bool) (any, error) {
+	return a.desktopGetJSON(analysisWarmupPath("/api/analysis/vehicle", warmup), 30*time.Second)
 }
 
 func (a *DesktopApp) GetMediaAnalysis(forceRefresh bool) (any, error) {
@@ -1062,7 +1112,7 @@ func (a *DesktopApp) GetMediaPlaybackBlob(token string) (desktopBackendBlob, err
 	})
 }
 
-func (a *DesktopApp) GetUSBAnalysis(hidSource string, hidEventLimit int) (any, error) {
+func (a *DesktopApp) GetUSBAnalysis(hidSource string, hidEventLimit int, warmup bool) (any, error) {
 	if strings.TrimSpace(hidSource) == "" {
 		hidSource = "auto"
 	}
@@ -1072,11 +1122,24 @@ func (a *DesktopApp) GetUSBAnalysis(hidSource string, hidEventLimit int) (any, e
 	values := url.Values{}
 	values.Set("hid_source", strings.TrimSpace(hidSource))
 	values.Set("hid_event_limit", fmt.Sprint(hidEventLimit))
+	if warmup {
+		values.Set("warmup", "1")
+	}
 	return a.desktopGetJSON("/api/analysis/usb?"+values.Encode(), 30*time.Second)
 }
 
-func (a *DesktopApp) GetC2SampleAnalysis() (any, error) {
-	return a.desktopGetJSON("/api/c2-analysis", 30*time.Second)
+func (a *DesktopApp) GetC2SampleAnalysis(warmup bool) (any, error) {
+	return a.desktopGetJSON(analysisWarmupPath("/api/c2-analysis", warmup), 30*time.Second)
+}
+
+func analysisWarmupPath(path string, warmup bool) string {
+	if !warmup {
+		return path
+	}
+	if strings.Contains(path, "?") {
+		return path + "&warmup=1"
+	}
+	return path + "?warmup=1"
 }
 
 func (a *DesktopApp) DecryptC2Traffic(req desktopC2DecryptRequest) (any, error) {

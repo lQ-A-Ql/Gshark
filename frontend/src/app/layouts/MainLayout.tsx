@@ -12,6 +12,7 @@ import { copyTextToClipboard, downloadText } from "../utils/browserFile";
 import { installBrowserPageDragGuard, preventBrowserPageDrag } from "./dragGuard";
 import { themeForPath } from "./mainLayoutConfig";
 import { MainFooter, MainHeader, MainSettingsChrome, MainSidebarNav } from "./MainLayoutChrome";
+import { useMainLayoutPreloads } from "./useMainLayoutPreloads";
 
 type BackgroundFadeState = { key: string; style: CSSProperties };
 
@@ -40,11 +41,12 @@ export function MainLayout() {
   const backgroundRouteRef = useRef(location.pathname);
   const backgroundThemeStyleRef = useRef<CSSProperties | null>(null);
   const { backendConnected, backendStatus, decryptionConfig } = useBackend();
-  const { fileMeta, openCapture } = useCapture();
+  const { fileMeta, openCapture, captureRevision, isPreloadingCapture } = useCapture();
   const { filteredPackets, packets, totalPackets, selectedPacket } = usePacket();
   useStream();
   const { setDisplayFilter, applyFilter } = useFilter();
   useAnalysis();
+  useMainLayoutPreloads({ backendConnected, captureRevision, filePath: fileMeta.path, isPreloadingCapture, pathname: location.pathname, totalPackets });
 
   const exportPacketsJson = () => {
     downloadText(

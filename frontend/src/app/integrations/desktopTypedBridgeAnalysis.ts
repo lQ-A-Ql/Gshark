@@ -22,29 +22,29 @@ export function createAnalysisEvidenceTypedOverrides(desktopApp: DesktopTranspor
         await typedCall(() => desktopApp.GetGlobalTrafficStats!(), "DesktopApp.GetGlobalTrafficStats", signal),
       );
     },
-    async getIndustrialAnalysis(signal) {
+    async getIndustrialAnalysis(signal, options) {
       return asIndustrialAnalysis(
-        await typedCall(() => desktopApp.GetIndustrialAnalysis!(), "DesktopApp.GetIndustrialAnalysis", signal),
+        await typedCall(() => desktopApp.GetIndustrialAnalysis!(options?.source === "warmup"), "DesktopApp.GetIndustrialAnalysis", signal),
       );
     },
-    async getVehicleAnalysis(signal) {
+    async getVehicleAnalysis(signal, options) {
       return asVehicleAnalysis(
-        await typedCall(() => desktopApp.GetVehicleAnalysis!(), "DesktopApp.GetVehicleAnalysis", signal),
+        await typedCall(() => desktopApp.GetVehicleAnalysis!(options?.source === "warmup"), "DesktopApp.GetVehicleAnalysis", signal),
       );
     },
-    async getUSBAnalysis(signal, hidSource: USBHIDSourceMode = "auto", hidEventLimit = 20000) {
+    async getUSBAnalysis(signal, hidSource: USBHIDSourceMode = "auto", hidEventLimit = 20000, options) {
       return asUSBAnalysis(
         await typedCall(
-          () => desktopApp.GetUSBAnalysis!(hidSource, hidEventLimit),
+          () => desktopApp.GetUSBAnalysis!(hidSource, hidEventLimit, options?.source === "warmup"),
           "DesktopApp.GetUSBAnalysis",
           signal,
           LONG_TYPED_IPC_TIMEOUT_MS,
         ),
       );
     },
-    async getC2SampleAnalysis(signal) {
+    async getC2SampleAnalysis(signal, options) {
       return asC2SampleAnalysis(
-        await typedCall(() => desktopApp.GetC2SampleAnalysis!(), "DesktopApp.GetC2SampleAnalysis", signal),
+        await typedCall(() => desktopApp.GetC2SampleAnalysis!(options?.source === "warmup"), "DesktopApp.GetC2SampleAnalysis", signal),
       );
     },
     async decryptC2Traffic(req, signal) {

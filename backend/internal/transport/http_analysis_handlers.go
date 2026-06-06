@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/servicecontract"
 )
 
 func (s *Server) handleHunting(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,7 @@ func (s *Server) handleIndustrialAnalysis(w http.ResponseWriter, r *http.Request
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	analysis, err := s.analysis.IndustrialAnalysisWithContext(r.Context())
+	analysis, err := s.analysis.IndustrialAnalysisWithContext(analysisRequestContext(r, "industrial"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -76,7 +77,7 @@ func (s *Server) handleVehicleAnalysis(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	analysis, err := s.analysis.VehicleAnalysisWithContext(r.Context())
+	analysis, err := s.analysis.VehicleAnalysisWithContext(analysisRequestContext(r, "vehicle"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -122,7 +123,7 @@ func (s *Server) handleUSBAnalysis(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid hid_event_limit; expected integer")
 		return
 	}
-	analysis, err := s.analysis.USBAnalysisWithOptions(r.Context(), model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
+	analysis, err := s.analysis.USBAnalysisWithOptions(analysisRequestContext(r, "usb"), model.USBAnalysisOptions{HIDSourceMode: mode, HIDEventLimit: hidEventLimit})
 	if err != nil {
 		if strings.Contains(err.Error(), "no capture loaded") {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -150,7 +151,7 @@ func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	analysis, err := s.analysis.C2SampleAnalysis(r.Context())
+	analysis, err := s.analysis.C2SampleAnalysis(analysisRequestContext(r, "c2"))
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			writeError(w, http.StatusRequestTimeout, err.Error())
@@ -160,6 +161,23 @@ func (s *Server) handleC2Analysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, analysis)
+}
+
+func analysisRequestContext(r *http.Request, target string) context.Context {
+	ctx := r.Context()
+	warmup := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("warmup")))
+	if warmup != "1" && warmup != "true" && warmup != "yes" {
+		return servicecontract.WithAnalysisRequestMeta(ctx, servicecontract.AnalysisRequestMeta{
+			Source:   servicecontract.AnalysisRequestSourceUser,
+			Priority: servicecontract.AnalysisRequestPriorityNormal,
+			Target:   target,
+		})
+	}
+	return servicecontract.WithAnalysisRequestMeta(ctx, servicecontract.AnalysisRequestMeta{
+		Source:   servicecontract.AnalysisRequestSourceWarmup,
+		Priority: servicecontract.AnalysisRequestPriorityBackground,
+		Target:   target,
+	})
 }
 
 func (s *Server) handleC2Decrypt(w http.ResponseWriter, r *http.Request) {

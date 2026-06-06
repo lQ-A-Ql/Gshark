@@ -4,6 +4,14 @@ export function isProgressStatusMessage(message: string): boolean {
   return message.startsWith("__progress__:");
 }
 
+export function isInternalTelemetryStatusMessage(message: string): boolean {
+  return (
+    message.startsWith("__evidence_timing__:") ||
+    message.startsWith("__analysis_warmup__:") ||
+    message.startsWith("__analysis_request__:")
+  );
+}
+
 export function isCaptureLifecycleMessage(message: string): boolean {
   if (isProgressStatusMessage(message)) {
     return true;

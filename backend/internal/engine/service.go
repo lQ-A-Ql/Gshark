@@ -124,6 +124,10 @@ func NewService(emitter EventEmitter) *Service {
 				TimeoutMS: 25000,
 			},
 		},
+		analysisCache: analysisCache{
+			analysisLimiter: newAnalysisLimiter(1),
+			analysisMetrics: newAnalysisMetrics(),
+		},
 		playbookStatePB: playbookStatePB{
 			playbooks: map[string]*model.HuntingPlaybook{},
 			lastRun:   map[string]*model.PlaybookRunResult{},

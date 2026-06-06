@@ -6,6 +6,7 @@ import type { EventHandlers } from "./clients/eventClient";
 import { createHuntingClient } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
 import { createObjectClient } from "./clients/objectClient";
+import { createRuleClient } from "./clients/ruleClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
 import { createToolRuntimeClient } from "./clients/toolRuntimeClient";
@@ -35,6 +36,7 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
   const huntingClient = createHuntingClient(transport.requestJSON);
   const c2DecryptClient = createC2DecryptClient(transport.requestJSON);
   const desktopClient = createDesktopClient(transport.requestJSON, transport.getDesktopAppBinding);
+  const ruleClient = createRuleClient(transport.requestJSON);
 
   return {
     isAvailable: desktopClient.isAvailable,
@@ -130,6 +132,14 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     getShiroRememberMeAnalysis: toolClient.getShiroRememberMeAnalysis,
     getUDPTunnelAnalysis: toolClient.getUDPTunnelAnalysis,
     getBruteforceAnalysis: toolClient.getBruteforceAnalysis,
+
+    getRuleStatus: ruleClient.getRuleStatus,
+    toggleRulePack: ruleClient.toggleRulePack,
+    checkRuleUpdates: ruleClient.checkRuleUpdates,
+    downloadRulePack: ruleClient.downloadRulePack,
+    updateRuleConfig: ruleClient.updateRuleConfig,
+    listRuleConflicts: ruleClient.listRuleConflicts,
+    validateRuleContent: ruleClient.validateRuleContent,
 
     subscribeEvents: transport.subscribeEvents,
   };

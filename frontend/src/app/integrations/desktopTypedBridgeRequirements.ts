@@ -55,4 +55,11 @@ export const typedBindingRequirements: Record<string, keyof DesktopTransportBind
   runMiscModule: "RunMiscModulePackage",
   getUDPTunnelAnalysis: "GetUDPTunnelAnalysis",
   getBruteforceAnalysis: "GetBruteforceAnalysis",
+  getRuleStatus: "GetRuleStatus",
+  toggleRulePack: "ToggleRulePack",
+  checkRuleUpdates: "CheckRuleUpdates",
+  downloadRulePack: "DownloadRulePack",
+  updateRuleConfig: "UpdateRuleConfig",
+  listRuleConflicts: "GetRuleConflicts",
+  validateRuleContent: "ValidateRules",
 };

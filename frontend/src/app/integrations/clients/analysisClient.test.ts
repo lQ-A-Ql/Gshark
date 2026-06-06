@@ -13,7 +13,7 @@ describe("analysisClient", () => {
         return {
           total_packets: 12,
           protocol_kinds: 2,
-          timeline: [{ label: "10:00", count: 3 }],
+          timeline: [{ label: "10:00:00", count: 3 }],
           protocol_dist: [],
           top_talkers: [],
           top_hostnames: [],
@@ -47,7 +47,7 @@ describe("analysisClient", () => {
     await expect(client.getGlobalTrafficStats(signal)).resolves.toMatchObject({
       totalPackets: 12,
       protocolKinds: 2,
-      timeline: [{ label: "10:00", count: 3 }],
+      timeline: [{ label: "10:00:00", count: 3 }],
     });
     await expect(client.getEvidence(signal)).resolves.toMatchObject([
       { id: "c2-1", module: "c2", summary: "CS candidate", severity: "medium" },
