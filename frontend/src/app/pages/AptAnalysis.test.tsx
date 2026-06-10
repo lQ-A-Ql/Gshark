@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { APTAnalysis } from "../core/types";
 
@@ -161,21 +161,34 @@ describe("AptAnalysis", () => {
       expect(screen.getByText("APT 组织画像")).toBeInTheDocument();
       expect(screen.getAllByText("Silver Fox / 银狐").length).toBeGreaterThan(0);
       expect(screen.getAllByText("样本家族").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("ValleyRAT").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("https-c2").length).toBeGreaterThan(0);
       expect(screen.getByText("APT28 / Fancy Bear")).toBeInTheDocument();
       expect(screen.getByText("Lazarus Group")).toBeInTheDocument();
       expect(screen.getAllByText("已接入检测").length).toBeGreaterThan(0);
       expect(screen.getAllByText("框架预置").length).toBeGreaterThan(0);
       expect(screen.getAllByText("待样本验证").length).toBeGreaterThan(0);
       expect(screen.getAllByText("不参与本轮评分").length).toBeGreaterThan(0);
+      expect(screen.getByText("画像状态与证据需求")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Signals/ }));
+    await waitFor(() => {
+      expect(screen.getAllByText("ValleyRAT").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("https-c2").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Attribution/ }));
+    await waitFor(() => {
+      expect(screen.getByText("Evidence Timeline")).toBeInTheDocument();
+      expect(screen.getAllByText("hfs-download-chain").length).toBeGreaterThan(0);
+      expect(screen.getByText(/缺失 Object Export 证据/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Evidence/ }));
+    await waitFor(() => {
       expect(screen.getByText("C2 Evidence")).toBeInTheDocument();
       expect(screen.getByText("Delivery / Object")).toBeInTheDocument();
       expect(screen.getAllByText(/c2-analysis · c2-indicator/).length).toBeGreaterThan(0);
       expect(screen.getAllByText("C2 技术证据关联 Silver Fox 候选").length).toBeGreaterThan(0);
-      expect(screen.getByText("Evidence Timeline")).toBeInTheDocument();
-      expect(screen.getAllByText("hfs-download-chain").length).toBeGreaterThan(0);
-      expect(screen.getByText(/缺失 Object Export 证据/)).toBeInTheDocument();
     });
     expect(mocks.getAPTAnalysis).toHaveBeenCalledTimes(1);
   });

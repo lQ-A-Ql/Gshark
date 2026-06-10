@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAnalysis } from "./C2Analysis.testFixtures";
+import { seedC2AnalysisTestState } from "./C2Analysis.testState";
 
 const mocks = vi.hoisted(() => ({
   getC2SampleAnalysis: vi.fn(),
@@ -59,32 +60,21 @@ vi.mock("react-router", async (importOriginal) => {
 });
 import C2Analysis from "./C2Analysis";
 
+async function openEvidenceSection() {
+  fireEvent.click(await screen.findByRole("button", { name: /^证据 候选表与复核 notes$/ }));
+}
+
 describe("C2Analysis candidate interactions", () => {
   let seed = 0;
 
   beforeEach(() => {
     seed += 1;
-    mocks.sentinelState.backendConnected = true;
-    mocks.sentinelState.isPreloadingCapture = false;
-    mocks.sentinelState.totalPackets = 256 + seed;
-    mocks.sentinelState.captureRevision = seed;
-    mocks.sentinelState.fileMeta = {
-      path: `C:/captures/c2-candidates-${seed}.pcapng`,
-      name: `c2-candidates-${seed}.pcapng`,
-      sizeBytes: 4096,
-    };
-    mocks.getC2SampleAnalysis.mockReset();
-    mocks.decryptC2Traffic.mockReset();
-    mocks.navigate.mockReset();
-    mocks.clipboardWriteText.mockReset();
+    seedC2AnalysisTestState(mocks, seed, "c2-candidates", { packet: null, protocol: "HTTP", streamId: 7 });
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: mocks.clipboardWriteText },
       configurable: true,
     });
-    mocks.sentinelState.locatePacketById.mockReset();
-    mocks.sentinelState.preparePacketStream.mockReset();
-    mocks.sentinelState.locatePacketById.mockResolvedValue(null);
-    mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "HTTP", streamId: 7 });
+    mocks.clipboardWriteText.mockReset();
     mocks.getC2SampleAnalysis.mockResolvedValue(createAnalysis({
       totalMatchedPackets: 1,
       families: [{ label: "CS", count: 1 }],
@@ -126,6 +116,7 @@ describe("C2Analysis candidate interactions", () => {
 
   it("copies HTTP display filter from C2 candidate rows", async () => {
     render(<C2Analysis />);
+    await openEvidenceSection();
 
     await waitFor(() => {
       expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();
@@ -142,6 +133,7 @@ describe("C2Analysis candidate interactions", () => {
 
   it("expands candidate context without opening a stream", async () => {
     render(<C2Analysis />);
+    await openEvidenceSection();
 
     await waitFor(() => {
       expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();
@@ -164,6 +156,7 @@ describe("C2Analysis candidate interactions", () => {
 
   it("links C2 candidates back to packet and stream evidence", async () => {
     render(<C2Analysis />);
+    await openEvidenceSection();
 
     await waitFor(() => {
       expect(screen.getByText("周期性 HTTPS 回连候选")).toBeInTheDocument();

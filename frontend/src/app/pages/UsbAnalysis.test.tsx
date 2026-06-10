@@ -124,6 +124,7 @@ describe("UsbAnalysis", () => {
       expect(screen.getByText("当前抓包未识别到可展示的 USB 行为。")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: /其他 USB/ }));
     fireEvent.click(screen.getByRole("button", { name: "原始记录" }));
     await waitFor(() => {
       expect(screen.getByText("暂无其他 USB 记录")).toBeInTheDocument();

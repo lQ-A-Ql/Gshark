@@ -4,6 +4,8 @@ import { AnalysisHero } from "../components/AnalysisHero";
 import { InvestigationReportPanel } from "../components/InvestigationReportPanel";
 import { PageShell } from "../components/PageShell";
 import { StatusHint } from "../components/DesignSystem";
+import { AnalysisWorkbenchShell } from "../components/analysis/AnalysisWorkbenchShell";
+import type { AnalysisWorkbenchSection } from "../components/analysis/analysisWorkbenchTypes";
 import { VehicleDetailPanels } from "../features/vehicle/VehicleDetailPanels";
 import { VehicleDbcPanel } from "../features/vehicle/VehicleDbcPanel";
 import { VehicleOverviewPanel, VEHICLE_PROTOCOL_TAGS } from "../features/vehicle/VehicleOverviewPanel";
@@ -14,6 +16,17 @@ import { useVehicleDbcProfiles } from "../features/vehicle/useVehicleDbcProfiles
 import { useBackend } from "../state/contexts/BackendContext";
 import { useCapture } from "../state/contexts/CaptureContext";
 import { usePacket } from "../state/contexts/PacketContext";
+
+type VehicleWorkbenchSection = "setup" | "overview" | "protocols" | "details" | "uds" | "report";
+
+const VEHICLE_WORKBENCH_SECTIONS: AnalysisWorkbenchSection[] = [
+  { id: "setup", title: "Setup", description: "DBC profile 与分析输入", group: "Setup" },
+  { id: "overview", title: "总览", description: "车机协议指标", group: "Analysis" },
+  { id: "protocols", title: "协议", description: "CAN、J1939、DoIP、UDS", group: "Analysis" },
+  { id: "details", title: "明细", description: "CAN ID、payload 与 signal", group: "Workspace" },
+  { id: "uds", title: "UDS", description: "诊断事务与状态过滤", group: "Workspace" },
+  { id: "report", title: "报告", description: "车机调查报告", group: "Output" },
+];
 
 export default function VehicleAnalysis() {
   const { backendConnected } = useBackend();
@@ -42,6 +55,7 @@ export default function VehicleAnalysis() {
     dbcProfiles,
   });
   const error = analysisError || dbcError;
+  const [activeSection, setActiveSection] = useState<VehicleWorkbenchSection>("setup");
   const [udsStatusFilter, setUdsStatusFilter] = useState("all");
   const filteredUdsTransactions = useMemo(() => {
     if (udsStatusFilter === "all") return analysis.uds.transactions;
@@ -78,32 +92,46 @@ export default function VehicleAnalysis() {
         </StatusHint>
       )}
 
-      <VehicleDbcPanel
-        profiles={dbcProfiles}
-        pathInput={dbcPathInput}
-        onPathInputChange={setDBCPathInput}
-        onImport={() => void importDBC().then((changed) => changed && refreshAnalysis(true))}
-        onAddPath={() => void addDBC(dbcPathInput).then((changed) => changed && refreshAnalysis(true))}
-        onRemove={(path) => void removeDBC(path).then((changed) => changed && refreshAnalysis(true))}
-      />
+      <AnalysisWorkbenchShell
+        sections={VEHICLE_WORKBENCH_SECTIONS}
+        selectedSection={activeSection}
+        onSectionChange={setActiveSection}
+      >
+        {activeSection === "setup" && (
+          <VehicleDbcPanel
+            profiles={dbcProfiles}
+            pathInput={dbcPathInput}
+            onPathInputChange={setDBCPathInput}
+            onImport={() => void importDBC().then((changed) => changed && refreshAnalysis(true))}
+            onAddPath={() => void addDBC(dbcPathInput).then((changed) => changed && refreshAnalysis(true))}
+            onRemove={(path) => void removeDBC(path).then((changed) => changed && refreshAnalysis(true))}
+          />
+        )}
 
-      <VehicleOverviewPanel analysis={analysis} />
-      <InvestigationReportPanel
-        className="mt-0"
-        preferredProtocol="TCP"
-        report={analysis.report}
-        title="车机调查报告"
-      />
+        {activeSection === "overview" && <VehicleOverviewPanel analysis={analysis} />}
 
-      <VehicleProtocolPanels analysis={analysis} />
-      <VehicleDetailPanels analysis={analysis} />
+        {activeSection === "protocols" && <VehicleProtocolPanels analysis={analysis} />}
 
-      <VehicleUdsTransactionsPanel
-        transactions={analysis.uds.transactions}
-        filteredTransactions={filteredUdsTransactions}
-        statusFilter={udsStatusFilter}
-        onStatusFilterChange={setUdsStatusFilter}
-      />
+        {activeSection === "details" && <VehicleDetailPanels analysis={analysis} />}
+
+        {activeSection === "uds" && (
+          <VehicleUdsTransactionsPanel
+            transactions={analysis.uds.transactions}
+            filteredTransactions={filteredUdsTransactions}
+            statusFilter={udsStatusFilter}
+            onStatusFilterChange={setUdsStatusFilter}
+          />
+        )}
+
+        {activeSection === "report" && (
+          <InvestigationReportPanel
+            className="mt-0"
+            preferredProtocol="TCP"
+            report={analysis.report}
+            title="车机调查报告"
+          />
+        )}
+      </AnalysisWorkbenchShell>
     </PageShell>
   );
 }

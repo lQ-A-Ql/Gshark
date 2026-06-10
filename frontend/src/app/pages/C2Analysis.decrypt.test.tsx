@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAnalysis, findAncestorWithClass } from "./C2Analysis.testFixtures";
+import { seedC2AnalysisTestState } from "./C2Analysis.testState";
 
 const mocks = vi.hoisted(() => ({
   getC2SampleAnalysis: vi.fn(),
@@ -57,26 +58,19 @@ vi.mock("react-router", async (importOriginal) => {
 });
 import C2Analysis from "./C2Analysis";
 
+async function openVShellDecryptWorkbench() {
+  fireEvent.click(await screen.findByRole("button", { name: /^Family CS \/ VShell 画像$/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^VShell TCP/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^解密 流量解密工作台$/ }));
+}
+
 describe("C2Analysis decrypt workflow", () => {
   let seed = 0;
 
   beforeEach(() => {
     seed += 1;
-    mocks.sentinelState.backendConnected = true;
-    mocks.sentinelState.isPreloadingCapture = false;
-    mocks.sentinelState.totalPackets = 256 + seed;
-    mocks.sentinelState.captureRevision = seed;
-    mocks.sentinelState.fileMeta = {
-      path: `C:/captures/c2-decrypt-${seed}.pcapng`,
-      name: `c2-decrypt-${seed}.pcapng`,
-      sizeBytes: 4096,
-    };
+    seedC2AnalysisTestState(mocks, seed, "c2-decrypt", { packet: null, protocol: "TCP", streamId: 9 });
     mocks.getC2SampleAnalysis.mockReset();
-    mocks.decryptC2Traffic.mockReset();
-    mocks.sentinelState.locatePacketById.mockReset();
-    mocks.sentinelState.preparePacketStream.mockReset();
-    mocks.sentinelState.locatePacketById.mockResolvedValue(null);
-    mocks.sentinelState.preparePacketStream.mockResolvedValue({ packet: null, protocol: "TCP", streamId: 9 });
     mocks.getC2SampleAnalysis.mockResolvedValue(
       createAnalysis({
         totalMatchedPackets: 1,
@@ -139,7 +133,7 @@ describe("C2Analysis decrypt workflow", () => {
   it("submits VShell decrypt request with vkey and salt", async () => {
     render(<C2Analysis />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
+    await openVShellDecryptWorkbench();
     const modeSelect = screen.getByRole("combobox", { name: "模式" });
     expect(modeSelect).toHaveTextContent("auto：三 KDF + GCM/CBC 自动尝试");
     expect(modeSelect).toHaveClass("meow-field", "rounded-sm");
@@ -199,7 +193,7 @@ describe("C2Analysis decrypt workflow", () => {
 
     render(<C2Analysis />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /VShell/ }));
+    await openVShellDecryptWorkbench();
     fireEvent.change(screen.getByLabelText(/vkey/), { target: { value: "fallsnow" } });
     fireEvent.change(screen.getByLabelText(/salt/), { target: { value: "paperplane" } });
     fireEvent.click(screen.getByRole("button", { name: /批量解密候选流量/ }));

@@ -211,6 +211,7 @@ describe("C2Analysis", () => {
 
   it("renders CS Host and URI aggregation profile", async () => {
     render(<C2Analysis />);
+    fireEvent.click(screen.getByRole("button", { name: /聚合/ }));
 
     await waitFor(() => {
       expect(screen.getByText("CS Host / URI 聚合画像")).toBeInTheDocument();
@@ -235,6 +236,7 @@ describe("C2Analysis", () => {
 
   it("renders CS DNS Beacon aggregation profile", async () => {
     render(<C2Analysis />);
+    fireEvent.click(screen.getByRole("button", { name: /聚合/ }));
 
     await waitFor(() => {
       expect(screen.getByText("CS DNS Beacon 聚合画像")).toBeInTheDocument();
@@ -249,6 +251,7 @@ describe("C2Analysis", () => {
 
   it("copies DNS and VShell stream display filters from aggregate rows", async () => {
     render(<C2Analysis />);
+    fireEvent.click(screen.getByRole("button", { name: /聚合/ }));
 
     await waitFor(() => {
       expect(screen.getByText("abcdefg.example.com")).toBeInTheDocument();
@@ -260,7 +263,7 @@ describe("C2Analysis", () => {
       expect(mocks.clipboardWriteText).toHaveBeenCalledWith('dns.qry.name contains "abcdefg.example.com" && dns.qry.type == 16');
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /VShell/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^VShell Stream 聚合画像$/ }));
 
     await waitFor(() => {
       expect(screen.getByText("VShell stream-level 候选")).toBeInTheDocument();
@@ -276,6 +279,7 @@ describe("C2Analysis", () => {
 
   it("expands DNS and VShell aggregate detail panels", async () => {
     render(<C2Analysis />);
+    fireEvent.click(screen.getByRole("button", { name: /聚合/ }));
 
     await waitFor(() => {
       expect(screen.getByText("abcdefg.example.com")).toBeInTheDocument();
@@ -291,7 +295,7 @@ describe("C2Analysis", () => {
       expect(screen.getAllByText("51, 52, 53, 54, 55, 56").length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /VShell/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^VShell Stream 聚合画像$/ }));
 
     await waitFor(() => {
       expect(screen.getByText("VShell stream-level 候选")).toBeInTheDocument();

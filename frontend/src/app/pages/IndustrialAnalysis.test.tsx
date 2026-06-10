@@ -86,6 +86,22 @@ function createAnalysis(overrides: Partial<IndustrialAnalysisData> = {}): Indust
   };
 }
 
+function openModbusSection() {
+  fireEvent.click(screen.getByRole("button", { name: /Modbus/ }));
+}
+
+function openDnp3Section() {
+  fireEvent.click(screen.getByRole("button", { name: /DNP3/ }));
+}
+
+function openCommandsSection() {
+  fireEvent.click(screen.getByRole("button", { name: /控制命令/ }));
+}
+
+function openDetailsSection() {
+  fireEvent.click(screen.getByRole("button", { name: /^明细 协议明细记录$/ }));
+}
+
 describe("IndustrialAnalysis", () => {
   let renderSeed = 0;
 
@@ -150,6 +166,7 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openModbusSection();
 
     await waitFor(() => {
       expect(screen.getByText("Modbus 事务明细 (1)")).toBeInTheDocument();
@@ -190,6 +207,11 @@ describe("IndustrialAnalysis", () => {
     expect(screen.getAllByText("200").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("异常响应")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
+
+    openModbusSection();
+    await waitFor(() => {
+      expect(screen.getByText("Modbus 请求")).toBeInTheDocument();
+    });
     expect(screen.getByText("Modbus 请求")).toBeInTheDocument();
     expect(screen.getByText("150")).toBeInTheDocument();
     expect(screen.getByText("Modbus 响应")).toBeInTheDocument();
@@ -231,6 +253,7 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openModbusSection();
 
     await waitFor(() => {
       expect(screen.getByText("Modbus 事务明细 (1)")).toBeInTheDocument();
@@ -282,6 +305,7 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openModbusSection();
 
     await waitFor(() => {
       expect(screen.getByText("Modbus 事务明细 (3)")).toBeInTheDocument();
@@ -331,6 +355,7 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openModbusSection();
 
     await waitFor(() => {
       expect(screen.getByText("Modbus 事务明细 (3)")).toBeInTheDocument();
@@ -405,6 +430,7 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openDnp3Section();
 
     await waitFor(() => {
       expect(screen.getByText("DNP3 专项 (3)")).toBeInTheDocument();
@@ -419,7 +445,11 @@ describe("IndustrialAnalysis", () => {
     expect(screen.getAllByText("Repeated DNP3 operate requests").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("index=12").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("fc=5 count=3").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("控制指令 (1)")).toBeInTheDocument();
+
+    openDetailsSection();
+    await waitFor(() => {
+      expect(screen.getByText("DNP3 outstation 明细 (1)")).toBeInTheDocument();
+    });
     expect(screen.getByText("DNP3 outstation 明细 (1)")).toBeInTheDocument();
   });
 
@@ -455,13 +485,23 @@ describe("IndustrialAnalysis", () => {
     }));
 
     render(<IndustrialAnalysis />);
+    openCommandsSection();
 
     await waitFor(() => {
       expect(screen.getByText("控制指令 (1)")).toBeInTheDocument();
     });
 
     expect(screen.queryByText(/DNP3 专项/)).not.toBeInTheDocument();
-    expect(screen.getByText("IEC104 明细 (1)")).toBeInTheDocument();
+    openDetailsSection();
+    await waitFor(() => {
+      expect(screen.getByText("IEC104 明细 (1)")).toBeInTheDocument();
+    });
+    expect(screen.getByText("IEC104 record")).toBeInTheDocument();
+
+    openCommandsSection();
+    await waitFor(() => {
+      expect(screen.getByText("控制指令 (1)")).toBeInTheDocument();
+    });
     expect(screen.getByText("IEC104 single command")).toBeInTheDocument();
   });
 });
