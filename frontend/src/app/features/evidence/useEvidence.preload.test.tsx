@@ -59,4 +59,45 @@ describe("evidence preload contract", () => {
     expect(backendClients.evidence.getEvidenceWithFilter).toHaveBeenCalledTimes(1);
     expect(backendClients.evidence.getEvidenceWithFilter).toHaveBeenCalledWith(["hunting"], expect.anything());
   });
+
+  it("short-circuits empty captures without requesting evidence", async () => {
+    const { result } = renderHook(() =>
+      useEvidence({
+        backendConnected: true,
+        filePath: "empty.pcapng",
+        totalPackets: 0,
+        captureRevision: 1,
+        modules: ["hunting"],
+        isPreloadingCapture: false,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.evidence).toEqual([]);
+    expect(result.current.error).toBe("");
+    expect(backendClients.evidence.getEvidenceWithFilter).not.toHaveBeenCalled();
+  });
+
+  it("does not rerun when callers pass a new modules array with the same values", async () => {
+    vi.mocked(backendClients.evidence.getEvidenceWithFilter).mockResolvedValue(records);
+
+    const { result, rerender } = renderHook(
+      ({ modules }) =>
+        useEvidence({
+          backendConnected: true,
+          filePath: "capture.pcapng",
+          totalPackets: 3,
+          captureRevision: 1,
+          modules,
+          isPreloadingCapture: false,
+        }),
+      { initialProps: { modules: ["hunting"] } },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ modules: ["hunting"] });
+
+    expect(result.current.evidence).toEqual(records);
+    expect(backendClients.evidence.getEvidenceWithFilter).toHaveBeenCalledTimes(1);
+  });
 });

@@ -9,6 +9,8 @@ import { useCapture } from "../state/contexts/CaptureContext";
 import { useFilter } from "../state/contexts/FilterContext";
 import { usePacket } from "../state/contexts/PacketContext";
 
+const TRAFFIC_GRAPH_EVIDENCE_MODULES = ["hunting"];
+
 export function useTrafficGraphPageState() {
   const [selectedSection, setSelectedSection] = useState<TrafficGraphSection>("overview");
   const [timelineSelection, setTimelineSelection] = useState<TrafficTimelineSelection>({
@@ -34,7 +36,7 @@ export function useTrafficGraphPageState() {
     filePath: fileMeta.path,
     totalPackets,
     captureRevision,
-    modules: ["hunting"],
+    modules: TRAFFIC_GRAPH_EVIDENCE_MODULES,
   });
 
   const jumpWithFilter = useCallback((filter: string) => {

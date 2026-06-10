@@ -7,6 +7,7 @@ import { LRUCache } from "../../utils/lruCache";
 
 const evidenceCache = new LRUCache<string, UnifiedEvidenceRecord[]>(10);
 const evidenceInflight = new Map<string, Promise<UnifiedEvidenceRecord[]>>();
+const EMPTY_EVIDENCE: UnifiedEvidenceRecord[] = [];
 
 export interface UseEvidenceOptions {
   backendConnected: boolean;
@@ -30,21 +31,27 @@ export function useEvidence({
   captureRevision,
   modules,
 }: UseEvidenceOptions) {
-  const [evidence, setEvidence] = useState<UnifiedEvidenceRecord[]>([]);
+  const modulesKey = buildEvidenceModulesKey(modules);
+  const normalizedModules = useMemo(() => parseEvidenceModulesKey(modulesKey), [modulesKey]);
+  const hasCaptureForEvidence = useMemo(
+    () => backendConnected && filePath.trim().length > 0 && totalPackets > 0,
+    [backendConnected, filePath, totalPackets],
+  );
+  const [evidence, setEvidence] = useState<UnifiedEvidenceRecord[]>(EMPTY_EVIDENCE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { run: runRequest, cancel: cancelRequest } = useAbortableRequest();
 
   const cacheKey = useMemo(
-    () => buildEvidenceCacheKey(captureRevision, filePath, totalPackets, modules),
-    [captureRevision, filePath, totalPackets, modules],
+    () => buildEvidenceCacheKey(captureRevision, filePath, totalPackets, normalizedModules),
+    [captureRevision, filePath, normalizedModules, totalPackets],
   );
 
   const refreshEvidence = useCallback(
     (force = false) => {
-      if (!filePath || !backendConnected) {
+      if (!hasCaptureForEvidence) {
         cancelRequest();
-        setEvidence([]);
+        setEvidence(EMPTY_EVIDENCE);
         setLoading(false);
         setError("");
         return;
@@ -60,7 +67,7 @@ export function useEvidence({
       setLoading(true);
       setError("");
       return runRequest({
-        request: (signal) => requestEvidence(cacheKey, modules, signal, { force }),
+        request: (signal) => requestEvidence(cacheKey, normalizedModules, signal, { force }),
         onSuccess: (payload) => {
           if (cacheKey) {
             evidenceCache.set(cacheKey, payload);
@@ -69,12 +76,12 @@ export function useEvidence({
         },
         onError: (err) => {
           setError(err instanceof Error ? err.message : "统一证据加载失败");
-          setEvidence([]);
+          setEvidence(EMPTY_EVIDENCE);
         },
         onSettled: () => setLoading(false),
       });
     },
-    [backendConnected, cacheKey, cancelRequest, filePath, modules, runRequest],
+    [cacheKey, cancelRequest, hasCaptureForEvidence, normalizedModules, runRequest],
   );
 
   useEffect(() => {
@@ -91,12 +98,22 @@ export function useEvidence({
 }
 
 export function buildEvidenceCacheKey(captureRevision: number, filePath: string, totalPackets: number, modules?: string[]) {
-  if (!filePath.trim()) return "";
+  if (!filePath.trim() || totalPackets <= 0) return "";
   const base = `${captureRevision}::${filePath}::${totalPackets}`;
-  if (modules && modules.length > 0) {
-    return `${base}::${[...modules].sort().join(",")}`;
+  const modulesKey = buildEvidenceModulesKey(modules);
+  if (modulesKey) {
+    return `${base}::${modulesKey}`;
   }
   return base;
+}
+
+export function buildEvidenceModulesKey(modules?: readonly string[]) {
+  if (!modules || modules.length === 0) return "";
+  return Array.from(new Set(modules.map((module) => module.trim()).filter(Boolean))).sort().join(",");
+}
+
+function parseEvidenceModulesKey(modulesKey: string) {
+  return modulesKey ? modulesKey.split(",") : undefined;
 }
 
 export const evidencePreloadContract: FeaturePreloadContract<EvidencePreloadInput, UnifiedEvidenceRecord[]> = {
@@ -113,7 +130,7 @@ export const evidencePreloadContract: FeaturePreloadContract<EvidencePreloadInpu
     return evidenceInflight.get(key);
   },
   prefetch(input, signal) {
-    if (!input.backendConnected || !input.filePath) return Promise.resolve([]);
+    if (!input.backendConnected || !input.filePath || input.totalPackets <= 0) return Promise.resolve([]);
     if (!input.modules || input.modules.length === 0) {
       return Promise.reject(new Error("evidence preload requires explicit modules"));
     }
