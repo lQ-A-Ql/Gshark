@@ -16,10 +16,8 @@ export function MiscModuleWorkbench({ modules, selectedModuleId, onModuleDeleted
 
   if (!selectedModule) {
     return (
-      <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-        <MeowEmptyState variant="box">
-          当前筛选下没有可展示的 MISC 模块。
-        </MeowEmptyState>
+      <div className="flex min-h-[240px] items-center justify-center">
+        <MeowEmptyState variant="box">当前筛选下没有可展示的 MISC 模块。</MeowEmptyState>
       </div>
     );
   }
@@ -28,7 +26,7 @@ export function MiscModuleWorkbench({ modules, selectedModuleId, onModuleDeleted
   const meta = summarizeModule(selectedModule);
 
   return (
-    <div className="flex-1 overflow-auto p-5">
+    <>
       <div className="mb-4 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
         <span className="font-semibold text-slate-700">{selectedModule.summary}</span>
         {meta.length > 0 && <span className="text-slate-300">·</span>}
@@ -41,7 +39,7 @@ export function MiscModuleWorkbench({ modules, selectedModuleId, onModuleDeleted
       <Suspense fallback={<WorkbenchLoading title={selectedModule.title} />}>
         <Renderer module={selectedModule} onModuleDeleted={onModuleDeleted} surfaceVariant="card" />
       </Suspense>
-    </div>
+    </>
   );
 }
 

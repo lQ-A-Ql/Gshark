@@ -10,6 +10,22 @@ const sections: AnalysisWorkbenchSection[] = [
 ];
 
 describe("AnalysisWorkbenchShell", () => {
+  it("passes through nav item ids and expanded state", () => {
+    render(
+      <AnalysisWorkbenchShell
+        sections={[
+          { id: "module:webshell", title: "WebShell", group: "Modules", testId: "module-webshell", expanded: true },
+        ]}
+        selectedSection="module:webshell"
+        onSectionChange={vi.fn()}
+      >
+        <div>当前内容</div>
+      </AnalysisWorkbenchShell>,
+    );
+
+    expect(screen.getByTestId("module-webshell")).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("renders grouped sections, header, active button and scroll container", () => {
     render(
       <AnalysisWorkbenchShell sections={sections} selectedSection="overview" onSectionChange={vi.fn()}>

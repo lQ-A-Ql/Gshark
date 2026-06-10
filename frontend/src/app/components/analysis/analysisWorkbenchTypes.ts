@@ -7,6 +7,9 @@ export type AnalysisWorkbenchSection = {
   group?: string;
   badge?: string | number;
   disabled?: boolean;
+  icon?: ReactNode;
+  testId?: string;
+  expanded?: boolean;
 };
 
 export interface AnalysisWorkbenchShellProps<TSectionId extends string> {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
+import { AnalysisWorkbenchShell } from "../../components/analysis/AnalysisWorkbenchShell";
+import type { AnalysisWorkbenchSection } from "../../components/analysis/analysisWorkbenchTypes";
 import { normalizeTrafficTimelineBuckets } from "./trafficTimeline";
-import { TrafficGraphPanelHeader } from "./TrafficGraphPanelHeader";
-import { TrafficGraphSectionNav } from "./TrafficGraphSectionNav";
 import { TrafficGraphSelectedPanel } from "./TrafficGraphSelectedPanel";
 import {
   buildConversationBuckets,
@@ -12,6 +12,15 @@ import {
 import type { TrafficGraphPanelsProps } from "./trafficGraphPanelTypes";
 export type { TrafficGraphSection } from "./trafficGraphPanelTypes";
 export { TrafficGraphOverview } from "./TrafficGraphOverview";
+
+const trafficWorkbenchSections: AnalysisWorkbenchSection[] = trafficSectionGroups.flatMap((group) =>
+  group.items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    group: group.label,
+  })),
+);
 
 export function TrafficGraphPanels(props: TrafficGraphPanelsProps) {
   const timelinePoints = useMemo(
@@ -31,39 +40,47 @@ export function TrafficGraphPanels(props: TrafficGraphPanelsProps) {
         topSrcPorts: props.topSrcPorts,
         topTalkers: props.topTalkers,
       }),
-    [props.topComputerNames, props.topDestPorts, props.topDomains, props.topDstIPs, props.topSrcIPs, props.topSrcPorts, props.topTalkers],
+    [
+      props.topComputerNames,
+      props.topDestPorts,
+      props.topDomains,
+      props.topDstIPs,
+      props.topSrcIPs,
+      props.topSrcPorts,
+      props.topTalkers,
+    ],
   );
   const selectedSectionMeta = useMemo(
     () => trafficSectionGroups.flatMap((group) => group.items).find((item) => item.id === props.selectedSection),
     [props.selectedSection],
   );
   const hasTimelineSelection = Boolean(
-    props.timelineSelection.hoveredLabel || props.timelineSelection.lockedLabel || props.timelineSelection.selectedRange,
+    props.timelineSelection.hoveredLabel ||
+    props.timelineSelection.lockedLabel ||
+    props.timelineSelection.selectedRange,
   );
   const linkedContextLabel = props.timelineSelection.selectedRange
     ? `${props.timelineSelection.selectedRange.startLabel} ~ ${props.timelineSelection.selectedRange.endLabel}`
-    : props.timelineSelection.lockedLabel ?? props.timelineSelection.hoveredLabel;
+    : (props.timelineSelection.lockedLabel ?? props.timelineSelection.hoveredLabel);
 
   return (
-    <div className="meow-aurora-surface flex min-h-0 flex-1 overflow-hidden border border-[var(--meow-tile-divider)]">
-      <TrafficGraphSectionNav selectedSection={props.selectedSection} onSelectSection={props.onSelectSection} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TrafficGraphPanelHeader
-          title={selectedSectionMeta?.title ?? "流量概览"}
-          description={selectedSectionMeta?.description ?? "聚焦当前流量分析主视图。"}
-        />
-        <div className="min-h-0 flex-1 overflow-auto">
-          <TrafficGraphSelectedPanel
-            {...props}
-            conversationBuckets={conversationBuckets}
-            hasTimelineSelection={hasTimelineSelection}
-            linkedContextLabel={linkedContextLabel}
-            talkerPanels={talkerPanels}
-            timelinePoints={timelinePoints}
-            topologyEdges={topologyEdges}
-          />
-        </div>
-      </div>
-    </div>
+    <AnalysisWorkbenchShell
+      sections={trafficWorkbenchSections}
+      selectedSection={props.selectedSection}
+      onSectionChange={props.onSelectSection}
+      title={selectedSectionMeta?.title}
+      description={selectedSectionMeta?.description}
+      contentClassName="p-0"
+    >
+      <TrafficGraphSelectedPanel
+        {...props}
+        conversationBuckets={conversationBuckets}
+        hasTimelineSelection={hasTimelineSelection}
+        linkedContextLabel={linkedContextLabel}
+        talkerPanels={talkerPanels}
+        timelinePoints={timelinePoints}
+        topologyEdges={topologyEdges}
+      />
+    </AnalysisWorkbenchShell>
   );
 }

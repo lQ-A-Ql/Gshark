@@ -47,6 +47,16 @@ Invoke-Step "Backend focused contracts" {
   go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
 }
 
+Invoke-Step "Backend foundational contracts" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/servicecontract ./internal/report ./internal/mcp -count=1 -v
+}
+
+Invoke-Step "Backend API contract suite" {
+  Set-Location (Join-Path $root "backend")
+  go test ./internal/transport -run "TestRegisteredAPIRoutesHaveContractCases|Test.*Contract|TestHandle.*Context|TestHandle.*Method|TestHandle.*Invalid" -count=1 -v
+}
+
 Invoke-Step "Backend governance register check" {
   Set-Location (Join-Path $root "backend")
   go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
@@ -60,6 +70,13 @@ Invoke-Step "Backend feature gap remediation tests" {
 Invoke-Step "Backend tests" {
   Set-Location (Join-Path $root "backend")
   go test ./...
+}
+
+Invoke-Step "Backend coverage report" {
+  Set-Location (Join-Path $root "backend")
+  $coveragePath = Join-Path $env:TEMP "gshark-backend-cover.out"
+  go test ./... -covermode=count -coverprofile="$coveragePath"
+  go tool cover -func="$coveragePath"
 }
 
 Invoke-Step "Frontend package manager check" {

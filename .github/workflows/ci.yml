@@ -30,6 +30,12 @@ jobs:
       - name: Backend focused contracts
         run: go test ./internal/engine -run "TestGatherEvidence|Test.*InvestigationReport|TestBundledPublic" -count=1 -v
 
+      - name: Backend foundational contracts
+        run: go test ./internal/servicecontract ./internal/report ./internal/mcp -count=1 -v
+
+      - name: Backend API contract suite
+        run: go test ./internal/transport -run "TestRegisteredAPIRoutesHaveContractCases|Test.*Contract|TestHandle.*Context|TestHandle.*Method|TestHandle.*Invalid" -count=1 -v
+
       - name: Backend governance register check
         run: go test ./internal/governance -run "Test.*Defect|Test.*Report|Test.*Archive" -count=1 -v
 
@@ -38,6 +44,11 @@ jobs:
 
       - name: Go test
         run: go test ./...
+
+      - name: Backend coverage report
+        run: |
+          go test ./... -covermode=count -coverprofile="${RUNNER_TEMP}/gshark-backend-cover.out"
+          go tool cover -func="${RUNNER_TEMP}/gshark-backend-cover.out"
 
   frontend:
     runs-on: ubuntu-latest

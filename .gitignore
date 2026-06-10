@@ -55,3 +55,5 @@ backend/internal/transport/plugins/misc/
 
 # Local component gallery / design scratchpad
 /component-gallery/
+CLAUDE.md
+AGENTS.md
