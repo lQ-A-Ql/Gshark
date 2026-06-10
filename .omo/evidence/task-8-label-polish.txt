@@ -1,7 +1,0 @@
-2026-06-06
-- Command: `cd frontend && pnpm run test:run -- EvidencePanel`
-- Result: PASS. `src/app/features/evidence/evidencePanelRules.test.ts` and `src/app/pages/EvidencePanel.test.tsx` both passed; 2 files, 13 tests total.
-- Command: `cd frontend && pnpm run test:run -- EvidencePanel MiscTools IndustrialAnalysis ThreatHunting C2Analysis`
-- Result: PASS. 18 files and 67 tests passed, including the repaired `EvidencePanel` action-guard coverage and the previously updated C2/MISC/Industrial/ThreatHunting suites.
-- Final selector strategy: EvidencePanel tests now scope row selection to the actual evidence results table via the `调查摘要` header and scope action assertions to the selected detail pane, avoiding duplicate summary text from the report panel.
-- Label/copy coverage verified: `JA3`, `JA3S`, `菜刀 / China Chopper`, `WebShell`, `未提供`, `DNP3`, `IOC API unavailable`, `Playbook`, and explicit unavailable labels for sparse rule/playbook fields.

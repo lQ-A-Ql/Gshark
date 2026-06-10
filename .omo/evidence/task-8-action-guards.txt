@@ -1,5 +1,0 @@
-2026-06-06
-- Implemented action guards so packet and stream actions render only when their required IDs are valid.
-- `EvidenceActions` gates packet navigation on `packetId` and stream navigation on both `packetId` + `streamId` instead of implying stream navigation from packet context alone.
-- Updated existing frontend callers that already had real stream context to pass `streamId`: Shiro rememberMe results, payload/webshell source list, investigation report items, and C2 candidate/aggregate surfaces.
-- Verification PASS: `pnpm run test:run -- EvidencePanel` passed with the new EvidencePanel action-guard assertions, and `pnpm run test:run -- EvidencePanel MiscTools IndustrialAnalysis ThreatHunting C2Analysis` passed end-to-end with 67/67 tests green.

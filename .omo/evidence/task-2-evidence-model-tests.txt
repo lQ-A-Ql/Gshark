@@ -1,3 +1,0 @@
-Command: cd frontend && pnpm run test:run -- evidenceMapper evidencePanelRules evidenceSchema
-Result: PASS
-Summary: 3 test files passed, 15 tests passed. evidenceMapper, evidencePanelRules, and evidenceSchema targeted coverage verified.

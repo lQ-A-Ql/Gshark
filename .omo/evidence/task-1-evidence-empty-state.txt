@@ -1,7 +1,0 @@
-Command: cd frontend && pnpm run test:run -- evidenceMapper evidencePanelRules EvidencePanel
-Result: PASS
-
-Verified empty/sparse-state coverage:
-- Sparse WebShell/rule evidence records render without `undefined` text.
-- Empty evidence backend response renders `当前抓包未产生证据记录` and exports `[]`.
-- Optional-contract fixtures cover JA3, JA3S, WebShell, China Chopper, DNP3, IOC, Playbook, and Rule using existing frontend fields.
