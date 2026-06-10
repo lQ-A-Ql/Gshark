@@ -87,7 +87,7 @@ func TestResolveUpdateManifestURLBuildsRawGitHubURL(t *testing.T) {
 	t.Setenv("MEOW_TRAFFIC_UPDATE_MANIFEST_REF", "release/version.json")
 
 	got := resolveUpdateManifestURL("lQ-A-Ql/Gshark")
-	want := "https://raw.githubusercontent.com/lQ-A-Ql/meow-traffic/release/version.json"
+	want := "https://raw.githubusercontent.com/lQ-A-Ql/Gshark/release/version.json"
 	if got != want {
 		t.Fatalf("resolveUpdateManifestURL() = %q, want %q", got, want)
 	}

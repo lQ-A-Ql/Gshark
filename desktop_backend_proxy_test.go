@@ -99,7 +99,7 @@ func TestDesktopTypedJSONProxiesRequest(t *testing.T) {
 	defer server.Close()
 
 	app := newTestDesktopApp(server.URL)
-	payload, err := app.GetIndustrialAnalysis()
+	payload, err := app.GetIndustrialAnalysis(false)
 	if err != nil {
 		t.Fatalf("GetIndustrialAnalysis() error = %v", err)
 	}
@@ -282,7 +282,7 @@ func TestDesktopTypedMiscImportMultipart(t *testing.T) {
 
 func TestValidateDesktopBackendRequestRejectsUnsafeInputs(t *testing.T) {
 	cases := []desktopBackendRequest{
-		{Method: "PUT", Path: "/api/objects"},
+		{Method: "PATCH", Path: "/api/objects"},
 		{Method: "GET", Path: "http://127.0.0.1:1/api/objects"},
 		{Method: "GET", Path: "/api/../secrets"},
 		{Method: "GET", Path: "/admin"},

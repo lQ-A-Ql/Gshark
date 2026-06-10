@@ -17,6 +17,11 @@ function writePolicyFixture(requirementBody, typedCallBody) {
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridge.ts", "export const typed = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeCore.ts", "export const core = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeRequirements.ts", requirementBody);
+  writeFixtureFile(
+    frontendRoot,
+    "src/app/integrations/desktopTypedBridgePlaybookRequirements.ts",
+    "export const playbookRequirements = {};\n",
+  );
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeStream.ts", typedCallBody);
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeTooling.ts", "export const tooling = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeAnalysis.ts", "export const analysis = {};\n");
@@ -24,11 +29,13 @@ function writePolicyFixture(requirementBody, typedCallBody) {
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeMisc.ts", "export const misc = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgePacket.ts", "export const packet = {};\n");
   writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeHunting.ts", "export const hunting = {};\n");
+  writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgePlaybook.ts", "export const playbook = {};\n");
   writeFixtureFile(
     frontendRoot,
     "src/app/integrations/desktopTypedBridgeVehicleDbc.ts",
     "export const vehicleDbc = {};\n",
   );
+  writeFixtureFile(frontendRoot, "src/app/integrations/desktopTypedBridgeRules.ts", "export const rules = {};\n");
 
   return frontendRoot;
 }

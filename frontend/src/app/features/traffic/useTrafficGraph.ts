@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GlobalTrafficStats, Packet, TrafficConversation } from "../../core/types";
-import { isAbortLikeError, useAbortableRequest } from "../../hooks/useAbortableRequest";
+import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { buildTimelineBucketsFromPacketTimes } from "./trafficTimeline";
 import type { FeaturePreloadContract } from "../../preload/preloadContracts";
@@ -45,46 +45,53 @@ export function useTrafficGraph({
   totalPackets,
   captureRevision,
 }: UseTrafficGraphOptions) {
-  const captureCacheKey = useMemo(() => buildTrafficStatsCacheKey(captureRevision, filePath, totalPackets), [captureRevision, filePath, totalPackets]);
+  const captureCacheKey = useMemo(
+    () => buildTrafficStatsCacheKey(captureRevision, filePath, totalPackets),
+    [captureRevision, filePath, totalPackets],
+  );
   const [stats, setStats] = useState<GlobalTrafficStats>(EMPTY_TRAFFIC_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { run: runStatsRequest, cancel: cancelStatsRequest } = useAbortableRequest();
+  const hasCaptureForStats = useMemo(() => filePath.trim().length > 0 && totalPackets > 0, [filePath, totalPackets]);
 
-  const refreshStats = useCallback((force = false) => {
-    if (!backendConnected) {
-      cancelStatsRequest();
-      setStats(EMPTY_TRAFFIC_STATS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    if (!force && captureCacheKey && trafficStatsCache.has(captureCacheKey)) {
-      cancelStatsRequest();
-      setStats(trafficStatsCache.get(captureCacheKey) ?? EMPTY_TRAFFIC_STATS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    return runStatsRequest({
-      request: (signal) => requestTrafficStats(captureCacheKey, signal, { force, allowPacketFallback: true }),
-      onSuccess: (payload) => {
-        if (captureCacheKey) {
-          trafficStatsCache.set(captureCacheKey, payload);
-        }
-        setStats(payload);
-      },
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : "流量统计加载失败");
+  const refreshStats = useCallback(
+    (force = false) => {
+      if (!backendConnected || !hasCaptureForStats) {
+        cancelStatsRequest();
         setStats(EMPTY_TRAFFIC_STATS);
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [backendConnected, captureCacheKey, cancelStatsRequest, runStatsRequest]);
+        setLoading(false);
+        setError("");
+        return;
+      }
+
+      if (!force && captureCacheKey && trafficStatsCache.has(captureCacheKey)) {
+        cancelStatsRequest();
+        setStats(trafficStatsCache.get(captureCacheKey) ?? EMPTY_TRAFFIC_STATS);
+        setLoading(false);
+        setError("");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      return runStatsRequest({
+        request: (signal) => requestTrafficStats(captureCacheKey, signal, { force }),
+        onSuccess: (payload) => {
+          if (captureCacheKey) {
+            trafficStatsCache.set(captureCacheKey, payload);
+          }
+          setStats(payload);
+        },
+        onError: (err) => {
+          setError(err instanceof Error ? err.message : "流量统计加载失败");
+          setStats(EMPTY_TRAFFIC_STATS);
+        },
+        onSettled: () => setLoading(false),
+      });
+    },
+    [backendConnected, captureCacheKey, cancelStatsRequest, hasCaptureForStats, runStatsRequest],
+  );
 
   useEffect(() => {
     if (isPreloadingCapture) return;
@@ -114,9 +121,10 @@ export const trafficStatsPreloadContract: FeaturePreloadContract<TrafficStatsPre
     return trafficStatsInflight.get(key);
   },
   async prefetch(input, signal) {
-    if (!input.backendConnected) return EMPTY_TRAFFIC_STATS;
+    if (!input.backendConnected || input.filePath.trim().length === 0 || input.totalPackets <= 0)
+      return EMPTY_TRAFFIC_STATS;
     const key = trafficStatsPreloadContract.getCacheKey(input);
-    return requestTrafficStats(key, signal, { force: false, allowPacketFallback: false });
+    return requestTrafficStats(key, signal, { force: false });
   },
 };
 
@@ -128,7 +136,7 @@ export function resetTrafficStatsPreloadForTest() {
 function requestTrafficStats(
   cacheKey: string,
   signal: AbortSignal,
-  options: { force: boolean; allowPacketFallback: boolean },
+  options: { force: boolean },
 ): Promise<GlobalTrafficStats> {
   if (!options.force && cacheKey) {
     const cached = trafficStatsCache.get(cacheKey);
@@ -137,7 +145,7 @@ function requestTrafficStats(
     if (existing) return existing;
   }
 
-  const promise = fetchTrafficStats(signal, options.allowPacketFallback).then((payload) => {
+  const promise = fetchTrafficStats(signal).then((payload) => {
     if (cacheKey && !signal.aborted) {
       trafficStatsCache.set(cacheKey, payload);
     }
@@ -154,19 +162,8 @@ function requestTrafficStats(
   return promise;
 }
 
-async function fetchTrafficStats(signal: AbortSignal, allowPacketFallback: boolean): Promise<GlobalTrafficStats> {
-  try {
-    return await backendClients.analysis.getGlobalTrafficStats(signal);
-  } catch (fetchError) {
-    if (!allowPacketFallback || isAbortLikeError(fetchError, signal)) {
-      throw fetchError;
-    }
-    const packets = await backendClients.packet.listPackets();
-    if (signal.aborted) {
-      throw new DOMException("The operation was aborted.", "AbortError");
-    }
-    return buildStatsFromPackets(packets);
-  }
+function fetchTrafficStats(signal: AbortSignal): Promise<GlobalTrafficStats> {
+  return backendClients.analysis.getGlobalTrafficStats(signal);
 }
 
 function extractDomain(packet: Packet): string {

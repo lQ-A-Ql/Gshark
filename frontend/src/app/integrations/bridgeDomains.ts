@@ -1,5 +1,4 @@
 import type { BackendBridge, BackendClients } from "./bridgeTypes";
-import { createPlaybookFromBridge } from "./playbookBridgeClient";
 
 export function createBackendClients(bridge: BackendBridge): BackendClients {
   return {
@@ -15,7 +14,7 @@ export function createBackendClients(bridge: BackendBridge): BackendClients {
     vehicleDBC: bridge,
     securityMaterial: bridge,
     miscModule: bridge,
-    playbook: createPlaybookFromBridge(bridge),
+    playbook: bridge,
     rules: bridge,
   };
 }

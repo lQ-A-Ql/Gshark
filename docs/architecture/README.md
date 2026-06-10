@@ -1,462 +1,272 @@
-# Architecture Overview
+# meow~traffic 架构总览
 
-meow~traffic (internal name: sentinel) is a network traffic analysis desktop application built with Wails (Go backend + React frontend).
+meow~traffic（内部兼容名：sentinel）是基于 Wails、Go 后端和 React 前端的桌面端离线流量分析应用。本文是当前架构图谱的权威入口，图中的模块名以仓库真实目录、文件和接口为准。
 
-## 1. Backend Component Diagram
-
-Layered architecture — each layer depends only on the layer below.
+## 1. 系统上下文
 
 ```mermaid
-graph TD
-    subgraph Entry
-        CMD[cmd/sentinel<br/>main entry point]
-    end
+flowchart LR
+    Analyst["分析员"] --> Wails["Wails 桌面壳\nmain.go / app.go"]
+    Wails --> WebView["React WebView\nfrontend/src/app"]
+    Wails --> DesktopBindings["typed Wails bindings\nDesktopApp"]
+    DesktopBindings --> Engine["backend engine.Service"]
 
-    subgraph Transport["transport (HTTP/SSE)"]
-        SRV[http_server.go<br/>Server struct]
-        CAP[http_capture.go<br/>capture endpoints]
-        EVT[http_events.go<br/>SSE hub]
-        MID[http_middleware.go<br/>CORS, auth, audit]
-        ANA[http_analysis_handlers.go]
-        TOL[http_tool_handlers.go]
-        MED[http_media_handlers.go]
-        MISC_H[misc_modules.go<br/>misc module endpoints]
-        MISC_P[misc_package_handlers.go<br/>package management]
-    end
+    WebView --> BridgeFactory["bridgeFactory"]
+    BridgeFactory --> DesktopBridge["desktopBridge\ntyped IPC 优先"]
+    BridgeFactory --> HttpBridge["httpBridge\nbrowser-dev HTTP/SSE"]
+    DesktopBridge --> DesktopBindings
+    HttpBridge --> HTTPServer["transport.Server\n127.0.0.1:17891"]
+    HTTPServer --> Engine
 
-    subgraph Engine["engine (core business logic)"]
-        SVC[service.go<br/>Service struct]
-        SVC_CAP[service_capture.go]
-        SVC_ANA[service_analysis.go]
-        SVC_STR[service_streams.go]
-        SVC_TOL[service_tools.go]
-        C2[c2_decrypt.go]
-        TH[threat_hunt_stream.go]
-        STR_DEC[stream_decoder.go]
-        STR_PAY[stream_payload_inspector.go]
-        STR_SRC[stream_payload_sources.go]
-        PKT[packet_store.go]
-        FIL[filter.go]
-        EVD[evidence.go]
-        YARA[yara_batch.go]
-        MED_PB[media_playback.go]
-        SPEECH[speech_to_text.go]
-    end
-
-    subgraph TShark["tshark (subprocess mgmt)"]
-        TS[tshark process management]
-    end
-
-    subgraph Model["model (shared types)"]
-        MDL[model definitions]
-    end
-
-    subgraph MCP["mcp (MCP protocol)"]
-        MCP_SRV[server.go]
-    end
-
-    subgraph MiscPkg["miscpkg (plugin/module mgr)"]
-        MGR[manager.go]
-        LOADER[module_loader.go]
-        JS[runtime_javascript.go]
-        PY[runtime_python.go]
-    end
-
-    subgraph ServiceContract["servicecontract (interfaces)"]
-        CTR[contract.go]
-    end
-
-    subgraph Governance["governance (dev workflow)"]
-        GOV_MODELS[models.go]
-        GOV_SEL[task_selector.go]
-        GOV_DEF[defect_register.go]
-        GOV_AUD[self_audit.go]
-        GOV_RPT[report_render.go]
-        GOV_ARC[archive_path.go]
-    end
-
-    subgraph Report["report (rules)"]
-        RPT_RULE[rules.go]
-    end
-
-    CMD --> SRV
-    SRV --> CAP
-    SRV --> EVT
-    SRV --> MID
-    SRV --> ANA
-    SRV --> TOL
-    SRV --> MED
-    SRV --> MISC_H
-    SRV --> MISC_P
-
-    CAP --> SVC
-    ANA --> SVC
-    TOL --> SVC
-    MED --> SVC
-    MISC_H --> SVC
-    MISC_H --> MGR
-
-    SVC --> SVC_CAP
-    SVC --> SVC_ANA
-    SVC --> SVC_STR
-    SVC --> SVC_TOL
-
-    SVC_CAP --> TS
-    SVC_CAP --> PKT
-    SVC_ANA --> C2
-    SVC_ANA --> TH
-    SVC_STR --> STR_DEC
-    SVC_STR --> STR_PAY
-    SVC_STR --> STR_SRC
-    SVC_TOL --> FIL
-
-    SVC_ANA --> EVD
-    SVC_ANA --> YARA
-    SVC --> MED_PB
-    SVC --> SPEECH
-
-    SVC -.-> CTR
-    SRV -.-> MDL
-    SVC -.-> MDL
-
-    SRV --> MCP_SRV
-    MGR --> LOADER
-    LOADER --> JS
-    LOADER --> PY
-
-    GOV_SEL --> GOV_MODELS
-    GOV_DEF --> GOV_MODELS
-    GOV_AUD --> GOV_MODELS
-    GOV_RPT --> GOV_MODELS
-    GOV_ARC --> GOV_MODELS
+    Engine --> TShark["tshark\nPCAP 解析与流重组"]
+    Engine --> YARA["YARA\n对象/流目标扫描"]
+    Engine --> FFmpeg["FFmpeg\n媒体播放素材"]
+    Engine --> PythonVosk["Python + Vosk\n语音转写"]
+    Engine --> MiscRuntime["MISC JS/Python runtime\nzip 自定义模块"]
+    HTTPServer --> MCP["MCP JSON-RPC\n/api/mcp"]
 ```
 
-**Key packages:**
+关键约束：
 
-| Package | Responsibility |
-|---|---|
-| `cmd/sentinel` | Process entry point, flag parsing, server bootstrap |
-| `transport` | HTTP handlers, SSE event hub, CORS/auth/audit middleware |
-| `engine` | Core `Service` struct — capture lifecycle, analysis, C2 decrypt, stream decoding, YARA, evidence |
-| `tshark` | tshark subprocess lifecycle and output parsing |
-| `model` | Shared data types (packets, streams, audit entries) |
-| `mcp` | MCP protocol server for tool integration |
-| `miscpkg` | Plugin/module manager with JS and Python runtimes |
-| `servicecontract` | Shared interfaces between transport and engine |
-| `governance` | Dev workflow — task selection, defect tracking, self-audit, report rendering |
-| `report` | Investigation report rule definitions |
+- 桌面模式的数据面优先走 typed Wails IPC。
+- 普通浏览器开发模式保留 HTTP REST 与 SSE。
+- 两条传输路径最终都汇聚到同一个 `engine.Service`。
+- 外部工具能力降级应被报告，不应阻塞应用启动主路径。
 
----
-
-## 2. Frontend Component Diagram
+## 2. 后端分层
 
 ```mermaid
-graph TD
-    subgraph Entry["Entry Point"]
-        MAIN[main.tsx]
-        APP[App.tsx]
-        ROUTES[routes.tsx]
-    end
+flowchart TD
+    Entry["cmd/sentinel\nbackend/main.go"] --> Transport["transport\nHTTP/SSE/auth/audit"]
 
-    subgraph Layout["layouts/"]
-        ML[MainLayout.tsx]
-        ML_CHROME[MainLayoutChrome.tsx]
-        HEADER[MainHeader.tsx]
-        FOOTER[MainFooter.tsx]
-        SIDEBAR[MainSidebarNav.tsx]
-    end
+    Transport --> ServiceContract["servicecontract\n只读服务接口"]
+    Transport --> Engine["engine\nService 核心编排"]
+    Transport --> MCP["mcp\nJSON-RPC tools/resources/prompts"]
+    Transport --> MiscRoutes["misc_modules.go\n内建与 packaged MISC 端点"]
 
-    subgraph State["state/ (Zustand)"]
-        SC[SentinelContext.tsx]
-        CAP_STATE[capture*State.ts<br/>capture lifecycle]
-        PKT_STATE[packet*State.ts<br/>packet filtering/paging]
-        STR_STATE[stream*State.ts<br/>stream switching/prefetch]
-        TOOL_STATE[tool*State.ts<br/>runtime probe/storage]
-        PROG[progressStatus.ts]
-    end
+    Engine --> Capture["capture lifecycle\nBeginCaptureLoad / LoadPCAPWithRun"]
+    Engine --> PacketStore["packet_store.go\n分页、定位、过滤"]
+    Engine --> Streams["service_streams.go\nHTTP/TCP/UDP 流"]
+    Engine --> Analysis["service_analysis.go\n工控、车机、USB、媒体、C2、APT"]
+    Engine --> Hunting["service_tools.go\nThreatHunt + YARA"]
+    Engine --> Evidence["evidence.go\n统一证据聚合"]
+    Engine --> Reports["analysis_report_*.go\n调查报告"]
 
-    subgraph Pages["pages/"]
-        WS[Workspace.tsx]
-        AC[AnalysisCockpit.tsx]
-        C2[C2Analysis.tsx]
-        APT[AptAnalysis.tsx]
-        IND[IndustrialAnalysis.tsx]
-        VEH[VehicleAnalysis.tsx]
-        USB[UsbAnalysis.tsx]
-        MED_P[MediaAnalysis.tsx]
-        TH_P[ThreatHunting.tsx]
-        HTTP_S[HttpStream.tsx]
-        TCP_S[TcpStream.tsx]
-        UDP_S[UdpStream.tsx]
-        RAW[RawStreamPage.tsx]
-        EVD_P[EvidencePanel.tsx]
-        MTOOLS[MiscTools.tsx]
-        OBJ[ObjectExport.tsx]
-        UPD[UpdateCenter.tsx]
-        TG[TrafficGraph.tsx]
-    end
-
-    subgraph Features["features/ (hooks)"]
-        F_C2[c2/]
-        F_APT[apt/]
-        F_IND[industrial/]
-        F_VEH[vehicle/]
-        F_USB[usb/]
-        F_MEDIA[media/]
-        F_TRAF[traffic/]
-        F_OBJ[object/]
-        F_HUNT[hunting/]
-        F_EVD[evidence/]
-        F_RAW[raw-stream/]
-        F_UPD[update/]
-    end
-
-    subgraph Components["components/"]
-        UI[ui/]
-        ANALYSIS[analysis/]
-        STREAM_C[stream/]
-        WORKSPACE_C[workspace/]
-        PKT_V[PacketVirtualTable.tsx]
-        CAP_M[CaptureMission*.tsx]
-        STR_D[StreamDecoder*.tsx]
-        INV_RPT[InvestigationReportPanel.tsx]
-        RUNTIME[RuntimeSettings*.tsx]
-    end
-
-    subgraph Core["core/"]
-        ENGINE[engine.ts]
-        CO[captureOverview.ts]
-        PC[packetColoring.ts]
-        PL[protocolLayer*.ts]
-        EVS[evidenceSchema.ts]
-        TYPES["types/<br/>15 sub-modules"]
-    end
-
-    subgraph Integrations["integrations/"]
-        BB[bridgeFactory.ts]
-        HTTP_BR[httpBridge.ts]
-        DESK_BR[desktopBridge.ts]
-        WAILS_BR[wailsBridge.ts]
-        DBT[desktopTypedBridge*.ts]
-        WIRE[wire/]
-        CLIENTS[clients/]
-    end
-
-    subgraph Misc["misc/ (MISC tools)"]
-        M_REG[registry.tsx]
-        M_MOD[modules/]
-        M_CAT[useMiscToolsCatalog.ts]
-        M_WB[MiscModuleWorkbench.tsx]
-    end
-
-    subgraph Hooks["hooks/"]
-        HOOKS[shared React hooks]
-    end
-
-    subgraph Utils["utils/"]
-        UTILS[utility functions]
-    end
-
-    MAIN --> APP
-    APP --> ROUTES
-    ROUTES --> ML
-    ML --> ML_CHROME
-    ML_CHROME --> HEADER
-    ML_CHROME --> FOOTER
-    ML_CHROME --> SIDEBAR
-
-    ML --> WS
-    ML --> AC
-    ML --> C2
-    ML --> APT
-    ML --> IND
-    ML --> VEH
-    ML --> USB
-    ML --> MED_P
-    ML --> TH_P
-    ML --> HTTP_S
-    ML --> TCP_S
-    ML --> UDP_S
-    ML --> RAW
-    ML --> EVD_P
-    ML --> MTOOLS
-    ML --> OBJ
-    ML --> UPD
-    ML --> TG
-
-    APP --> SC
-
-    WS --> SC
-    C2 --> SC
-    AC --> SC
-
-    SC --> CAP_STATE
-    SC --> PKT_STATE
-    SC --> STR_STATE
-    SC --> TOOL_STATE
-    SC --> PROG
-
-    C2 --> F_C2
-    APT --> F_APT
-    IND --> F_IND
-    VEH --> F_VEH
-    USB --> F_USB
-    MED_P --> F_MEDIA
-    TH_P --> F_HUNT
-    EVD_P --> F_EVD
-    RAW --> F_RAW
-    UPD --> F_UPD
-    TG --> F_TRAF
-    OBJ --> F_OBJ
-
-    WS --> PKT_V
-    WS --> CAP_M
-    HTTP_S --> STR_D
-    TCP_S --> STR_D
-    RAW --> STR_D
-
-    F_C2 --> TYPES
-    F_APT --> TYPES
-    PKT_V --> PC
-    AC --> CO
-    STR_D --> ENGINE
-    INV_RPT --> EVS
-
-    BB --> HTTP_BR
-    BB --> DESK_BR
-    DESK_BR --> WAILS_BR
-    DESK_BR --> DBT
-    HTTP_BR --> WIRE
-    DBT --> WIRE
-
-    SC --> BB
-
-    MTOOLS --> M_REG
-    M_REG --> M_MOD
-    MTOOLS --> M_CAT
-    MTOOLS --> M_WB
+    Capture --> TShark["tshark package\n子进程、字段探测、解析"]
+    Streams --> TShark
+    Analysis --> TShark
+    Hunting --> YaraBatch["yara_batch.go / yara_stream_targets.go"]
+    Evidence --> Model["model\n共享 JSON DTO"]
+    Reports --> ReportRules["report\n规则元数据"]
+    MiscRoutes --> MiscPkg["miscpkg\nmodule loader + JS/Python runtime"]
+    Transport --> Governance["governance\n缺陷登记、自审、报告渲染"]
 ```
 
-**Key directories:**
+后端维护规则：
 
-| Directory | Responsibility |
-|---|---|
-| `pages/` | Route-level page components (Workspace, C2Analysis, ThreatHunting, etc.) |
-| `features/` | Domain-specific hooks and logic (c2, apt, industrial, vehicle, usb, media, etc.) |
-| `state/` | Zustand state management — `SentinelContext` orchestrates capture, packet, stream, tool state |
-| `components/` | Shared UI — `ui/` (design system), `analysis/`, `stream/`, `workspace/` |
-| `core/` | Engine client, packet coloring, protocol layers, evidence schema, `types/` (15 sub-modules) |
-| `integrations/` | Bridge layer — `bridgeFactory` routes to `httpBridge` (browser) or `desktopBridge` → `wailsBridge` (desktop) |
-| `misc/` | MISC tools framework — module registry, JS/Python runtime catalog, workbench |
-| `layouts/` | MainLayout chrome — header, footer, sidebar navigation |
-| `hooks/` | Shared React hooks |
-| `utils/` | Utility functions |
+- HTTP 路由注册权威来源是 `backend/internal/transport/http_server.go` 和 `misc_modules.go`。
+- 新 HTTP handler 必须使用 `WithContext` 变体和 `r.Context()`。
+- 领域分析留在 `engine`；外部解析和字段兼容留在 `tshark`；传输、鉴权、审计留在 `transport`。
 
----
+## 3. 前端数据面
 
-## 3. Data Flow — PCAP Processing Pipeline
+```mermaid
+flowchart LR
+    Pages["pages\n路由级页面"] --> Features["features\n领域 hooks 与面板逻辑"]
+    Features --> Clients["backendClients\nbridgeDomains"]
+    Pages --> State["state\nCapture/Packet/Stream/Tool"]
+    State --> Clients
+
+    Clients --> Bridge["bridgeFactory"]
+    Bridge --> Desktop["desktopBridge"]
+    Bridge --> HTTP["httpBridge"]
+
+    Desktop --> Typed["desktopTypedBridge*.ts"]
+    Typed --> Requirements["desktopTypedBridgeRequirements.ts"]
+    Requirements --> WailsDTS["DesktopApp.d.ts"]
+    Typed --> Wire["wire DTO"]
+
+    HTTP --> Fetch["fetch + EventSource"]
+    Fetch --> Wire
+
+    Wire --> Mappers["integrations/mappers"]
+    Mappers --> CoreTypes["core/types"]
+    CoreTypes --> Features
+```
+
+前端维护规则：
+
+- pages/features 不直接调用后端 `fetch`，而是通过 bridge/client。
+- wire DTO 表示后端 JSON；mapper 负责归一化；`core/types` 是功能层消费的稳定类型。
+- 已迁移桌面数据面缺少 typed binding 时，应以 `generic_ipc_disabled` 失败，不静默回退 HTTP。
+
+## 4. Capture 生命周期
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant FE as Frontend<br/>(Workspace)
-    participant BE as Backend<br/>(transport)
-    participant ENG as Engine<br/>(Service)
-    participant TS as tshark<br/>(subprocess)
-    participant PKT as Packet Store
+    participant User as 分析员
+    participant FE as 前端 Workspace
+    participant Bridge as bridgeFactory
+    participant BE as transport.Server
+    participant SVC as engine.Service
+    participant TS as tshark
+    participant Store as packet_store
+    participant Events as SSE/Wails events
 
-    U->>FE: Load PCAP file
-    FE->>BE: POST /api/capture/upload
-    BE->>ENG: BeginCaptureLoad()
-    ENG->>TS: Spawn tshark process
-    TS-->>ENG: Raw packet output
-    ENG->>PKT: Index packets
-    ENG-->>BE: Capture ready (SSE event)
-    BE-->>FE: SSE: capture loaded
+    User->>FE: 选择 PCAP/PCAPNG
+    FE->>Bridge: upload/start capture
+    Bridge->>BE: /api/capture/upload 或 typed binding
+    BE->>SVC: BeginCaptureLoad(ctx)
+    SVC->>SVC: 注册 capture task scope
+    SVC->>TS: LoadPCAPWithRun(runCtx, opts, runID)
+    TS-->>SVC: packet rows / fields
+    SVC->>Store: 写入分页索引与首屏数据
+    SVC->>Events: ready/status/packet/error
+    Events-->>FE: SSE 或 Wails runtime event
+    FE->>Bridge: 请求 packet page / stream / analysis
+    Bridge->>SVC: typed IPC 或 HTTP handler
 
-    U->>FE: Request packet list
-    FE->>BE: GET /api/packets?page=N
-    BE->>ENG: PageFilter()
-    ENG->>PKT: Query store
-    PKT-->>ENG: Packet slice
-    ENG-->>BE: JSON response
-    BE-->>FE: Packet table data
-
-    U->>FE: Select packet / stream
-    FE->>BE: GET /api/streams/:id
-    BE->>ENG: StreamDecoder()
-    ENG-->>BE: Decoded payload
-    BE-->>FE: Stream data
-
-    U->>FE: Run analysis (C2/threat hunt)
-    FE->>BE: POST /api/analysis/...
-    BE->>ENG: C2Decrypt / ThreatHunt
-    ENG-->>BE: Analysis results
-    BE-->>FE: SSE: analysis complete
+    User->>FE: 替换或关闭抓包
+    FE->>Bridge: prepareForCaptureReplacement
+    Bridge->>BE: /api/capture/prepare-replacement 或 typed binding
+    BE->>SVC: PrepareCaptureReplacement()
+    SVC->>SVC: 取消 capture task scope
+    SVC->>Store: 清理旧 capture 相关缓存
 ```
 
-**Pipeline stages:**
+取消链路要求：
 
-1. **Upload** — User selects PCAP/PCAPNG file via frontend
-2. **Capture** — Backend spawns tshark subprocess, indexes packets into store
-3. **Parse** — tshark decodes protocols, engine builds packet metadata
-4. **Store** — Packets and streams cached in `packet_store.go`
-5. **Analyze** — C2 decrypt, threat hunting, YARA, stream decoding run on demand
-6. **Display** — Frontend renders packet table, stream views, analysis results via SSE updates
+- HTTP handler 使用 `r.Context()`。
+- 媒体播放、语音转写、YARA、专项分析等长任务必须尊重 context。
+- 前端使用 capture task scope 和 abortable request 避免旧抓包结果回写新页面状态。
 
----
-
-## 4. IPC Communication — Dual Transport
+## 5. Evidence 聚合模型
 
 ```mermaid
-graph LR
-    subgraph Frontend["Frontend (React)"]
-        APP_F[App.tsx]
-        BF[bridgeFactory.ts]
-    end
+flowchart TD
+    Packets["Packet Store"] --> Hunting["Threat Hunting\nThreatHit"]
+    Streams["Reassembled Streams"] --> C2["C2 Analysis / Decrypt"]
+    Streams --> WebShell["WebShell Payload Inspector"]
+    Packets --> Industrial["Industrial Analysis"]
+    Packets --> Vehicle["Vehicle Analysis"]
+    Packets --> USB["USB Analysis"]
+    Objects["Extracted Objects"] --> ObjectEvidence["Object Evidence"]
+    Objects --> YARA["YARA Hits"]
+    Media["Media Artifacts"] --> MediaEvidence["Media / Speech Evidence"]
+    Hunting --> APT["APT Analysis"]
+    C2 --> APT
 
-    subgraph Desktop["Desktop Mode (Wails)"]
-        WB[wailsBridge.ts]
-        DB[desktopBridge.ts]
-        DTB[desktopTypedBridge*.ts]
-        WAILS_RT[Wails Runtime<br/>(IPC bindings)]
-    end
+    Hunting --> Gather["engine.GatherEvidence"]
+    C2 --> Gather
+    WebShell --> Gather
+    Industrial --> Gather
+    Vehicle --> Gather
+    USB --> Gather
+    ObjectEvidence --> Gather
+    YARA --> Gather
+    MediaEvidence --> Gather
+    APT --> Gather
 
-    subgraph Browser["Browser Mode (HTTP)"]
-        HB[httpBridge.ts]
-        WIRE[wire/<br/>fetch + EventSource]
-    end
-
-    subgraph Backend["Backend (Go)"]
-        WAILS_APP[app.go<br/>Wails bindings]
-        HTTP_SRV[transport/Server<br/>HTTP/SSE]
-        ENG[engine/Service]
-    end
-
-    APP_F --> BF
-
-    BF -->|desktop detected| DB
-    BF -->|browser fallback| HB
-
-    DB --> DTB
-    DTB --> WB
-    WB --> WAILS_RT
-    WAILS_RT --> WAILS_APP
-    WAILS_APP --> ENG
-
-    HB --> WIRE
-    WIRE -->|fetch /api/*| HTTP_SRV
-    WIRE -->|EventSource /api/events| HTTP_SRV
-    HTTP_SRV --> ENG
+    Gather --> Unified["UnifiedEvidenceRecord\nmodule / severity / confidence / context"]
+    Unified --> Frontend["Evidence feature\nfilter / sort / detail / export"]
+    Unified --> Report["Investigation Report"]
 ```
 
-**Transport selection:**
+证据记录应尽量保留 `packet_id`、`stream_id`、来源模块、严重性、置信度、tags、metadata 和 caveats。无法追溯上下文的记录必须显式说明 caveat。
 
-| Mode | Transport | Protocol | Use case |
-|---|---|---|---|
-| Desktop | `wailsBridge` → `desktopBridge` | Wails IPC (Go ↔ JS) | Native app, embedded WebView |
-| Browser | `httpBridge` | HTTP REST + SSE | Remote access, development, multi-client |
+## 6. C2 检测与解密流程
 
-The `bridgeFactory` auto-detects the runtime environment. In desktop mode, typed bindings (`desktopTypedBridge*.ts`) provide compile-safe IPC for analysis, packet, stream, tooling, media, vehicle, and misc operations. In browser mode, `httpBridge` uses standard `fetch` for REST calls and `EventSource` for server-sent events on `/api/events`.
+```mermaid
+flowchart TD
+    Capture["已加载抓包"] --> Stats["Global traffic stats\n会话、域名、端点"]
+    Capture --> Streams["HTTP/TCP/UDP streams"]
+    Capture --> DNS["DNS / Host / URI 聚合"]
+    Streams --> Indicators["C2 indicators\nbeacon、端点、UA、方向"]
+    DNS --> Indicators
+    Stats --> Indicators
+    Indicators --> Family["家族/画像评分\nVShell、CS、Winos/HFS 等"]
+    Family --> C2Result["C2SampleAnalysis"]
 
-Both paths converge on the same `engine/Service` — the backend logic is transport-agnostic.
+    Streams --> DecryptReq["C2DecryptRequest\nfamily + key/material"]
+    DecryptReq --> VShell["VShell 3-KDF\nmd5(salt)、md5(salt+vkey)、md5(saltPad32+vkey)"]
+    DecryptReq --> CS["Cobalt Strike keyed workbench"]
+    DecryptReq --> Raw["raw-stream candidates"]
+    VShell --> DecryptResult["C2DecryptResult"]
+    CS --> DecryptResult
+    Raw --> DecryptResult
+    C2Result --> Evidence["C2 evidence"]
+    DecryptResult --> Evidence
+```
+
+## 7. WebShell Payload 分析流程
+
+```mermaid
+flowchart TD
+    HTTPPackets["HTTP packets"] --> SourceScan["stream_payload_sources.go\n可疑 URI、参数、重复 burst"]
+    Streams["Reassembled streams"] --> SourceScan
+    SourceScan --> Candidates["StreamPayloadSource\npayload、confidence、signals"]
+    Candidates --> Decode["stream_decoder.go\nbase64 / Behinder / AntSword / Godzilla / auto"]
+    Decode --> Inspect["stream_payload_inspector.go\n命令执行、编码层级、失败阶段"]
+    Inspect --> Result["StreamPayloadInspection\nconfidence + decoded preview"]
+    Result --> Evidence["WebShell / payload evidence"]
+```
+
+## 8. YARA 扫描目标流程
+
+```mermaid
+flowchart TD
+    Objects["Extracted ObjectFile"] --> Targets["buildYaraScanTargetsWithContext"]
+    Streams["HTTP/TCP/UDP stream context"] --> Targets
+    Targets --> TempFiles["临时扫描目标\n对象 + 重组流"]
+    Config["YaraConfig\nbin、rules、timeout"] --> Preflight["preflightYaraScanConfig"]
+    Preflight --> Scan["BatchScanTargetsWithYaraConfigContext"]
+    TempFiles --> Scan
+    Scan --> Hits["ThreatHit\ncategory=YARA"]
+    Scan --> Warning["YARA warning hit\n配置/执行异常"]
+    Hits --> Cache["yaraHits cache"]
+    Warning --> Cache
+```
+
+## 9. 专项协议分析流程
+
+```mermaid
+flowchart TD
+    Capture["PCAP/PCAPNG"] --> TSharkFields["tshark 字段扫描与兼容降级"]
+    TSharkFields --> Industrial["工控\nModbus / S7 / DNP3 / CIP / IEC104"]
+    TSharkFields --> Vehicle["车机\nCAN / J1939 / DoIP / UDS / OBD-II"]
+    TSharkFields --> USB["USB\nHID / Mass Storage / Control"]
+    TSharkFields --> Media["媒体\nRTP/RTSP/媒体对象"]
+
+    Industrial --> IndustrialUI["IndustrialAnalysis 页面"]
+    Vehicle --> DBC["DBC profile\nBO_ / SG_ 信号解码"]
+    DBC --> VehicleUI["VehicleAnalysis 页面"]
+    USB --> USBUI["UsbAnalysis 页面"]
+    Media --> FFmpeg["FFmpeg 播放素材"]
+    Media --> Speech["Python/Vosk 转写"]
+    FFmpeg --> MediaUI["MediaAnalysis 页面"]
+    Speech --> MediaUI
+
+    Industrial --> Evidence["Unified evidence"]
+    Vehicle --> Evidence
+    USB --> Evidence
+    Media --> Evidence
+```
+
+## 10. MISC 模块执行流程
+
+```mermaid
+flowchart TD
+    Catalog["/api/tools/misc/modules\n内建 + packaged manifest"] --> Workbench["MiscModuleWorkbench"]
+    Zip["zip package\nmanifest.json + api.json + form.json + backend.js/.py"] --> Import["/api/tools/misc/import"]
+    Import --> Manager["miscpkg.Manager\nLoadFromDir"]
+    Manager --> Catalog
+    Workbench --> Invoke["/api/tools/misc/packages/{id}/invoke\n或 typed binding"]
+    Invoke --> Loader["module_loader.go"]
+    Loader --> JS["runtime_javascript.go"]
+    Loader --> PY["runtime_python.go"]
+    JS --> Result["MiscModuleRunResult\nmessage / text / output / table"]
+    PY --> Result
+    Result --> Export["JSON / TXT / table export"]
+```
+
+MISC 适合低频、高价值、强场景化辅助工具。稳定威胁狩猎能力优先使用 Go 内建检测、YARA 或 playbook；可执行 JS/Python 工具优先使用 MISC zip 模块。

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -8,6 +8,7 @@ export const typedDesktopBridgeFiles = [
   "src/app/integrations/desktopTypedBridge.ts",
   "src/app/integrations/desktopTypedBridgeCore.ts",
   "src/app/integrations/desktopTypedBridgeRequirements.ts",
+  "src/app/integrations/desktopTypedBridgePlaybookRequirements.ts",
   "src/app/integrations/desktopTypedBridgeStream.ts",
   "src/app/integrations/desktopTypedBridgeTooling.ts",
   "src/app/integrations/desktopTypedBridgeAnalysis.ts",
@@ -15,7 +16,14 @@ export const typedDesktopBridgeFiles = [
   "src/app/integrations/desktopTypedBridgeMisc.ts",
   "src/app/integrations/desktopTypedBridgePacket.ts",
   "src/app/integrations/desktopTypedBridgeHunting.ts",
+  "src/app/integrations/desktopTypedBridgePlaybook.ts",
   "src/app/integrations/desktopTypedBridgeVehicleDbc.ts",
+  "src/app/integrations/desktopTypedBridgeRules.ts",
+];
+
+export const typedDesktopRequirementFiles = [
+  "src/app/integrations/desktopTypedBridgeRequirements.ts",
+  "src/app/integrations/desktopTypedBridgePlaybookRequirements.ts",
 ];
 
 export const migratedBridgeRequirements = {
@@ -63,6 +71,26 @@ export const migratedBridgeRequirements = {
   listThreatHits: "ListThreatHits",
   getHuntingRuntimeConfig: "GetHuntingRuntimeConfig",
   updateHuntingRuntimeConfig: "UpdateHuntingRuntimeConfig",
+  listPlaybooks: "ListPlaybooks",
+  getPlaybook: "GetPlaybook",
+  createPlaybook: "CreatePlaybook",
+  updatePlaybook: "UpdatePlaybook",
+  deletePlaybook: "DeletePlaybook",
+  runPlaybook: "RunPlaybook",
+  getPlaybookLastRun: "GetPlaybookLastRun",
+  listSavedSearches: "ListSavedSearches",
+  getSavedSearch: "GetSavedSearch",
+  createSavedSearch: "CreateSavedSearch",
+  updateSavedSearch: "UpdateSavedSearch",
+  deleteSavedSearch: "DeleteSavedSearch",
+  executeSavedSearch: "ExecuteSavedSearch",
+  listHypotheses: "ListHypotheses",
+  getHypothesis: "GetHypothesis",
+  createHypothesis: "CreateHypothesis",
+  updateHypothesis: "UpdateHypothesis",
+  deleteHypothesis: "DeleteHypothesis",
+  addHypothesisEvidence: "AddHypothesisEvidence",
+  updateHypothesisStatus: "UpdateHypothesisStatus",
   listVehicleDBCProfiles: "ListVehicleDBCProfiles",
   addVehicleDBC: "AddVehicleDBC",
   removeVehicleDBC: "RemoveVehicleDBC",
@@ -71,6 +99,15 @@ export const migratedBridgeRequirements = {
   importMiscModulePackageFromPath: "ImportMiscModulePackageFromPath",
   deleteMiscModule: "DeleteMiscModulePackage",
   runMiscModule: "RunMiscModulePackage",
+  getUDPTunnelAnalysis: "GetUDPTunnelAnalysis",
+  getBruteforceAnalysis: "GetBruteforceAnalysis",
+  getRuleStatus: "GetRuleStatus",
+  toggleRulePack: "ToggleRulePack",
+  checkRuleUpdates: "CheckRuleUpdates",
+  downloadRulePack: "DownloadRulePack",
+  updateRuleConfig: "UpdateRuleConfig",
+  listRuleConflicts: "GetRuleConflicts",
+  validateRuleContent: "ValidateRules",
 };
 
 export function findDesktopTransportPolicyViolations({
@@ -114,17 +151,23 @@ function recordForbiddenDesktopBridgeWiring(violations, file, body) {
 }
 
 function recordMissingTypedRequirements(violations, frontendRoot, requirements) {
-  const requirementsPath = resolve(frontendRoot, "src/app/integrations/desktopTypedBridgeRequirements.ts");
   const fallbackPath = resolve(frontendRoot, "src/app/integrations/desktopTypedBridgeCore.ts");
-  const path = existsSync(requirementsPath) ? requirementsPath : fallbackPath;
-  if (!existsSync(path)) {
+  const requirementBodies = typedDesktopRequirementFiles
+    .map((file) => {
+      const path = resolve(frontendRoot, file);
+      return existsSync(path) ? readFileSync(path, "utf8") : "";
+    })
+    .filter(Boolean);
+  const fallbackBody = existsSync(fallbackPath) ? readFileSync(fallbackPath, "utf8") : "";
+  const body = requirementBodies.length > 0 ? requirementBodies.join("\n") : fallbackBody;
+
+  if (body.length === 0) {
     violations.push(
       "src/app/integrations/desktopTypedBridgeRequirements.ts: missing typed binding requirements source",
     );
     return;
   }
-  const body = readFileSync(path, "utf8");
-  const displayPath = relative(frontendRoot, path).replaceAll("\\", "/");
+  const displayPath = "src/app/integrations/desktopTypedBridgeRequirements.ts";
   for (const [bridgeMethod, bindingMethod] of Object.entries(requirements)) {
     const requirementPattern = new RegExp(`${escapeRegex(bridgeMethod)}\\s*:\\s*["']${escapeRegex(bindingMethod)}["']`);
     if (!requirementPattern.test(body)) {

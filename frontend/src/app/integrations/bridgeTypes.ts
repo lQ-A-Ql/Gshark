@@ -136,7 +136,12 @@ export interface AnalysisClient {
   getGlobalTrafficStats(signal?: AbortSignal): Promise<GlobalTrafficStats>;
   getIndustrialAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<IndustrialAnalysis>;
   getVehicleAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<VehicleAnalysis>;
-  getUSBAnalysis(signal?: AbortSignal, hidSource?: USBHIDSourceMode, hidEventLimit?: number, options?: { source?: "user" | "warmup" }): Promise<USBAnalysis>;
+  getUSBAnalysis(
+    signal?: AbortSignal,
+    hidSource?: USBHIDSourceMode,
+    hidEventLimit?: number,
+    options?: { source?: "user" | "warmup" },
+  ): Promise<USBAnalysis>;
   getC2SampleAnalysis(signal?: AbortSignal, options?: { source?: "user" | "warmup" }): Promise<C2SampleAnalysis>;
   decryptC2Traffic(req: C2DecryptRequest, signal?: AbortSignal): Promise<C2DecryptResult>;
   getAPTAnalysis(signal?: AbortSignal): Promise<APTAnalysis>;
@@ -196,6 +201,7 @@ export interface BackendBridge
     VehicleDBCClient,
     SecurityMaterialClient,
     MiscModuleClient,
+    PlaybookClient,
     RuleClient {}
 
 export interface BackendClients {

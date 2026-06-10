@@ -1,7 +1,12 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { backendClients } from "../../integrations/backendClients";
-import { trafficStatsPreloadContract, resetTrafficStatsPreloadForTest, useTrafficGraph } from "./useTrafficGraph";
+import {
+  EMPTY_TRAFFIC_STATS,
+  resetTrafficStatsPreloadForTest,
+  trafficStatsPreloadContract,
+  useTrafficGraph,
+} from "./useTrafficGraph";
 
 vi.mock("../../integrations/backendClients", () => ({
   backendClients: {
@@ -57,6 +62,44 @@ describe("traffic stats preload contract", () => {
       ),
     ).rejects.toThrow("boom");
 
+    expect(backendClients.packet.listPackets).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits the page hook for an empty capture without requesting packets", async () => {
+    const { result } = renderHook(() =>
+      useTrafficGraph({
+        backendConnected: true,
+        filePath: "",
+        totalPackets: 0,
+        captureRevision: 1,
+        isPreloadingCapture: false,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("");
+    expect(result.current.stats).toEqual(EMPTY_TRAFFIC_STATS);
+    expect(backendClients.analysis.getGlobalTrafficStats).not.toHaveBeenCalled();
+    expect(backendClients.packet.listPackets).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to listPackets when page stats loading fails", async () => {
+    vi.mocked(backendClients.analysis.getGlobalTrafficStats).mockRejectedValue(new Error("stats unavailable"));
+
+    const { result } = renderHook(() =>
+      useTrafficGraph({
+        backendConnected: true,
+        filePath: "capture.pcapng",
+        totalPackets: 3,
+        captureRevision: 1,
+        isPreloadingCapture: false,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("stats unavailable");
+    expect(result.current.stats).toEqual(EMPTY_TRAFFIC_STATS);
+    expect(backendClients.analysis.getGlobalTrafficStats).toHaveBeenCalledTimes(1);
     expect(backendClients.packet.listPackets).not.toHaveBeenCalled();
   });
 });

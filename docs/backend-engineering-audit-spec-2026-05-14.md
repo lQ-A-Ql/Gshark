@@ -712,20 +712,18 @@ Remaining context work:
 
 Status: `BE-SCRIPT-7.1` completed on 2026-05-15 01:20:55 +08:00.
 
-This documentation-only slice clarifies that Plugin and MISC script execution are local trusted extension points, not strong sandboxes.
+This documentation-only slice clarifies that MISC script execution is a local trusted extension point, not a strong sandbox.
 
 Updated docs:
 
 - `docs/misc-module-interface.md`
-- `docs/plugin-interface.md`
 
 Trust model now stated explicitly:
 
 - MISC zip modules run local `backend.js` or `backend.py` logic under the current user context after import.
-- Plugin execution requires `exec.local`, but that capability is an explicit local execution consent marker, not an isolation guarantee.
-- Zip/import validation, host bridge scoping, unified forms, and `exec.local` permission checks are engineering guardrails, not malicious-code containment.
-- Unknown-source modules/plugins should not be imported or enabled.
-- Untrusted code execution requires external isolation such as an OS sandbox, VM, or separate process policy outside the current Plugin/MISC model.
+- Zip/import validation, host bridge scoping, and unified forms are engineering guardrails, not malicious-code containment.
+- Unknown-source modules should not be imported or enabled.
+- Untrusted code execution requires external isolation such as an OS sandbox, VM, or separate process policy outside the current MISC model.
 
 Validation:
 
@@ -951,7 +949,7 @@ Validation:
 
 - `cd backend && gofmt -l .` — PASS.
 - `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
-- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md docs/plugin-interface.md docs/audit-development-report-archive-2026-05-14/backend-engineering-report-2026-05-14.md` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md docs/audit-development-report-archive-2026-05-14/backend-engineering-report-2026-05-14.md` — PASS.
 
 Cycle approval result:
 
@@ -1747,7 +1745,7 @@ Validation:
 
 - `cd backend && gofmt -l .` — PASS.
 - `cd backend && go test ./internal/model ./internal/engine ./internal/transport ./internal/architecture ./internal/governance ./internal/miscpkg ./internal/plugin -count=1` — PASS.
-- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md docs/plugin-interface.md` — PASS.
+- `git diff --check -- backend docs/backend-engineering-audit-spec-2026-05-14.md docs/misc-module-interface.md` — PASS.
 
 Cycle approval result:
 

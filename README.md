@@ -12,7 +12,7 @@ meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、
 - 对象提取、TLS 解密配置、流量图、威胁狩猎和规则匹配。
 - 工控、车机、媒体、USB 等专项分析页面。
 - MISC 工具箱支持内建协议辅助工具和 zip 自定义模块。
-- JavaScript / Python 扩展运行时，用于威胁狩猎插件与 MISC 自定义模块。
+- JavaScript / Python 扩展运行时，用于 MISC 自定义模块等本地扩展能力。
 
 ## 技术栈
 
@@ -73,23 +73,14 @@ MISC 模块特性：
 
 相关文档：
 
+- [项目开发指南](./docs/project-development-guide.md)
+- [设计与工程约束](./docs/project-design-and-constraints.md)
+- [架构总览与流程图](./docs/architecture/README.md)
+- [HTTP OpenAPI 文档](./docs/api/openapi.yaml)
 - [本地 MCP 接入文档](./docs/mcp-interface.md)
 - [MISC 模块接口文档](./docs/misc-module-interface.md)
 
 ## 扩展方式
-
-### 威胁狩猎插件
-
-威胁狩猎插件用于对数据包进行扫描、命中上报和规则化分析，适合：
-
-- IOC 扫描；
-- 危险应用特征匹配；
-- payload 关键字提取；
-- 自定义风险标记。
-
-插件接口见：
-
-- [插件接口文档](./docs/plugin-interface.md)
 
 ### MISC 自定义模块
 
@@ -259,11 +250,19 @@ python .\scripts\build_release_package.py v0.0.5 --skip-build
 ## 文档入口
 
 - [文档中心](./docs/README.md)
+- [项目开发指南](./docs/project-development-guide.md)
+- [设计与工程约束](./docs/project-design-and-constraints.md)
+- [工程化全量审计方案](./docs/engineering-full-audit-plan.md)
+- [架构总览与 Mermaid 流程图](./docs/architecture/README.md)
+- [HTTP OpenAPI 文档](./docs/api/openapi.yaml)
 - [MISC 模块接口文档](./docs/misc-module-interface.md)
-- [插件接口文档](./docs/plugin-interface.md)
 - [车机流量分析方案](./docs/automotive-analysis-plan.md)
 - [车机流量分析 0 基础教程](./docs/automotive-analysis-zero-basics.md)
 - [车机与工控分析重点说明](./docs/ctf-vehicle-industrial-focus.md)
+
+当前权威事实优先级：代码与 CI 配置 → `AGENTS.md` → 根 README / `docs/README.md` → 接口与架构文档 → 历史审计归档。`docs/audit-development-report-archive-*` 只作为历史证据，不直接代表当前实现。
+
+新增 HTTP route、typed Wails binding、核心类型、MISC 接口或 CI 约束时，必须同步更新对应权威文档或 `docs/api/openapi.yaml`。
 
 ## 当前边界
 

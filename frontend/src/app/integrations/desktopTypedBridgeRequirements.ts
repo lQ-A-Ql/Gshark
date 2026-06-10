@@ -1,6 +1,7 @@
 import type { DesktopTransportBinding } from "./bridgeTypes";
+import { playbookTypedBindingRequirements } from "./desktopTypedBridgePlaybookRequirements";
 
-export const typedBindingRequirements: Record<string, keyof DesktopTransportBinding> = {
+const baseTypedBindingRequirements: Record<string, keyof DesktopTransportBinding> = {
   getHttpStream: "GetHttpStream",
   getRawStream: "GetRawStream",
   getRawStreamPage: "GetRawStreamPage",
@@ -62,4 +63,9 @@ export const typedBindingRequirements: Record<string, keyof DesktopTransportBind
   updateRuleConfig: "UpdateRuleConfig",
   listRuleConflicts: "GetRuleConflicts",
   validateRuleContent: "ValidateRules",
+};
+
+export const typedBindingRequirements: Record<string, keyof DesktopTransportBinding> = {
+  ...baseTypedBindingRequirements,
+  ...playbookTypedBindingRequirements,
 };

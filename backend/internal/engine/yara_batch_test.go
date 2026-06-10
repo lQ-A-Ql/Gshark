@@ -150,13 +150,17 @@ rule DUMMY_RULE {
 }
 
 func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
 	svc := NewService(NopEmitter{})
 	defer svc.packetStore.Close()
 
+	tempDir := t.TempDir()
 	svc.huntMu.Lock()
 	svc.yaraConf = model.YaraConfig{
 		Enabled:   true,
-		Bin:       filepath.Join(t.TempDir(), "missing-yara.exe"),
+		Bin:       filepath.Join(tempDir, "missing-yara.exe"),
+		Rules:     filepath.Join(tempDir, "missing-rules.yar"),
 		TimeoutMS: 25000,
 	}
 	svc.huntMu.Unlock()
@@ -344,6 +348,8 @@ func TestCompileYaraRulesToCacheReturnsYarcUnchanged(t *testing.T) {
 }
 
 func TestCompileYaraRulesToCacheReturnsOriginalWhenNoYarac(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
 	// When yarac is not available, the original .yar path should be returned.
 	dir := t.TempDir()
 	rulePath := filepath.Join(dir, "test.yar")

@@ -335,14 +335,14 @@ func TestBuildMediaAnalysisFromGameStreamSample(t *testing.T) {
 	}
 
 	var video47998 *model.MediaSession
-	var audio48000Count int
+	var audioGameStreamCount int
 	for i := range stats.Sessions {
 		session := &stats.Sessions[i]
 		if session.SourcePort == 47998 && session.DestinationPort == 33314 && session.PacketCount > 100 {
 			video47998 = session
 		}
-		if session.SourcePort == 48000 && session.MediaType == "audio" {
-			audio48000Count++
+		if session.Application == "Moonlight / GameStream" && session.MediaType == "audio" {
+			audioGameStreamCount++
 			if session.Artifact != nil && session.Artifact.SizeBytes <= 0 {
 				t.Fatalf("expected GameStream audio artifact metadata to report size, got %+v", session.Artifact)
 			}
@@ -357,7 +357,7 @@ func TestBuildMediaAnalysisFromGameStreamSample(t *testing.T) {
 	if video47998.Artifact == nil {
 		t.Fatalf("expected 47998 session to generate artifact, got %+v", video47998)
 	}
-	if audio48000Count == 0 {
-		t.Fatalf("expected at least one audio-classified GameStream session on port 48000, got %+v", stats.Sessions)
+	if audioGameStreamCount == 0 {
+		t.Fatalf("expected at least one audio-classified GameStream session, got %+v", stats.Sessions)
 	}
 }

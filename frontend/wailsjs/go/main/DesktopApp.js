@@ -42,6 +42,10 @@ export function DownloadRulePack(packID, remoteURL) {
   return window['go']['main']['DesktopApp']['DownloadRulePack'](packID, remoteURL);
 }
 
+export function ExecuteSavedSearch(id) {
+  return window['go']['main']['DesktopApp']['ExecuteSavedSearch'](id);
+}
+
 export function ExportMediaBatchTranscription(format) {
   return window['go']['main']['DesktopApp']['ExportMediaBatchTranscription'](format);
 }
@@ -94,6 +98,10 @@ export function GetHttpStream(streamID) {
   return window['go']['main']['DesktopApp']['GetHttpStream'](streamID);
 }
 
+export function GetHypothesis(id) {
+  return window['go']['main']['DesktopApp']['GetHypothesis'](id);
+}
+
 export function GetIndustrialAnalysis(warmup) {
   return window['go']['main']['DesktopApp']['GetIndustrialAnalysis'](warmup);
 }
@@ -130,6 +138,14 @@ export function GetPacket(packetID) {
   return window['go']['main']['DesktopApp']['GetPacket'](packetID);
 }
 
+export function GetPlaybook(id) {
+  return window['go']['main']['DesktopApp']['GetPlaybook'](id);
+}
+
+export function GetPlaybookLastRun(id) {
+  return window['go']['main']['DesktopApp']['GetPlaybookLastRun'](id);
+}
+
 export function GetRawStream(protocol, streamID) {
   return window['go']['main']['DesktopApp']['GetRawStream'](protocol, streamID);
 }
@@ -146,6 +162,10 @@ export function GetRuleStatus() {
   return window['go']['main']['DesktopApp']['GetRuleStatus']();
 }
 
+export function GetSavedSearch(id) {
+  return window['go']['main']['DesktopApp']['GetSavedSearch'](id);
+}
+
 export function GetSMTPAnalysis() {
   return window['go']['main']['DesktopApp']['GetSMTPAnalysis']();
 }
@@ -158,6 +178,10 @@ export function InspectStreamPayload(payload) {
   return window['go']['main']['DesktopApp']['InspectStreamPayload'](payload);
 }
 
+export function AddHypothesisEvidence(id, payload) {
+  return window['go']['main']['DesktopApp']['AddHypothesisEvidence'](id, payload);
+}
+
 export function AddPlugin(plugin) {
   return window['go']['main']['DesktopApp']['AddPlugin'](plugin);
 }
@@ -166,8 +190,32 @@ export function AddVehicleDBC(path) {
   return window['go']['main']['DesktopApp']['AddVehicleDBC'](path);
 }
 
+export function CreateHypothesis(payload) {
+  return window['go']['main']['DesktopApp']['CreateHypothesis'](payload);
+}
+
+export function CreatePlaybook(payload) {
+  return window['go']['main']['DesktopApp']['CreatePlaybook'](payload);
+}
+
+export function CreateSavedSearch(payload) {
+  return window['go']['main']['DesktopApp']['CreateSavedSearch'](payload);
+}
+
+export function DeleteHypothesis(id) {
+  return window['go']['main']['DesktopApp']['DeleteHypothesis'](id);
+}
+
+export function DeletePlaybook(id) {
+  return window['go']['main']['DesktopApp']['DeletePlaybook'](id);
+}
+
 export function DeletePlugin(id) {
   return window['go']['main']['DesktopApp']['DeletePlugin'](id);
+}
+
+export function DeleteSavedSearch(id) {
+  return window['go']['main']['DesktopApp']['DeleteSavedSearch'](id);
 }
 
 export function DeleteMiscModulePackage(id) {
@@ -190,8 +238,20 @@ export function ListVehicleDBCProfiles() {
   return window['go']['main']['DesktopApp']['ListVehicleDBCProfiles']();
 }
 
+export function ListHypotheses(status) {
+  return window['go']['main']['DesktopApp']['ListHypotheses'](status);
+}
+
 export function ListPlugins() {
   return window['go']['main']['DesktopApp']['ListPlugins']();
+}
+
+export function ListPlaybooks() {
+  return window['go']['main']['DesktopApp']['ListPlaybooks']();
+}
+
+export function ListSavedSearches() {
+  return window['go']['main']['DesktopApp']['ListSavedSearches']();
 }
 
 export function ListMiscModules() {
@@ -282,6 +342,10 @@ export function PrepareCaptureReplacement() {
   return window['go']['main']['DesktopApp']['PrepareCaptureReplacement']();
 }
 
+export function RunPlaybook(id) {
+  return window['go']['main']['DesktopApp']['RunPlaybook'](id);
+}
+
 export function RunMiscModulePackage(id, values) {
   return window['go']['main']['DesktopApp']['RunMiscModulePackage'](id, values);
 }
@@ -330,8 +394,24 @@ export function UpdateMCPConfig(cfg) {
   return window['go']['main']['DesktopApp']['UpdateMCPConfig'](cfg);
 }
 
+export function UpdateHypothesis(id, payload) {
+  return window['go']['main']['DesktopApp']['UpdateHypothesis'](id, payload);
+}
+
+export function UpdateHypothesisStatus(id, status, conclusion) {
+  return window['go']['main']['DesktopApp']['UpdateHypothesisStatus'](id, status, conclusion);
+}
+
 export function UpdateHuntingRuntimeConfig(config) {
   return window['go']['main']['DesktopApp']['UpdateHuntingRuntimeConfig'](config);
+}
+
+export function UpdatePlaybook(id, payload) {
+  return window['go']['main']['DesktopApp']['UpdatePlaybook'](id, payload);
+}
+
+export function UpdateSavedSearch(id, payload) {
+  return window['go']['main']['DesktopApp']['UpdateSavedSearch'](id, payload);
 }
 
 export function UpdateStreamPayloads(protocol, streamID, patches) {

@@ -6,6 +6,7 @@ import type { EventHandlers } from "./clients/eventClient";
 import { createHuntingClient } from "./clients/huntingClient";
 import { createMediaClient } from "./clients/mediaClient";
 import { createObjectClient } from "./clients/objectClient";
+import { createPlaybookClient } from "./clients/playbookClient";
 import { createRuleClient } from "./clients/ruleClient";
 import { createStreamClient } from "./clients/streamClient";
 import { createToolClient } from "./clients/toolClient";
@@ -37,6 +38,7 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
   const c2DecryptClient = createC2DecryptClient(transport.requestJSON);
   const desktopClient = createDesktopClient(transport.requestJSON, transport.getDesktopAppBinding);
   const ruleClient = createRuleClient(transport.requestJSON);
+  const playbookClient = createPlaybookClient(transport.requestJSON);
 
   return {
     isAvailable: desktopClient.isAvailable,
@@ -114,8 +116,6 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     getTLSConfig: toolClient.getTLSConfig,
     updateTLSConfig: toolClient.updateTLSConfig,
 
-
-
     runWinRMDecrypt: toolClient.runWinRMDecrypt,
     getWinRMDecryptResultText: toolClient.getWinRMDecryptResultText,
     exportWinRMDecryptResult: toolClient.exportWinRMDecryptResult,
@@ -140,6 +140,27 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     updateRuleConfig: ruleClient.updateRuleConfig,
     listRuleConflicts: ruleClient.listRuleConflicts,
     validateRuleContent: ruleClient.validateRuleContent,
+
+    listPlaybooks: playbookClient.listPlaybooks,
+    getPlaybook: playbookClient.getPlaybook,
+    createPlaybook: playbookClient.createPlaybook,
+    updatePlaybook: playbookClient.updatePlaybook,
+    deletePlaybook: playbookClient.deletePlaybook,
+    runPlaybook: playbookClient.runPlaybook,
+    getPlaybookLastRun: playbookClient.getPlaybookLastRun,
+    listSavedSearches: playbookClient.listSavedSearches,
+    getSavedSearch: playbookClient.getSavedSearch,
+    createSavedSearch: playbookClient.createSavedSearch,
+    updateSavedSearch: playbookClient.updateSavedSearch,
+    deleteSavedSearch: playbookClient.deleteSavedSearch,
+    executeSavedSearch: playbookClient.executeSavedSearch,
+    listHypotheses: playbookClient.listHypotheses,
+    getHypothesis: playbookClient.getHypothesis,
+    createHypothesis: playbookClient.createHypothesis,
+    updateHypothesis: playbookClient.updateHypothesis,
+    deleteHypothesis: playbookClient.deleteHypothesis,
+    addHypothesisEvidence: playbookClient.addHypothesisEvidence,
+    updateHypothesisStatus: playbookClient.updateHypothesisStatus,
 
     subscribeEvents: transport.subscribeEvents,
   };

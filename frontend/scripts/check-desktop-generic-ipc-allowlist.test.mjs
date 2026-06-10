@@ -19,6 +19,25 @@ describe("check-desktop-generic-ipc-allowlist script", () => {
       request("/api/tools/misc/modules");
       request("/api/tools/misc/import");
       request(\`/api/tools/misc/packages/\${encodeURIComponent(id)}/invoke\`);
+      request("/api/playbooks");
+      request(\`/api/playbooks/\${encodeURIComponent(id)}/run\`);
+      request("/api/hunting/saved-searches");
+      request(\`/api/hunting/saved-searches/\${encodeURIComponent(id)}/execute\`);
+      request(\`/api/hunting/hypotheses?status=\${encodeURIComponent(status)}\`);
+      request(\`/api/hunting/hypotheses/\${encodeURIComponent(id)}/status\`);
+      request("/api/rules/status");
+      request("/api/rules/pack/toggle");
+      request("/api/rules/check-updates");
+      request("/api/rules/download");
+      request("/api/rules/config");
+      request("/api/rules/conflicts");
+      request("/api/rules/validate");
+      request("/api/vehicle/dbc/profiles");
+      request("/api/vehicle/dbc/add");
+      request("/api/vehicle/dbc/remove");
+      request("/api/security/tls-config");
+      request("/api/tools/udp-tunnel");
+      request("/api/tools/bruteforce");
       request("/api/runtime/identity");
     `);
 

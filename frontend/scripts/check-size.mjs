@@ -67,6 +67,11 @@ export const sourceSizeBudgets = [
     reason: "desktop analysis binding should only cover analysis, media, C2, APT, USB, and evidence contracts",
   },
   {
+    path: "src/app/integrations/desktopTransportBindingPlaybook.ts",
+    maxLines: 35,
+    reason: "desktop playbook binding should only cover Playbook, SavedSearch, and Hypothesis IPC contracts",
+  },
+  {
     path: "src/app/integrations/desktopTypedBridge.ts",
     maxLines: 35,
     reason: "desktop typed bridge should only compose domain-specific typed IPC overrides",
@@ -82,6 +87,11 @@ export const sourceSizeBudgets = [
     reason: "desktop typed bridge requirements should only map bridge methods to required Wails bindings",
   },
   {
+    path: "src/app/integrations/desktopTypedBridgePlaybookRequirements.ts",
+    maxLines: 30,
+    reason: "desktop playbook typed bridge requirements should only map workspace methods to Wails bindings",
+  },
+  {
     path: "src/app/integrations/desktopTypedBridgeStream.ts",
     maxLines: 210,
     reason: "desktop stream typed bridge should only map stream and packet-detail typed IPC methods",
@@ -95,6 +105,11 @@ export const sourceSizeBudgets = [
     path: "src/app/integrations/desktopTypedBridgeAnalysis.ts",
     maxLines: 145,
     reason: "desktop analysis typed bridge should only map analysis, C2 decrypt, APT, and evidence methods",
+  },
+  {
+    path: "src/app/integrations/desktopTypedBridgePlaybook.ts",
+    maxLines: 160,
+    reason: "desktop playbook typed bridge should only map Playbook, SavedSearch, and Hypothesis methods",
   },
   {
     path: "src/app/integrations/mappers/c2DecryptDisplayMapper.ts",

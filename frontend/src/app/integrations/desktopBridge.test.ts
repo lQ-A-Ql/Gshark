@@ -64,6 +64,26 @@ function createFallbackBridge(overrides: Partial<BackendBridge> = {}): BackendBr
     listThreatHits: vi.fn(),
     getHuntingRuntimeConfig: vi.fn(),
     updateHuntingRuntimeConfig: vi.fn(),
+    listPlaybooks: vi.fn(),
+    getPlaybook: vi.fn(),
+    createPlaybook: vi.fn(),
+    updatePlaybook: vi.fn(),
+    deletePlaybook: vi.fn(),
+    runPlaybook: vi.fn(),
+    getPlaybookLastRun: vi.fn(),
+    listSavedSearches: vi.fn(),
+    getSavedSearch: vi.fn(),
+    createSavedSearch: vi.fn(),
+    updateSavedSearch: vi.fn(),
+    deleteSavedSearch: vi.fn(),
+    executeSavedSearch: vi.fn(),
+    listHypotheses: vi.fn(),
+    getHypothesis: vi.fn(),
+    createHypothesis: vi.fn(),
+    updateHypothesis: vi.fn(),
+    deleteHypothesis: vi.fn(),
+    addHypothesisEvidence: vi.fn(),
+    updateHypothesisStatus: vi.fn(),
     listVehicleDBCProfiles: vi.fn(),
     addVehicleDBC: vi.fn(),
     removeVehicleDBC: vi.fn(),
@@ -585,6 +605,153 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.startMediaBatchTranscription).not.toHaveBeenCalled();
     expect(fallbackBridge.getMediaBatchTranscriptionStatus).not.toHaveBeenCalled();
     expect(fallbackBridge.cancelMediaBatchTranscription).not.toHaveBeenCalled();
+  });
+
+  it("routes playbook workspace domains through typed Wails IPC before generic IPC", async () => {
+    const fallbackBridge = createFallbackBridge({
+      listPlaybooks: vi.fn(),
+      getPlaybook: vi.fn(),
+      createPlaybook: vi.fn(),
+      updatePlaybook: vi.fn(),
+      deletePlaybook: vi.fn(),
+      runPlaybook: vi.fn(),
+      getPlaybookLastRun: vi.fn(),
+      listSavedSearches: vi.fn(),
+      getSavedSearch: vi.fn(),
+      createSavedSearch: vi.fn(),
+      updateSavedSearch: vi.fn(),
+      deleteSavedSearch: vi.fn(),
+      executeSavedSearch: vi.fn(),
+      listHypotheses: vi.fn(),
+      getHypothesis: vi.fn(),
+      createHypothesis: vi.fn(),
+      updateHypothesis: vi.fn(),
+      deleteHypothesis: vi.fn(),
+      addHypothesisEvidence: vi.fn(),
+      updateHypothesisStatus: vi.fn(),
+    });
+    const playbook = {
+      id: "pb-1",
+      name: "Beacon triage",
+      steps: [],
+      status: "ready",
+      createdAt: "2026-06-10T00:00:00Z",
+      updatedAt: "2026-06-10T00:00:00Z",
+    };
+    const savedSearch = {
+      id: "ss-1",
+      name: "Flag",
+      query: "flag{",
+      createdAt: "2026-06-10T00:00:00Z",
+      updatedAt: "2026-06-10T00:00:00Z",
+    };
+    const hypothesis = {
+      id: "h-1",
+      title: "C2 hypothesis",
+      status: "open",
+      createdAt: "2026-06-10T00:00:00Z",
+      updatedAt: "2026-06-10T00:00:00Z",
+    };
+    const runResult = {
+      playbookId: "pb-1",
+      playbookName: "Beacon triage",
+      status: "complete",
+      stepResults: [],
+      totalHits: 0,
+      durationMs: 1,
+      startedAt: "2026-06-10T00:00:00Z",
+      completedAt: "2026-06-10T00:00:01Z",
+    };
+    const desktopApp: DesktopTransportBinding = {
+      ListPlaybooks: vi.fn(async () => [playbook]),
+      GetPlaybook: vi.fn(async () => playbook),
+      CreatePlaybook: vi.fn(async () => playbook),
+      UpdatePlaybook: vi.fn(async () => ({ ...playbook, name: "Updated triage" })),
+      DeletePlaybook: vi.fn(async () => ({ status: "deleted" })),
+      RunPlaybook: vi.fn(async () => runResult),
+      GetPlaybookLastRun: vi.fn(async () => runResult),
+      ListSavedSearches: vi.fn(async () => [savedSearch]),
+      GetSavedSearch: vi.fn(async () => savedSearch),
+      CreateSavedSearch: vi.fn(async () => savedSearch),
+      UpdateSavedSearch: vi.fn(async () => ({ ...savedSearch, name: "Updated search" })),
+      DeleteSavedSearch: vi.fn(async () => ({ status: "deleted" })),
+      ExecuteSavedSearch: vi.fn(async () => ({ search: savedSearch, hits: [], total: 0 })),
+      ListHypotheses: vi.fn(async () => [hypothesis]),
+      GetHypothesis: vi.fn(async () => hypothesis),
+      CreateHypothesis: vi.fn(async () => hypothesis),
+      UpdateHypothesis: vi.fn(async () => ({ ...hypothesis, title: "Updated hypothesis" })),
+      DeleteHypothesis: vi.fn(async () => ({ status: "deleted" })),
+      AddHypothesisEvidence: vi.fn(async () => ({
+        ...hypothesis,
+        evidence: [
+          {
+            id: "ev-1",
+            description: "hit",
+            source: "hunting",
+            strength: "supports",
+            createdAt: "2026-06-10T00:00:00Z",
+          },
+        ],
+      })),
+      UpdateHypothesisStatus: vi.fn(async () => ({ ...hypothesis, status: "confirmed", conclusion: "ok" })),
+    };
+    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+
+    await expect(bridge.listPlaybooks()).resolves.toEqual([playbook]);
+    await expect(bridge.getPlaybook("pb-1")).resolves.toEqual(playbook);
+    await expect(bridge.createPlaybook({ name: "Beacon triage" })).resolves.toEqual(playbook);
+    await expect(bridge.updatePlaybook("pb-1", { name: "Updated triage" })).resolves.toMatchObject({
+      name: "Updated triage",
+    });
+    await expect(bridge.deletePlaybook("pb-1")).resolves.toBeUndefined();
+    await expect(bridge.runPlaybook("pb-1")).resolves.toEqual(runResult);
+    await expect(bridge.getPlaybookLastRun("pb-1")).resolves.toEqual(runResult);
+    await expect(bridge.listSavedSearches()).resolves.toEqual([savedSearch]);
+    await expect(bridge.getSavedSearch("ss-1")).resolves.toEqual(savedSearch);
+    await expect(bridge.createSavedSearch({ name: "Flag" })).resolves.toEqual(savedSearch);
+    await expect(bridge.updateSavedSearch("ss-1", { name: "Updated search" })).resolves.toMatchObject({
+      name: "Updated search",
+    });
+    await expect(bridge.deleteSavedSearch("ss-1")).resolves.toBeUndefined();
+    await expect(bridge.executeSavedSearch("ss-1")).resolves.toEqual({ search: savedSearch, hits: [], total: 0 });
+    await expect(bridge.listHypotheses("open")).resolves.toEqual([hypothesis]);
+    await expect(bridge.getHypothesis("h-1")).resolves.toEqual(hypothesis);
+    await expect(bridge.createHypothesis({ title: "C2 hypothesis" })).resolves.toEqual(hypothesis);
+    await expect(bridge.updateHypothesis("h-1", { title: "Updated hypothesis" })).resolves.toMatchObject({
+      title: "Updated hypothesis",
+    });
+    await expect(bridge.deleteHypothesis("h-1")).resolves.toBeUndefined();
+    await expect(bridge.addHypothesisEvidence("h-1", { description: "hit" })).resolves.toMatchObject({
+      evidence: [{ description: "hit" }],
+    });
+    await expect(bridge.updateHypothesisStatus("h-1", "confirmed", "ok")).resolves.toMatchObject({
+      status: "confirmed",
+      conclusion: "ok",
+    });
+
+    expect(desktopApp.ListPlaybooks).toHaveBeenCalledTimes(1);
+    expect(desktopApp.GetPlaybook).toHaveBeenCalledWith("pb-1");
+    expect(desktopApp.CreatePlaybook).toHaveBeenCalledWith({ name: "Beacon triage" });
+    expect(desktopApp.UpdatePlaybook).toHaveBeenCalledWith("pb-1", { name: "Updated triage" });
+    expect(desktopApp.DeletePlaybook).toHaveBeenCalledWith("pb-1");
+    expect(desktopApp.RunPlaybook).toHaveBeenCalledWith("pb-1");
+    expect(desktopApp.GetPlaybookLastRun).toHaveBeenCalledWith("pb-1");
+    expect(desktopApp.ListSavedSearches).toHaveBeenCalledTimes(1);
+    expect(desktopApp.GetSavedSearch).toHaveBeenCalledWith("ss-1");
+    expect(desktopApp.CreateSavedSearch).toHaveBeenCalledWith({ name: "Flag" });
+    expect(desktopApp.UpdateSavedSearch).toHaveBeenCalledWith("ss-1", { name: "Updated search" });
+    expect(desktopApp.DeleteSavedSearch).toHaveBeenCalledWith("ss-1");
+    expect(desktopApp.ExecuteSavedSearch).toHaveBeenCalledWith("ss-1");
+    expect(desktopApp.ListHypotheses).toHaveBeenCalledWith("open");
+    expect(desktopApp.GetHypothesis).toHaveBeenCalledWith("h-1");
+    expect(desktopApp.CreateHypothesis).toHaveBeenCalledWith({ title: "C2 hypothesis" });
+    expect(desktopApp.UpdateHypothesis).toHaveBeenCalledWith("h-1", { title: "Updated hypothesis" });
+    expect(desktopApp.DeleteHypothesis).toHaveBeenCalledWith("h-1");
+    expect(desktopApp.AddHypothesisEvidence).toHaveBeenCalledWith("h-1", { description: "hit" });
+    expect(desktopApp.UpdateHypothesisStatus).toHaveBeenCalledWith("h-1", "confirmed", "ok");
+    expect(fallbackBridge.listPlaybooks).not.toHaveBeenCalled();
+    expect(fallbackBridge.listSavedSearches).not.toHaveBeenCalled();
+    expect(fallbackBridge.listHypotheses).not.toHaveBeenCalled();
   });
 
   it("routes migrated media blob calls through typed Wails IPC before generic IPC", async () => {

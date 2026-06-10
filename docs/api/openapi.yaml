@@ -400,6 +400,365 @@ components:
           type: array
           items:
             type: string
+    ObjectFile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        packet_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        mime:
+          type: string
+        magic:
+          type: string
+        source:
+          type: string
+    ThreatHit:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        packet_id:
+          type: integer
+          format: int64
+        category:
+          type: string
+        rule:
+          type: string
+        level:
+          type: string
+        preview:
+          type: string
+        match:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        technique_ids:
+          type: array
+          items:
+            type: string
+        tactic_ids:
+          type: array
+          items:
+            type: string
+    HuntingRuntimeConfig:
+      type: object
+      properties:
+        prefixes:
+          type: array
+          items:
+            type: string
+        yara_enabled:
+          type: boolean
+        yara_bin:
+          type: string
+        yara_rules:
+          type: string
+        yara_timeout_ms:
+          type: integer
+    RuleVersion:
+      type: object
+      properties:
+        major:
+          type: integer
+        minor:
+          type: integer
+        patch:
+          type: integer
+        tag:
+          type: string
+        released_at:
+          type: string
+          format: date-time
+    RuleEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+    RulePack:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+        version:
+          $ref: '#/components/schemas/RuleVersion'
+        enabled:
+          type: boolean
+        rule_count:
+          type: integer
+        checksum:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleEntry'
+    RuleUpdateConfig:
+      type: object
+      properties:
+        remote_url:
+          type: string
+        auto_update:
+          type: boolean
+        update_interval_hours:
+          type: integer
+        cache_dir:
+          type: string
+    RuleConflict:
+      type: object
+      properties:
+        rule_id_1:
+          type: string
+        rule_id_2:
+          type: string
+        pack_id_1:
+          type: string
+        pack_id_2:
+          type: string
+        conflict:
+          type: string
+        severity:
+          type: string
+    RuleStatus:
+      type: object
+      properties:
+        packs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RulePack'
+        total_rules:
+          type: integer
+        enabled_rules:
+          type: integer
+        disabled_rules:
+          type: integer
+        last_update:
+          type: string
+          format: date-time
+        update_config:
+          $ref: '#/components/schemas/RuleUpdateConfig'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleConflict'
+    RuleUpdateResult:
+      type: object
+      properties:
+        pack_id:
+          type: string
+        old_version:
+          $ref: '#/components/schemas/RuleVersion'
+        new_version:
+          $ref: '#/components/schemas/RuleVersion'
+        updated:
+          type: boolean
+        downloaded_rules:
+          type: integer
+        error:
+          type: string
+    PlaybookStepCondition:
+      type: object
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+        value:
+          type: string
+    PlaybookStep:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [threat_hunt, filter_query, yara_scan, c2_analysis, apt_analysis, custom]
+        config:
+          type: object
+          additionalProperties: true
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaybookStepCondition'
+        enabled:
+          type: boolean
+    HuntingPlaybook:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaybookStep'
+        status:
+          type: string
+          enum: [draft, ready, running, complete, failed]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PlaybookStepResult:
+      type: object
+      properties:
+        step_id:
+          type: string
+        step_name:
+          type: string
+        status:
+          type: string
+        hits_count:
+          type: integer
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreatHit'
+        error:
+          type: string
+        duration_ms:
+          type: integer
+        condition_ok:
+          type: boolean
+    PlaybookRunResult:
+      type: object
+      properties:
+        playbook_id:
+          type: string
+        playbook_name:
+          type: string
+        status:
+          type: string
+        step_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaybookStepResult'
+        total_hits:
+          type: integer
+        duration_ms:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+    SavedSearch:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        query:
+          type: string
+        filters:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        hit_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    HypothesisEvidence:
+      type: object
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+        ref_id:
+          type: string
+        strength:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Hypothesis:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, investigating, confirmed, refuted, inconclusive]
+        playbook_id:
+          type: string
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/HypothesisEvidence'
+        conclusion:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     MiscModuleManifest:
       type: object
       properties:
@@ -995,6 +1354,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /api/hunting:
+    get:
+      tags: [Hunting]
+      summary: Run threat hunting
+      description: Runs threat hunting against the current capture. Repeated `prefix` query parameters override configured prefixes for this request.
+      operationId: runThreatHunting
+      parameters:
+        - name: prefix
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: Optional custom prefixes to scan for this request.
+      responses:
+        '200':
+          description: Threat hunting hits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ThreatHit'
+
+  /api/hunting/config:
+    get:
+      tags: [Hunting]
+      summary: Get hunting runtime config
+      description: Returns threat-hunting prefixes and YARA runtime settings.
+      operationId: getHuntingRuntimeConfig
+      responses:
+        '200':
+          description: Hunting runtime configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingRuntimeConfig'
+    post:
+      tags: [Hunting]
+      summary: Update hunting runtime config
+      description: Updates threat-hunting prefixes and YARA runtime settings.
+      operationId: setHuntingRuntimeConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HuntingRuntimeConfig'
+      responses:
+        '200':
+          description: Updated hunting runtime configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingRuntimeConfig'
+
+  /api/objects:
+    get:
+      tags: [Objects]
+      summary: List extracted objects
+      description: Returns extracted objects from the current capture.
+      operationId: listObjects
+      responses:
+        '200':
+          description: Extracted objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObjectFile'
+
+  /api/objects/download:
+    get:
+      tags: [Objects]
+      summary: Download extracted objects
+      description: Downloads extracted objects as a ZIP archive. Without `ids`, all objects are downloaded if the object count is within the backend safety limit.
+      operationId: downloadObjectsZipGet
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated object IDs.
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+    post:
+      tags: [Objects]
+      summary: Download selected extracted objects
+      description: Downloads selected extracted objects as a ZIP archive.
+      operationId: downloadObjectsZipPost
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
 
   /api/streams/index:
     get:
@@ -2071,6 +2552,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/tools/winrm-decrypt/export:
+    get:
+      tags: [Tools]
+      summary: Export WinRM decrypt result
+      description: Downloads a plaintext export for a previous WinRM decrypt result.
+      operationId: exportWinRMDecryptResult
+      parameters:
+        - name: result_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Result ID returned by `/api/tools/winrm-decrypt`.
+      responses:
+        '200':
+          description: Plaintext export
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Export result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/tools/smb3-session-candidates:
     get:
       tags: [Tools]
@@ -2353,3 +2861,604 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AuditEntry'
+
+  /api/rules/status:
+    get:
+      tags: [Rules]
+      summary: Get rule status
+      description: Returns loaded YARA rule packs, rule counts, update config, and conflicts.
+      operationId: getRuleStatus
+      responses:
+        '200':
+          description: Rule status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleStatus'
+
+  /api/rules/config:
+    get:
+      tags: [Rules]
+      summary: Get rule update config
+      description: Returns remote rule update configuration.
+      operationId: getRuleUpdateConfig
+      responses:
+        '200':
+          description: Rule update config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleUpdateConfig'
+    post:
+      tags: [Rules]
+      summary: Update rule update config
+      description: Updates remote rule update configuration.
+      operationId: setRuleUpdateConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleUpdateConfig'
+      responses:
+        '200':
+          description: Updated rule update config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleUpdateConfig'
+
+  /api/rules/pack/toggle:
+    post:
+      tags: [Rules]
+      summary: Toggle rule pack
+      description: Enables or disables a rule pack.
+      operationId: toggleRulePack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pack_id, enabled]
+              properties:
+                pack_id:
+                  type: string
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Toggle result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  pack_id:
+                    type: string
+                  enabled:
+                    type: boolean
+
+  /api/rules/check-updates:
+    post:
+      tags: [Rules]
+      summary: Check rule updates
+      description: Checks configured remote rule packs for updates.
+      operationId: checkRuleUpdates
+      responses:
+        '200':
+          description: Update check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RuleUpdateResult'
+
+  /api/rules/download:
+    post:
+      tags: [Rules]
+      summary: Download rule pack
+      description: Downloads or refreshes a rule pack.
+      operationId: downloadRulePack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pack_id]
+              properties:
+                pack_id:
+                  type: string
+                url:
+                  type: string
+      responses:
+        '200':
+          description: Downloaded rule pack
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePack'
+
+  /api/rules/conflicts:
+    get:
+      tags: [Rules]
+      summary: List rule conflicts
+      description: Detects conflicts between loaded rules.
+      operationId: listRuleConflicts
+      responses:
+        '200':
+          description: Rule conflicts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conflicts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RuleConflict'
+                  count:
+                    type: integer
+
+  /api/rules/validate:
+    post:
+      tags: [Rules]
+      summary: Validate rule content
+      description: Validates YARA rule content.
+      operationId: validateRules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+
+  /api/playbooks:
+    get:
+      tags: [Playbooks]
+      summary: List playbooks
+      description: Returns all hunting playbooks.
+      operationId: listPlaybooks
+      responses:
+        '200':
+          description: Playbooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HuntingPlaybook'
+    post:
+      tags: [Playbooks]
+      summary: Create playbook
+      description: Creates a hunting playbook.
+      operationId: createPlaybook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HuntingPlaybook'
+      responses:
+        '201':
+          description: Created playbook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingPlaybook'
+
+  /api/playbooks/{id}:
+    get:
+      tags: [Playbooks]
+      summary: Get playbook
+      description: Returns a playbook by ID.
+      operationId: getPlaybook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playbook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingPlaybook'
+    put:
+      tags: [Playbooks]
+      summary: Update playbook
+      description: Updates a playbook by ID.
+      operationId: updatePlaybook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HuntingPlaybook'
+      responses:
+        '200':
+          description: Updated playbook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingPlaybook'
+    delete:
+      tags: [Playbooks]
+      summary: Delete playbook
+      description: Deletes a playbook by ID.
+      operationId: deletePlaybook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/playbooks/{id}/run:
+    post:
+      tags: [Playbooks]
+      summary: Run playbook
+      description: Runs a playbook with the current capture context.
+      operationId: runPlaybook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playbook run result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybookRunResult'
+
+  /api/playbooks/{id}/last-run:
+    get:
+      tags: [Playbooks]
+      summary: Get playbook last run
+      description: Returns the last run result for a playbook.
+      operationId: getPlaybookLastRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Last playbook run result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybookRunResult'
+
+  /api/hunting/saved-searches:
+    get:
+      tags: [Hunting]
+      summary: List saved searches
+      description: Returns all saved hunting searches.
+      operationId: listSavedSearches
+      responses:
+        '200':
+          description: Saved searches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavedSearch'
+    post:
+      tags: [Hunting]
+      summary: Create saved search
+      description: Creates a saved hunting search.
+      operationId: createSavedSearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedSearch'
+      responses:
+        '201':
+          description: Created saved search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+
+  /api/hunting/saved-searches/{id}:
+    get:
+      tags: [Hunting]
+      summary: Get saved search
+      description: Returns a saved search by ID.
+      operationId: getSavedSearch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Saved search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+    put:
+      tags: [Hunting]
+      summary: Update saved search
+      description: Updates a saved search by ID.
+      operationId: updateSavedSearch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedSearch'
+      responses:
+        '200':
+          description: Updated saved search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+    delete:
+      tags: [Hunting]
+      summary: Delete saved search
+      description: Deletes a saved search by ID.
+      operationId: deleteSavedSearch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/hunting/saved-searches/{id}/execute:
+    post:
+      tags: [Hunting]
+      summary: Execute saved search
+      description: Executes a saved search and returns matching threat hits.
+      operationId: executeSavedSearch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Saved search execution result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  search:
+                    $ref: '#/components/schemas/SavedSearch'
+                  hits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ThreatHit'
+                  total:
+                    type: integer
+
+  /api/hunting/hypotheses:
+    get:
+      tags: [Hunting]
+      summary: List hypotheses
+      description: Returns hypotheses, optionally filtered by status.
+      operationId: listHypotheses
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, investigating, confirmed, refuted, inconclusive]
+      responses:
+        '200':
+          description: Hypotheses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hypothesis'
+    post:
+      tags: [Hunting]
+      summary: Create hypothesis
+      description: Creates a hunting hypothesis.
+      operationId: createHypothesis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Hypothesis'
+      responses:
+        '201':
+          description: Created hypothesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hypothesis'
+
+  /api/hunting/hypotheses/{id}:
+    get:
+      tags: [Hunting]
+      summary: Get hypothesis
+      description: Returns a hypothesis by ID.
+      operationId: getHypothesis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Hypothesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hypothesis'
+    put:
+      tags: [Hunting]
+      summary: Update hypothesis
+      description: Updates a hypothesis by ID.
+      operationId: updateHypothesis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Hypothesis'
+      responses:
+        '200':
+          description: Updated hypothesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hypothesis'
+    delete:
+      tags: [Hunting]
+      summary: Delete hypothesis
+      description: Deletes a hypothesis by ID.
+      operationId: deleteHypothesis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/hunting/hypotheses/{id}/evidence:
+    post:
+      tags: [Hunting]
+      summary: Add hypothesis evidence
+      description: Adds evidence to a hypothesis.
+      operationId: addHypothesisEvidence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HypothesisEvidence'
+      responses:
+        '200':
+          description: Updated hypothesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hypothesis'
+
+  /api/hunting/hypotheses/{id}/status:
+    post:
+      tags: [Hunting]
+      summary: Update hypothesis status
+      description: Updates hypothesis status and optional conclusion.
+      operationId: updateHypothesisStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, investigating, confirmed, refuted, inconclusive]
+                conclusion:
+                  type: string
+      responses:
+        '200':
+          description: Updated hypothesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hypothesis'

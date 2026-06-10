@@ -5,6 +5,12 @@
 .claude-design/
 __pycache__/
 .DS_Store
+.esdata/
+.kiro/
+.omo/
+.playwright-cli/
+.vscode/
+
 Thumbs.db
 
 # Logs / temp

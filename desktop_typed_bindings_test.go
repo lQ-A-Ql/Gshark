@@ -152,6 +152,174 @@ func TestDesktopHuntingTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	}
 }
 
+func TestDesktopPlaybookTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
+	seen := map[string]int{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := r.Method + " " + r.URL.String()
+		seen[key]++
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/playbooks":
+			if r.Method == http.MethodPost {
+				var payload map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode playbook create body: %v", err)
+				}
+				if payload["name"] != "pb" {
+					t.Fatalf("unexpected playbook create payload: %#v", payload)
+				}
+			}
+			_, _ = w.Write([]byte(`[{"id":"pb-1","name":"pb","steps":[],"status":"ready"}]`))
+		case "/api/playbooks/pb-1":
+			if r.Method == http.MethodPut {
+				var payload map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode playbook update body: %v", err)
+				}
+				if payload["name"] != "pb-updated" {
+					t.Fatalf("unexpected playbook update payload: %#v", payload)
+				}
+			}
+			_, _ = w.Write([]byte(`{"id":"pb-1","name":"pb","steps":[],"status":"ready"}`))
+		case "/api/playbooks/pb-1/run":
+			_, _ = w.Write([]byte(`{"playbook_id":"pb-1","playbook_name":"pb","status":"complete","step_results":[],"total_hits":0}`))
+		case "/api/playbooks/pb-1/last-run":
+			_, _ = w.Write([]byte(`{"playbook_id":"pb-1","playbook_name":"pb","status":"complete","step_results":[],"total_hits":0}`))
+		case "/api/hunting/saved-searches":
+			if r.Method == http.MethodPost {
+				var payload map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode saved search create body: %v", err)
+				}
+				if payload["name"] != "search" {
+					t.Fatalf("unexpected saved search create payload: %#v", payload)
+				}
+			}
+			_, _ = w.Write([]byte(`[{"id":"ss-1","name":"search","query":"flag{"}]`))
+		case "/api/hunting/saved-searches/ss-1":
+			_, _ = w.Write([]byte(`{"id":"ss-1","name":"search","query":"flag{"}`))
+		case "/api/hunting/saved-searches/ss-1/execute":
+			_, _ = w.Write([]byte(`{"search":{"id":"ss-1","name":"search","query":"flag{"},"hits":[],"total":0}`))
+		case "/api/hunting/hypotheses":
+			if r.Method == http.MethodPost {
+				var payload map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode hypothesis create body: %v", err)
+				}
+				if payload["title"] != "hypothesis" {
+					t.Fatalf("unexpected hypothesis create payload: %#v", payload)
+				}
+			}
+			_, _ = w.Write([]byte(`[{"id":"h-1","title":"hypothesis","status":"open"}]`))
+		case "/api/hunting/hypotheses/h-1":
+			_, _ = w.Write([]byte(`{"id":"h-1","title":"hypothesis","status":"open"}`))
+		case "/api/hunting/hypotheses/h-1/evidence":
+			_, _ = w.Write([]byte(`{"id":"h-1","title":"hypothesis","status":"open","evidence":[{"description":"hit"}]}`))
+		case "/api/hunting/hypotheses/h-1/status":
+			var payload desktopHypothesisStatusRequest
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode hypothesis status body: %v", err)
+			}
+			if payload.Status != "confirmed" || payload.Conclusion != "ok" {
+				t.Fatalf("unexpected hypothesis status payload: %#v", payload)
+			}
+			_, _ = w.Write([]byte(`{"id":"h-1","title":"hypothesis","status":"confirmed"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	app := newTestDesktopApp(server.URL)
+	if _, err := app.ListPlaybooks(); err != nil {
+		t.Fatalf("ListPlaybooks error = %v", err)
+	}
+	if _, err := app.GetPlaybook("pb-1"); err != nil {
+		t.Fatalf("GetPlaybook error = %v", err)
+	}
+	if _, err := app.CreatePlaybook(map[string]any{"name": "pb"}); err != nil {
+		t.Fatalf("CreatePlaybook error = %v", err)
+	}
+	if _, err := app.UpdatePlaybook("pb-1", map[string]any{"name": "pb-updated"}); err != nil {
+		t.Fatalf("UpdatePlaybook error = %v", err)
+	}
+	if _, err := app.DeletePlaybook("pb-1"); err != nil {
+		t.Fatalf("DeletePlaybook error = %v", err)
+	}
+	if _, err := app.RunPlaybook("pb-1"); err != nil {
+		t.Fatalf("RunPlaybook error = %v", err)
+	}
+	if _, err := app.GetPlaybookLastRun("pb-1"); err != nil {
+		t.Fatalf("GetPlaybookLastRun error = %v", err)
+	}
+	if _, err := app.ListSavedSearches(); err != nil {
+		t.Fatalf("ListSavedSearches error = %v", err)
+	}
+	if _, err := app.GetSavedSearch("ss-1"); err != nil {
+		t.Fatalf("GetSavedSearch error = %v", err)
+	}
+	if _, err := app.CreateSavedSearch(map[string]any{"name": "search"}); err != nil {
+		t.Fatalf("CreateSavedSearch error = %v", err)
+	}
+	if _, err := app.UpdateSavedSearch("ss-1", map[string]any{"name": "search"}); err != nil {
+		t.Fatalf("UpdateSavedSearch error = %v", err)
+	}
+	if _, err := app.DeleteSavedSearch("ss-1"); err != nil {
+		t.Fatalf("DeleteSavedSearch error = %v", err)
+	}
+	if _, err := app.ExecuteSavedSearch("ss-1"); err != nil {
+		t.Fatalf("ExecuteSavedSearch error = %v", err)
+	}
+	if _, err := app.ListHypotheses("open"); err != nil {
+		t.Fatalf("ListHypotheses error = %v", err)
+	}
+	if _, err := app.GetHypothesis("h-1"); err != nil {
+		t.Fatalf("GetHypothesis error = %v", err)
+	}
+	if _, err := app.CreateHypothesis(map[string]any{"title": "hypothesis"}); err != nil {
+		t.Fatalf("CreateHypothesis error = %v", err)
+	}
+	if _, err := app.UpdateHypothesis("h-1", map[string]any{"title": "hypothesis"}); err != nil {
+		t.Fatalf("UpdateHypothesis error = %v", err)
+	}
+	if _, err := app.DeleteHypothesis("h-1"); err != nil {
+		t.Fatalf("DeleteHypothesis error = %v", err)
+	}
+	if _, err := app.AddHypothesisEvidence("h-1", map[string]any{"description": "hit"}); err != nil {
+		t.Fatalf("AddHypothesisEvidence error = %v", err)
+	}
+	if _, err := app.UpdateHypothesisStatus("h-1", "confirmed", "ok"); err != nil {
+		t.Fatalf("UpdateHypothesisStatus error = %v", err)
+	}
+
+	for _, want := range []string{
+		"GET /api/playbooks",
+		"GET /api/playbooks/pb-1",
+		"POST /api/playbooks",
+		"PUT /api/playbooks/pb-1",
+		"DELETE /api/playbooks/pb-1",
+		"POST /api/playbooks/pb-1/run",
+		"GET /api/playbooks/pb-1/last-run",
+		"GET /api/hunting/saved-searches",
+		"GET /api/hunting/saved-searches/ss-1",
+		"POST /api/hunting/saved-searches",
+		"PUT /api/hunting/saved-searches/ss-1",
+		"DELETE /api/hunting/saved-searches/ss-1",
+		"POST /api/hunting/saved-searches/ss-1/execute",
+		"GET /api/hunting/hypotheses?status=open",
+		"GET /api/hunting/hypotheses/h-1",
+		"POST /api/hunting/hypotheses",
+		"PUT /api/hunting/hypotheses/h-1",
+		"DELETE /api/hunting/hypotheses/h-1",
+		"POST /api/hunting/hypotheses/h-1/evidence",
+		"POST /api/hunting/hypotheses/h-1/status",
+	} {
+		if seen[want] != 1 {
+			t.Fatalf("expected backend route %q once, seen=%#v", want, seen)
+		}
+	}
+}
+
 func TestDesktopVehicleDBCTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -375,7 +543,7 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 	if _, err := app.GetBruteforceAnalysis(); err != nil {
 		t.Fatalf("GetBruteforceAnalysis error = %v", err)
 	}
-	if _, err := app.GetUSBAnalysis("auto", 20000); err != nil {
+	if _, err := app.GetUSBAnalysis("auto", 20000, false); err != nil {
 		t.Fatalf("GetUSBAnalysis error = %v", err)
 	}
 	if _, err := app.DecryptC2Traffic(desktopC2DecryptRequest{Family: "vshell"}); err != nil {

@@ -150,6 +150,11 @@ type desktopRuleValidationRequest struct {
 	Content string `json:"content"`
 }
 
+type desktopHypothesisStatusRequest struct {
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion,omitempty"`
+}
+
 type desktopVehicleDBCRequest struct {
 	Path string `json:"path"`
 }
@@ -465,7 +470,7 @@ func (r desktopBackendRequest) normalizedMethod() string {
 func validateDesktopBackendRequest(req desktopBackendRequest) (string, string, error) {
 	method := req.normalizedMethod()
 	switch method {
-	case http.MethodGet, http.MethodPost, http.MethodDelete:
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete:
 	default:
 		return "", "", fmt.Errorf("desktop IPC backend request rejected: unsupported method %q", method)
 	}
@@ -797,6 +802,94 @@ func (a *DesktopApp) UpdateHuntingRuntimeConfig(config desktopHuntingRuntimeConf
 	return a.desktopPostJSON("/api/hunting/config", config, 15*time.Second)
 }
 
+func (a *DesktopApp) ListPlaybooks() (any, error) {
+	return a.desktopGetJSON("/api/playbooks", 15*time.Second)
+}
+
+func (a *DesktopApp) GetPlaybook(id string) (any, error) {
+	return a.desktopGetJSON("/api/playbooks/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) CreatePlaybook(payload map[string]any) (any, error) {
+	return a.desktopPostJSON("/api/playbooks", payload, 15*time.Second)
+}
+
+func (a *DesktopApp) UpdatePlaybook(id string, payload map[string]any) (any, error) {
+	return a.desktopPutJSON("/api/playbooks/"+url.PathEscape(strings.TrimSpace(id)), payload, 15*time.Second)
+}
+
+func (a *DesktopApp) DeletePlaybook(id string) (any, error) {
+	return a.desktopDeleteJSON("/api/playbooks/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) RunPlaybook(id string) (any, error) {
+	return a.desktopPostJSON("/api/playbooks/"+url.PathEscape(strings.TrimSpace(id))+"/run", map[string]any{}, 60*time.Second)
+}
+
+func (a *DesktopApp) GetPlaybookLastRun(id string) (any, error) {
+	return a.desktopGetJSON("/api/playbooks/"+url.PathEscape(strings.TrimSpace(id))+"/last-run", 15*time.Second)
+}
+
+func (a *DesktopApp) ListSavedSearches() (any, error) {
+	return a.desktopGetJSON("/api/hunting/saved-searches", 15*time.Second)
+}
+
+func (a *DesktopApp) GetSavedSearch(id string) (any, error) {
+	return a.desktopGetJSON("/api/hunting/saved-searches/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) CreateSavedSearch(payload map[string]any) (any, error) {
+	return a.desktopPostJSON("/api/hunting/saved-searches", payload, 15*time.Second)
+}
+
+func (a *DesktopApp) UpdateSavedSearch(id string, payload map[string]any) (any, error) {
+	return a.desktopPutJSON("/api/hunting/saved-searches/"+url.PathEscape(strings.TrimSpace(id)), payload, 15*time.Second)
+}
+
+func (a *DesktopApp) DeleteSavedSearch(id string) (any, error) {
+	return a.desktopDeleteJSON("/api/hunting/saved-searches/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) ExecuteSavedSearch(id string) (any, error) {
+	return a.desktopPostJSON("/api/hunting/saved-searches/"+url.PathEscape(strings.TrimSpace(id))+"/execute", map[string]any{}, 60*time.Second)
+}
+
+func (a *DesktopApp) ListHypotheses(status string) (any, error) {
+	path := "/api/hunting/hypotheses"
+	if trimmed := strings.TrimSpace(status); trimmed != "" {
+		path += "?status=" + url.QueryEscape(trimmed)
+	}
+	return a.desktopGetJSON(path, 15*time.Second)
+}
+
+func (a *DesktopApp) GetHypothesis(id string) (any, error) {
+	return a.desktopGetJSON("/api/hunting/hypotheses/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) CreateHypothesis(payload map[string]any) (any, error) {
+	return a.desktopPostJSON("/api/hunting/hypotheses", payload, 15*time.Second)
+}
+
+func (a *DesktopApp) UpdateHypothesis(id string, payload map[string]any) (any, error) {
+	return a.desktopPutJSON("/api/hunting/hypotheses/"+url.PathEscape(strings.TrimSpace(id)), payload, 15*time.Second)
+}
+
+func (a *DesktopApp) DeleteHypothesis(id string) (any, error) {
+	return a.desktopDeleteJSON("/api/hunting/hypotheses/"+url.PathEscape(strings.TrimSpace(id)), 15*time.Second)
+}
+
+func (a *DesktopApp) AddHypothesisEvidence(id string, payload map[string]any) (any, error) {
+	return a.desktopPostJSON("/api/hunting/hypotheses/"+url.PathEscape(strings.TrimSpace(id))+"/evidence", payload, 15*time.Second)
+}
+
+func (a *DesktopApp) UpdateHypothesisStatus(id, status, conclusion string) (any, error) {
+	return a.desktopPostJSON(
+		"/api/hunting/hypotheses/"+url.PathEscape(strings.TrimSpace(id))+"/status",
+		desktopHypothesisStatusRequest{Status: strings.TrimSpace(status), Conclusion: conclusion},
+		15*time.Second,
+	)
+}
+
 func (a *DesktopApp) GetRuleStatus() (any, error) {
 	return a.desktopGetJSON("/api/rules/status", 15*time.Second)
 }
@@ -894,6 +987,16 @@ func (a *DesktopApp) desktopPostJSON(path string, payload any, timeout time.Dura
 	defer cancel()
 	var response any
 	if err := a.backendProxy().postJSON(ctx, path, payload, &response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (a *DesktopApp) desktopPutJSON(path string, payload any, timeout time.Duration) (any, error) {
+	ctx, cancel := a.backendProxyContext(timeout)
+	defer cancel()
+	var response any
+	if err := a.backendProxy().doJSON(ctx, http.MethodPut, path, payload, &response); err != nil {
 		return nil, err
 	}
 	return response, nil
