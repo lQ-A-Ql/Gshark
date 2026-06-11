@@ -23,6 +23,135 @@ meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、
 - 本地通信：Wails IPC 桌面代理 + 本地 HTTP 后端；普通浏览器模式保留 HTTP / SSE fallback
 - 扩展运行时：JavaScript、Python
 
+## 架构建模与核心流程
+
+meow~traffic 采用“桌面壳 + React 工作台 + 本地 Go 后端 + 外部解析工具”的离线分析架构。桌面端主线是 Wails typed IPC：前端页面通过 `desktopBridge` 调用明确的桌面 binding；普通浏览器开发模式保留 HTTP / SSE fallback。后端不使用 Web 框架，HTTP router 由 `net/http.ServeMux` 直接注册，核心业务集中在 `backend/internal/engine`，协议解析和专项字段扫描集中在 `backend/internal/tshark`。
+
+### 系统上下文
+
+```mermaid
+flowchart LR
+    Analyst["分析员"] --> Shell["Wails 桌面壳"]
+    Shell --> WebView["React WebView"]
+    Shell --> Bindings["typed Wails bindings"]
+    WebView --> Bridge["bridgeFactory / desktopBridge"]
+    Bridge --> Bindings
+    Bridge -. "browser-dev fallback" .-> HTTP["本地 HTTP backend"]
+    Bindings --> Backend["Go backend service"]
+    HTTP --> Backend
+    Backend --> Store["packet store / stream cache"]
+    Backend --> Tshark["tshark / field scan"]
+    Backend --> MediaTools["FFmpeg / Python / Vosk"]
+    Backend --> Yara["YARA rules"]
+    Backend --> MiscRuntime["MISC JS / Python runtime"]
+    Store --> Pages["Packets / streams / evidence"]
+    Tshark --> Analysis["traffic / C2 / USB / vehicle / industrial / media"]
+    MediaTools --> Analysis
+    Yara --> Analysis
+    MiscRuntime --> Analysis
+```
+
+这张图体现当前运行时边界：React 只负责交互和状态编排，桌面模式不再依赖 WebView 直接请求后端 `/api/...` 数据面；后端服务统一承接 capture、packet、stream、analysis、report、MISC 和 runtime 探测。`tshark`、FFmpeg、Python/Vosk 与 YARA 都是可探测的本地能力，缺失时按专项功能降级，而不是让主工作区不可用。
+
+### 前后端数据面
+
+```mermaid
+flowchart TB
+    subgraph Frontend["frontend/src/app"]
+        Pages["pages / features"] --> CoreTypes["core types"]
+        CoreTypes --> Mappers["mappers"]
+        Mappers --> WireDTO["wire DTO"]
+        WireDTO --> BridgeFactory["bridgeFactory"]
+        BridgeFactory --> DesktopBridge["desktop typed bridge"]
+        BridgeFactory --> HttpBridge["httpBridge fallback"]
+    end
+
+    subgraph Backend["backend/internal"]
+        Transport["transport handlers"] --> Contract["servicecontract"]
+        Contract --> Engine["engine service"]
+        Engine --> Model["model"]
+        Engine --> TsharkPkg["tshark"]
+        Engine --> MiscPkg["miscpkg"]
+        Engine --> MCP["mcp"]
+        Engine --> Report["report / governance"]
+    end
+
+    DesktopBridge --> Transport
+    HttpBridge -. "browser-dev only" .-> Transport
+```
+
+前端数据面遵循 `wire DTO -> mapper -> core type -> feature/page` 的方向。页面和 feature hook 不直接绑定后端 JSON shape；mapper 负责把传输 DTO 归一化为前端核心类型。后端 HTTP handler 必须使用 request context 进入 service 层，长任务和 capture replacement 才能正确取消。
+
+### PCAP 到证据结论
+
+```mermaid
+flowchart TD
+    File["PCAP / PCAPNG"] --> Load["BeginCaptureLoad"]
+    Load --> FirstScreen["first_screen packet list"]
+    Load --> Enrichment["background enrichment"]
+    FirstScreen --> PacketStore["packet store"]
+    Enrichment --> PacketStore
+    PacketStore --> Streams["HTTP / TCP / UDP stream rebuild"]
+    PacketStore --> FieldScan["tshark field scan cache"]
+    Streams --> Payloads["payload source / decode / inspect"]
+    FieldScan --> DomainAnalysis["industrial / vehicle / USB / media analysis"]
+    PacketStore --> Hunting["threat hunting / YARA targets"]
+    PacketStore --> C2["C2 detection / decrypt workbench"]
+    Payloads --> Evidence["UnifiedEvidenceRecord"]
+    DomainAnalysis --> Evidence
+    Hunting --> Evidence
+    C2 --> Evidence
+    Evidence --> Report["investigation report / export"]
+    Evidence --> JumpBack["packet / stream jump-back"]
+```
+
+核心算法流程分成两条节奏：首屏先用轻量字段集把包列表提交给前端，后台再补齐颜色、UDP payload、checksum 和专项协议辅助字段；分析页面按需读取 packet store、stream cache 或 field scan cache，最终聚合为统一证据记录和调查报告。这样能在大包场景下先进入工作台，再逐步补齐高成本分析。
+
+### 检测与专项算法
+
+```mermaid
+flowchart LR
+    Streams["reassembled streams"] --> WebShell["WebShell payload source"]
+    WebShell --> Decoder["decoder hints / inspector"]
+    PacketStore["packet store"] --> C2HTTP["CS HTTP / DNS / TLS signals"]
+    PacketStore --> VShell["VShell TCP / WebSocket shapes"]
+    FieldRows["field scan rows"] --> Industrial["Modbus / DNP3 / S7 / IEC104"]
+    FieldRows --> Vehicle["CAN / J1939 / DoIP / UDS / DBC"]
+    FieldRows --> USB["HID / Mass Storage / control transfer"]
+    FieldRows --> Media["RTP / media artifact / speech"]
+    PacketStore --> YaraTargets["YARA stream targets"]
+    WebShell --> Evidence["evidence records"]
+    Decoder --> Evidence
+    C2HTTP --> Evidence
+    VShell --> Evidence
+    Industrial --> Evidence
+    Vehicle --> Evidence
+    USB --> Evidence
+    Media --> Evidence
+    YaraTargets --> Evidence
+```
+
+C2 检测侧重多信号聚合：HTTP Host/URI 周期性、GET/POST tasking shape、DNS 长标签/TXT/NULL、TLS 指纹、VShell WebSocket 参数、长度前缀和短长包交替等都会进入候选、聚合和置信度因子。WebShell 流程先从 URI、form、multipart、JSON、HTTP body 和流内容中提取 payload source，再由 decoder / inspector 给出家族、解码建议和证据提示。工控、车机、USB、媒体等专项分析优先使用 tshark 字段扫描缓存，避免在页面切换时重复启动外部解析。
+
+### MISC 模块执行
+
+```mermaid
+flowchart TD
+    MiscUI["MISC workbench"] --> BuiltIn["built-in modules"]
+    MiscUI --> Package["zip custom module"]
+    Package --> Manifest["manifest.json / api.json / form.json"]
+    Manifest --> RuntimeChoice["runtime selection"]
+    RuntimeChoice --> JS["JavaScript runtime"]
+    RuntimeChoice --> Python["Python runtime"]
+    BuiltIn --> Result["structured result"]
+    JS --> Result
+    Python --> Result
+    Result --> Export["JSON / TXT export"]
+    Result --> Links["packet / stream links"]
+```
+
+MISC 不是通用插件沙箱，而是面向低频、高价值协议辅助任务的本地模块接口。内建模块直接复用后端 service 和 packet/stream 能力；自定义 zip 模块必须通过 manifest、api 和 form 描述输入输出，运行时限制在本地 JavaScript / Python 执行器内，结果以结构化 JSON 返回前端工作台。
+
 ## 功能概览
 
 ### 主工作区
@@ -189,6 +318,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-all.ps1
 cd backend
 go test ./...
 ```
+
+后端覆盖率报告：
+
+```powershell
+cd backend
+go test ./... -covermode=count -coverprofile="$env:TEMP\gshark-backend-cover.out"
+go tool cover -func="$env:TEMP\gshark-backend-cover.out"
+```
+
+当前后端测试面已覆盖 transport contract、servicecontract、report、MCP、tshark 专项解析、C2 聚合与解密辅助、WebShell payload inspector、stream cache/index/fallback 等高风险路径。最近一次精算基线为 `18734 / 22014` statements，总覆盖率 `85.1%`；覆盖率是质量观察指标，实际门禁仍以 focused contract tests、全量 `go test ./...` 和 `scripts/check-all.ps1` 为准。
 
 前端测试：
 
