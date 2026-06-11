@@ -112,6 +112,220 @@ func TestClearUSBAnalysisRawScanCacheInvalidatesEntries(t *testing.T) {
 	}
 }
 
+func TestBuildUSBAnalysisFromFileWithOptionsProjectsHIDMassStorageAndOtherRows(t *testing.T) {
+	oldRunner := usbAnalysisScanRunner
+	t.Cleanup(func() {
+		usbAnalysisScanRunner = oldRunner
+		ClearUSBAnalysisRawScanCache()
+	})
+	ClearUSBAnalysisRawScanCache()
+
+	var calls int32
+	SetUSBAnalysisScanRunnerForTesting(func(filePath string) (USBAnalysisRawScan, error) {
+		atomic.AddInt32(&calls, 1)
+		if filePath != "usb-mixed.pcap" {
+			t.Fatalf("unexpected file path: %q", filePath)
+		}
+		return USBAnalysisRawScan{
+			Rows: [][]string{
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:       "1",
+					usbFieldFrameTime:         "1.000000",
+					usbFieldProtocol:          "USBHID",
+					usbFieldBusID:             "1",
+					usbFieldDeviceAddress:     "2",
+					usbFieldEndpointAddress:   "0x81",
+					usbFieldEndpointDirection: "1",
+					usbFieldTransferType:      "1",
+					usbFieldURBType:           "c",
+					usbFieldURBStatus:         "0",
+					usbFieldDataLength:        "8",
+					usbFieldCapData:           "0200040000000000",
+					usbFieldInfo:              "keyboard A",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:       "2",
+					usbFieldFrameTime:         "1.100000",
+					usbFieldProtocol:          "USBHID",
+					usbFieldBusID:             "1",
+					usbFieldDeviceAddress:     "2",
+					usbFieldEndpointAddress:   "0x81",
+					usbFieldEndpointDirection: "1",
+					usbFieldTransferType:      "1",
+					usbFieldURBType:           "c",
+					usbFieldURBStatus:         "0",
+					usbFieldDataLength:        "8",
+					usbFieldCapData:           "0000000000000000",
+					usbFieldInfo:              "keyboard release",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:       "3",
+					usbFieldFrameTime:         "1.200000",
+					usbFieldProtocol:          "USBHID",
+					usbFieldBusID:             "1",
+					usbFieldDeviceAddress:     "3",
+					usbFieldEndpointAddress:   "0x82",
+					usbFieldEndpointDirection: "1",
+					usbFieldTransferType:      "1",
+					usbFieldURBType:           "c",
+					usbFieldURBStatus:         "0",
+					usbFieldDataLength:        "4",
+					usbFieldHIDData:           "01:05:FE:00",
+					usbFieldInfo:              "mouse move",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:                      "4",
+					usbFieldFrameTime:                        "2.000000",
+					usbFieldProtocol:                         "USBMS",
+					usbFieldBusID:                            "1",
+					usbFieldDeviceAddress:                    "7",
+					usbFieldEndpointAddress:                  "0x02",
+					usbFieldEndpointDirection:                "0",
+					usbFieldTransferType:                     "3",
+					usbFieldURBType:                          "s",
+					usbFieldURBStatus:                        "0",
+					usbFieldDataLength:                       "31",
+					usbFieldFrameData:                        buildCBWHex(0x1, 512, 0x80, 0, []byte{0x28, 0, 0, 0, 0, 0, 0, 0, 1, 0}),
+					usbFieldInfo:                             "SCSI READ(10)",
+					usbFieldMassStorageCBWSignature:          "0x43425355",
+					usbFieldMassStorageCBWTag:                "1",
+					usbFieldMassStorageCBWDataTransferLength: "512",
+					usbFieldMassStorageCBWFlags:              "0x80",
+					usbFieldMassStorageCBWLUN:                "0",
+					usbFieldMassStorageCBWCBLength:           "10",
+					usbFieldSCSIOpcode:                       "0x28",
+					usbFieldSCSILUN:                          "0",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:               "5",
+					usbFieldFrameTime:                 "2.050000",
+					usbFieldProtocol:                  "USBMS",
+					usbFieldBusID:                     "1",
+					usbFieldDeviceAddress:             "7",
+					usbFieldEndpointAddress:           "0x81",
+					usbFieldEndpointDirection:         "1",
+					usbFieldTransferType:              "3",
+					usbFieldURBType:                   "c",
+					usbFieldURBStatus:                 "0",
+					usbFieldDataLength:                "13",
+					usbFieldInfo:                      "SCSI READ(10) complete",
+					usbFieldMassStorageCBWTag:         "1",
+					usbFieldMassStorageCSWSignature:   "0x53425355",
+					usbFieldMassStorageCSWStatus:      "0",
+					usbFieldMassStorageCSWDataResidue: "0",
+					usbFieldSCSIOpcode:                "0x28",
+					usbFieldSCSILUN:                   "0",
+					usbFieldSCSIRequestFrame:          "4",
+					usbFieldSCSIResponseFrame:         "5",
+					usbFieldSCSITime:                  "0.001",
+					usbFieldSCSIStatus:                "good",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:                      "6",
+					usbFieldFrameTime:                        "2.100000",
+					usbFieldProtocol:                         "USBMS",
+					usbFieldBusID:                            "1",
+					usbFieldDeviceAddress:                    "7",
+					usbFieldEndpointAddress:                  "0x02",
+					usbFieldEndpointDirection:                "0",
+					usbFieldTransferType:                     "3",
+					usbFieldURBType:                          "s",
+					usbFieldURBStatus:                        "0",
+					usbFieldDataLength:                       "31",
+					usbFieldFrameData:                        buildCBWHex(0x2, 1024, 0x00, 1, []byte{0x2A, 0, 0, 0, 0, 0, 0, 0, 2, 0}),
+					usbFieldInfo:                             "SCSI WRITE(10)",
+					usbFieldMassStorageCBWSignature:          "0x43425355",
+					usbFieldMassStorageCBWTag:                "2",
+					usbFieldMassStorageCBWDataTransferLength: "1024",
+					usbFieldMassStorageCBWFlags:              "0x00",
+					usbFieldMassStorageCBWLUN:                "1",
+					usbFieldMassStorageCBWCBLength:           "10",
+					usbFieldSCSIOpcode:                       "0x2A",
+					usbFieldSCSILUN:                          "1",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldFrameNumber:       "7",
+					usbFieldFrameTime:         "3.000000",
+					usbFieldProtocol:          "USB",
+					usbFieldBusID:             "1",
+					usbFieldDeviceAddress:     "9",
+					usbFieldEndpointAddress:   "0x00",
+					usbFieldEndpointDirection: "0",
+					usbFieldTransferType:      "2",
+					usbFieldURBType:           "s",
+					usbFieldURBStatus:         "0",
+					usbFieldSetupRequest:      "0x06",
+					usbFieldSetupValue:        "0x0100",
+					usbFieldSetupIndex:        "0",
+					usbFieldSetupLength:       "64",
+					usbFieldFrameData:         "48:65:6c:6c:6f",
+					usbFieldInfo:              "GET DESCRIPTOR",
+				}),
+				makeUSBAnalysisRow(map[int]string{
+					usbFieldProtocol: "ARP",
+					usbFieldInfo:     "not usb",
+				}),
+			},
+			MissingOptional: []string{"usb.optional.missing"},
+		}, nil
+	})
+
+	analysis, err := BuildUSBAnalysisFromFileWithOptions("usb-mixed.pcap", model.USBAnalysisOptions{
+		HIDSourceMode: model.USBHIDSourceAuto,
+		HIDEventLimit: model.MinUSBHIDEventLimit,
+	})
+	if err != nil {
+		t.Fatalf("BuildUSBAnalysisFromFileWithOptions() error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected one raw scan call, got %d", calls)
+	}
+	if analysis.TotalUSBPackets != 7 || analysis.HIDPackets != 3 || analysis.MassStoragePackets != 3 || analysis.OtherUSBPackets != 1 {
+		t.Fatalf("unexpected top-level counts: %+v", analysis)
+	}
+	if analysis.KeyboardPackets != 2 || len(analysis.KeyboardEvents) != 2 || len(analysis.HID.KeyboardEvents) != 2 {
+		t.Fatalf("keyboard events not projected into top and nested views: %+v", analysis)
+	}
+	if analysis.MousePackets != 1 || len(analysis.MouseEvents) != 1 || analysis.MouseEvents[0].XDelta != 5 || analysis.MouseEvents[0].YDelta != -2 {
+		t.Fatalf("mouse event not projected as expected: %+v", analysis.MouseEvents)
+	}
+	if analysis.HIDSelectedSource != "usb.capdata" {
+		t.Fatalf("expected capdata to be selected after keyboard majority, got %q", analysis.HIDSelectedSource)
+	}
+	if !slices.Contains(analysis.HIDSourceCandidates, "usb.capdata") || !slices.Contains(analysis.HIDSourceCandidates, "usbhid.data") {
+		t.Fatalf("expected capdata and usbhid.data candidates, got %+v", analysis.HIDSourceCandidates)
+	}
+	if analysis.MassStorage.TotalPackets != 3 || len(analysis.MassStorage.ReadOperations) != 1 || len(analysis.MassStorage.WriteOperations) != 1 {
+		t.Fatalf("mass storage operations not projected: %+v", analysis.MassStorage)
+	}
+	if read := analysis.MassStorage.ReadOperations[0]; read.RequestFrame != 4 || read.ResponseFrame != 5 || read.Status != "good" {
+		t.Fatalf("read operation should merge request/response, got %+v", read)
+	}
+	if write := analysis.MassStorage.WriteOperations[0]; write.Operation != "write" || write.LUN != "LUN 1" || write.TransferLength != 1024 {
+		t.Fatalf("write operation should flush pending command, got %+v", write)
+	}
+	if analysis.Other.ControlPackets != 1 || len(analysis.Other.ControlRecords) != 1 {
+		t.Fatalf("control record not projected into other analysis: %+v", analysis.Other)
+	}
+	if len(analysis.Notes) == 0 || len(analysis.HIDSourceNotes) == 0 || len(analysis.MassStorage.Notes) == 0 || len(analysis.Other.Notes) == 0 {
+		t.Fatalf("expected notes for all USB sections, got notes=%+v hid=%+v mass=%+v other=%+v", analysis.Notes, analysis.HIDSourceNotes, analysis.MassStorage.Notes, analysis.Other.Notes)
+	}
+
+	second, err := BuildUSBAnalysisFromFileWithOptions("usb-mixed.pcap", model.USBAnalysisOptions{
+		HIDSourceMode: model.USBHIDSourceCapData,
+		HIDEventLimit: 1,
+	})
+	if err != nil {
+		t.Fatalf("second BuildUSBAnalysisFromFileWithOptions() error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("raw scan should be cached across option projections, got %d calls", calls)
+	}
+	if second.HIDSourceMode != string(model.USBHIDSourceCapData) || second.HIDEventLimit != model.MinUSBHIDEventLimit {
+		t.Fatalf("expected options to be normalized on projection, got mode=%q limit=%d", second.HIDSourceMode, second.HIDEventLimit)
+	}
+}
+
 func TestUSBAnalysisRawScanCacheDoesNotPersistFailures(t *testing.T) {
 	oldRunner := usbAnalysisScanRunner
 	t.Cleanup(func() {
@@ -497,6 +711,14 @@ func buildCBWHex(tag uint32, transferLength uint32, flags byte, lun byte, cdb []
 		parts = append(parts, fmt.Sprintf("%02x", b))
 	}
 	return strings.Join(parts, ":")
+}
+
+func makeUSBAnalysisRow(values map[int]string) []string {
+	row := make([]string, usbFieldCount)
+	for idx, value := range values {
+		row[idx] = value
+	}
+	return row
 }
 
 func TestDetectUSBKeyboardSnapshotFromRawBootPayload(t *testing.T) {

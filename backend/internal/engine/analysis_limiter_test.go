@@ -90,6 +90,31 @@ func TestAnalysisLimiterCanceledWaiterReleasesQueue(t *testing.T) {
 	second.release()
 }
 
+func TestAnalysisLimiterCancelWaiterDropsCanceledAndDrainsNormal(t *testing.T) {
+	limiter := newAnalysisLimiter(1)
+	limiter.mu.Lock()
+	blockedWarmup := &analysisLimiterWaiter{ctx: context.Background(), ready: make(chan struct{})}
+	normalWaiter := &analysisLimiterWaiter{ctx: context.Background(), normal: true, ready: make(chan struct{})}
+	limiter.waiters = []*analysisLimiterWaiter{blockedWarmup, normalWaiter}
+	limiter.mu.Unlock()
+
+	limiter.cancelWaiter(blockedWarmup)
+
+	select {
+	case <-normalWaiter.ready:
+	default:
+		t.Fatal("normal waiter was not drained after canceling blocked warmup")
+	}
+	if !blockedWarmup.canceled {
+		t.Fatal("blocked warmup waiter was not marked canceled")
+	}
+	limiter.mu.Lock()
+	defer limiter.mu.Unlock()
+	if len(limiter.waiters) != 0 {
+		t.Fatalf("waiters left after drain: %+v", limiter.waiters)
+	}
+}
+
 func TestAnalysisLimiterNormalBypassesWarmupQueue(t *testing.T) {
 	limiter := newAnalysisLimiter(1)
 	first, err := limiter.acquire(context.Background(), false)

@@ -1,10 +1,84 @@
 package tshark
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gshark/sentinel/backend/internal/model"
 )
+
+func TestBuildIndustrialAnalysisFromFileUsesFakeTSharkScanners(t *testing.T) {
+	withFakeTSharkCommand(t, "")
+	ClearCapabilityCache()
+	ClearFieldScanCache("")
+	t.Cleanup(func() {
+		ClearCapabilityCache()
+		ClearFieldScanCache("")
+	})
+
+	stats, err := BuildIndustrialAnalysisFromFile("industrial.pcap")
+	if err != nil {
+		t.Fatalf("BuildIndustrialAnalysisFromFile() error = %v", err)
+	}
+
+	if stats.TotalIndustrialPackets != 10 {
+		t.Fatalf("TotalIndustrialPackets = %d, want 10; stats=%+v", stats.TotalIndustrialPackets, stats)
+	}
+	if stats.Modbus.TotalFrames != 3 || stats.Modbus.Requests != 1 || stats.Modbus.Responses != 2 || stats.Modbus.Exceptions != 1 {
+		t.Fatalf("unexpected Modbus counters: %+v", stats.Modbus)
+	}
+	if len(stats.Modbus.Transactions) != 3 {
+		t.Fatalf("expected 3 Modbus transactions, got %+v", stats.Modbus.Transactions)
+	}
+	if stats.Modbus.Transactions[0].FunctionCode != 16 || stats.Modbus.Transactions[0].Reference != "Ref 40001" || stats.Modbus.Transactions[0].InputText != "flag" {
+		t.Fatalf("unexpected Modbus request projection: %+v", stats.Modbus.Transactions[0])
+	}
+	if stats.Modbus.Transactions[2].Kind != "exception" || stats.Modbus.Transactions[2].ExceptionCode != 2 {
+		t.Fatalf("unexpected Modbus exception projection: %+v", stats.Modbus.Transactions[2])
+	}
+	if len(stats.Modbus.DecodedInputs) != 1 || stats.Modbus.DecodedInputs[0].Text != "flag" {
+		t.Fatalf("expected decoded Modbus ASCII input, got %+v", stats.Modbus.DecodedInputs)
+	}
+	if len(stats.SuspiciousWrites) != 1 || stats.SuspiciousWrites[0].Target != "Ref 40001" {
+		t.Fatalf("expected write aggregation for Ref 40001, got %+v", stats.SuspiciousWrites)
+	}
+	if len(stats.RuleHits) == 0 {
+		t.Fatalf("expected industrial rule hits from Modbus exception/write role inference")
+	}
+
+	for _, protocol := range []string{"Modbus/TCP", "S7comm", "DNP3", "EtherNet/IP / CIP", "PROFINET", "BACnet", "IEC 104", "OPC UA"} {
+		if !hasTrafficBucket(stats.Protocols, protocol) {
+			t.Fatalf("missing protocol bucket %q in %+v", protocol, stats.Protocols)
+		}
+	}
+	for _, detailName := range []string{"S7comm", "DNP3", "EtherNet/IP / CIP", "PROFINET", "BACnet", "IEC 104", "OPC UA"} {
+		detail := findIndustrialDetail(stats.Details, detailName)
+		if detail == nil || detail.TotalFrames != 1 || len(detail.Records) != 1 {
+			t.Fatalf("missing populated detail %q in %+v", detailName, stats.Details)
+		}
+	}
+	if !hasIndustrialOperation(stats.Details, "S7comm", "Write Var") {
+		t.Fatalf("expected S7 Write Var operation, details=%+v", stats.Details)
+	}
+	if !hasIndustrialOperation(stats.Details, "DNP3", "Operate") {
+		t.Fatalf("expected DNP3 Operate operation, details=%+v", stats.Details)
+	}
+	if !hasIndustrialOperation(stats.Details, "BACnet", "Write Property") {
+		t.Fatalf("expected BACnet Write Property operation, details=%+v", stats.Details)
+	}
+	if !hasIndustrialOperation(stats.Details, "IEC 104", "C_SC_NA_1") {
+		t.Fatalf("expected IEC 104 single command operation, details=%+v", stats.Details)
+	}
+	if !hasIndustrialOperation(stats.Details, "PROFINET", "DCP Set") {
+		t.Fatalf("expected PROFINET DCP Set operation, details=%+v", stats.Details)
+	}
+	if len(stats.ControlCommands) < 3 {
+		t.Fatalf("expected DNP3/BACnet/IEC 104 control commands, got %+v", stats.ControlCommands)
+	}
+	if len(stats.Conversations) == 0 || len(stats.Notes) == 0 {
+		t.Fatalf("expected conversations and notes, conversations=%+v notes=%+v", stats.Conversations, stats.Notes)
+	}
+}
 
 func TestBuildModbusBitRangeReadCoilsResponseUsesRequestContext(t *testing.T) {
 	ctx, ok := buildModbusBitContext(1, "17", "10")
@@ -250,4 +324,35 @@ func TestBuildModbusFunctionMutationRuleHitsIgnoresStableOrDifferentTargets(t *t
 	if len(hits) != 0 {
 		t.Fatalf("len(hits) = %d, want 0", len(hits))
 	}
+}
+
+func hasTrafficBucket(items []model.TrafficBucket, label string) bool {
+	for _, item := range items {
+		if item.Label == label && item.Count > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func findIndustrialDetail(details []model.IndustrialProtocolDetail, name string) *model.IndustrialProtocolDetail {
+	for idx := range details {
+		if details[idx].Name == name {
+			return &details[idx]
+		}
+	}
+	return nil
+}
+
+func hasIndustrialOperation(details []model.IndustrialProtocolDetail, name, contains string) bool {
+	detail := findIndustrialDetail(details, name)
+	if detail == nil {
+		return false
+	}
+	for _, op := range detail.Operations {
+		if strings.Contains(op.Label, contains) {
+			return true
+		}
+	}
+	return false
 }
