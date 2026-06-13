@@ -165,7 +165,7 @@ func (s *Service) scanDisplayFilterIndex(
 		DisplayFilter: filter,
 		TLS:           tlsConf,
 	}, func(id int64) {
-		if s.packetStore != nil && !s.packetStore.HasID(id) {
+		if s.captureCtl.packetStore != nil && !s.captureCtl.packetStore.HasID(id) {
 			return
 		}
 		index.appendID(id)

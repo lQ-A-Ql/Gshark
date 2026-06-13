@@ -9,7 +9,7 @@ import (
 
 func TestCacheStreamStoresClone(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	stream := model.ReassembledStream{
 		StreamID: 7,
@@ -23,7 +23,7 @@ func TestCacheStreamStoresClone(t *testing.T) {
 	stream.Chunks[0].Body = "mutated"
 	stream.LoadMeta.Source = "mutated"
 
-	cached := svc.streamCache[streamCacheKey("TCP", 7)]
+	cached := svc.streamCtl.streamCache[streamCacheKey("TCP", 7)]
 	if cached.Chunks[0].Body != "original" {
 		t.Fatalf("cached chunk body = %q, want original", cached.Chunks[0].Body)
 	}
@@ -34,28 +34,28 @@ func TestCacheStreamStoresClone(t *testing.T) {
 
 func TestCacheStreamEvictsOldestBeyondLimit(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	limit := streamCacheLimitValue()
 	for i := 0; i < limit+1; i++ {
 		svc.cacheStream(streamCacheKey("TCP", int64(i)), model.ReassembledStream{StreamID: int64(i), Protocol: "TCP"})
 	}
 
-	if len(svc.streamCache) != limit {
-		t.Fatalf("stream cache size = %d, want %d", len(svc.streamCache), limit)
+	if len(svc.streamCtl.streamCache) != limit {
+		t.Fatalf("stream cache size = %d, want %d", len(svc.streamCtl.streamCache), limit)
 	}
-	if _, ok := svc.streamCache[streamCacheKey("TCP", 0)]; ok {
+	if _, ok := svc.streamCtl.streamCache[streamCacheKey("TCP", 0)]; ok {
 		t.Fatal("expected oldest stream cache entry to be evicted")
 	}
 	lastKey := streamCacheKey("TCP", int64(limit))
-	if _, ok := svc.streamCache[lastKey]; !ok {
+	if _, ok := svc.streamCtl.streamCache[lastKey]; !ok {
 		t.Fatalf("expected newest stream cache entry %q to remain", lastKey)
 	}
 }
 
 func TestCacheStreamRefreshesExistingOrder(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	limit := streamCacheLimitValue()
 	for i := 0; i < limit; i++ {
@@ -64,23 +64,23 @@ func TestCacheStreamRefreshesExistingOrder(t *testing.T) {
 	svc.cacheStream(streamCacheKey("TCP", 0), model.ReassembledStream{StreamID: 0, Protocol: "TCP"})
 	svc.cacheStream(streamCacheKey("TCP", int64(limit)), model.ReassembledStream{StreamID: int64(limit), Protocol: "TCP"})
 
-	if _, ok := svc.streamCache[streamCacheKey("TCP", 0)]; !ok {
+	if _, ok := svc.streamCtl.streamCache[streamCacheKey("TCP", 0)]; !ok {
 		t.Fatal("expected refreshed stream cache entry to remain")
 	}
-	if _, ok := svc.streamCache[streamCacheKey("TCP", 1)]; ok {
+	if _, ok := svc.streamCtl.streamCache[streamCacheKey("TCP", 1)]; ok {
 		t.Fatal("expected next-oldest stream cache entry to be evicted")
 	}
-	if got := len(svc.streamCacheOrder); got != limit {
+	if got := len(svc.streamCtl.streamCacheOrder); got != limit {
 		t.Fatalf("stream cache order size = %d, want %d", got, limit)
 	}
 }
 
 func TestStreamWithOverridesUsesClones(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	key := streamCacheKey("TCP", 42)
-	svc.streamOverrides[key] = map[int]string{0: "patched"}
+	svc.streamCtl.streamOverrides[key] = map[int]string{0: "patched"}
 	original := model.ReassembledStream{
 		StreamID: 42,
 		Protocol: "TCP",

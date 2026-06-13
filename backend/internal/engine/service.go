@@ -16,19 +16,19 @@ import (
 )
 
 type Service struct {
-	emitter EventEmitter
-	captureState
-	displayFilterState
-	streamState
-	analysisCache
-	objectState
-	mediaState
-	yaraHuntingState
-	toolRuntimeState
-	mcpState
-	playbookStatePB
-	savedSearchStateSS
-	hypothesisStateHT
+	emitter        EventEmitter
+	captureCtl     captureController
+	filterCtl      displayFilterController
+	streamCtl      streamController
+	analysisCtl    analysisController
+	objectCtl      objectController
+	mediaCtl       mediaController
+	huntingCtl     yaraHuntingController
+	runtimeCtl     toolRuntimeController
+	mcpCtl         mcpController
+	playbookCtl    playbookController
+	savedSearchCtl savedSearchController
+	hypothesisCtl  hypothesisController
 }
 
 const defaultStreamCacheLimit = 256
@@ -96,25 +96,25 @@ func NewService(emitter EventEmitter) *Service {
 	}
 	return &Service{
 		emitter: emitter,
-		captureState: captureState{
+		captureCtl: captureController{captureState: captureState{
 			packetStore:  store,
 			captureTasks: map[int64]captureTaskCancel{},
-		},
-		displayFilterState: displayFilterState{
+		}},
+		filterCtl: displayFilterController{displayFilterState: displayFilterState{
 			displayFilterCache: map[string]*filteredPacketIndex{},
-		},
-		streamState: streamState{
+		}},
+		streamCtl: streamController{streamState: streamState{
 			streamCache:     map[string]model.ReassembledStream{},
 			rawStreamIndex:  map[string]model.ReassembledStream{},
 			streamOverrides: map[string]map[int]string{},
-		},
-		objectState: objectState{},
-		mediaState: mediaState{
+		}},
+		objectCtl: objectController{},
+		mediaCtl: mediaController{mediaState: mediaState{
 			mediaArtifacts: map[string]string{},
 			mediaPlayback:  map[string]string{},
 			mediaSpeech:    map[string]model.MediaTranscription{},
-		},
-		yaraHuntingState: yaraHuntingState{
+		}},
+		huntingCtl: yaraHuntingController{yaraHuntingState: yaraHuntingState{
 			huntingPrefixes: []string{
 				"flag{",
 				"ctf{",
@@ -123,21 +123,21 @@ func NewService(emitter EventEmitter) *Service {
 				Enabled:   true,
 				TimeoutMS: 25000,
 			},
-		},
-		analysisCache: analysisCache{
+		}},
+		analysisCtl: analysisController{analysisCache: analysisCache{
 			analysisLimiter: newAnalysisLimiter(1),
 			analysisMetrics: newAnalysisMetrics(),
-		},
-		playbookStatePB: playbookStatePB{
+		}},
+		playbookCtl: playbookController{playbookStatePB: playbookStatePB{
 			playbooks: map[string]*model.HuntingPlaybook{},
 			lastRun:   map[string]*model.PlaybookRunResult{},
-		},
-		savedSearchStateSS: savedSearchStateSS{
+		}},
+		savedSearchCtl: savedSearchController{savedSearchStateSS: savedSearchStateSS{
 			savedSearches: map[string]*model.SavedSearch{},
-		},
-		hypothesisStateHT: hypothesisStateHT{
+		}},
+		hypothesisCtl: hypothesisController{hypothesisStateHT: hypothesisStateHT{
 			hypotheses: map[string]*model.Hypothesis{},
-		},
+		}},
 	}
 }
 

@@ -80,10 +80,10 @@ func TestPacketFilterExpressionHelpersCoverComparisonsAndContains(t *testing.T) 
 
 func TestStreamPayloadUpdatesRebuildHTTPBodiesAndValidateInputs(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	httpKey := streamCacheKey("HTTP", 7)
-	svc.streamCache[httpKey] = model.ReassembledStream{
+	svc.streamCtl.streamCache[httpKey] = model.ReassembledStream{
 		StreamID: 7,
 		Protocol: "HTTP",
 		Chunks: []model.StreamChunk{
@@ -111,7 +111,7 @@ func TestStreamPayloadUpdatesRebuildHTTPBodiesAndValidateInputs(t *testing.T) {
 	}
 
 	rawKey := streamCacheKey("TCP", 9)
-	svc.rawStreamIndex[rawKey] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[rawKey] = model.ReassembledStream{
 		StreamID: 9,
 		Protocol: "TCP",
 		Chunks: []model.StreamChunk{
@@ -140,7 +140,7 @@ func TestStreamPayloadUpdatesRebuildHTTPBodiesAndValidateInputs(t *testing.T) {
 
 func TestServiceToolConfigAndStreamIDs(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	hunting := svc.SetHuntingRuntimeConfig(model.HuntingRuntimeConfig{
 		Prefixes:      []string{" flag{ ", "FLAG{", "", "token="},
@@ -167,9 +167,9 @@ func TestServiceToolConfigAndStreamIDs(t *testing.T) {
 		t.Fatalf("MCP config/status not enabled: cfg=%+v status=%+v", cfg, svc.MCPStatus(false))
 	}
 
-	svc.rawStreamIndex[streamCacheKey("TCP", 5)] = model.ReassembledStream{StreamID: 5, Protocol: "TCP"}
-	svc.rawStreamIndex[streamCacheKey("UDP", 3)] = model.ReassembledStream{StreamID: 3, Protocol: "UDP"}
-	if err := svc.packetStore.Append([]model.Packet{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 5)] = model.ReassembledStream{StreamID: 5, Protocol: "TCP"}
+	svc.streamCtl.rawStreamIndex[streamCacheKey("UDP", 3)] = model.ReassembledStream{StreamID: 3, Protocol: "UDP"}
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "HTTP", StreamID: 1},
 		{ID: 2, Protocol: "TLS", StreamID: 2},
 		{ID: 3, Protocol: "DNS", StreamID: 3},
@@ -195,7 +195,7 @@ func TestServiceToolConfigAndStreamIDs(t *testing.T) {
 
 func TestPacketLookupAndRawHelpersReturnExpectedErrors(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if _, err := svc.Packet(0); err == nil || !strings.Contains(err.Error(), "invalid packet id") {
 		t.Fatalf("Packet(0) err = %v", err)
@@ -203,7 +203,7 @@ func TestPacketLookupAndRawHelpersReturnExpectedErrors(t *testing.T) {
 	if _, err := svc.Packet(99); err == nil || !strings.Contains(err.Error(), "packet not found") {
 		t.Fatalf("Packet(99) err = %v", err)
 	}
-	if err := svc.packetStore.Append([]model.Packet{{ID: 7, Protocol: "TCP", Info: "demo"}}); err != nil {
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{ID: 7, Protocol: "TCP", Info: "demo"}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 	packet, err := svc.Packet(7)

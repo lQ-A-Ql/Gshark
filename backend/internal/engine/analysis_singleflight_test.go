@@ -32,8 +32,8 @@ func TestGlobalTrafficStatsSingleflightCoalescesColdRequests(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := runConcurrentAnalysisRequests(4, func() error {
 		stats, err := svc.GlobalTrafficStatsWithContext(context.Background())
@@ -75,8 +75,8 @@ func TestIndustrialAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := runConcurrentAnalysisRequests(4, func() error {
 		analysis, err := svc.IndustrialAnalysisWithContext(context.Background())
@@ -118,8 +118,8 @@ func TestVehicleAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := runConcurrentAnalysisRequests(4, func() error {
 		analysis, err := svc.VehicleAnalysisWithContext(context.Background())
@@ -163,8 +163,8 @@ func TestMediaAnalysisSingleflightCoalescesNonForceColdRequests(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := runConcurrentAnalysisRequests(4, func() error {
 		analysis, err := svc.MediaAnalysis()
@@ -201,8 +201,8 @@ func TestC2SampleAnalysisSingleflightCoalescesColdRequests(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := runConcurrentAnalysisRequests(4, func() error {
 		analysis, err := svc.C2SampleAnalysis(context.Background())
@@ -239,8 +239,8 @@ func TestWarmupAndUserAnalysisShareNormalSingleflightBuilder(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	userErr := make(chan error, 1)
 	go func() {
@@ -295,8 +295,8 @@ func TestAnalysisSingleflightCanceledWaiterDoesNotCancelSharedBuilder(t *testing
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	firstErr := make(chan error, 1)
 	go func() {
@@ -333,8 +333,8 @@ func TestAnalysisSingleflightFailureDoesNotPoisonCache(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	if _, err := svc.GlobalTrafficStatsWithContext(context.Background()); err == nil {
 		t.Fatal("expected first builder error")

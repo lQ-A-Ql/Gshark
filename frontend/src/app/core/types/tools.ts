@@ -1,4 +1,5 @@
 import type { SpeechToTextStatus } from "./media";
+import type { KnownOrUnknown } from "./unknownEnum";
 
 export interface ToolRuntimeConfig {
   tsharkPath: string;
@@ -75,8 +76,8 @@ export interface ToolRuntimeSnapshot {
   };
   speech: SpeechToTextStatus;
   yara: YaraToolStatus;
-  probeMode?: ToolRuntimeProbeMode | string;
-  probeState?: ToolRuntimeProbeState | string;
+  probeMode?: KnownOrUnknown<ToolRuntimeProbeMode>;
+  probeState?: KnownOrUnknown<ToolRuntimeProbeState>;
   probeTimings?: Record<string, number>;
   probeErrors?: Record<string, string>;
   cached?: boolean;

@@ -172,7 +172,7 @@ func TestListSMB3SessionCandidatesBuildsDetailedRows(t *testing.T) {
 	}
 
 	svc := NewService(nil)
-	svc.pcap = "demo.pcapng"
+	svc.captureCtl.pcap = "demo.pcapng"
 
 	rows, err := svc.ListSMB3SessionCandidates()
 	if err != nil {
@@ -240,7 +240,7 @@ func TestRunWinRMDecryptReturnsDiagnosticWhenNoPreviewIsExtracted(t *testing.T) 
 	}
 
 	svc := NewService(nil)
-	svc.pcap = "case.pcapng"
+	svc.captureCtl.pcap = "case.pcapng"
 
 	result, err := svc.RunWinRMDecrypt(model.WinRMDecryptRequest{
 		Port:         5985,

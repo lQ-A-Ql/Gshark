@@ -113,14 +113,14 @@ func TestDecodeYaraChunkBodyAndReadabilityBoundaries(t *testing.T) {
 
 func TestBuildYaraScanTargetsIncludesObjectsAndMaterializedStreams(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	objectPath := filepath.Join(t.TempDir(), "dump.bin")
 	if err := os.WriteFile(objectPath, []byte("object payload"), 0o644); err != nil {
 		t.Fatalf("write object: %v", err)
 	}
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID: 101, Protocol: "HTTP", StreamID: 3,
 			SourceIP: "10.0.0.10", SourcePort: 50123, DestIP: "10.0.0.20", DestPort: 80,
@@ -136,14 +136,14 @@ func TestBuildYaraScanTargetsIncludesObjectsAndMaterializedStreams(t *testing.T)
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 9)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 9)] = model.ReassembledStream{
 		StreamID: 9,
 		Protocol: "TCP",
 		Chunks: []model.StreamChunk{
 			{PacketID: 201, Direction: "client", Body: "70:6f:77:65:72:73:68:65:6c:6c"},
 		},
 	}
-	svc.rawStreamIndex[streamCacheKey("UDP", 4)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("UDP", 4)] = model.ReassembledStream{
 		StreamID: 4,
 		Protocol: "UDP",
 		Chunks: []model.StreamChunk{
@@ -198,10 +198,10 @@ func TestBuildYaraScanTargetsIncludesObjectsAndMaterializedStreams(t *testing.T)
 
 func TestBuildYaraScanTargetsTruncatesLargeStreamContent(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	large := strings.Repeat("PAYLOAD!", (maxStreamContentBytes/8)+1024)
-	svc.rawStreamIndex[streamCacheKey("TCP", 44)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 44)] = model.ReassembledStream{
 		StreamID: 44,
 		Protocol: "TCP",
 		Chunks: []model.StreamChunk{
@@ -231,7 +231,7 @@ func TestBuildYaraScanTargetsTruncatesLargeStreamContent(t *testing.T) {
 
 func TestYaraStreamContentReturnsEmptyForUnsupportedOrCanceledContext(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	content, packetID := svc.yaraStreamContent(context.Background(), "icmp", 1)
 	if content != "" || packetID != 0 {

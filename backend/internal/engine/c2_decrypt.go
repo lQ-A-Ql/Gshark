@@ -190,10 +190,10 @@ func (s *Service) collectC2DecryptCandidates(ctx context.Context, family string,
 	packetCandidates := make([]c2DecryptCandidate, 0, c2DecryptMaxRecords)
 	packetSeen := map[string]struct{}{}
 	streamRepresentatives := map[int64]model.Packet{}
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return out, false, nil
 	}
-	err = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	err = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -461,9 +461,9 @@ var csHTTPPayloadFieldLabels = map[int]string{
 }
 
 func (s *Service) collectCSHTTPFieldDecryptCandidates(ctx context.Context, seen map[string]struct{}, out *[]c2DecryptCandidate) error {
-	s.mu.RLock()
-	pcap := strings.TrimSpace(s.pcap)
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := strings.TrimSpace(s.captureCtl.pcap)
+	s.captureCtl.mu.RUnlock()
 	if pcap == "" || len(*out) >= c2DecryptMaxRecords {
 		return nil
 	}

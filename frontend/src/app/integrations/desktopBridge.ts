@@ -16,6 +16,8 @@ import { createTypedDesktopOverrides } from "./desktopTypedBridge";
 import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
 import { withDesktopIpcControls } from "./desktopIpcControls";
 import { isLegacyDesktopGenericIpcDisableExperimentEnabled } from "./desktopGenericIpcPolicy";
+import { asPlainObject } from "./mappers/mapperPrimitives";
+import type { MCPStatusWireDTO } from "./wire/mcpWireDtos";
 
 export { resolveDesktopGenericIpcPolicy } from "./desktopGenericIpcPolicy";
 
@@ -144,12 +146,13 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         responseKind: "typed-ipc",
         timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
       });
+      const status = asPlainObject(payload) ?? {};
       return {
-        available: Boolean((payload as any)?.available),
-        path: String((payload as any)?.path ?? ""),
-        message: String((payload as any)?.message ?? ""),
-        customPath: String((payload as any)?.custom_path ?? ""),
-        usingCustomPath: Boolean((payload as any)?.using_custom_path),
+        available: Boolean(status.available),
+        path: String(status.path ?? ""),
+        message: String(status.message ?? ""),
+        customPath: String(status.custom_path ?? ""),
+        usingCustomPath: Boolean(status.using_custom_path),
       };
     },
     async getMCPStatus(signal?: AbortSignal) {
@@ -301,7 +304,7 @@ async function resolveMCPThroughDesktopIPC({
       signal,
       timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
     });
-    return asMCPStatus(payload as Record<string, unknown>);
+    return asMCPStatus((asPlainObject(payload) ?? {}) as MCPStatusWireDTO);
   } catch {
     return await fallback();
   }

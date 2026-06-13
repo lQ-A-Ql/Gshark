@@ -39,6 +39,10 @@ flowchart LR
 - `context.Background()` 包装方法只为桌面同步 binding 兼容保留，不要在 HTTP handler 中使用。
 - 长任务必须能被请求取消、抓包替换或关闭流程中断。
 - 传输层逻辑留在 `transport`；tshark 子进程逻辑留在 `tshark`；领域分析逻辑留在 `engine`。
+- `engine` 根包新增生产文件必须登记领域归属；新增超过大文件阈值的根包文件必须拆分或显式进入 grandfather 例外清单。
+- `engine` 纯逻辑子包不得反向依赖根 `engine`、`transport`、`tshark`、HTTP 或外部进程执行能力；当前 WebShell payload inspection 已下沉到 `engine/payloadinspect`。
+- `engine.Service` 是 transport/Wails 的稳定门面，但内部状态必须通过显式 controller 字段组合；controller 只拥有自己的 state group，不跨 controller 持锁调用。
+- YARA 等长任务必须使用真实 goroutine/命令完成信号，不得把 request/capture cancel channel 当作成功完成信号；底层错误应保留 `%w` cause，用户中文提示在 transport/mapper/display 层处理。
 - Go 只使用 `gofmt` 格式化。
 
 正确 HTTP handler 模式：
@@ -78,6 +82,8 @@ flowchart LR
 - 普通 browser-dev 模式继续使用 HTTP REST 和 SSE。
 - wire DTO 表示后端 JSON；mapper 负责归一化到 `core/types`；feature hooks 和 pages 只消费归一化类型。
 - 避免在 pages/features 中直接 `fetch` 后端；应新增 bridge/client 方法。
+- 分析 hook 应使用公共 cache/guard 语义：同 key inflight 去重、force refresh 绕过缓存、capture revision/filePath/totalPackets 变化刷新、空样本或无可用路径时不发 IPC/HTTP 请求。
+- core enum 需要兼容未知后端值时使用 `KnownOrUnknown<T>` 或领域等价类型，不直接新增开放 `| string`；wire DTO 需要宽动态结构时必须登记到 type governance 例外。
 - 前端包管理保持 `pnpm`，保留 `frontend/pnpm-lock.yaml`。
 - Vite 配置不得把 `.css`、`.tsx`、`.ts` 加入 `assetsInclude`。
 
@@ -139,7 +145,16 @@ HTTP route 权威来源：
 
 - Corepack + `pnpm@10.31.0`
 - `pnpm install --frozen-lockfile`
-- `pnpm run ci`
+- `pnpm run ci:quality`
+- `pnpm run ci:boundaries`
+- `pnpm run ci:desktop`
+- `pnpm run ci:test-build`
+- `pnpm run ci` 仍保留为本地全量聚合命令，顺序调用以上四组。
+- `pnpm run type-governance:check` 属于 `ci:boundaries`，用于阻止新增裸 `as any`、开放核心 `| string` union 和未登记宽 wire DTO。
+
+仓库门禁：
+
+- `.gitignore` 覆盖的本地产物不得继续被 Git 跟踪；本地与 CI 通过 ignored tracked files check 拦截。
 
 桌面 CI：
 
@@ -148,4 +163,3 @@ HTTP route 权威来源：
 - 根模块 `dev` 和 `production` tag 测试
 
 具体本地命令见 [项目开发指南](./project-development-guide.md)。
-

@@ -125,7 +125,7 @@ func TestBundledPublicUSBMountBaselineKeepsWriteEvidenceBelowHighSeverity(t *tes
 
 func TestBundledPublicBenignHTTPThreatHuntStaysQuiet(t *testing.T) {
 	svc := loadBundledPublicSample(t, "benign", "http.cap")
-	packets, err := svc.packetStore.All(nil)
+	packets, err := svc.captureCtl.packetStore.All(nil)
 	if err != nil {
 		t.Fatalf("packetStore.All() error = %v", err)
 	}
@@ -137,7 +137,7 @@ func TestBundledPublicBenignHTTPThreatHuntStaysQuiet(t *testing.T) {
 
 func TestBundledPublicBenignSMTPThreatHuntStaysQuiet(t *testing.T) {
 	svc := loadBundledPublicSample(t, "benign", "smtp.pcap")
-	packets, err := svc.packetStore.All(nil)
+	packets, err := svc.captureCtl.packetStore.All(nil)
 	if err != nil {
 		t.Fatalf("packetStore.All() error = %v", err)
 	}
@@ -149,7 +149,7 @@ func TestBundledPublicBenignSMTPThreatHuntStaysQuiet(t *testing.T) {
 
 func TestBundledPublicBenignMySQLThreatHuntStaysQuiet(t *testing.T) {
 	svc := loadBundledPublicSample(t, "benign", "mysql_complete.pcap")
-	packets, err := svc.packetStore.All(nil)
+	packets, err := svc.captureCtl.packetStore.All(nil)
 	if err != nil {
 		t.Fatalf("packetStore.All() error = %v", err)
 	}

@@ -80,12 +80,13 @@ func TestBatchScanTargetsWithYaraConfigBoundaryBranches(t *testing.T) {
 
 	oldRun := runYaraCommand
 	t.Cleanup(func() { runYaraCommand = oldRun })
+	runnerErr := errors.New("runner exploded")
 	runYaraCommand = func(context.Context, string, string, string) ([]byte, error) {
-		return []byte("boom from yara"), errors.New("runner exploded")
+		return []byte("boom from yara"), runnerErr
 	}
 
 	hits, err := BatchScanTargetsWithYaraConfigContext(nil, []yaraScanTarget{{name: "payload.bin", path: targetPath}}, model.YaraConfig{Enabled: true, Bin: fakeExe, Rules: ruleFile})
-	if err == nil || !strings.Contains(err.Error(), "runner exploded") || len(hits) != 0 {
+	if err == nil || !errors.Is(err, runnerErr) || !strings.Contains(err.Error(), "boom from yara") || len(hits) != 0 {
 		t.Fatalf("runner error = hits=%+v err=%v", hits, err)
 	}
 }

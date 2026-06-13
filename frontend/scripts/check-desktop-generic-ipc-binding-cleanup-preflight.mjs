@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { packageScriptRunsFromCi } from "./ci-script-coverage.mjs";
+
 const frontendRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(frontendRoot, "..");
 
@@ -386,7 +388,7 @@ function validatePackageScripts(packagePath, violations) {
   }
   const ci = String(manifest.scripts?.ci ?? "");
   for (const scriptName of Object.keys(requiredPackageScripts)) {
-    if (!ci.includes(`pnpm run ${scriptName}`)) {
+    if (!ci.includes(`pnpm run ${scriptName}`) && !packageScriptRunsFromCi(manifest, scriptName)) {
       violations.push(`frontend/package.json: ci must run ${scriptName}`);
     }
   }

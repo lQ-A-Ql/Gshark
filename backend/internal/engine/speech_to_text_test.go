@@ -40,9 +40,9 @@ func TestStartMediaBatchTranscriptionSkipsCachedAudioArtifacts(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	svc.mediaAnalysis = &model.MediaAnalysis{
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{
 		Sessions: []model.MediaSession{
 			{
 				ID:          "audio-1",
@@ -59,7 +59,7 @@ func TestStartMediaBatchTranscriptionSkipsCachedAudioArtifacts(t *testing.T) {
 			},
 		},
 	}
-	svc.mediaSpeech["tok-audio"] = model.MediaTranscription{
+	svc.mediaCtl.mediaSpeech["tok-audio"] = model.MediaTranscription{
 		Token: "tok-audio", SessionID: "audio-1", Title: "cached", Text: "cached text", Status: "completed", Cached: false,
 	}
 
@@ -108,8 +108,8 @@ func TestStartMediaBatchTranscriptionRunsSequentially(t *testing.T) {
 	_ = os.WriteFile(audioFile2, []byte("b"), 0o644)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.mediaAnalysis = &model.MediaAnalysis{
+	defer svc.captureCtl.packetStore.Close()
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{
 		Sessions: []model.MediaSession{
 			{
 				ID: "audio-1", MediaType: "audio", Application: "RTP",
@@ -123,8 +123,8 @@ func TestStartMediaBatchTranscriptionRunsSequentially(t *testing.T) {
 			},
 		},
 	}
-	svc.mediaArtifacts["tok-1"] = audioFile1
-	svc.mediaArtifacts["tok-2"] = audioFile2
+	svc.mediaCtl.mediaArtifacts["tok-1"] = audioFile1
+	svc.mediaCtl.mediaArtifacts["tok-2"] = audioFile2
 
 	if _, err := svc.StartMediaBatchTranscription(true); err != nil {
 		t.Fatalf("StartMediaBatchTranscription() error = %v", err)
@@ -185,8 +185,8 @@ func TestPrepareCaptureReplacementCancelsSpeechBatchTask(t *testing.T) {
 	_ = os.WriteFile(audioFile2, []byte("b"), 0o644)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.mediaAnalysis = &model.MediaAnalysis{
+	defer svc.captureCtl.packetStore.Close()
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{
 		Sessions: []model.MediaSession{
 			{
 				ID: "audio-1", MediaType: "audio", Application: "RTP",
@@ -200,8 +200,8 @@ func TestPrepareCaptureReplacementCancelsSpeechBatchTask(t *testing.T) {
 			},
 		},
 	}
-	svc.mediaArtifacts["tok-1"] = audioFile1
-	svc.mediaArtifacts["tok-2"] = audioFile2
+	svc.mediaCtl.mediaArtifacts["tok-1"] = audioFile1
+	svc.mediaCtl.mediaArtifacts["tok-2"] = audioFile2
 
 	if _, err := svc.StartMediaBatchTranscription(true); err != nil {
 		t.Fatalf("StartMediaBatchTranscription() error = %v", err)

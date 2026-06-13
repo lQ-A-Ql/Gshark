@@ -44,7 +44,7 @@ func (s *Service) ListStreamPayloadSources(limit int) ([]model.StreamPayloadSour
 	if limit > 500 {
 		limit = 500
 	}
-	if s.packetStore == nil || s.packetStore.Count() == 0 {
+	if s.captureCtl.packetStore == nil || s.captureCtl.packetStore.Count() == 0 {
 		return []model.StreamPayloadSource{}, nil
 	}
 
@@ -57,7 +57,7 @@ func (s *Service) ListStreamPayloadSources(limit int) ([]model.StreamPayloadSour
 	seen := map[string]struct{}{}
 	needsStreamBody := make([]pendingPacket, 0)
 
-	err := s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	err := s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 		meta, ok := parsePayloadSourceHTTPMeta(packet)
 		if !ok {
 			return nil

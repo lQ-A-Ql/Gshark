@@ -1,5 +1,6 @@
 import type { InvestigationReport } from "./report";
 import type { AnalysisConversation, TrafficBucket } from "./traffic";
+import type { KnownOrUnknown } from "./unknownEnum";
 
 export interface C2IndicatorRecord {
   packetId: number;
@@ -158,9 +159,9 @@ export interface C2DecryptedRecord {
   packetId?: number;
   streamId?: number;
   time?: string;
-  direction?: "client_to_server" | "server_to_client" | "unknown" | string;
+  direction?: KnownOrUnknown<"client_to_server" | "server_to_client" | "unknown">;
   algorithm?: string;
-  keyStatus?: "verified" | "unverified" | "not_applicable" | string;
+  keyStatus?: KnownOrUnknown<"verified" | "unverified" | "not_applicable">;
   confidence: number;
   plaintextPreview?: string;
   parsed?: Record<string, unknown>;
@@ -172,7 +173,7 @@ export interface C2DecryptedRecord {
 
 export interface C2DecryptResult {
   family: "cs" | "vshell";
-  status: "completed" | "partial" | "failed" | string;
+  status: KnownOrUnknown<"completed" | "partial" | "failed">;
   totalCandidates: number;
   decryptedCount: number;
   failedCount: number;

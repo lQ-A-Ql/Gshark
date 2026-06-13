@@ -163,7 +163,8 @@ function validPackageJson() {
     scripts: {
       "desktop-generic-ipc-binding-cleanup-preflight:check":
         "node scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs",
-      ci: "pnpm run desktop-generic-ipc-binding-cleanup-preflight:check",
+      "ci:desktop": "pnpm run desktop-generic-ipc-binding-cleanup-preflight:check",
+      ci: "pnpm run ci:desktop",
     },
   };
 }

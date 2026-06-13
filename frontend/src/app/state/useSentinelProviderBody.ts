@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { backendClients } from "../integrations/backendClients";
 import { useBackendLifecycle } from "./hooks/useBackendLifecycle";
 import { useSyncedRefValue } from "./hooks/useSyncedRefValue";
@@ -6,7 +6,6 @@ import { useAnalysisProgress } from "./hooks/useAnalysisProgress";
 import { useCapturePreloadState } from "./hooks/useCapturePreloadState";
 import { useCaptureSessionState } from "./hooks/useCaptureSessionState";
 import { useDisplayFilterState } from "./hooks/useDisplayFilterState";
-import type { SentinelContextValue } from "./sentinelTypes";
 import { useCaptureSignalWaiters } from "./hooks/useCaptureSignalWaiters";
 import { useRecentCapturesState } from "./hooks/useRecentCapturesState";
 import { useProgressStatusUpdater } from "./hooks/useProgressStatusUpdater";
@@ -22,6 +21,8 @@ import { useOpenCaptureAction } from "./hooks/useOpenCaptureAction";
 import { useCaptureStartWorkflow } from "./hooks/useCaptureStartWorkflow";
 import { useSentinelPacketStreamBundle } from "./hooks/useSentinelPacketStreamBundle";
 import { useSentinelRuntimeRefs } from "./hooks/useSentinelRuntimeRefs";
+import { useSentinelContextValues } from "./hooks/useSentinelContextValues";
+import { useSentinelDomainValues } from "./hooks/useSentinelDomainValues";
 
 /**
  * Houses the full SentinelProvider body. Extracted from SentinelContext.tsx to
@@ -381,176 +382,77 @@ export function useSentinelProviderBody() {
     closeCapture: backendClients.capture.closeCapture,
   });
 
-  // ---- Sub-context value objects ----
+  const domainValues = useSentinelDomainValues({
+    backendConnected,
+    backendStatus,
+    tsharkStatus,
+    isTSharkChecking,
+    toolRuntimeCheckDegraded,
+    toolRuntimeProbeState,
+    toolRuntimeProbeTransport,
+    lastToolRuntimeProbeError,
+    setTSharkPath,
+    toolRuntimeSnapshot,
+    isToolRuntimeLoading,
+    refreshToolRuntimeSnapshot,
+    saveToolRuntimeConfig,
+    backendAuthToken,
+    isBackendAuthTokenLoading,
+    mcpStatus,
+    refreshMCPStatus,
+    saveMCPConfig,
+    decryptionConfig,
+    updateDecryptionConfig,
+    isPreloadingCapture,
+    preloadProcessed,
+    preloadTotal,
+    capturePreloadDiagnostics,
+    captureTransaction,
+    fileMeta,
+    captureRevision,
+    recentCaptures,
+    openCapture,
+    stopCapture,
+    retryCapturePreloadConfirm,
+    packets,
+    totalPackets,
+    currentPage,
+    totalPages,
+    filteredPackets,
+    hasMorePackets,
+    hasPrevPackets,
+    isPageLoading,
+    isFilterLoading,
+    packetPageError,
+    loadMorePackets,
+    loadPrevPackets,
+    jumpToPage,
+    retryPacketPage,
+    locatePacketById,
+    selectedPacket,
+    selectedPacketRawHex,
+    selectedPacketId,
+    selectPacket,
+    protocolTree,
+    hexDump,
+    httpStream,
+    tcpStream,
+    udpStream,
+    streamIds,
+    setActiveStream,
+    persistStreamPayloads,
+    streamSwitchMetrics,
+    preparePacketStream,
+    displayFilter,
+    setDisplayFilter,
+    applyFilter,
+    clearFilter,
+    threatHits,
+    isThreatAnalysisLoading,
+    threatAnalysisProgress,
+    extractedObjects,
+    mediaAnalysisProgress,
+  });
 
-  const backendValue = useMemo(
-    () => ({
-      backendConnected,
-      backendStatus,
-      tsharkStatus,
-      isTSharkChecking,
-      toolRuntimeCheckDegraded,
-      toolRuntimeProbeState,
-      toolRuntimeProbeTransport,
-      lastToolRuntimeProbeError,
-      setTSharkPath,
-      toolRuntimeSnapshot,
-      isToolRuntimeLoading,
-      refreshToolRuntimeSnapshot,
-      saveToolRuntimeConfig,
-      backendAuthToken,
-      isBackendAuthTokenLoading,
-      mcpStatus,
-      refreshMCPStatus,
-      saveMCPConfig,
-      decryptionConfig,
-      updateDecryptionConfig,
-    }),
-    [
-      backendConnected,
-      backendStatus,
-      tsharkStatus,
-      isTSharkChecking,
-      toolRuntimeCheckDegraded,
-      toolRuntimeProbeState,
-      toolRuntimeProbeTransport,
-      lastToolRuntimeProbeError,
-      setTSharkPath,
-      toolRuntimeSnapshot,
-      isToolRuntimeLoading,
-      refreshToolRuntimeSnapshot,
-      saveToolRuntimeConfig,
-      backendAuthToken,
-      isBackendAuthTokenLoading,
-      mcpStatus,
-      refreshMCPStatus,
-      saveMCPConfig,
-      decryptionConfig,
-      updateDecryptionConfig,
-    ],
-  );
-
-  const captureValue = useMemo(
-    () => ({
-      isPreloadingCapture,
-      preloadProcessed,
-      preloadTotal,
-      capturePreloadDiagnostics,
-      captureTransaction,
-      fileMeta,
-      captureRevision,
-      recentCaptures,
-      openCapture,
-      stopCapture,
-      retryCapturePreloadConfirm,
-    }),
-    [
-      isPreloadingCapture,
-      preloadProcessed,
-      preloadTotal,
-      capturePreloadDiagnostics,
-      captureTransaction,
-      fileMeta,
-      captureRevision,
-      recentCaptures,
-      openCapture,
-      stopCapture,
-      retryCapturePreloadConfirm,
-    ],
-  );
-
-  const packetValue = useMemo(
-    () => ({
-      packets,
-      totalPackets,
-      currentPage,
-      totalPages,
-      filteredPackets,
-      hasMorePackets,
-      hasPrevPackets,
-      isPageLoading,
-      isFilterLoading,
-      packetPageError,
-      loadMorePackets,
-      loadPrevPackets,
-      jumpToPage,
-      retryPacketPage,
-      locatePacketById,
-      selectedPacket,
-      selectedPacketRawHex,
-      selectedPacketId,
-      selectPacket,
-      protocolTree,
-      hexDump,
-    }),
-    [
-      packets,
-      totalPackets,
-      currentPage,
-      totalPages,
-      filteredPackets,
-      hasMorePackets,
-      hasPrevPackets,
-      isPageLoading,
-      isFilterLoading,
-      packetPageError,
-      loadMorePackets,
-      loadPrevPackets,
-      jumpToPage,
-      retryPacketPage,
-      locatePacketById,
-      selectedPacket,
-      selectedPacketRawHex,
-      selectedPacketId,
-      selectPacket,
-      protocolTree,
-      hexDump,
-    ],
-  );
-
-  const streamValue = useMemo(
-    () => ({
-      httpStream,
-      tcpStream,
-      udpStream,
-      streamIds,
-      setActiveStream,
-      persistStreamPayloads,
-      streamSwitchMetrics,
-      preparePacketStream,
-    }),
-    [
-      httpStream,
-      tcpStream,
-      udpStream,
-      streamIds,
-      setActiveStream,
-      persistStreamPayloads,
-      streamSwitchMetrics,
-      preparePacketStream,
-    ],
-  );
-
-  const filterValue = useMemo(
-    () => ({ displayFilter, setDisplayFilter, applyFilter, clearFilter }),
-    [displayFilter, setDisplayFilter, applyFilter, clearFilter],
-  );
-
-  const analysisValue = useMemo(
-    () => ({
-      threatHits,
-      isThreatAnalysisLoading,
-      threatAnalysisProgress,
-      extractedObjects,
-      mediaAnalysisProgress,
-    }),
-    [threatHits, isThreatAnalysisLoading, threatAnalysisProgress, extractedObjects, mediaAnalysisProgress],
-  );
-
-  const value = useMemo<SentinelContextValue>(
-    () => ({ ...backendValue, ...captureValue, ...packetValue, ...streamValue, ...filterValue, ...analysisValue }),
-    [backendValue, captureValue, packetValue, streamValue, filterValue, analysisValue],
-  );
-
-  return { value, backendValue, captureValue, packetValue, streamValue, filterValue, analysisValue };
+  return useSentinelContextValues(domainValues);
 }

@@ -1,9 +1,12 @@
 import type { TrafficBucket } from "./traffic";
+import type { KnownOrUnknown } from "./unknownEnum";
+
+type APTScoreFactorDirection = KnownOrUnknown<"positive" | "negative" | "missing">;
 
 export interface APTScoreFactor {
   name: string;
   weight: number;
-  direction: "positive" | "negative" | "missing" | string;
+  direction: APTScoreFactorDirection;
   sourceModule?: string;
   summary?: string;
 }

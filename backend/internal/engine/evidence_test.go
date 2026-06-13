@@ -23,10 +23,10 @@ func (e *recordingEvidenceEmitter) EmitError(string) {}
 func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 	svc := NewService(nil)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 
-	svc.vehicleAnalysis = &model.VehicleAnalysis{
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{
 		UDS: model.UDSAnalysis{
 			Transactions: []model.UDSTransaction{
 				{
@@ -45,7 +45,7 @@ func TestGatherEvidenceFiltersVehicleAndUSBAndExcludesMisc(t *testing.T) {
 		},
 	}
 
-	svc.usbAnalysis = &model.USBAnalysis{
+	svc.analysisCtl.usbAnalysis = &model.USBAnalysis{
 		MassStorage: model.USBMassStorageAnalysis{
 			WriteOperations: []model.USBMassStorageOperation{
 				{
@@ -93,7 +93,7 @@ func TestGatherEvidenceReturnsCanceledContext(t *testing.T) {
 	emitter := &recordingEvidenceEmitter{}
 	svc := NewService(emitter)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -112,10 +112,10 @@ func TestGatherEvidenceEmitsCollectorTimingStatuses(t *testing.T) {
 	emitter := &recordingEvidenceEmitter{}
 	svc := NewService(emitter)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 
-	svc.vehicleAnalysis = &model.VehicleAnalysis{
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{
 		UDS: model.UDSAnalysis{
 			Transactions: []model.UDSTransaction{{
 				RequestPacketID:  101,
@@ -149,14 +149,14 @@ func TestGatherEvidenceEmitsCollectorTimingStatuses(t *testing.T) {
 func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 	svc := NewService(nil)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
-	svc.huntMu.Lock()
+	svc.huntingCtl.huntMu.Lock()
 	// Keep this evidence-mapping test independent from host YARA availability.
-	svc.yaraConf.Enabled = false
-	svc.huntMu.Unlock()
+	svc.huntingCtl.yaraConf.Enabled = false
+	svc.huntingCtl.huntMu.Unlock()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:       1,
 			Protocol: "TCP",
@@ -170,7 +170,7 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc.c2Analysis = &model.C2SampleAnalysis{
+	svc.analysisCtl.c2Analysis = &model.C2SampleAnalysis{
 		CS: model.C2FamilyAnalysis{
 			Candidates: []model.C2IndicatorRecord{
 				{
@@ -191,7 +191,7 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 		},
 	}
 
-	svc.industrialAnalysis = &model.IndustrialAnalysis{
+	svc.analysisCtl.industrialAnalysis = &model.IndustrialAnalysis{
 		RuleHits: []model.IndustrialRuleHit{
 			{
 				Rule:         "Modbus 可疑写突发",
@@ -207,8 +207,8 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 		},
 	}
 
-	svc.objectsLoaded = true
-	svc.objects = []model.ObjectFile{
+	svc.objectCtl.objectsLoaded = true
+	svc.objectCtl.objects = []model.ObjectFile{
 		{
 			ID:        1,
 			PacketID:  31,
@@ -255,11 +255,11 @@ func TestGatherEvidenceBuildsConsistentRecordsAcrossCoreModules(t *testing.T) {
 func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
 	svc := NewService(nil)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 
-	svc.objectsLoaded = true
-	svc.objects = []model.ObjectFile{
+	svc.objectCtl.objectsLoaded = true
+	svc.objectCtl.objects = []model.ObjectFile{
 		{
 			ID:        2,
 			PacketID:  41,
@@ -290,10 +290,10 @@ func TestGatherEvidenceKeepsBenignImageObjectsInformational(t *testing.T) {
 func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *testing.T) {
 	svc := NewService(nil)
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 
-	svc.usbAnalysis = &model.USBAnalysis{
+	svc.analysisCtl.usbAnalysis = &model.USBAnalysis{
 		TotalUSBPackets:    4,
 		MassStoragePackets: 4,
 		MassStorage: model.USBMassStorageAnalysis{
@@ -308,7 +308,7 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 			}},
 		},
 	}
-	svc.c2Analysis = &model.C2SampleAnalysis{
+	svc.analysisCtl.c2Analysis = &model.C2SampleAnalysis{
 		CS: model.C2FamilyAnalysis{
 			CandidateCount: 1,
 			Candidates: []model.C2IndicatorRecord{{
@@ -323,7 +323,7 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 			}},
 		},
 	}
-	svc.industrialAnalysis = &model.IndustrialAnalysis{
+	svc.analysisCtl.industrialAnalysis = &model.IndustrialAnalysis{
 		RuleHits: []model.IndustrialRuleHit{{
 			Rule:         "Modbus 可疑写突发",
 			Level:        "high",
@@ -343,7 +343,7 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 			SamplePacketID: 42,
 		}},
 	}
-	svc.vehicleAnalysis = &model.VehicleAnalysis{
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{
 		UDS: model.UDSAnalysis{
 			Transactions: []model.UDSTransaction{{
 				RequestPacketID:  51,
@@ -364,10 +364,10 @@ func TestEvidenceAndInvestigationReportsKeepSeverityAndPacketLinksAligned(t *tes
 	if err != nil {
 		t.Fatalf("GatherEvidence() error = %v", err)
 	}
-	usbReport := buildUSBInvestigationReport(*svc.usbAnalysis)
-	c2Report := buildC2FamilyInvestigationReport("cs", svc.c2Analysis.CS)
-	industrialReport := buildIndustrialInvestigationReport(*svc.industrialAnalysis)
-	vehicleReport := buildVehicleInvestigationReport(*svc.vehicleAnalysis)
+	usbReport := buildUSBInvestigationReport(*svc.analysisCtl.usbAnalysis)
+	c2Report := buildC2FamilyInvestigationReport("cs", svc.analysisCtl.c2Analysis.CS)
+	industrialReport := buildIndustrialInvestigationReport(*svc.analysisCtl.industrialAnalysis)
+	vehicleReport := buildVehicleInvestigationReport(*svc.analysisCtl.vehicleAnalysis)
 
 	usbEvidence := firstEvidenceByModule(evidence.Records, "usb")
 	if usbEvidence == nil || len(usbReport.Evidence) == 0 {

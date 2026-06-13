@@ -247,12 +247,12 @@ func TestInspectStreamPayloadHintsGodzillaRandomParam(t *testing.T) {
 
 func TestListStreamPayloadSourcesScansHTTPQueryFormJSONAndMultipart(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	queryEncoded := base64.StdEncoding.EncodeToString([]byte("assert($_POST['cmd']);"))
 	jsonEncoded := base64.StdEncoding.EncodeToString([]byte("system('id');"))
 	multipartEncoded := base64.StdEncoding.EncodeToString([]byte("eval($_POST['x']);"))
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         10,
 			Protocol:   "HTTP",
@@ -312,7 +312,7 @@ func TestListStreamPayloadSourcesScansHTTPQueryFormJSONAndMultipart(t *testing.T
 
 func TestListStreamPayloadSourcesKeepsWebshellSourceUnderNoiseLimit(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	packets := make([]model.Packet, 0, 61)
 	for i := 0; i < 60; i++ {
@@ -345,7 +345,7 @@ func TestListStreamPayloadSourcesKeepsWebshellSourceUnderNoiseLimit(t *testing.T
 		SourceIP:   "10.0.0.1",
 		SourcePort: 51000,
 	})
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
@@ -366,8 +366,8 @@ func TestListStreamPayloadSourcesKeepsWebshellSourceUnderNoiseLimit(t *testing.T
 
 func TestListStreamPayloadSourcesDoesNotPromoteBenignHTTP(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         20,
 			Protocol:   "HTTP",
@@ -393,7 +393,7 @@ func TestListStreamPayloadSourcesDoesNotPromoteBenignHTTP(t *testing.T) {
 
 func TestListStreamPayloadSourcesPromotesRepeatBurst(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	packets := make([]model.Packet, 0, 3)
 	for i := 0; i < 3; i++ {
 		packets = append(packets, model.Packet{
@@ -408,7 +408,7 @@ func TestListStreamPayloadSourcesPromotesRepeatBurst(t *testing.T) {
 			SourceIP:  "10.0.0.1",
 		})
 	}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 	sources, err := svc.ListStreamPayloadSources(20)
@@ -435,9 +435,9 @@ func TestListStreamPayloadSourcesPromotesRepeatBurst(t *testing.T) {
 
 func TestListStreamPayloadSourcesDetectsDecodedCommandExecFunction(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	encoded := base64.StdEncoding.EncodeToString([]byte("Runtime.getRuntime().exec(\"whoami\")"))
-	if err := svc.packetStore.Append([]model.Packet{{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        40,
 		Timestamp: "2026-05-02T10:01:00Z",
 		Protocol:  "HTTP",
@@ -751,9 +751,9 @@ func TestInspectStreamPayloadNotBehinderV2SingleDigitPass(t *testing.T) {
 
 func TestListStreamPayloadSourcesDetectsBehinderV2HexKey(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         200,
 			Timestamp:  "2026-06-04T10:00:00Z",
@@ -798,9 +798,9 @@ func TestListStreamPayloadSourcesDetectsBehinderV2HexKey(t *testing.T) {
 
 func TestListStreamPayloadSourcesDetectsBehinderV2PassParam(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         201,
 			Timestamp:  "2026-06-04T10:00:01Z",
@@ -839,12 +839,12 @@ func TestListStreamPayloadSourcesDetectsBehinderV2PassParam(t *testing.T) {
 
 func TestListStreamPayloadSourcesBehinderV2TwoPhaseCorrelation(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	// Simulate Behinder v2.0 two-phase handshake:
 	// Phase 1: GET /shell.php?pass=645 → key response
 	// Phase 2: GET /shell.php?pass=123 → second request
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         300,
 			Timestamp:  "2026-06-04T10:00:00Z",
@@ -1006,9 +1006,9 @@ func TestInspectStreamPayloadBenignUANotBehinder(t *testing.T) {
 
 func TestInspectStreamPayloadBehinderHTTPFingerprintDetectedViaSourceList(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         400,
 			Timestamp:  "2026-06-04T11:00:00Z",

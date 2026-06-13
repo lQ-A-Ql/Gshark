@@ -1,4 +1,4 @@
-package engine
+package payloadinspect
 
 import (
 	"encoding/hex"
@@ -152,6 +152,24 @@ func TestCollectJSONCandidatesCoversInvalidLimitsAndOrdering(t *testing.T) {
 func c2More85HasCandidateKind(items []model.StreamPayloadCandidate, kind, value string) bool {
 	for _, item := range items {
 		if item.Kind == kind && item.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCandidate(items []model.StreamPayloadCandidate, kind, paramName string) bool {
+	for _, item := range items {
+		if item.Kind == kind && item.ParamName == paramName {
 			return true
 		}
 	}

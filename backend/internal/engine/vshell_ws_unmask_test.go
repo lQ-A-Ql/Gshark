@@ -229,7 +229,7 @@ func TestC2DecryptVShellUnmasksClientWebSocketStream(t *testing.T) {
 	frame := buildMaskedClientFrame(inner, []byte{0x1a, 0x2b, 0x3c, 0x4d})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	packets := []model.Packet{{
 		ID:         301,
@@ -242,10 +242,10 @@ func TestC2DecryptVShellUnmasksClientWebSocketStream(t *testing.T) {
 		Payload:    hexEncodeForTest(frame),
 		StreamID:   77,
 	}}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 77)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 77)] = model.ReassembledStream{
 		StreamID: 77,
 		Protocol: "TCP",
 		From:     "192.168.116.129",
@@ -303,7 +303,7 @@ func TestC2DecryptVShellUnmasksMultiFrameClientStream(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	packets := []model.Packet{{
 		ID:         401,
@@ -316,10 +316,10 @@ func TestC2DecryptVShellUnmasksMultiFrameClientStream(t *testing.T) {
 		Payload:    hexEncodeForTest(stream),
 		StreamID:   88,
 	}}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 88)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 88)] = model.ReassembledStream{
 		StreamID: 88,
 		Protocol: "TCP",
 		From:     "192.168.116.129",

@@ -48,15 +48,11 @@ func (s *Service) ListSMB3SessionCandidates() ([]model.SMB3SessionCandidate, err
 }
 
 func (s *Service) ListSMB3SessionCandidatesWithContext(ctx context.Context) ([]model.SMB3SessionCandidate, error) {
-	capturePath := s.CurrentCapturePath()
-	if capturePath == "" {
-		return nil, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
-	}
-	rows, err := scanSMB3SessionCandidates(ctx, capturePath)
+	capturePath, err := s.requireCapturePathForToolAnalysis()
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	return scanSMB3SessionCandidates(ctx, capturePath)
 }
 
 func decodeHexField(name, raw string) ([]byte, error) {
@@ -170,7 +166,7 @@ func scanSMB3SessionCandidates(ctx context.Context, capturePath string) ([]model
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("扫描 SMB3 Session 候选失败: %s", explainWinRMScanError(err))
+		return nil, wrapToolAnalysisError("smb3-session-candidate-scan", "扫描 SMB3 Session 候选失败: "+explainWinRMScanError(err), err)
 	}
 
 	pending := map[string]int{}

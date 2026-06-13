@@ -112,7 +112,8 @@ function validPackageJson() {
   return {
     scripts: {
       "desktop-generic-ipc-post-removal:check": "node scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
-      ci: "pnpm run desktop-generic-ipc-post-removal:check",
+      "ci:desktop": "pnpm run desktop-generic-ipc-post-removal:check",
+      ci: "pnpm run ci:desktop",
     },
   };
 }

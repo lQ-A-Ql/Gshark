@@ -39,6 +39,13 @@ func newAnalysisMetrics() *analysisMetrics {
 	return &analysisMetrics{}
 }
 
+func (ctl *analysisController) recordMetric(sample analysisMetricSample) {
+	if ctl == nil {
+		return
+	}
+	ctl.analysisMetrics.record(sample)
+}
+
 func (m *analysisMetrics) record(sample analysisMetricSample) {
 	if m == nil {
 		return
@@ -108,7 +115,7 @@ func (s *Service) recordAnalysisTelemetry(ctx context.Context, target string, qu
 		Status:     status,
 	}
 	if s != nil {
-		s.analysisMetrics.record(sample)
+		s.analysisCtl.recordMetric(sample)
 		s.emitAnalysisTelemetry(sample)
 	}
 }

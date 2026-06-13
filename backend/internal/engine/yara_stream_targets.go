@@ -38,7 +38,7 @@ func (s *Service) buildYaraScanTargetsWithContext(ctx context.Context, objects [
 		})
 	}
 
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return targets, func() {}, nil
 	}
 	if err := ctx.Err(); err != nil {

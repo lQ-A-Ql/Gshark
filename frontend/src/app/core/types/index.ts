@@ -1,4 +1,5 @@
 export * from "./packet";
+export * from "./unknownEnum";
 export * from "./stream";
 export * from "./traffic";
 export * from "./report";

@@ -8,6 +8,56 @@ import (
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
+// Controllers keep domain state explicit while Service remains the stable
+// facade consumed by transport, Wails bindings, and tests.
+type captureController struct {
+	captureState
+}
+
+type displayFilterController struct {
+	displayFilterState
+}
+
+type streamController struct {
+	streamState
+}
+
+type analysisController struct {
+	analysisCache
+}
+
+type objectController struct {
+	objectState
+}
+
+type mediaController struct {
+	mediaState
+}
+
+type yaraHuntingController struct {
+	yaraHuntingState
+}
+
+type toolRuntimeController struct {
+	toolRuntimeState
+}
+
+type mcpController struct {
+	mcpState
+}
+
+type playbookController struct {
+	playbookStatePB
+}
+
+type savedSearchController struct {
+	savedSearchStateSS
+}
+
+type hypothesisController struct {
+	hypothesisStateHT
+}
+
 // captureState groups fields related to the capture lifecycle:
 // loading PCAPs, tracking active loads, and managing capture tasks.
 type captureState struct {
@@ -79,6 +129,7 @@ type mediaState struct {
 type yaraHuntingState struct {
 	yaraLoaded      bool
 	yaraScanning    bool
+	yaraScanDone    chan struct{}
 	yaraHits        []model.ThreatHit
 	yaraLastError   string
 	yaraMu          sync.Mutex

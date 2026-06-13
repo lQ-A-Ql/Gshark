@@ -3,6 +3,8 @@ import type { IndustrialAnalysis as IndustrialAnalysisData } from "../../core/ty
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
 export const EMPTY_INDUSTRIAL_ANALYSIS: IndustrialAnalysisData = {
   totalIndustrialPackets: 0,
@@ -26,7 +28,7 @@ export const EMPTY_INDUSTRIAL_ANALYSIS: IndustrialAnalysisData = {
   report: EMPTY_INVESTIGATION_REPORT,
 };
 
-const industrialAnalysisCache = new Map<string, IndustrialAnalysisData>();
+const industrialAnalysisCache = createAnalysisResourceCache<IndustrialAnalysisData>();
 
 export interface UseIndustrialAnalysisOptions {
   backendConnected: boolean;
@@ -54,7 +56,7 @@ export function useIndustrialAnalysis({
 
   const refreshAnalysis = useCallback(
     (force = false) => {
-      if (!backendConnected) {
+      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
         cancelAnalysisRequest();
         setLoading(false);
         setError("");
@@ -71,7 +73,12 @@ export function useIndustrialAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => backendClients.analysis.getIndustrialAnalysis(signal),
+        request: (signal) =>
+          industrialAnalysisCache.request(cacheKey, {
+            force,
+            signal,
+            load: () => backendClients.analysis.getIndustrialAnalysis(signal),
+          }),
         onSuccess: (payload) => {
           if (cacheKey) {
             industrialAnalysisCache.set(cacheKey, payload);
@@ -85,7 +92,7 @@ export function useIndustrialAnalysis({
         onSettled: () => setLoading(false),
       });
     },
-    [backendConnected, cacheKey, cancelAnalysisRequest, runAnalysisRequest],
+    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
   );
 
   useEffect(() => {

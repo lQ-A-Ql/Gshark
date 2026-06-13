@@ -3,7 +3,8 @@ import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
-import { LRUCache } from "../../utils/lruCache";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
 const EMPTY_FAMILY: C2FamilyAnalysis = {
   candidateCount: 0,
@@ -31,7 +32,7 @@ export const EMPTY_C2_ANALYSIS: C2SampleAnalysis = {
   notes: [],
 };
 
-const c2AnalysisCache = new LRUCache<string, C2SampleAnalysis>(10);
+const c2AnalysisCache = createAnalysisResourceCache<C2SampleAnalysis>({ capacity: 10 });
 
 export interface UseC2AnalysisOptions {
   backendConnected: boolean;
@@ -60,7 +61,7 @@ export function useC2Analysis({
 
   const refreshAnalysis = useCallback(
     (force = false) => {
-      if (!filePath || !backendConnected) {
+      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
         cancelAnalysisRequest();
         setAnalysis(EMPTY_C2_ANALYSIS);
         setLoading(false);
@@ -78,7 +79,12 @@ export function useC2Analysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => backendClients.analysis.getC2SampleAnalysis(signal),
+        request: (signal) =>
+          c2AnalysisCache.request(cacheKey, {
+            force,
+            signal,
+            load: () => backendClients.analysis.getC2SampleAnalysis(signal),
+          }),
         onSuccess: (payload) => {
           if (cacheKey) {
             c2AnalysisCache.set(cacheKey, payload);
@@ -92,7 +98,7 @@ export function useC2Analysis({
         onSettled: () => setLoading(false),
       });
     },
-    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest],
+    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
   );
 
   useEffect(() => {

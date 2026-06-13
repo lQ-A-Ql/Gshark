@@ -40,10 +40,14 @@ type FFmpegStatus struct {
 }
 
 func (s *Service) FFmpegStatus() model.FFmpegToolStatus {
-	return toModelFFmpegStatus(s.ffmpegStatus())
+	return toModelFFmpegStatus(s.mediaCtl.ffmpegStatus())
 }
 
 func (s *Service) ffmpegStatus() FFmpegStatus {
+	return s.mediaCtl.ffmpegStatus()
+}
+
+func (ctl *mediaController) ffmpegStatus() FFmpegStatus {
 	customPath := strings.TrimSpace(os.Getenv(ffmpegEnvVar))
 	path, err := resolveFFmpegBinary(customPath)
 	if err != nil {
@@ -90,10 +94,9 @@ func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (s
 		return "", "", err
 	}
 	outputName := buildPlaybackName(inputName, profile.outputExt)
-
-	s.mu.RLock()
-	existing := strings.TrimSpace(s.mediaPlayback[token])
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	existing := strings.TrimSpace(s.mediaCtl.mediaPlayback[token])
+	s.captureCtl.mu.RUnlock()
 	if existing != "" {
 		if info, statErr := os.Stat(existing); statErr == nil && info.Size() > 0 {
 			return existing, outputName, nil
@@ -104,13 +107,12 @@ func (s *Service) MediaPlaybackWithContext(ctx context.Context, token string) (s
 	if err := generatePlaybackAsset(ctx, status.Path, inputPath, outputPath, profile); err != nil {
 		return "", "", err
 	}
-
-	s.mu.Lock()
-	if s.mediaPlayback == nil {
-		s.mediaPlayback = map[string]string{}
+	s.captureCtl.mu.Lock()
+	if s.mediaCtl.mediaPlayback == nil {
+		s.mediaCtl.mediaPlayback = map[string]string{}
 	}
-	s.mediaPlayback[token] = outputPath
-	s.mu.Unlock()
+	s.mediaCtl.mediaPlayback[token] = outputPath
+	s.captureCtl.mu.Unlock()
 
 	return outputPath, outputName, nil
 }
@@ -161,7 +163,7 @@ func generatePlaybackAsset(ctx context.Context, ffmpegPath, inputPath, outputPat
 		if detail == "" {
 			return fmt.Errorf("ffmpeg convert failed: %w", err)
 		}
-		return fmt.Errorf("ffmpeg convert failed: %s", detail)
+		return fmt.Errorf("ffmpeg convert failed: %s: %w", detail, err)
 	}
 
 	info, statErr := os.Stat(outputPath)

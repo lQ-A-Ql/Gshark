@@ -3,6 +3,8 @@ import type { USBAnalysis as USBAnalysisData, USBHIDSourceMode } from "../../cor
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
 export const EMPTY_USB_ANALYSIS: USBAnalysisData = {
   totalUSBPackets: 0,
@@ -57,7 +59,7 @@ export const EMPTY_USB_ANALYSIS: USBAnalysisData = {
 };
 
 const USB_ANALYSIS_CACHE_CAPACITY = 5;
-const usbAnalysisCache = new Map<string, USBAnalysisData>();
+const usbAnalysisCache = createAnalysisResourceCache<USBAnalysisData>({ capacity: USB_ANALYSIS_CACHE_CAPACITY });
 
 export interface UseUsbAnalysisOptions {
   backendConnected: boolean;
@@ -89,7 +91,7 @@ export function useUsbAnalysis({
 
   const refreshAnalysis = useCallback(
     (force = false) => {
-      if (!backendConnected) {
+      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
         cancelAnalysisRequest();
         setLoading(false);
         setError("");
@@ -106,7 +108,12 @@ export function useUsbAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => backendClients.analysis.getUSBAnalysis(signal, hidSource, hidEventLimit),
+        request: (signal) =>
+          usbAnalysisCache.request(cacheKey, {
+            force,
+            signal,
+            load: () => backendClients.analysis.getUSBAnalysis(signal, hidSource, hidEventLimit),
+          }),
         onSuccess: (payload) => {
           if (cacheKey) {
             writeUSBAnalysisCache(cacheKey, payload);
@@ -120,7 +127,16 @@ export function useUsbAnalysis({
         onSettled: () => setLoading(false),
       });
     },
-    [backendConnected, cacheKey, cancelAnalysisRequest, hidEventLimit, hidSource, runAnalysisRequest],
+    [
+      backendConnected,
+      cacheKey,
+      cancelAnalysisRequest,
+      filePath,
+      hidEventLimit,
+      hidSource,
+      runAnalysisRequest,
+      totalPackets,
+    ],
   );
 
   useEffect(() => {
@@ -144,23 +160,11 @@ export function buildUSBAnalysisCacheKey(
 }
 
 export function readUSBAnalysisCache(cacheKey: string) {
-  const cached = usbAnalysisCache.get(cacheKey);
-  if (!cached) return undefined;
-  usbAnalysisCache.delete(cacheKey);
-  usbAnalysisCache.set(cacheKey, cached);
-  return cached;
+  return usbAnalysisCache.get(cacheKey);
 }
 
 export function writeUSBAnalysisCache(cacheKey: string, payload: USBAnalysisData) {
-  if (usbAnalysisCache.has(cacheKey)) {
-    usbAnalysisCache.delete(cacheKey);
-  }
   usbAnalysisCache.set(cacheKey, payload);
-  while (usbAnalysisCache.size > USB_ANALYSIS_CACHE_CAPACITY) {
-    const oldestKey = usbAnalysisCache.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    usbAnalysisCache.delete(oldestKey);
-  }
 }
 
 export function clearUSBAnalysisCacheForTest() {

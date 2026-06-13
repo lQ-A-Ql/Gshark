@@ -38,11 +38,11 @@ func TestStartCaptureEnrichmentCoversReadyFailedAndCanceledBranches(t *testing.T
 		}
 
 		svc := NewService(NopEmitter{})
-		defer svc.packetStore.Close()
-		svc.pcap = "capture.pcapng"
-		atomic.StoreInt64(&svc.runID, 11)
+		defer svc.captureCtl.packetStore.Close()
+		svc.captureCtl.pcap = "capture.pcapng"
+		atomic.StoreInt64(&svc.captureCtl.runID, 11)
 		svc.startCaptureLoadStatus(11, model.ParseOptions{FilePath: "capture.pcapng"})
-		if err := svc.packetStore.Append([]model.Packet{{
+		if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 			ID:         1,
 			SourceIP:   "10.0.0.1",
 			SourcePort: 51515,
@@ -68,9 +68,9 @@ func TestStartCaptureEnrichmentCoversReadyFailedAndCanceledBranches(t *testing.T
 		if len(packets) != 1 || packets[0].UDPPayloadHex != "AA:BB:CC" || !packets[0].Color.Broadcast {
 			t.Fatalf("expected enriched packet to be persisted, got %+v", packets)
 		}
-		svc.mu.RLock()
-		raw := svc.rawStreamIndex["UDP:7"]
-		svc.mu.RUnlock()
+		svc.captureCtl.mu.RLock()
+		raw := svc.streamCtl.rawStreamIndex["UDP:7"]
+		svc.captureCtl.mu.RUnlock()
 		if raw.StreamID != 7 || len(raw.Chunks) != 1 || raw.Chunks[0].Body == "" {
 			t.Fatalf("expected raw stream index to be refreshed, got %+v", raw)
 		}
@@ -84,7 +84,7 @@ func TestStartCaptureEnrichmentCoversReadyFailedAndCanceledBranches(t *testing.T
 		}
 
 		svc := NewService(NopEmitter{})
-		defer svc.packetStore.Close()
+		defer svc.captureCtl.packetStore.Close()
 		svc.startCaptureLoadStatus(22, model.ParseOptions{FilePath: "bad.pcapng"})
 
 		svc.startCaptureEnrichment(model.ParseOptions{FilePath: "bad.pcapng"}, 22)
@@ -103,9 +103,9 @@ func TestStartCaptureEnrichmentCoversReadyFailedAndCanceledBranches(t *testing.T
 		}
 
 		svc := NewService(NopEmitter{})
-		defer svc.packetStore.Close()
-		svc.pcap = "stale.pcapng"
-		atomic.StoreInt64(&svc.runID, 34)
+		defer svc.captureCtl.packetStore.Close()
+		svc.captureCtl.pcap = "stale.pcapng"
+		atomic.StoreInt64(&svc.captureCtl.runID, 34)
 		svc.startCaptureLoadStatus(33, model.ParseOptions{FilePath: "stale.pcapng"})
 
 		svc.startCaptureEnrichment(model.ParseOptions{FilePath: "stale.pcapng"}, 33)
@@ -150,7 +150,7 @@ func TestCaptureStatusHelpersCoverCloneAndDefaults(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	svc.startCaptureLoadStatus(55, model.ParseOptions{FilePath: "capture.pcapng"})
 	svc.setCaptureEnrichmentStatus(55, "running", 7, 3, " partial ")
 	status := svc.CaptureStatus()

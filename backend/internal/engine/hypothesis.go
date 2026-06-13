@@ -10,10 +10,10 @@ import (
 
 // ListHypotheses returns all hypotheses, optionally filtered by status.
 func (s *Service) ListHypotheses(statusFilter string) []model.Hypothesis {
-	s.hypothesisMu.RLock()
-	defer s.hypothesisMu.RUnlock()
-	out := make([]model.Hypothesis, 0, len(s.hypotheses))
-	for _, h := range s.hypotheses {
+	s.hypothesisCtl.hypothesisMu.RLock()
+	defer s.hypothesisCtl.hypothesisMu.RUnlock()
+	out := make([]model.Hypothesis, 0, len(s.hypothesisCtl.hypotheses))
+	for _, h := range s.hypothesisCtl.hypotheses {
 		if statusFilter != "" && string(h.Status) != statusFilter {
 			continue
 		}
@@ -24,9 +24,9 @@ func (s *Service) ListHypotheses(statusFilter string) []model.Hypothesis {
 
 // GetHypothesis returns a hypothesis by ID.
 func (s *Service) GetHypothesis(id string) (*model.Hypothesis, bool) {
-	s.hypothesisMu.RLock()
-	defer s.hypothesisMu.RUnlock()
-	h, ok := s.hypotheses[id]
+	s.hypothesisCtl.hypothesisMu.RLock()
+	defer s.hypothesisCtl.hypothesisMu.RUnlock()
+	h, ok := s.hypothesisCtl.hypotheses[id]
 	if !ok {
 		return nil, false
 	}
@@ -49,10 +49,9 @@ func (s *Service) CreateHypothesis(h model.Hypothesis) (*model.Hypothesis, error
 	if h.Status == "" {
 		h.Status = model.HypothesisStatusOpen
 	}
-
-	s.hypothesisMu.Lock()
-	s.hypotheses[h.ID] = &h
-	s.hypothesisMu.Unlock()
+	s.hypothesisCtl.hypothesisMu.Lock()
+	s.hypothesisCtl.hypotheses[h.ID] = &h
+	s.hypothesisCtl.hypothesisMu.Unlock()
 
 	copy := h
 	return &copy, nil
@@ -63,28 +62,28 @@ func (s *Service) UpdateHypothesis(h model.Hypothesis) (*model.Hypothesis, error
 	if strings.TrimSpace(h.ID) == "" {
 		return nil, fmt.Errorf("hypothesis ID is required")
 	}
-	s.hypothesisMu.Lock()
-	existing, ok := s.hypotheses[h.ID]
+	s.hypothesisCtl.hypothesisMu.Lock()
+	existing, ok := s.hypothesisCtl.hypotheses[h.ID]
 	if !ok {
-		s.hypothesisMu.Unlock()
+		s.hypothesisCtl.hypothesisMu.Unlock()
 		return nil, fmt.Errorf("hypothesis %s not found", h.ID)
 	}
 	h.CreatedAt = existing.CreatedAt
 	h.UpdatedAt = time.Now().UTC()
-	s.hypotheses[h.ID] = &h
-	s.hypothesisMu.Unlock()
+	s.hypothesisCtl.hypotheses[h.ID] = &h
+	s.hypothesisCtl.hypothesisMu.Unlock()
 	copy := h
 	return &copy, nil
 }
 
 // DeleteHypothesis removes a hypothesis by ID.
 func (s *Service) DeleteHypothesis(id string) bool {
-	s.hypothesisMu.Lock()
-	defer s.hypothesisMu.Unlock()
-	if _, ok := s.hypotheses[id]; !ok {
+	s.hypothesisCtl.hypothesisMu.Lock()
+	defer s.hypothesisCtl.hypothesisMu.Unlock()
+	if _, ok := s.hypothesisCtl.hypotheses[id]; !ok {
 		return false
 	}
-	delete(s.hypotheses, id)
+	delete(s.hypothesisCtl.hypotheses, id)
 	return true
 }
 
@@ -94,26 +93,25 @@ func (s *Service) AddHypothesisEvidence(hypothesisID string, evidence model.Hypo
 		evidence.ID = nextID("ev")
 	}
 	evidence.CreatedAt = time.Now().UTC()
-
-	s.hypothesisMu.Lock()
-	h, ok := s.hypotheses[hypothesisID]
+	s.hypothesisCtl.hypothesisMu.Lock()
+	h, ok := s.hypothesisCtl.hypotheses[hypothesisID]
 	if !ok {
-		s.hypothesisMu.Unlock()
+		s.hypothesisCtl.hypothesisMu.Unlock()
 		return nil, fmt.Errorf("hypothesis %s not found", hypothesisID)
 	}
 	h.Evidence = append(h.Evidence, evidence)
 	h.UpdatedAt = time.Now().UTC()
 	copy := *h
-	s.hypothesisMu.Unlock()
+	s.hypothesisCtl.hypothesisMu.Unlock()
 	return &copy, nil
 }
 
 // UpdateHypothesisStatus changes the status of a hypothesis.
 func (s *Service) UpdateHypothesisStatus(id string, status model.HypothesisStatus, conclusion string) (*model.Hypothesis, error) {
-	s.hypothesisMu.Lock()
-	h, ok := s.hypotheses[id]
+	s.hypothesisCtl.hypothesisMu.Lock()
+	h, ok := s.hypothesisCtl.hypotheses[id]
 	if !ok {
-		s.hypothesisMu.Unlock()
+		s.hypothesisCtl.hypothesisMu.Unlock()
 		return nil, fmt.Errorf("hypothesis %s not found", id)
 	}
 	h.Status = status
@@ -122,6 +120,6 @@ func (s *Service) UpdateHypothesisStatus(id string, status model.HypothesisStatu
 	}
 	h.UpdatedAt = time.Now().UTC()
 	copy := *h
-	s.hypothesisMu.Unlock()
+	s.hypothesisCtl.hypothesisMu.Unlock()
 	return &copy, nil
 }

@@ -3,6 +3,8 @@ import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../../c
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
 export const EMPTY_VEHICLE_ANALYSIS: VehicleAnalysisData = {
   totalVehiclePackets: 0,
@@ -31,7 +33,7 @@ export const EMPTY_VEHICLE_ANALYSIS: VehicleAnalysisData = {
   report: EMPTY_INVESTIGATION_REPORT,
 };
 
-const vehicleAnalysisCache = new Map<string, VehicleAnalysisData>();
+const vehicleAnalysisCache = createAnalysisResourceCache<VehicleAnalysisData>();
 
 export interface UseVehicleAnalysisOptions {
   backendConnected: boolean;
@@ -61,7 +63,7 @@ export function useVehicleAnalysis({
 
   const refreshAnalysis = useCallback(
     (force = false) => {
-      if (!backendConnected) {
+      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
         cancelAnalysisRequest();
         setLoading(false);
         setError("");
@@ -78,7 +80,12 @@ export function useVehicleAnalysis({
       setLoading(true);
       setError("");
       return runAnalysisRequest({
-        request: (signal) => backendClients.analysis.getVehicleAnalysis(signal),
+        request: (signal) =>
+          vehicleAnalysisCache.request(cacheKey, {
+            force,
+            signal,
+            load: () => backendClients.analysis.getVehicleAnalysis(signal),
+          }),
         onSuccess: (payload) => {
           if (cacheKey) {
             vehicleAnalysisCache.set(cacheKey, payload);
@@ -92,7 +99,7 @@ export function useVehicleAnalysis({
         onSettled: () => setLoading(false),
       });
     },
-    [backendConnected, cacheKey, cancelAnalysisRequest, runAnalysisRequest],
+    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
   );
 
   useEffect(() => {

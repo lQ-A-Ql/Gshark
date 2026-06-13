@@ -10,10 +10,10 @@ import (
 
 // ListSavedSearches returns all saved searches.
 func (s *Service) ListSavedSearches() []model.SavedSearch {
-	s.searchMu.RLock()
-	defer s.searchMu.RUnlock()
-	out := make([]model.SavedSearch, 0, len(s.savedSearches))
-	for _, ss := range s.savedSearches {
+	s.savedSearchCtl.searchMu.RLock()
+	defer s.savedSearchCtl.searchMu.RUnlock()
+	out := make([]model.SavedSearch, 0, len(s.savedSearchCtl.savedSearches))
+	for _, ss := range s.savedSearchCtl.savedSearches {
 		out = append(out, *ss)
 	}
 	return out
@@ -21,9 +21,9 @@ func (s *Service) ListSavedSearches() []model.SavedSearch {
 
 // GetSavedSearch returns a saved search by ID.
 func (s *Service) GetSavedSearch(id string) (*model.SavedSearch, bool) {
-	s.searchMu.RLock()
-	defer s.searchMu.RUnlock()
-	ss, ok := s.savedSearches[id]
+	s.savedSearchCtl.searchMu.RLock()
+	defer s.savedSearchCtl.searchMu.RUnlock()
+	ss, ok := s.savedSearchCtl.savedSearches[id]
 	if !ok {
 		return nil, false
 	}
@@ -46,10 +46,9 @@ func (s *Service) CreateSavedSearch(ss model.SavedSearch) (*model.SavedSearch, e
 	}
 	ss.CreatedAt = now
 	ss.UpdatedAt = now
-
-	s.searchMu.Lock()
-	s.savedSearches[ss.ID] = &ss
-	s.searchMu.Unlock()
+	s.savedSearchCtl.searchMu.Lock()
+	s.savedSearchCtl.savedSearches[ss.ID] = &ss
+	s.savedSearchCtl.searchMu.Unlock()
 
 	copy := ss
 	return &copy, nil
@@ -60,54 +59,53 @@ func (s *Service) UpdateSavedSearch(ss model.SavedSearch) (*model.SavedSearch, e
 	if strings.TrimSpace(ss.ID) == "" {
 		return nil, fmt.Errorf("saved search ID is required")
 	}
-	s.searchMu.Lock()
-	existing, ok := s.savedSearches[ss.ID]
+	s.savedSearchCtl.searchMu.Lock()
+	existing, ok := s.savedSearchCtl.savedSearches[ss.ID]
 	if !ok {
-		s.searchMu.Unlock()
+		s.savedSearchCtl.searchMu.Unlock()
 		return nil, fmt.Errorf("saved search %s not found", ss.ID)
 	}
 	ss.CreatedAt = existing.CreatedAt
 	ss.UpdatedAt = time.Now().UTC()
-	s.savedSearches[ss.ID] = &ss
-	s.searchMu.Unlock()
+	s.savedSearchCtl.savedSearches[ss.ID] = &ss
+	s.savedSearchCtl.searchMu.Unlock()
 	copy := ss
 	return &copy, nil
 }
 
 // DeleteSavedSearch removes a saved search by ID.
 func (s *Service) DeleteSavedSearch(id string) bool {
-	s.searchMu.Lock()
-	defer s.searchMu.Unlock()
-	if _, ok := s.savedSearches[id]; !ok {
+	s.savedSearchCtl.searchMu.Lock()
+	defer s.savedSearchCtl.searchMu.Unlock()
+	if _, ok := s.savedSearchCtl.savedSearches[id]; !ok {
 		return false
 	}
-	delete(s.savedSearches, id)
+	delete(s.savedSearchCtl.savedSearches, id)
 	return true
 }
 
 // ExecuteSavedSearch runs a saved search and returns the matching threat hits.
 func (s *Service) ExecuteSavedSearch(id string) (*model.SavedSearch, []model.ThreatHit, error) {
-	s.searchMu.RLock()
-	ss, ok := s.savedSearches[id]
+	s.savedSearchCtl.searchMu.RLock()
+	ss, ok := s.savedSearchCtl.savedSearches[id]
 	if !ok {
-		s.searchMu.RUnlock()
+		s.savedSearchCtl.searchMu.RUnlock()
 		return nil, nil, fmt.Errorf("saved search %s not found", id)
 	}
 	ssCopy := *ss
-	s.searchMu.RUnlock()
+	s.savedSearchCtl.searchMu.RUnlock()
 
 	prefixes := []string{ssCopy.Query}
 	prefixes = append(prefixes, ssCopy.Filters...)
 
 	hits := s.ThreatHuntWithContext(nil, prefixes)
-
 	// Update hit count.
-	s.searchMu.Lock()
-	if existing, ok := s.savedSearches[id]; ok {
+	s.savedSearchCtl.searchMu.Lock()
+	if existing, ok := s.savedSearchCtl.savedSearches[id]; ok {
 		existing.HitCount = len(hits)
 		existing.UpdatedAt = time.Now().UTC()
 	}
-	s.searchMu.Unlock()
+	s.savedSearchCtl.searchMu.Unlock()
 
 	return &ssCopy, hits, nil
 }

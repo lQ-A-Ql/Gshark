@@ -40,13 +40,7 @@ func (s *Service) ShiroRememberMeAnalysis(ctx context.Context, req model.ShiroRe
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if s.CurrentCapturePath() == "" {
-		return model.ShiroRememberMeAnalysis{}, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
-	}
-	if s.packetStore == nil {
-		return model.ShiroRememberMeAnalysis{}, fmt.Errorf("当前抓包尚未建立本地数据包索引")
-	}
-	packets, err := s.packetStore.All(nil)
+	packets, err := s.packetsForToolAnalysis()
 	if err != nil {
 		return model.ShiroRememberMeAnalysis{}, err
 	}

@@ -8,25 +8,25 @@ func TestNewServiceInitializesOwnerState(t *testing.T) {
 	if svc.emitter == nil {
 		t.Fatal("expected default emitter")
 	}
-	if svc.packetStore == nil {
+	if svc.captureCtl.packetStore == nil {
 		t.Fatal("expected packet store")
 	}
-	if svc.captureTasks == nil {
+	if svc.captureCtl.captureTasks == nil {
 		t.Fatal("expected capture task registry")
 	}
-	if svc.displayFilterCache == nil {
+	if svc.filterCtl.displayFilterCache == nil {
 		t.Fatal("expected display filter cache")
 	}
-	if svc.streamCache == nil || svc.rawStreamIndex == nil || svc.streamOverrides == nil {
-		t.Fatalf("expected stream owner maps, got cache=%v raw=%v overrides=%v", svc.streamCache, svc.rawStreamIndex, svc.streamOverrides)
+	if svc.streamCtl.streamCache == nil || svc.streamCtl.rawStreamIndex == nil || svc.streamCtl.streamOverrides == nil {
+		t.Fatalf("expected stream owner maps, got cache=%v raw=%v overrides=%v", svc.streamCtl.streamCache, svc.streamCtl.rawStreamIndex, svc.streamCtl.streamOverrides)
 	}
-	if svc.mediaArtifacts == nil || svc.mediaPlayback == nil || svc.mediaSpeech == nil {
-		t.Fatalf("expected media owner maps, got artifacts=%v playback=%v speech=%v", svc.mediaArtifacts, svc.mediaPlayback, svc.mediaSpeech)
+	if svc.mediaCtl.mediaArtifacts == nil || svc.mediaCtl.mediaPlayback == nil || svc.mediaCtl.mediaSpeech == nil {
+		t.Fatalf("expected media owner maps, got artifacts=%v playback=%v speech=%v", svc.mediaCtl.mediaArtifacts, svc.mediaCtl.mediaPlayback, svc.mediaCtl.mediaSpeech)
 	}
-	if len(svc.huntingPrefixes) == 0 {
+	if len(svc.huntingCtl.huntingPrefixes) == 0 {
 		t.Fatal("expected default hunting prefixes")
 	}
-	if !svc.yaraConf.Enabled || svc.yaraConf.TimeoutMS <= 0 {
-		t.Fatalf("expected default yara config, got %+v", svc.yaraConf)
+	if !svc.huntingCtl.yaraConf.Enabled || svc.huntingCtl.yaraConf.TimeoutMS <= 0 {
+		t.Fatalf("expected default yara config, got %+v", svc.huntingCtl.yaraConf)
 	}
 }

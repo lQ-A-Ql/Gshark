@@ -177,7 +177,7 @@ func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{captureState: captureState{packetStore: store}}
+	svc := &Service{captureCtl: captureController{captureState: captureState{packetStore: store}}}
 	cursor, total, found := svc.PacketPageCursor(4, 2, "http")
 	if !found {
 		t.Fatal("expected packet #4 to be found in filtered results")
@@ -192,16 +192,16 @@ func TestPacketPageCursorUsesFilteredIndex(t *testing.T) {
 
 func TestClearCaptureResetsPacketStore(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "TCP", Info: "demo"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.pcap = "demo.pcap"
+	svc.captureCtl.pcap = "demo.pcap"
 
-	pathBefore := svc.packetStore.Path()
+	pathBefore := svc.captureCtl.packetStore.Path()
 	if pathBefore == "" {
 		t.Fatal("expected packet store path to be initialized")
 	}
@@ -210,11 +210,11 @@ func TestClearCaptureResetsPacketStore(t *testing.T) {
 		t.Fatalf("ClearCapture() error = %v", err)
 	}
 
-	if svc.packetStore.Count() != 0 {
-		t.Fatalf("expected cleared packet store, got %d packets", svc.packetStore.Count())
+	if svc.captureCtl.packetStore.Count() != 0 {
+		t.Fatalf("expected cleared packet store, got %d packets", svc.captureCtl.packetStore.Count())
 	}
-	if svc.pcap != "" {
-		t.Fatalf("expected capture path to be cleared, got %q", svc.pcap)
+	if svc.captureCtl.pcap != "" {
+		t.Fatalf("expected capture path to be cleared, got %q", svc.captureCtl.pcap)
 	}
 	if _, err := os.Stat(pathBefore); !os.IsNotExist(err) {
 		t.Fatalf("expected old packet db to be removed, stat err=%v", err)
@@ -223,67 +223,67 @@ func TestClearCaptureResetsPacketStore(t *testing.T) {
 
 func TestClearCaptureResetsDerivedAnalysisState(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	svc.mu.Lock()
-	svc.pcap = "demo.pcap"
-	svc.displayFilterCache = map[string]*filteredPacketIndex{"tcp": newFilteredPacketIndex(nil)}
-	svc.displayFilterCacheOrder = []string{"tcp"}
-	svc.globalTrafficStats = &model.GlobalTrafficStats{}
-	svc.industrialAnalysis = &model.IndustrialAnalysis{}
-	svc.vehicleAnalysis = &model.VehicleAnalysis{}
-	svc.mediaAnalysis = &model.MediaAnalysis{}
-	svc.usbAnalysis = &model.USBAnalysis{}
-	svc.c2Analysis = &model.C2SampleAnalysis{}
-	svc.aptAnalysis = &model.APTAnalysis{}
-	svc.mediaArtifacts = map[string]string{"artifact": "path"}
-	svc.mediaPlayback = map[string]string{"artifact": "path"}
-	svc.mediaSpeech = map[string]model.MediaTranscription{"artifact": {Token: "artifact"}}
-	svc.speechBatch = &model.SpeechBatchTaskStatus{Running: 1}
-	svc.streamCache = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
-	svc.streamCacheOrder = []string{"tcp:1"}
-	svc.rawStreamIndex = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
-	svc.streamOverrides = map[string]map[int]string{"tcp:1": {0: "override"}}
-	svc.mu.Unlock()
+	svc.captureCtl.mu.Lock()
+	svc.captureCtl.pcap = "demo.pcap"
+	svc.filterCtl.displayFilterCache = map[string]*filteredPacketIndex{"tcp": newFilteredPacketIndex(nil)}
+	svc.filterCtl.displayFilterCacheOrder = []string{"tcp"}
+	svc.analysisCtl.globalTrafficStats = &model.GlobalTrafficStats{}
+	svc.analysisCtl.industrialAnalysis = &model.IndustrialAnalysis{}
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{}
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{}
+	svc.analysisCtl.usbAnalysis = &model.USBAnalysis{}
+	svc.analysisCtl.c2Analysis = &model.C2SampleAnalysis{}
+	svc.analysisCtl.aptAnalysis = &model.APTAnalysis{}
+	svc.mediaCtl.mediaArtifacts = map[string]string{"artifact": "path"}
+	svc.mediaCtl.mediaPlayback = map[string]string{"artifact": "path"}
+	svc.mediaCtl.mediaSpeech = map[string]model.MediaTranscription{"artifact": {Token: "artifact"}}
+	svc.mediaCtl.speechBatch = &model.SpeechBatchTaskStatus{Running: 1}
+	svc.streamCtl.streamCache = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
+	svc.streamCtl.streamCacheOrder = []string{"tcp:1"}
+	svc.streamCtl.rawStreamIndex = map[string]model.ReassembledStream{"tcp:1": {Protocol: "TCP"}}
+	svc.streamCtl.streamOverrides = map[string]map[int]string{"tcp:1": {0: "override"}}
+	svc.captureCtl.mu.Unlock()
 
 	if err := svc.ClearCapture(); err != nil {
 		t.Fatalf("ClearCapture() error = %v", err)
 	}
 
-	svc.mu.RLock()
-	defer svc.mu.RUnlock()
-	if svc.pcap != "" || len(svc.displayFilterCache) != 0 || len(svc.displayFilterCacheOrder) != 0 {
-		t.Fatalf("expected capture/filter state to reset, pcap=%q cache=%d order=%d", svc.pcap, len(svc.displayFilterCache), len(svc.displayFilterCacheOrder))
+	svc.captureCtl.mu.RLock()
+	defer svc.captureCtl.mu.RUnlock()
+	if svc.captureCtl.pcap != "" || len(svc.filterCtl.displayFilterCache) != 0 || len(svc.filterCtl.displayFilterCacheOrder) != 0 {
+		t.Fatalf("expected capture/filter state to reset, pcap=%q cache=%d order=%d", svc.captureCtl.pcap, len(svc.filterCtl.displayFilterCache), len(svc.filterCtl.displayFilterCacheOrder))
 	}
-	if svc.globalTrafficStats != nil || svc.industrialAnalysis != nil || svc.vehicleAnalysis != nil || svc.mediaAnalysis != nil || svc.usbAnalysis != nil || svc.c2Analysis != nil || svc.aptAnalysis != nil {
+	if svc.analysisCtl.globalTrafficStats != nil || svc.analysisCtl.industrialAnalysis != nil || svc.analysisCtl.vehicleAnalysis != nil || svc.analysisCtl.mediaAnalysis != nil || svc.analysisCtl.usbAnalysis != nil || svc.analysisCtl.c2Analysis != nil || svc.analysisCtl.aptAnalysis != nil {
 		t.Fatal("expected cached analysis results to reset")
 	}
-	if len(svc.mediaArtifacts) != 0 || len(svc.mediaPlayback) != 0 || len(svc.mediaSpeech) != 0 || svc.speechBatch != nil {
-		t.Fatalf("expected media and speech state to reset, artifacts=%d playback=%d speech=%d batch=%v", len(svc.mediaArtifacts), len(svc.mediaPlayback), len(svc.mediaSpeech), svc.speechBatch)
+	if len(svc.mediaCtl.mediaArtifacts) != 0 || len(svc.mediaCtl.mediaPlayback) != 0 || len(svc.mediaCtl.mediaSpeech) != 0 || svc.mediaCtl.speechBatch != nil {
+		t.Fatalf("expected media and speech state to reset, artifacts=%d playback=%d speech=%d batch=%v", len(svc.mediaCtl.mediaArtifacts), len(svc.mediaCtl.mediaPlayback), len(svc.mediaCtl.mediaSpeech), svc.mediaCtl.speechBatch)
 	}
-	if len(svc.streamCache) != 0 || len(svc.streamCacheOrder) != 0 || len(svc.rawStreamIndex) != 0 || len(svc.streamOverrides) != 0 {
-		t.Fatalf("expected stream state to reset, cache=%d order=%d raw=%d overrides=%d", len(svc.streamCache), len(svc.streamCacheOrder), len(svc.rawStreamIndex), len(svc.streamOverrides))
+	if len(svc.streamCtl.streamCache) != 0 || len(svc.streamCtl.streamCacheOrder) != 0 || len(svc.streamCtl.rawStreamIndex) != 0 || len(svc.streamCtl.streamOverrides) != 0 {
+		t.Fatalf("expected stream state to reset, cache=%d order=%d raw=%d overrides=%d", len(svc.streamCtl.streamCache), len(svc.streamCtl.streamCacheOrder), len(svc.streamCtl.rawStreamIndex), len(svc.streamCtl.streamOverrides))
 	}
 }
 
 func TestPrepareCaptureReplacementInvalidatesActiveRun(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	streamCtx, streamCancel := context.WithCancel(context.Background())
 	filterCtx, filterCancel := context.WithCancel(context.Background())
-	svc.mu.Lock()
-	svc.cancel = streamCancel
-	svc.displayFilterCache = map[string]*filteredPacketIndex{
+	svc.captureCtl.mu.Lock()
+	svc.captureCtl.cancel = streamCancel
+	svc.filterCtl.displayFilterCache = map[string]*filteredPacketIndex{
 		"tcp": newFilteredPacketIndex(filterCancel),
 	}
-	svc.displayFilterCacheOrder = []string{"tcp"}
-	svc.mu.Unlock()
-	atomic.StoreInt64(&svc.runID, 41)
+	svc.filterCtl.displayFilterCacheOrder = []string{"tcp"}
+	svc.captureCtl.mu.Unlock()
+	atomic.StoreInt64(&svc.captureCtl.runID, 41)
 
 	svc.PrepareCaptureReplacement()
 
-	if got := atomic.LoadInt64(&svc.runID); got != 42 {
+	if got := atomic.LoadInt64(&svc.captureCtl.runID); got != 42 {
 		t.Fatalf("expected replacement to invalidate previous runID, got %d", got)
 	}
 	select {
@@ -296,8 +296,8 @@ func TestPrepareCaptureReplacementInvalidatesActiveRun(t *testing.T) {
 	default:
 		t.Fatal("expected display filter cache context to be cancelled")
 	}
-	if len(svc.displayFilterCache) != 0 {
-		t.Fatalf("expected display filter cache to be cleared, got %d entries", len(svc.displayFilterCache))
+	if len(svc.filterCtl.displayFilterCache) != 0 {
+		t.Fatalf("expected display filter cache to be cleared, got %d entries", len(svc.filterCtl.displayFilterCache))
 	}
 }
 
@@ -320,7 +320,7 @@ func TestClearCaptureCancelsActiveLoad(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
 	done := make(chan error, 1)
@@ -373,7 +373,7 @@ func TestCaptureStatusReportsActiveFirstScreenLoad(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
 	done := make(chan error, 1)
@@ -428,7 +428,7 @@ func TestPendingLoadRunHonorsCloseBeforeGoroutineStarts(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	capture := writeTempCaptureFile(t)
 
 	runID, runCtx := svc.BeginCaptureLoad(context.Background())
@@ -440,14 +440,14 @@ func TestPendingLoadRunHonorsCloseBeforeGoroutineStarts(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected closed pending run to be canceled, got %v", err)
 	}
-	if got := svc.packetStore.Count(); got != 0 {
+	if got := svc.captureCtl.packetStore.Count(); got != 0 {
 		t.Fatalf("expected no packets to be written by canceled pending run, got %d", got)
 	}
 }
 
 func TestClearCaptureCancelsTrackedCaptureTasks(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "unit-test-task")
 	defer finishTask()
@@ -471,7 +471,7 @@ func TestClearCaptureCancelsTrackedCaptureTasks(t *testing.T) {
 
 func TestPrepareCaptureReplacementCancelsTrackedCaptureTasks(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	taskCtx, finishTask := svc.TrackCaptureTask(context.Background(), "replacement-task")
 	defer finishTask()
@@ -512,7 +512,7 @@ func TestLoadPCAPReplacementCancelsPreviousLoad(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	first := writeTempCaptureFile(t)
 	second := writeTempCaptureFile(t)
 
@@ -537,7 +537,7 @@ func TestLoadPCAPReplacementCancelsPreviousLoad(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected first load to exit after replacement")
 	}
-	if got := svc.packetStore.Count(); got != 1 {
+	if got := svc.captureCtl.packetStore.Count(); got != 1 {
 		t.Fatalf("expected replacement packet store to contain one packet, got %d", got)
 	}
 }
@@ -563,26 +563,26 @@ func TestLoadPCAPFailureKeepsPreviousCaptureActive(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{ID: 7, Protocol: "HTTP", Info: "old"}}); err != nil {
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{ID: 7, Protocol: "HTTP", Info: "old"}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.pcap = "old.pcap"
-	oldPath := svc.packetStore.Path()
+	svc.captureCtl.pcap = "old.pcap"
+	oldPath := svc.captureCtl.packetStore.Path()
 
 	capture := writeTempCaptureFile(t)
 	err := svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture})
 	if err == nil || err.Error() != "boom" {
 		t.Fatalf("expected parse failure, got %v", err)
 	}
-	if svc.pcap != "old.pcap" {
-		t.Fatalf("expected previous capture path to remain active, got %q", svc.pcap)
+	if svc.captureCtl.pcap != "old.pcap" {
+		t.Fatalf("expected previous capture path to remain active, got %q", svc.captureCtl.pcap)
 	}
-	if svc.packetStore.Count() != 1 {
-		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.packetStore.Count())
+	if svc.captureCtl.packetStore.Count() != 1 {
+		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.captureCtl.packetStore.Count())
 	}
-	if svc.packetStore.Path() != oldPath {
-		t.Fatalf("expected previous packet store path to remain active, got %q", svc.packetStore.Path())
+	if svc.captureCtl.packetStore.Path() != oldPath {
+		t.Fatalf("expected previous packet store path to remain active, got %q", svc.captureCtl.packetStore.Path())
 	}
 }
 
@@ -607,22 +607,22 @@ func TestLoadPCAPZeroPacketsKeepsPreviousCaptureActive(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{ID: 9, Protocol: "TCP", Info: "old"}}); err != nil {
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{ID: 9, Protocol: "TCP", Info: "old"}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.pcap = "old-zero.pcap"
+	svc.captureCtl.pcap = "old-zero.pcap"
 
 	capture := writeTempCaptureFile(t)
 	err := svc.LoadPCAP(context.Background(), model.ParseOptions{FilePath: capture})
 	if err == nil || err.Error() != "capture parse completed but produced no packets" {
 		t.Fatalf("expected zero-packet parse failure, got %v", err)
 	}
-	if svc.pcap != "old-zero.pcap" {
-		t.Fatalf("expected previous capture path to remain active, got %q", svc.pcap)
+	if svc.captureCtl.pcap != "old-zero.pcap" {
+		t.Fatalf("expected previous capture path to remain active, got %q", svc.captureCtl.pcap)
 	}
-	if svc.packetStore.Count() != 1 {
-		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.packetStore.Count())
+	if svc.captureCtl.packetStore.Count() != 1 {
+		t.Fatalf("expected previous packet store to remain active, got %d rows", svc.captureCtl.packetStore.Count())
 	}
 }
 
@@ -664,7 +664,7 @@ func TestThreatHuntStreamsFromPacketStore(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{captureState: captureState{packetStore: store}}
+	svc := &Service{captureCtl: captureController{captureState: captureState{packetStore: store}}}
 	hits := svc.ThreatHunt([]string{"flag{"})
 	if len(hits) < 2 {
 		t.Fatalf("expected streamed hunt hits, got %+v", hits)
@@ -698,9 +698,9 @@ func TestPacketsPageUsesTSharkDisplayFilterCache(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "TCP", DestPort: 80, Info: "HTTP"},
 		{ID: 2, Protocol: "TLS", DestPort: 443, Info: "Client Hello"},
 		{ID: 3, Protocol: "UDP", DestPort: 53, Info: "DNS"},
@@ -755,9 +755,9 @@ func TestPacketsPageDoesNotFallbackToLegacyFilterWhenTSharkFilterFails(t *testin
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
 		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
 	}); err != nil {
@@ -781,9 +781,9 @@ func TestPacketsPageWithErrorReturnsDisplayFilterError(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
 		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
 	}); err != nil {
@@ -813,9 +813,9 @@ func TestPacketPageCursorWithErrorReturnsDisplayFilterError(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -844,9 +844,9 @@ func TestFilteredPacketIndexUsesAccessOrderForLRUEviction(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{{ID: 1, Protocol: "TCP", DestPort: 443}}); err != nil {
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{ID: 1, Protocol: "TCP", DestPort: 443}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
@@ -931,9 +931,9 @@ func TestPacketsPageReturnsFirstWindowBeforeDisplayFilterScanCompletes(t *testin
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "TCP", DestPort: 80},
 		{ID: 2, Protocol: "TCP", DestPort: 443},
 		{ID: 3, Protocol: "TCP", DestPort: 8080},
@@ -1007,9 +1007,9 @@ func TestPacketsPageReturnsBlankWhenDisplayFilterMatchesNoPackets(t *testing.T) 
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "demo.pcap"
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "demo.pcap"
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Protocol: "HTTP", DestPort: 80, Info: "GET /index"},
 		{ID: 2, Protocol: "HTTP", DestPort: 80, Info: "POST /login"},
 	}); err != nil {

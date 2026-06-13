@@ -279,7 +279,7 @@ func loadRealSample(t *testing.T, envName, fallback string) *Service {
 	path := realSamplePath(t, envName, fallback)
 	svc := NewService(NopEmitter{})
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

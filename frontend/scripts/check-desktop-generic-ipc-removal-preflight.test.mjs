@@ -114,7 +114,8 @@ function validPackageJson() {
   return {
     scripts: {
       "desktop-generic-ipc-removal-preflight:check": "node scripts/check-desktop-generic-ipc-removal-preflight.mjs",
-      ci: "pnpm run desktop-generic-ipc-removal-preflight:check",
+      "ci:desktop": "pnpm run desktop-generic-ipc-removal-preflight:check",
+      ci: "pnpm run ci:desktop",
     },
   };
 }

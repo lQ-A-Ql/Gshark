@@ -31,8 +31,8 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 	s.emitStatus("__progress__:threat:0:5:准备威胁分析")
 	hunter := newThreatHunter(prefixes, 1)
 
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -77,10 +77,10 @@ func (s *Service) ThreatHuntWithContext(ctx context.Context, prefixes []string) 
 }
 
 func (s *Service) getHuntingPrefixes() []string {
-	s.huntMu.RLock()
-	defer s.huntMu.RUnlock()
-	out := make([]string, len(s.huntingPrefixes))
-	copy(out, s.huntingPrefixes)
+	s.huntingCtl.huntMu.RLock()
+	defer s.huntingCtl.huntMu.RUnlock()
+	out := make([]string, len(s.huntingCtl.huntingPrefixes))
+	copy(out, s.huntingCtl.huntingPrefixes)
 	return out
 }
 
@@ -89,10 +89,9 @@ func (s *Service) GetHuntingRuntimeConfig() model.HuntingRuntimeConfig {
 	if len(prefixes) == 0 {
 		prefixes = []string{"flag{", "ctf{"}
 	}
-
-	s.huntMu.RLock()
-	yc := s.yaraConf
-	s.huntMu.RUnlock()
+	s.huntingCtl.huntMu.RLock()
+	yc := s.huntingCtl.yaraConf
+	s.huntingCtl.huntMu.RUnlock()
 
 	yaraTimeoutMS := yc.TimeoutMS
 	if yaraTimeoutMS <= 0 {
@@ -125,27 +124,20 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 			normalized = append(normalized, v)
 		}
 		if len(normalized) > 0 {
-			s.huntMu.Lock()
-			s.huntingPrefixes = normalized
-			s.huntMu.Unlock()
+			s.huntingCtl.huntMu.Lock()
+			s.huntingCtl.huntingPrefixes = normalized
+			s.huntingCtl.huntMu.Unlock()
 		}
 	}
-
-	s.huntMu.Lock()
-	s.yaraConf = model.YaraConfig{
+	s.huntingCtl.huntMu.Lock()
+	s.huntingCtl.yaraConf = model.YaraConfig{
 		Enabled:   cfg.YaraEnabled,
 		Bin:       strings.TrimSpace(cfg.YaraBin),
 		Rules:     strings.TrimSpace(cfg.YaraRules),
 		TimeoutMS: cfg.YaraTimeoutMS,
 	}
-	s.huntMu.Unlock()
-
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraScanning = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
+	s.huntingCtl.huntMu.Unlock()
+	s.resetYaraScanState()
 
 	return s.GetHuntingRuntimeConfig()
 }
@@ -163,32 +155,39 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	if ctx.Err() != nil {
 		return nil
 	}
-
 	// Fast path: return cached results under short lock.
-	s.yaraMu.Lock()
-	if s.yaraLoaded {
-		out := make([]model.ThreatHit, len(s.yaraHits))
-		copy(out, s.yaraHits)
-		s.yaraMu.Unlock()
+	s.huntingCtl.yaraMu.Lock()
+	if s.huntingCtl.yaraLoaded {
+		out := make([]model.ThreatHit, len(s.huntingCtl.yaraHits))
+		copy(out, s.huntingCtl.yaraHits)
+		s.huntingCtl.yaraMu.Unlock()
 		return out
 	}
-	if s.yaraScanning {
+	if s.huntingCtl.yaraScanning {
 		// Another goroutine is already scanning; wait for it.
-		s.yaraMu.Unlock()
-		<-ctx.Done()
-		s.yaraMu.Lock()
-		out := make([]model.ThreatHit, len(s.yaraHits))
-		copy(out, s.yaraHits)
-		s.yaraMu.Unlock()
+		done := s.huntingCtl.yaraScanDone
+		s.huntingCtl.yaraMu.Unlock()
+		if done == nil {
+			<-ctx.Done()
+		} else {
+			select {
+			case <-done:
+			case <-ctx.Done():
+			}
+		}
+		s.huntingCtl.yaraMu.Lock()
+		out := make([]model.ThreatHit, len(s.huntingCtl.yaraHits))
+		copy(out, s.huntingCtl.yaraHits)
+		s.huntingCtl.yaraMu.Unlock()
 		return out
 	}
-	s.yaraScanning = true
-	s.yaraMu.Unlock()
-
+	s.huntingCtl.yaraScanning = true
+	s.huntingCtl.yaraScanDone = make(chan struct{})
+	s.huntingCtl.yaraMu.Unlock()
 	// Scan runs outside the lock.
-	s.huntMu.RLock()
-	yc := s.yaraConf
-	s.huntMu.RUnlock()
+	s.huntingCtl.huntMu.RLock()
+	yc := s.huntingCtl.yaraConf
+	s.huntingCtl.huntMu.RUnlock()
 
 	if !yc.Enabled {
 		s.setYaraResult(nil, nil, true)
@@ -198,25 +197,47 @@ func (s *Service) cachedYaraHitsWithContext(ctx context.Context, objects []model
 	hits, scanErr := s.executeYaraScan(ctx, yc, objects)
 
 	s.setYaraResult(hits, scanErr, true)
-
-	s.yaraMu.Lock()
-	out := make([]model.ThreatHit, len(s.yaraHits))
-	copy(out, s.yaraHits)
-	s.yaraMu.Unlock()
+	s.huntingCtl.yaraMu.Lock()
+	out := make([]model.ThreatHit, len(s.huntingCtl.yaraHits))
+	copy(out, s.huntingCtl.yaraHits)
+	s.huntingCtl.yaraMu.Unlock()
 	return out
 }
 
 func (s *Service) setYaraResult(hits []model.ThreatHit, scanErr error, loaded bool) {
-	s.yaraMu.Lock()
-	s.yaraHits = hits
-	s.yaraLoaded = loaded
-	s.yaraScanning = false
+	s.huntingCtl.yaraMu.Lock()
+	done := s.huntingCtl.yaraScanDone
+	s.huntingCtl.yaraHits = hits
+	s.huntingCtl.yaraLoaded = loaded
+	s.huntingCtl.yaraScanning = false
+	s.huntingCtl.yaraScanDone = nil
 	if scanErr != nil {
-		s.yaraLastError = scanErr.Error()
+		s.huntingCtl.yaraLastError = scanErr.Error()
 	} else {
-		s.yaraLastError = ""
+		s.huntingCtl.yaraLastError = ""
 	}
-	s.yaraMu.Unlock()
+	s.huntingCtl.yaraMu.Unlock()
+	if done != nil {
+		close(done)
+	}
+}
+
+func closeYaraScanDoneLocked(state *yaraHuntingState) {
+	if state == nil || state.yaraScanDone == nil {
+		return
+	}
+	close(state.yaraScanDone)
+	state.yaraScanDone = nil
+}
+
+func (s *Service) resetYaraScanState() {
+	s.huntingCtl.yaraMu.Lock()
+	closeYaraScanDoneLocked(&s.huntingCtl.yaraHuntingState)
+	s.huntingCtl.yaraLoaded = false
+	s.huntingCtl.yaraScanning = false
+	s.huntingCtl.yaraHits = nil
+	s.huntingCtl.yaraLastError = ""
+	s.huntingCtl.yaraMu.Unlock()
 }
 
 func (s *Service) executeYaraScan(ctx context.Context, yc model.YaraConfig, objects []model.ObjectFile) ([]model.ThreatHit, error) {
@@ -262,17 +283,16 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 	}
 	ctx, finishTask := s.TrackCaptureTask(ctx, "object-export")
 	defer finishTask()
-	s.objMu.Lock()
-	if s.objectsLoaded {
-		objects := s.objects
-		s.objMu.Unlock()
+	s.objectCtl.objMu.Lock()
+	if s.objectCtl.objectsLoaded {
+		objects := s.objectCtl.objects
+		s.objectCtl.objMu.Unlock()
 		return objects
 	}
-	s.objMu.Unlock()
-
-	s.mu.RLock()
-	pcapPath := s.pcap
-	s.mu.RUnlock()
+	s.objectCtl.objMu.Unlock()
+	s.captureCtl.mu.RLock()
+	pcapPath := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
 
 	if pcapPath == "" {
 		return nil
@@ -298,29 +318,29 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-		s.objMu.Lock()
-		s.mu.RLock()
-		currentPCAP := s.pcap
-		s.mu.RUnlock()
-		if currentPCAP == pcapPath && !s.objectsLoaded {
-			s.objectsLoaded = true
-			s.objects = nil
+		s.objectCtl.objMu.Lock()
+		s.captureCtl.mu.RLock()
+		currentPCAP := s.captureCtl.pcap
+		s.captureCtl.mu.RUnlock()
+		if currentPCAP == pcapPath && !s.objectCtl.objectsLoaded {
+			s.objectCtl.objectsLoaded = true
+			s.objectCtl.objects = nil
 		}
-		s.objMu.Unlock()
+		s.objectCtl.objMu.Unlock()
 		return nil
 	}
 
 	entries, err := os.ReadDir(tempDir)
 	if err != nil {
-		s.objMu.Lock()
-		s.mu.RLock()
-		currentPCAP := s.pcap
-		s.mu.RUnlock()
-		if currentPCAP == pcapPath && !s.objectsLoaded {
-			s.objectsLoaded = true
-			s.objects = nil
+		s.objectCtl.objMu.Lock()
+		s.captureCtl.mu.RLock()
+		currentPCAP := s.captureCtl.pcap
+		s.captureCtl.mu.RUnlock()
+		if currentPCAP == pcapPath && !s.objectCtl.objectsLoaded {
+			s.objectCtl.objectsLoaded = true
+			s.objectCtl.objects = nil
 		}
-		s.objMu.Unlock()
+		s.objectCtl.objMu.Unlock()
 		return nil
 	}
 
@@ -363,52 +383,57 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 		})
 		id++
 	}
-
-	s.objMu.Lock()
-	defer s.objMu.Unlock()
-	if s.objectsLoaded {
-		return s.objects
+	s.objectCtl.objMu.Lock()
+	defer s.objectCtl.objMu.Unlock()
+	if s.objectCtl.objectsLoaded {
+		return s.objectCtl.objects
 	}
-
-	s.mu.RLock()
-	currentPCAP := s.pcap
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	currentPCAP := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
 	if currentPCAP != pcapPath {
 		return nil
 	}
-
-	s.exportDir = tempDir
-	s.objects = objects
-	s.objectsLoaded = true
+	s.objectCtl.exportDir = tempDir
+	s.objectCtl.objects = objects
+	s.objectCtl.objectsLoaded = true
 	keepTempDir = true
-	return s.objects
+	return s.objectCtl.objects
 }
 
 func (s *Service) packetObjectNameIndex() map[string]int64 {
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return map[string]int64{}
 	}
 	return buildPacketIDByObjectNameFromIterate(func(fn func(model.Packet) error) error {
-		return s.packetStore.Iterate(nil, fn)
+		return s.captureCtl.packetStore.Iterate(nil, fn)
 	})
 }
 
 func (s *Service) SetTLSConfig(cfg model.TLSConfig) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.tlsConf = cfg
+	s.runtimeCtl.setTLSConfig(cfg)
 }
 
 func (s *Service) TLSConfig() model.TLSConfig {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.tlsConf
+	return s.runtimeCtl.tlsConfig()
+}
+
+func (ctl *toolRuntimeController) setTLSConfig(cfg model.TLSConfig) {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.tlsConf = cfg
+}
+
+func (ctl *toolRuntimeController) tlsConfig() model.TLSConfig {
+	ctl.toolRuntimeMu.RLock()
+	defer ctl.toolRuntimeMu.RUnlock()
+	return ctl.tlsConf
 }
 
 func (s *Service) PacketRawHex(packetID int64) (string, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
 
 	if pcap == "" {
 		return "", errors.New("no capture loaded")
@@ -417,9 +442,9 @@ func (s *Service) PacketRawHex(packetID int64) (string, error) {
 }
 
 func (s *Service) PacketLayers(packetID int64) (map[string]any, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
 
 	if pcap == "" {
 		return nil, errors.New("no capture loaded")
@@ -430,19 +455,18 @@ func (s *Service) PacketLayers(packetID int64) (map[string]any, error) {
 func (s *Service) StreamIDs(protocol string) []int64 {
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	ids := make(map[int64]struct{})
-
-	s.mu.RLock()
-	if len(s.rawStreamIndex) > 0 {
-		for _, stream := range s.rawStreamIndex {
+	s.captureCtl.mu.RLock()
+	if len(s.streamCtl.rawStreamIndex) > 0 {
+		for _, stream := range s.streamCtl.rawStreamIndex {
 			if strings.EqualFold(stream.Protocol, normalized) && stream.StreamID >= 0 {
 				ids[stream.StreamID] = struct{}{}
 			}
 		}
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(p model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(p model.Packet) error {
 			if p.StreamID < 0 {
 				return nil
 			}
@@ -480,65 +504,64 @@ func (s *Service) filteredPacketIndex(filter string) (*filteredPacketIndex, erro
 	if filter == "" {
 		return nil, nil
 	}
-
-	s.mu.Lock()
-	if cached, ok := s.displayFilterCache[filter]; ok {
+	s.captureCtl.mu.Lock()
+	if cached, ok := s.filterCtl.displayFilterCache[filter]; ok {
 		s.touchDisplayFilterCacheLocked(filter)
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 		return cached, nil
 	}
-	pcap := s.pcap
-	tlsConf := s.tlsConf
-	if strings.TrimSpace(pcap) == "" || s.packetStore == nil {
-		s.mu.Unlock()
+	pcap := s.captureCtl.pcap
+	tlsConf := s.runtimeCtl.tlsConfig()
+	if strings.TrimSpace(pcap) == "" || s.captureCtl.packetStore == nil {
+		s.captureCtl.mu.Unlock()
 		return nil, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	index := newFilteredPacketIndex(cancel)
-	s.displayFilterCache[filter] = index
+	s.filterCtl.displayFilterCache[filter] = index
 	s.touchDisplayFilterCacheLocked(filter)
 	s.evictDisplayFilterCacheLocked()
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 	go s.scanDisplayFilterIndex(ctx, filter, pcap, tlsConf, index)
 	return index, nil
 }
 
 func (s *Service) touchDisplayFilterCacheLocked(filter string) {
-	for i, existing := range s.displayFilterCacheOrder {
+	for i, existing := range s.filterCtl.displayFilterCacheOrder {
 		if existing != filter {
 			continue
 		}
-		copy(s.displayFilterCacheOrder[i:], s.displayFilterCacheOrder[i+1:])
-		s.displayFilterCacheOrder = s.displayFilterCacheOrder[:len(s.displayFilterCacheOrder)-1]
+		copy(s.filterCtl.displayFilterCacheOrder[i:], s.filterCtl.displayFilterCacheOrder[i+1:])
+		s.filterCtl.displayFilterCacheOrder = s.filterCtl.displayFilterCacheOrder[:len(s.filterCtl.displayFilterCacheOrder)-1]
 		break
 	}
-	s.displayFilterCacheOrder = append(s.displayFilterCacheOrder, filter)
+	s.filterCtl.displayFilterCacheOrder = append(s.filterCtl.displayFilterCacheOrder, filter)
 }
 
 func (s *Service) evictDisplayFilterCacheLocked() {
-	for len(s.displayFilterCacheOrder) > displayFilterCacheLimit {
-		oldest := s.displayFilterCacheOrder[0]
-		s.displayFilterCacheOrder = s.displayFilterCacheOrder[1:]
-		if cached, ok := s.displayFilterCache[oldest]; ok {
+	for len(s.filterCtl.displayFilterCacheOrder) > displayFilterCacheLimit {
+		oldest := s.filterCtl.displayFilterCacheOrder[0]
+		s.filterCtl.displayFilterCacheOrder = s.filterCtl.displayFilterCacheOrder[1:]
+		if cached, ok := s.filterCtl.displayFilterCache[oldest]; ok {
 			cached.stop()
 		}
-		delete(s.displayFilterCache, oldest)
+		delete(s.filterCtl.displayFilterCache, oldest)
 	}
 }
 
 func (s *Service) cancelDisplayFilterCacheLocked() {
-	for filter, cached := range s.displayFilterCache {
+	for filter, cached := range s.filterCtl.displayFilterCache {
 		if cached != nil {
 			cached.stop()
 		}
-		delete(s.displayFilterCache, filter)
+		delete(s.filterCtl.displayFilterCache, filter)
 	}
 }
 
 func (s *Service) hasCapturePath() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return strings.TrimSpace(s.pcap) != ""
+	s.captureCtl.mu.RLock()
+	defer s.captureCtl.mu.RUnlock()
+	return strings.TrimSpace(s.captureCtl.pcap) != ""
 }
 
 func streamCacheLimitValue() int {

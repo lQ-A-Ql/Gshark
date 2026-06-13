@@ -126,10 +126,19 @@ func (l *analysisLimiter) drainLocked() {
 }
 
 func (s *Service) withLimitedAnalysis(ctx context.Context, target string, fn func(context.Context) error) error {
+	return s.analysisCtl.withLimited(ctx, target, fn, s.recordAnalysisTelemetry)
+}
+
+func (ctl *analysisController) withLimited(
+	ctx context.Context,
+	target string,
+	fn func(context.Context) error,
+	record func(context.Context, string, int, time.Duration, time.Duration, error),
+) error {
 	if !analysisRequestIsWarmup(ctx) {
 		startedAt := time.Now()
 		err := fn(ctx)
-		s.recordAnalysisTelemetry(ctx, target, 0, 0, time.Since(startedAt), err)
+		record(ctx, target, 0, 0, time.Since(startedAt), err)
 		return err
 	}
 	if ctx == nil {
@@ -142,15 +151,15 @@ func (s *Service) withLimitedAnalysis(ctx context.Context, target string, fn fun
 	}
 	ctx = servicecontract.WithAnalysisRequestMeta(ctx, meta)
 	waitStartedAt := time.Now()
-	result, err := s.analysisLimiter.acquire(ctx, false)
+	result, err := ctl.analysisLimiter.acquire(ctx, false)
 	if err != nil {
-		s.recordAnalysisTelemetry(ctx, target, 0, time.Since(waitStartedAt), 0, err)
+		record(ctx, target, 0, time.Since(waitStartedAt), 0, err)
 		return err
 	}
 	defer result.release()
 	startedAt := time.Now()
 	err = fn(ctx)
-	s.recordAnalysisTelemetry(ctx, target, result.queueDepth, result.wait, time.Since(startedAt), err)
+	record(ctx, target, result.queueDepth, result.wait, time.Since(startedAt), err)
 	return err
 }
 

@@ -1,6 +1,7 @@
 package architecture
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -178,6 +179,373 @@ func TestBackendArchitectureBoundaries(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("engine root files have domain ownership", func(t *testing.T) {
+		engineDir := filepath.Join(root, "internal", "engine")
+		owners := engineDomainOwners()
+		for _, path := range goFiles(t, engineDir) {
+			if filepath.Dir(path) != engineDir {
+				continue
+			}
+			name := filepath.Base(path)
+			if _, ok := owners[name]; !ok {
+				t.Fatalf("%s is missing from engine domain ownership map", rel(root, path))
+			}
+		}
+	})
+
+	t.Run("new large engine root files must be explicitly grandfathered", func(t *testing.T) {
+		engineDir := filepath.Join(root, "internal", "engine")
+		grandfathered := grandfatheredLargeEngineFiles()
+		const largeFileLineLimit = 650
+		for _, path := range goFiles(t, engineDir) {
+			if filepath.Dir(path) != engineDir {
+				continue
+			}
+			name := filepath.Base(path)
+			lines := countLines(readFile(t, path))
+			if lines <= largeFileLineLimit {
+				continue
+			}
+			if _, ok := grandfathered[name]; !ok {
+				t.Fatalf("%s has %d lines; split or explicitly add to large-file exception list", rel(root, path), lines)
+			}
+		}
+	})
+
+	t.Run("engine pure logic subpackages stay dependency light", func(t *testing.T) {
+		pureLogicPackages := []string{
+			filepath.Join(root, "internal", "engine", "payloadinspect"),
+		}
+		for _, dir := range pureLogicPackages {
+			for _, path := range goFiles(t, dir) {
+				for _, imported := range importsFor(t, path) {
+					if containsAny(imported, []string{
+						"/internal/engine",
+						"/internal/transport",
+						"/internal/tshark",
+						"/internal/miscpkg",
+						"/internal/plugin",
+						"net/http",
+						"os/exec",
+					}) {
+						t.Fatalf("%s imports forbidden pure-logic dependency %q", rel(root, path), imported)
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("engine service uses explicit controllers instead of embedded state", func(t *testing.T) {
+		servicePath := filepath.Join(root, "internal", "engine", "service.go")
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, servicePath, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", rel(root, servicePath), err)
+		}
+		serviceStruct := findStructType(parsed, "Service")
+		if serviceStruct == nil {
+			t.Fatalf("%s is missing Service struct", rel(root, servicePath))
+		}
+
+		wantControllers := map[string]string{
+			"captureCtl":     "captureController",
+			"filterCtl":      "displayFilterController",
+			"streamCtl":      "streamController",
+			"analysisCtl":    "analysisController",
+			"objectCtl":      "objectController",
+			"mediaCtl":       "mediaController",
+			"huntingCtl":     "yaraHuntingController",
+			"runtimeCtl":     "toolRuntimeController",
+			"mcpCtl":         "mcpController",
+			"playbookCtl":    "playbookController",
+			"savedSearchCtl": "savedSearchController",
+			"hypothesisCtl":  "hypothesisController",
+		}
+		seen := map[string]string{}
+		for _, field := range serviceStruct.Fields.List {
+			if len(field.Names) == 0 {
+				t.Fatalf("Service anonymously embeds %s; state must be grouped behind explicit controller fields", exprString(field.Type))
+			}
+			name := field.Names[0].Name
+			if _, ok := wantControllers[name]; ok {
+				seen[name] = exprString(field.Type)
+			}
+			if _, ok := engineServiceStateTypes()[exprString(field.Type)]; ok {
+				t.Fatalf("Service field %s directly uses %s; use explicit controller composition", name, exprString(field.Type))
+			}
+		}
+		for field, wantType := range wantControllers {
+			if got := seen[field]; got != wantType {
+				t.Fatalf("Service.%s type = %q, want %q", field, got, wantType)
+			}
+		}
+	})
+
+	t.Run("engine controllers do not embed other controllers or service", func(t *testing.T) {
+		typesPath := filepath.Join(root, "internal", "engine", "service_types.go")
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, typesPath, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", rel(root, typesPath), err)
+		}
+		stateTypes := engineServiceStateTypes()
+		for controller, state := range map[string]string{
+			"captureController":       "captureState",
+			"displayFilterController": "displayFilterState",
+			"streamController":        "streamState",
+			"analysisController":      "analysisCache",
+			"objectController":        "objectState",
+			"mediaController":         "mediaState",
+			"yaraHuntingController":   "yaraHuntingState",
+			"toolRuntimeController":   "toolRuntimeState",
+			"mcpController":           "mcpState",
+			"playbookController":      "playbookStatePB",
+			"savedSearchController":   "savedSearchStateSS",
+			"hypothesisController":    "hypothesisStateHT",
+		} {
+			structType := findStructType(parsed, controller)
+			if structType == nil {
+				t.Fatalf("%s missing controller type %s", rel(root, typesPath), controller)
+			}
+			if len(structType.Fields.List) != 1 || len(structType.Fields.List[0].Names) != 0 || exprString(structType.Fields.List[0].Type) != state {
+				t.Fatalf("%s must anonymously embed only %s", controller, state)
+			}
+			for _, field := range structType.Fields.List {
+				fieldType := exprString(field.Type)
+				if fieldType == "Service" || fieldType == "*Service" {
+					t.Fatalf("%s embeds Service; controllers must not depend on the facade", controller)
+				}
+				if _, ok := stateTypes[fieldType]; ok && fieldType != state {
+					t.Fatalf("%s embeds cross-domain state %s; controllers must own one state group", controller, fieldType)
+				}
+			}
+		}
+	})
+
+	t.Run("service facade cross-controller access stays audited", func(t *testing.T) {
+		engineDir := filepath.Join(root, "internal", "engine")
+		allowed := allowedServiceCrossControllerMethods()
+		controllers := []string{
+			"captureCtl",
+			"filterCtl",
+			"streamCtl",
+			"analysisCtl",
+			"objectCtl",
+			"mediaCtl",
+			"huntingCtl",
+			"runtimeCtl",
+			"mcpCtl",
+			"playbookCtl",
+			"savedSearchCtl",
+			"hypothesisCtl",
+		}
+		for _, path := range goFiles(t, engineDir) {
+			if filepath.Dir(path) != engineDir {
+				continue
+			}
+			fset := token.NewFileSet()
+			parsed, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				t.Fatalf("parse %s: %v", rel(root, path), err)
+			}
+			for _, decl := range parsed.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Recv == nil || fn.Body == nil || len(fn.Recv.List) == 0 || !isServiceReceiver(fn.Recv.List[0]) {
+					continue
+				}
+				seen := map[string]struct{}{}
+				ast.Inspect(fn.Body, func(node ast.Node) bool {
+					sel, ok := node.(*ast.SelectorExpr)
+					if !ok {
+						return true
+					}
+					ident, ok := sel.X.(*ast.Ident)
+					if !ok || ident.Name != "s" {
+						return true
+					}
+					for _, controller := range controllers {
+						if sel.Sel.Name == controller {
+							seen[controller] = struct{}{}
+						}
+					}
+					return true
+				})
+				if len(seen) <= 1 {
+					continue
+				}
+				key := filepath.Base(path) + ":" + fn.Name.Name
+				if _, ok := allowed[key]; !ok {
+					t.Fatalf("%s touches %d controller fields; move implementation behind a controller helper or add an audited exception", key, len(seen))
+				}
+			}
+		}
+	})
+}
+
+func engineDomainOwners() map[string]string {
+	return map[string]string{
+		"analysis.go":                           "analysis_evidence",
+		"analysis_limiter.go":                   "analysis_evidence",
+		"analysis_metrics.go":                   "analysis_evidence",
+		"analysis_report.go":                    "analysis_evidence",
+		"analysis_report_industrial_vehicle.go": "protocol_tools",
+		"analysis_report_login.go":              "analysis_evidence",
+		"analysis_report_rules.go":              "analysis_evidence",
+		"analysis_report_shared.go":             "analysis_evidence",
+		"analysis_report_shiro.go":              "analysis_evidence",
+		"analysis_report_smtp_mysql.go":         "analysis_evidence",
+		"analysis_report_usb_c2.go":             "analysis_evidence",
+		"c2_decrypt.go":                         "c2_webshell",
+		"dga_detection.go":                      "analysis_evidence",
+		"display_filter_index.go":               "capture_stream_store",
+		"dnp3_analysis.go":                      "protocol_tools",
+		"events.go":                             "capture_stream_store",
+		"evidence.go":                           "analysis_evidence",
+		"evidence_collectors_assets.go":         "analysis_evidence",
+		"evidence_collectors_detection.go":      "analysis_evidence",
+		"evidence_object_rules.go":              "analysis_evidence",
+		"evidence_rules.go":                     "analysis_evidence",
+		"evidence_usb_rules.go":                 "analysis_evidence",
+		"evidence_vehicle_rules.go":             "analysis_evidence",
+		"filter.go":                             "capture_stream_store",
+		"hypothesis.go":                         "analysis_evidence",
+		"ioc_import.go":                         "analysis_evidence",
+		"ioc_match.go":                          "analysis_evidence",
+		"malleable_c2_profiles.go":              "c2_webshell",
+		"mcp_config.go":                         "runtime_integration",
+		"media_playback.go":                     "media_speech",
+		"mitre_attack_mapping.go":               "analysis_evidence",
+		"object_mapping.go":                     "runtime_integration",
+		"packet_store.go":                       "capture_stream_store",
+		"playbook.go":                           "analysis_evidence",
+		"raw_stream_index.go":                   "capture_stream_store",
+		"rtp.go":                                "media_speech",
+		"rule_manager.go":                       "yara_hunting_rules",
+		"saved_search.go":                       "analysis_evidence",
+		"service.go":                            "capture_stream_store",
+		"service_analysis.go":                   "analysis_evidence",
+		"service_capture.go":                    "capture_stream_store",
+		"service_streams.go":                    "capture_stream_store",
+		"service_tools.go":                      "runtime_integration",
+		"service_types.go":                      "capture_stream_store",
+		"shared_helpers.go":                     "runtime_integration",
+		"speech_to_text.go":                     "media_speech",
+		"stream_decoder.go":                     "stream_payload",
+		"stream_decoder_extended.go":            "stream_payload",
+		"stream_payload_inspector.go":           "stream_payload",
+		"stream_payload_sources.go":             "stream_payload",
+		"threat_hunt_stream.go":                 "yara_hunting_rules",
+		"tool_apt.go":                           "analysis_evidence",
+		"tool_bruteforce.go":                    "protocol_tools",
+		"tool_c2.go":                            "c2_webshell",
+		"tool_http_login.go":                    "protocol_tools",
+		"tool_iec104.go":                        "protocol_tools",
+		"tool_misc.go":                          "runtime_integration",
+		"tool_mysql.go":                         "protocol_tools",
+		"tool_ntlm.go":                          "protocol_tools",
+		"tool_runtime.go":                       "runtime_integration",
+		"tool_shiro.go":                         "protocol_tools",
+		"tool_smb3.go":                          "protocol_tools",
+		"tool_smtp.go":                          "protocol_tools",
+		"tool_udp_tunnel.go":                    "protocol_tools",
+		"tool_winrm.go":                         "protocol_tools",
+		"vshell_websocket_decrypt.go":           "c2_webshell",
+		"yara_batch.go":                         "yara_hunting_rules",
+		"yara_stream_targets.go":                "yara_hunting_rules",
+	}
+}
+
+func grandfatheredLargeEngineFiles() map[string]struct{} {
+	return map[string]struct{}{
+		"c2_decrypt.go":             {},
+		"dnp3_analysis.go":          {},
+		"packet_store.go":           {},
+		"service_analysis.go":       {},
+		"service_capture.go":        {},
+		"speech_to_text.go":         {},
+		"stream_decoder.go":         {},
+		"stream_payload_sources.go": {},
+		"threat_hunt_stream.go":     {},
+		"tool_c2.go":                {},
+		"tool_http_login.go":        {},
+		"tool_iec104.go":            {},
+		"tool_winrm.go":             {},
+		"yara_batch.go":             {},
+	}
+}
+
+func allowedServiceCrossControllerMethods() map[string]struct{} {
+	return map[string]struct{}{
+		"evidence_collectors_assets.go:gatherMediaEvidence":    {},
+		"media_playback.go:MediaPlaybackWithContext":           {},
+		"service_analysis.go:APTAnalysis":                      {},
+		"service_analysis.go:AddVehicleDBC":                    {},
+		"service_analysis.go:C2SampleAnalysis":                 {},
+		"service_analysis.go:GlobalTrafficStatsWithContext":    {},
+		"service_analysis.go:IndustrialAnalysisWithContext":    {},
+		"service_analysis.go:MediaArtifact":                    {},
+		"service_analysis.go:RemoveVehicleDBC":                 {},
+		"service_analysis.go:USBAnalysisWithOptions":           {},
+		"service_analysis.go:VehicleAnalysisWithContext":       {},
+		"service_analysis.go:VehicleDBCProfiles":               {},
+		"service_analysis.go:mediaAnalysisCold":                {},
+		"service_analysis.go:mediaAnalysisWithForce":           {},
+		"service_capture.go:ClearCapture":                      {},
+		"service_capture.go:commitLoadedCapture":               {},
+		"service_capture.go:loadPCAPLocked":                    {},
+		"service_capture.go:resetAnalysisCachesLocked":         {},
+		"service_capture.go:resetCaptureAnalysisStateLocked":   {},
+		"service_capture.go:startCaptureEnrichment":            {},
+		"service_streams.go:HTTPStream":                        {},
+		"service_streams.go:RawStream":                         {},
+		"service_streams.go:RawStreamPage":                     {},
+		"service_streams.go:UpdateStreamPayloads":              {},
+		"service_streams.go:cacheStream":                       {},
+		"service_streams.go:countStreamOverrides":              {},
+		"service_streams.go:peekRawStreamInMemory":             {},
+		"service_streams.go:streamWithOverrides":               {},
+		"service_tools.go:ObjectsWithContext":                  {},
+		"service_tools.go:StreamIDs":                           {},
+		"service_tools.go:filteredPacketIndex":                 {},
+		"speech_to_text.go:CancelMediaBatchTranscription":      {},
+		"speech_to_text.go:ExportMediaBatchTranscription":      {},
+		"speech_to_text.go:MediaBatchTranscriptionStatus":      {},
+		"speech_to_text.go:StartMediaBatchTranscription":       {},
+		"speech_to_text.go:mediaSessionForArtifact":            {},
+		"speech_to_text.go:runSpeechBatchTask":                 {},
+		"speech_to_text.go:transcribeMediaArtifactWithContext": {},
+		"tool_runtime.go:SetToolRuntimeConfig":                 {},
+		"tool_runtime.go:ToolRuntimeConfig":                    {},
+	}
+}
+
+func isServiceReceiver(field *ast.Field) bool {
+	if field == nil {
+		return false
+	}
+	star, ok := field.Type.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := star.X.(*ast.Ident)
+	return ok && ident.Name == "Service"
+}
+func engineServiceStateTypes() map[string]struct{} {
+	return map[string]struct{}{
+		"captureState":       {},
+		"displayFilterState": {},
+		"streamState":        {},
+		"analysisCache":      {},
+		"objectState":        {},
+		"mediaState":         {},
+		"yaraHuntingState":   {},
+		"toolRuntimeState":   {},
+		"mcpState":           {},
+		"playbookStatePB":    {},
+		"savedSearchStateSS": {},
+		"hypothesisStateHT":  {},
+	}
 }
 
 func assertFileCovered(t *testing.T, root string, files []string, relative string) {
@@ -238,6 +606,38 @@ func importsFor(t *testing.T, path string) []string {
 	return out
 }
 
+func findStructType(file *ast.File, name string) *ast.StructType {
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || typeSpec.Name.Name != name {
+				continue
+			}
+			if structType, ok := typeSpec.Type.(*ast.StructType); ok {
+				return structType
+			}
+		}
+	}
+	return nil
+}
+
+func exprString(expr ast.Expr) string {
+	switch v := expr.(type) {
+	case *ast.Ident:
+		return v.Name
+	case *ast.StarExpr:
+		return "*" + exprString(v.X)
+	case *ast.SelectorExpr:
+		return exprString(v.X) + "." + v.Sel.Name
+	default:
+		return ""
+	}
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	body, err := os.ReadFile(path)
@@ -245,6 +645,13 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(body)
+}
+
+func countLines(body string) int {
+	if body == "" {
+		return 0
+	}
+	return strings.Count(body, "\n") + 1
 }
 
 func containsAny(value string, needles []string) bool {

@@ -26,8 +26,8 @@ func TestUSBAnalysisWithOptionsReusesRawScanAcrossSourceAndLimitChanges(t *testi
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	if _, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{HIDSourceMode: model.USBHIDSourceAuto, HIDEventLimit: 500}); err != nil {
 		t.Fatalf("first USBAnalysisWithOptions() error = %v", err)
@@ -59,16 +59,16 @@ func TestUSBAnalysisCacheInvalidatedByCaptureReplacement(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	if _, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{}); err != nil {
 		t.Fatalf("first USBAnalysisWithOptions() error = %v", err)
 	}
 	svc.PrepareCaptureReplacement()
-	svc.mu.Lock()
-	svc.pcap = "capture.pcapng"
-	svc.mu.Unlock()
+	svc.captureCtl.mu.Lock()
+	svc.captureCtl.pcap = "capture.pcapng"
+	svc.captureCtl.mu.Unlock()
 
 	if _, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{}); err != nil {
 		t.Fatalf("second USBAnalysisWithOptions() error = %v", err)
@@ -93,8 +93,8 @@ func TestUSBAnalysisRawScanCacheInvalidatedByCaptureCommit(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	if _, err := svc.USBAnalysisWithOptions(context.Background(), model.USBAnalysisOptions{}); err != nil {
 		t.Fatalf("first USBAnalysisWithOptions() error = %v", err)
@@ -137,8 +137,8 @@ func TestUSBAnalysisDoesNotCacheResultAfterCaptureChanges(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "old.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "old.pcapng"
 
 	errs := make(chan error, 1)
 	go func() {
@@ -151,19 +151,19 @@ func TestUSBAnalysisDoesNotCacheResultAfterCaptureChanges(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected old USB scan to start")
 	}
-	svc.mu.Lock()
-	svc.pcap = "new.pcapng"
-	svc.mu.Unlock()
+	svc.captureCtl.mu.Lock()
+	svc.captureCtl.pcap = "new.pcapng"
+	svc.captureCtl.mu.Unlock()
 	close(releaseScan)
 
 	if err := <-errs; err != context.Canceled {
 		t.Fatalf("expected stale USB analysis to be canceled, got %v", err)
 	}
 
-	svc.mu.RLock()
-	cachedDefault := svc.usbAnalysis
-	sourceCacheSize := len(svc.usbAnalysisBySource)
-	svc.mu.RUnlock()
+	svc.captureCtl.mu.RLock()
+	cachedDefault := svc.analysisCtl.usbAnalysis
+	sourceCacheSize := len(svc.analysisCtl.usbAnalysisBySource)
+	svc.captureCtl.mu.RUnlock()
 	if cachedDefault != nil || sourceCacheSize != 0 {
 		t.Fatalf("expected stale USB analysis not to populate cache, default=%v sourceCacheSize=%d", cachedDefault != nil, sourceCacheSize)
 	}
@@ -194,8 +194,8 @@ func TestUSBAnalysisConcurrentRequestsShareOneRawScan(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := make(chan error, 2)
 	go func() {
@@ -238,8 +238,8 @@ func TestUSBAnalysisWithOptionsSingleflightKeepsDifferentOptionKeysIsolated(t *t
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	errs := make(chan error, 2)
 	go func() {

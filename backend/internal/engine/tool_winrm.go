@@ -86,9 +86,9 @@ var (
 )
 
 func (s *Service) CurrentCapturePath() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return strings.TrimSpace(s.pcap)
+	s.captureCtl.mu.RLock()
+	defer s.captureCtl.mu.RUnlock()
+	return strings.TrimSpace(s.captureCtl.pcap)
 }
 
 func (s *Service) RunWinRMDecrypt(req model.WinRMDecryptRequest) (model.WinRMDecryptResult, error) {
@@ -102,9 +102,9 @@ func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinR
 	if err := ctx.Err(); err != nil {
 		return model.WinRMDecryptResult{}, err
 	}
-	capturePath := s.CurrentCapturePath()
-	if capturePath == "" {
-		return model.WinRMDecryptResult{}, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
+	capturePath, err := s.requireCapturePathForToolAnalysis()
+	if err != nil {
+		return model.WinRMDecryptResult{}, err
 	}
 	if req.Port <= 0 || req.Port > 65535 {
 		return model.WinRMDecryptResult{}, fmt.Errorf("port 非法")
@@ -114,7 +114,6 @@ func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinR
 		return model.WinRMDecryptResult{}, fmt.Errorf("auth_mode 仅支持 password 或 nt_hash")
 	}
 	var ntHash []byte
-	var err error
 	if authMode == "password" {
 		password := strings.TrimSpace(req.Password)
 		if password == "" {
@@ -122,6 +121,7 @@ func (s *Service) RunWinRMDecryptWithContext(ctx context.Context, req model.WinR
 		}
 		ntHash = ntowfv1(password)
 	} else {
+		var err error
 		ntHash, err = decodeHexField("nt_hash", req.NTHash)
 		if err != nil {
 			return model.WinRMDecryptResult{}, err
@@ -264,7 +264,7 @@ func scanWinRMRowsWithContext(ctx context.Context, capturePath string, port int)
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("扫描 WinRM 字段失败: %s", explainWinRMScanError(err))
+		return nil, wrapToolAnalysisError("winrm-field-scan", "扫描 WinRM 字段失败: "+explainWinRMScanError(err), err)
 	}
 	return rows, ctx.Err()
 }

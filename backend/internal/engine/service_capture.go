@@ -37,8 +37,8 @@ func (s *Service) LoadPCAPWithRun(runCtx context.Context, opts model.ParseOption
 		s.emitStatus("解析被取消")
 		return err
 	}
-	defer s.loadMu.Unlock()
-	if atomic.LoadInt64(&s.runID) != currentRunID {
+	defer s.captureCtl.loadMu.Unlock()
+	if atomic.LoadInt64(&s.captureCtl.runID) != currentRunID {
 		return context.Canceled
 	}
 
@@ -61,7 +61,7 @@ func (s *Service) makeStreamCallbacks(
 	flushPending func(),
 ) (func(model.Packet) error, func(int)) {
 	onPacket := func(packet model.Packet) error {
-		if atomic.LoadInt64(&s.runID) != currentRunID {
+		if atomic.LoadInt64(&s.captureCtl.runID) != currentRunID {
 			return nil
 		}
 		state.accepted++
@@ -90,10 +90,10 @@ func (s *Service) makeStreamCallbacks(
 }
 
 func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions, currentRunID int64) error {
-	s.mu.RLock()
-	oldPCAP := s.pcap
-	currentTLS := s.tlsConf
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	oldPCAP := s.captureCtl.pcap
+	currentTLS := s.runtimeCtl.tlsConfig()
+	s.captureCtl.mu.RUnlock()
 	if oldPCAP != "" {
 		tshark.ClearFieldScanCache(oldPCAP)
 	}
@@ -244,7 +244,7 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 	if total > 0 {
 		s.emitStatus(fmt.Sprintf("__progress__:parsing:%d:%d", state.processed, total))
 	}
-	if err == nil && atomic.LoadInt64(&s.runID) != currentRunID {
+	if err == nil && atomic.LoadInt64(&s.captureCtl.runID) != currentRunID {
 		err = context.Canceled
 	}
 
@@ -276,7 +276,7 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadFailed, "capture parse completed but produced no packets")
 			return errors.New("capture parse completed but produced no packets")
 		}
-		if atomic.LoadInt64(&s.runID) != currentRunID {
+		if atomic.LoadInt64(&s.captureCtl.runID) != currentRunID {
 			s.emitStatus("解析被取消")
 			s.setCaptureLoadPhase(currentRunID, model.CaptureLoadCanceled, context.Canceled.Error())
 			return context.Canceled
@@ -288,22 +288,22 @@ func (s *Service) loadPCAPLocked(runCtx context.Context, opts model.ParseOptions
 			return err
 		}
 		commitPending = true
-		s.mu.Lock()
-		s.rawStreamIndex = make(map[string]model.ReassembledStream, len(state.rawStreamIndex))
+		s.captureCtl.mu.Lock()
+		s.streamCtl.rawStreamIndex = make(map[string]model.ReassembledStream, len(state.rawStreamIndex))
 		for key, stream := range state.rawStreamIndex {
 			if stream == nil {
 				continue
 			}
-			s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+			s.streamCtl.rawStreamIndex[key] = cloneReassembledStream(*stream)
 		}
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 		s.emitStatus("解析完成")
 		s.updateCaptureLoadStatus(currentRunID, func(status *model.CaptureLoadStatus) {
 			status.Phase = string(model.CaptureLoadReady)
 			status.Processed = state.processed
 			status.Accepted = state.accepted
-			if s.packetStore != nil {
-				status.StagedCount = s.packetStore.Count()
+			if s.captureCtl.packetStore != nil {
+				status.StagedCount = s.captureCtl.packetStore.Count()
 			}
 			status.CompletedAt = nowCaptureLoadTimestamp()
 		})
@@ -324,50 +324,43 @@ func (s *Service) commitLoadedCapture(filePath string, nextStore *packetStore, n
 	if nextStore == nil {
 		return errors.New("replacement packet store is nil")
 	}
-	s.objMu.Lock()
-	if s.exportDir != "" {
-		_ = os.RemoveAll(s.exportDir)
-		s.exportDir = ""
+	s.objectCtl.objMu.Lock()
+	if s.objectCtl.exportDir != "" {
+		_ = os.RemoveAll(s.objectCtl.exportDir)
+		s.objectCtl.exportDir = ""
 	}
-	s.objectsLoaded = false
-	s.objects = nil
-	s.objMu.Unlock()
+	s.objectCtl.objectsLoaded = false
+	s.objectCtl.objects = nil
+	s.objectCtl.objMu.Unlock()
+	s.resetYaraScanState()
+	s.captureCtl.mu.Lock()
+	defer s.captureCtl.mu.Unlock()
 
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraScanning = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.mediaExportDir != "" {
-		_ = os.RemoveAll(s.mediaExportDir)
-		s.mediaExportDir = ""
+	if s.mediaCtl.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaCtl.mediaExportDir)
+		s.mediaCtl.mediaExportDir = ""
 	}
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return errors.New("active packet store is not initialized")
 	}
-	if err := s.packetStore.ReplaceWith(nextStore); err != nil {
+	if err := s.captureCtl.packetStore.ReplaceWith(nextStore); err != nil {
 		return err
 	}
 	tshark.ClearUSBAnalysisRawScanCache()
 	s.cancelDisplayFilterCacheLocked()
-	s.pcap = filePath
-	s.displayFilterCache = map[string]*filteredPacketIndex{}
-	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.captureCtl.pcap = filePath
+	s.filterCtl.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.filterCtl.displayFilterCacheOrder = s.filterCtl.displayFilterCacheOrder[:0]
 	s.resetAnalysisCachesLocked()
-	s.cancelSpeechBatchLocked()
-	s.rawStreamIndex = make(map[string]model.ReassembledStream, len(nextRawStreamIndex))
+	s.mediaCtl.cancelBatchLocked()
+	s.streamCtl.rawStreamIndex = make(map[string]model.ReassembledStream, len(nextRawStreamIndex))
 	for key, stream := range nextRawStreamIndex {
 		if stream == nil {
 			continue
 		}
-		s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+		s.streamCtl.rawStreamIndex[key] = cloneReassembledStream(*stream)
 	}
-	s.streamOverrides = map[string]map[int]string{}
+	s.streamCtl.streamOverrides = map[string]map[int]string{}
 	return nil
 }
 
@@ -388,11 +381,11 @@ func (s *Service) startCaptureEnrichment(opts model.ParseOptions, runID int64) {
 		updated := 0
 		enrichedRawStreamIndex := make(map[string]*model.ReassembledStream)
 		err := streamPacketsFastFn(taskCtx, enrichOpts, func(packet model.Packet) error {
-			if atomic.LoadInt64(&s.runID) != runID {
+			if atomic.LoadInt64(&s.captureCtl.runID) != runID {
 				return context.Canceled
 			}
 			appendPacketToRawStreamIndex(enrichedRawStreamIndex, packet)
-			changed, updateErr := s.packetStore.UpdatePacketEnrichment(packet)
+			changed, updateErr := s.captureCtl.packetStore.UpdatePacketEnrichment(packet)
 			if updateErr != nil {
 				return updateErr
 			}
@@ -418,21 +411,21 @@ func (s *Service) startCaptureEnrichment(opts model.ParseOptions, runID int64) {
 			s.setCaptureEnrichmentStatus(runID, "failed", processed, updated, err.Error())
 			return
 		}
-		if atomic.LoadInt64(&s.runID) != runID {
+		if atomic.LoadInt64(&s.captureCtl.runID) != runID {
 			s.setCaptureEnrichmentStatus(runID, "canceled", processed, updated, context.Canceled.Error())
 			return
 		}
-		s.mu.Lock()
-		if s.pcap == opts.FilePath {
-			s.rawStreamIndex = make(map[string]model.ReassembledStream, len(enrichedRawStreamIndex))
+		s.captureCtl.mu.Lock()
+		if s.captureCtl.pcap == opts.FilePath {
+			s.streamCtl.rawStreamIndex = make(map[string]model.ReassembledStream, len(enrichedRawStreamIndex))
 			for key, stream := range enrichedRawStreamIndex {
 				if stream == nil {
 					continue
 				}
-				s.rawStreamIndex[key] = cloneReassembledStream(*stream)
+				s.streamCtl.rawStreamIndex[key] = cloneReassembledStream(*stream)
 			}
 		}
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 		s.setCaptureEnrichmentStatus(runID, "ready", processed, updated, "")
 		log.Printf("engine: capture enrichment completed file=%q processed=%d updated=%d", opts.FilePath, processed, updated)
 	}()
@@ -453,16 +446,9 @@ func shouldSkipPacketEstimate(opts model.ParseOptions) bool {
 	return info.Size() >= skipEstimateFileSizeThreshold
 }
 
-func (s *Service) cancelSpeechBatchLocked() {
-	if s.speechCancel != nil {
-		s.speechCancel()
-		s.speechCancel = nil
-	}
-}
-
 func (s *Service) lockLoad(ctx context.Context) error {
 	for {
-		if s.loadMu.TryLock() {
+		if s.captureCtl.loadMu.TryLock() {
 			return nil
 		}
 		select {
@@ -474,11 +460,11 @@ func (s *Service) lockLoad(ctx context.Context) error {
 }
 
 func (s *Service) registerActiveCaptureLoad(runID int64, cancel context.CancelFunc) {
-	s.activeLoadMu.Lock()
-	previous := s.activeLoadCancel
-	s.activeLoadID = runID
-	s.activeLoadCancel = cancel
-	s.activeLoadMu.Unlock()
+	s.captureCtl.activeLoadMu.Lock()
+	previous := s.captureCtl.activeLoadCancel
+	s.captureCtl.activeLoadID = runID
+	s.captureCtl.activeLoadCancel = cancel
+	s.captureCtl.activeLoadMu.Unlock()
 	if previous != nil {
 		previous()
 	}
@@ -489,36 +475,36 @@ func (s *Service) TrackCaptureTask(ctx context.Context, name string) (context.Co
 		ctx = context.Background()
 	}
 	taskCtx, cancel := context.WithCancel(ctx)
-	s.captureTaskMu.Lock()
-	if s.captureTasks == nil {
-		s.captureTasks = map[int64]captureTaskCancel{}
+	s.captureCtl.captureTaskMu.Lock()
+	if s.captureCtl.captureTasks == nil {
+		s.captureCtl.captureTasks = map[int64]captureTaskCancel{}
 	}
-	s.captureTaskSeq++
-	id := s.captureTaskSeq
-	s.captureTasks[id] = captureTaskCancel{name: strings.TrimSpace(name), cancel: cancel}
-	s.captureTaskMu.Unlock()
+	s.captureCtl.captureTaskSeq++
+	id := s.captureCtl.captureTaskSeq
+	s.captureCtl.captureTasks[id] = captureTaskCancel{name: strings.TrimSpace(name), cancel: cancel}
+	s.captureCtl.captureTaskMu.Unlock()
 
 	var done atomic.Bool
 	finish := func() {
 		if !done.CompareAndSwap(false, true) {
 			return
 		}
-		s.captureTaskMu.Lock()
-		delete(s.captureTasks, id)
-		s.captureTaskMu.Unlock()
+		s.captureCtl.captureTaskMu.Lock()
+		delete(s.captureCtl.captureTasks, id)
+		s.captureCtl.captureTaskMu.Unlock()
 		cancel()
 	}
 	return taskCtx, finish
 }
 
 func (s *Service) CancelCaptureTasks() int {
-	s.captureTaskMu.Lock()
-	tasks := make([]captureTaskCancel, 0, len(s.captureTasks))
-	for id, task := range s.captureTasks {
+	s.captureCtl.captureTaskMu.Lock()
+	tasks := make([]captureTaskCancel, 0, len(s.captureCtl.captureTasks))
+	for id, task := range s.captureCtl.captureTasks {
 		tasks = append(tasks, task)
-		delete(s.captureTasks, id)
+		delete(s.captureCtl.captureTasks, id)
 	}
-	s.captureTaskMu.Unlock()
+	s.captureCtl.captureTaskMu.Unlock()
 	for _, task := range tasks {
 		if task.cancel != nil {
 			task.cancel()
@@ -528,9 +514,9 @@ func (s *Service) CancelCaptureTasks() int {
 }
 
 func (s *Service) ActiveCaptureTaskCount() int {
-	s.captureTaskMu.Lock()
-	defer s.captureTaskMu.Unlock()
-	return len(s.captureTasks)
+	s.captureCtl.captureTaskMu.Lock()
+	defer s.captureCtl.captureTaskMu.Unlock()
+	return len(s.captureCtl.captureTasks)
 }
 
 func nowCaptureLoadTimestamp() string {
@@ -568,8 +554,8 @@ func normalizeCaptureListProfile(opts model.ParseOptions) string {
 
 func (s *Service) startCaptureLoadStatus(runID int64, opts model.ParseOptions) {
 	now := nowCaptureLoadTimestamp()
-	s.activeLoadMu.Lock()
-	s.activeLoadStatus = &model.CaptureLoadStatus{
+	s.captureCtl.activeLoadMu.Lock()
+	s.captureCtl.activeLoadStatus = &model.CaptureLoadStatus{
 		RunID:         runID,
 		FilePath:      opts.FilePath,
 		Phase:         string(model.CaptureLoadStarting),
@@ -577,17 +563,17 @@ func (s *Service) startCaptureLoadStatus(runID int64, opts model.ParseOptions) {
 		StartedAt:     now,
 		UpdatedAt:     now,
 	}
-	s.activeLoadMu.Unlock()
+	s.captureCtl.activeLoadMu.Unlock()
 }
 
 func (s *Service) updateCaptureLoadStatus(runID int64, fn func(*model.CaptureLoadStatus)) {
-	s.activeLoadMu.Lock()
-	defer s.activeLoadMu.Unlock()
-	if s.activeLoadStatus == nil || s.activeLoadStatus.RunID != runID {
+	s.captureCtl.activeLoadMu.Lock()
+	defer s.captureCtl.activeLoadMu.Unlock()
+	if s.captureCtl.activeLoadStatus == nil || s.captureCtl.activeLoadStatus.RunID != runID {
 		return
 	}
-	fn(s.activeLoadStatus)
-	s.activeLoadStatus.UpdatedAt = nowCaptureLoadTimestamp()
+	fn(s.captureCtl.activeLoadStatus)
+	s.captureCtl.activeLoadStatus.UpdatedAt = nowCaptureLoadTimestamp()
 }
 
 func (s *Service) setCaptureLoadPhase(runID int64, phase model.CaptureLoadPhase, lastError string) {
@@ -615,16 +601,15 @@ func (s *Service) setCaptureEnrichmentStatus(runID int64, phase string, processe
 }
 
 func (s *Service) BeginCaptureLoad(ctx context.Context) (int64, context.Context) {
-	currentRunID := atomic.AddInt64(&s.runID, 1)
+	currentRunID := atomic.AddInt64(&s.captureCtl.runID, 1)
 	s.CancelActiveCaptureLoad()
 	s.cancelLegacyStreaming()
 	if canceled := s.CancelCaptureTasks(); canceled > 0 {
 		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
 	}
-
-	s.mu.Lock()
+	s.captureCtl.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 
 	runCtx, cancel := context.WithCancel(ctx)
 	s.registerActiveCaptureLoad(currentRunID, cancel)
@@ -632,36 +617,36 @@ func (s *Service) BeginCaptureLoad(ctx context.Context) (int64, context.Context)
 }
 
 func (s *Service) finishActiveCaptureLoad(runID int64) {
-	s.activeLoadMu.Lock()
-	if s.activeLoadID == runID {
-		s.activeLoadID = 0
-		s.activeLoadCancel = nil
+	s.captureCtl.activeLoadMu.Lock()
+	if s.captureCtl.activeLoadID == runID {
+		s.captureCtl.activeLoadID = 0
+		s.captureCtl.activeLoadCancel = nil
 	}
-	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == runID {
-		switch s.activeLoadStatus.Phase {
+	if s.captureCtl.activeLoadStatus != nil && s.captureCtl.activeLoadStatus.RunID == runID {
+		switch s.captureCtl.activeLoadStatus.Phase {
 		case string(model.CaptureLoadReady), string(model.CaptureLoadFailed), string(model.CaptureLoadCanceled):
 		default:
-			s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
-			s.activeLoadStatus.CompletedAt = nowCaptureLoadTimestamp()
-			s.activeLoadStatus.UpdatedAt = s.activeLoadStatus.CompletedAt
+			s.captureCtl.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+			s.captureCtl.activeLoadStatus.CompletedAt = nowCaptureLoadTimestamp()
+			s.captureCtl.activeLoadStatus.UpdatedAt = s.captureCtl.activeLoadStatus.CompletedAt
 		}
 	}
-	s.activeLoadMu.Unlock()
+	s.captureCtl.activeLoadMu.Unlock()
 }
 
 func (s *Service) CancelActiveCaptureLoad() bool {
-	s.activeLoadMu.Lock()
-	cancel := s.activeLoadCancel
-	canceledRunID := s.activeLoadID
-	s.activeLoadCancel = nil
-	s.activeLoadID = 0
-	if s.activeLoadStatus != nil && s.activeLoadStatus.RunID == canceledRunID && canceledRunID != 0 {
+	s.captureCtl.activeLoadMu.Lock()
+	cancel := s.captureCtl.activeLoadCancel
+	canceledRunID := s.captureCtl.activeLoadID
+	s.captureCtl.activeLoadCancel = nil
+	s.captureCtl.activeLoadID = 0
+	if s.captureCtl.activeLoadStatus != nil && s.captureCtl.activeLoadStatus.RunID == canceledRunID && canceledRunID != 0 {
 		now := nowCaptureLoadTimestamp()
-		s.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
-		s.activeLoadStatus.CompletedAt = now
-		s.activeLoadStatus.UpdatedAt = now
+		s.captureCtl.activeLoadStatus.Phase = string(model.CaptureLoadCanceled)
+		s.captureCtl.activeLoadStatus.CompletedAt = now
+		s.captureCtl.activeLoadStatus.UpdatedAt = now
 	}
-	s.activeLoadMu.Unlock()
+	s.captureCtl.activeLoadMu.Unlock()
 	if cancel != nil {
 		cancel()
 		return true
@@ -670,10 +655,10 @@ func (s *Service) CancelActiveCaptureLoad() bool {
 }
 
 func (s *Service) cancelLegacyStreaming() bool {
-	s.mu.Lock()
-	cancel := s.cancel
-	s.cancel = nil
-	s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	cancel := s.captureCtl.cancel
+	s.captureCtl.cancel = nil
+	s.captureCtl.mu.Unlock()
 	if cancel != nil {
 		cancel()
 		return true
@@ -688,33 +673,31 @@ func (s *Service) StopStreaming() bool {
 }
 
 func (s *Service) PrepareCaptureReplacement() {
-	atomic.AddInt64(&s.runID, 1)
+	atomic.AddInt64(&s.captureCtl.runID, 1)
 	if s.StopStreaming() {
 		s.emitStatus("正在终止旧抓包解析")
 	}
 	if canceled := s.CancelCaptureTasks(); canceled > 0 {
 		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
 	}
-
-	s.mu.Lock()
+	s.captureCtl.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
 	s.clearUSBAnalysisCacheLocked()
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 	tshark.ClearUSBAnalysisRawScanCache()
 }
 
 func (s *Service) ClearCapture() error {
-	atomic.AddInt64(&s.runID, 1)
+	atomic.AddInt64(&s.captureCtl.runID, 1)
 	if s.StopStreaming() {
 		s.emitStatus("正在终止当前抓包解析")
 	}
 	if canceled := s.CancelCaptureTasks(); canceled > 0 {
 		s.emitStatus(fmt.Sprintf("正在终止后台分析任务: %d", canceled))
 	}
-
-	s.mu.Lock()
+	s.captureCtl.mu.Lock()
 	s.cancelDisplayFilterCacheLocked()
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 	tshark.ClearUSBAnalysisRawScanCache()
 
 	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -723,78 +706,70 @@ func (s *Service) ClearCapture() error {
 		s.emitStatus("正在终止旧解析，请稍后重试关闭抓包。")
 		return err
 	}
-	defer s.loadMu.Unlock()
+	defer s.captureCtl.loadMu.Unlock()
 
-	if s.packetStore != nil {
-		if err := s.packetStore.Reset(); err != nil {
+	if s.captureCtl.packetStore != nil {
+		if err := s.captureCtl.packetStore.Reset(); err != nil {
 			return err
 		}
 		s.emitStatus("临时数据库已重置")
 	}
-
-	s.objMu.Lock()
-	if s.exportDir != "" {
-		_ = os.RemoveAll(s.exportDir)
-		s.exportDir = ""
+	s.objectCtl.objMu.Lock()
+	if s.objectCtl.exportDir != "" {
+		_ = os.RemoveAll(s.objectCtl.exportDir)
+		s.objectCtl.exportDir = ""
 	}
-	s.objectsLoaded = false
-	s.objects = nil
-	s.objMu.Unlock()
-
-	s.mu.Lock()
-	if s.mediaExportDir != "" {
-		_ = os.RemoveAll(s.mediaExportDir)
-		s.mediaExportDir = ""
+	s.objectCtl.objectsLoaded = false
+	s.objectCtl.objects = nil
+	s.objectCtl.objMu.Unlock()
+	s.captureCtl.mu.Lock()
+	if s.mediaCtl.mediaExportDir != "" {
+		_ = os.RemoveAll(s.mediaCtl.mediaExportDir)
+		s.mediaCtl.mediaExportDir = ""
 	}
-	if s.pcap != "" {
-		tshark.ClearFieldScanCache(s.pcap)
+	if s.captureCtl.pcap != "" {
+		tshark.ClearFieldScanCache(s.captureCtl.pcap)
 	}
 	s.resetCaptureAnalysisStateLocked()
-	s.cancelSpeechBatchLocked()
-	s.mu.Unlock()
+	s.mediaCtl.cancelBatchLocked()
+	s.captureCtl.mu.Unlock()
 	tshark.ClearUSBAnalysisRawScanCache()
-
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraScanning = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
-	s.activeLoadMu.Lock()
-	s.activeLoadStatus = nil
-	s.activeLoadMu.Unlock()
+	s.resetYaraScanState()
+	s.captureCtl.activeLoadMu.Lock()
+	s.captureCtl.activeLoadStatus = nil
+	s.captureCtl.activeLoadMu.Unlock()
 	return nil
 }
 
 func (s *Service) resetCaptureAnalysisStateLocked() {
-	s.pcap = ""
-	s.displayFilterCache = map[string]*filteredPacketIndex{}
-	s.displayFilterCacheOrder = s.displayFilterCacheOrder[:0]
+	s.captureCtl.pcap = ""
+	s.filterCtl.displayFilterCache = map[string]*filteredPacketIndex{}
+	s.filterCtl.displayFilterCacheOrder = s.filterCtl.displayFilterCacheOrder[:0]
 	s.resetAnalysisCachesLocked()
-	s.cancelSpeechBatchLocked()
-	s.rawStreamIndex = map[string]model.ReassembledStream{}
-	s.streamOverrides = map[string]map[int]string{}
+	s.mediaCtl.cancelBatchLocked()
+	s.streamCtl.rawStreamIndex = map[string]model.ReassembledStream{}
+	s.streamCtl.streamOverrides = map[string]map[int]string{}
 }
 
 func (s *Service) resetAnalysisCachesLocked() {
-	s.globalTrafficStats = nil
-	s.industrialAnalysis = nil
-	s.vehicleAnalysis = nil
-	s.mediaAnalysis = nil
-	s.usbAnalysis = nil
-	s.usbAnalysisBySource = nil
-	s.c2Analysis = nil
-	s.aptAnalysis = nil
-	s.inFlightAnalysis = analysisInFlightGroup{}
-	s.mediaArtifacts = map[string]string{}
-	s.mediaPlayback = map[string]string{}
-	s.mediaSpeech = map[string]model.MediaTranscription{}
-	s.speechBatch = nil
-	s.streamCache = map[string]model.ReassembledStream{}
-	s.streamCacheOrder = s.streamCacheOrder[:0]
+	s.analysisCtl.globalTrafficStats = nil
+	s.analysisCtl.industrialAnalysis = nil
+	s.analysisCtl.vehicleAnalysis = nil
+	s.analysisCtl.mediaAnalysis = nil
+	s.analysisCtl.usbAnalysis = nil
+	s.analysisCtl.usbAnalysisBySource = nil
+	s.analysisCtl.c2Analysis = nil
+	s.analysisCtl.aptAnalysis = nil
+	s.analysisCtl.inFlightAnalysis = analysisInFlightGroup{}
+	s.mediaCtl.mediaArtifacts = map[string]string{}
+	s.mediaCtl.mediaPlayback = map[string]string{}
+	s.mediaCtl.mediaSpeech = map[string]model.MediaTranscription{}
+	s.mediaCtl.speechBatch = nil
+	s.streamCtl.streamCache = map[string]model.ReassembledStream{}
+	s.streamCtl.streamCacheOrder = s.streamCtl.streamCacheOrder[:0]
 }
 
 func (s *Service) clearUSBAnalysisCacheLocked() {
-	s.usbAnalysis = nil
-	s.usbAnalysisBySource = nil
+	s.analysisCtl.usbAnalysis = nil
+	s.analysisCtl.usbAnalysisBySource = nil
 }

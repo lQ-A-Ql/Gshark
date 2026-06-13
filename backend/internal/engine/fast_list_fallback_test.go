@@ -46,7 +46,7 @@ func TestLoadPCAPFallsBackWhenFastListFails(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
 		FilePath: "fake.pcap",
@@ -104,7 +104,7 @@ func TestLoadPCAPFallsBackToCompatWhenEKStillFails(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
 		FilePath: "fake.pcap",
@@ -171,7 +171,7 @@ func TestLoadPCAPSkipsEstimateForLargeFastListCapture(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
 		FilePath: largeCapture,
@@ -219,7 +219,7 @@ func TestLoadPCAPFirstScreenProfileUsesLightweightParser(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if err := svc.LoadPCAP(context.Background(), model.ParseOptions{
 		FilePath:    "first-screen.pcap",

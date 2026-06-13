@@ -16,8 +16,8 @@ func TestHTTPStreamFileFallbackAndErrorBranches(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	called := 0
 	httpStreamFromFileFn = func(ctx context.Context, filePath string, streamID int64) (model.ReassembledStream, error) {
@@ -52,8 +52,8 @@ func TestHTTPStreamFileFallbackAndErrorBranches(t *testing.T) {
 	}
 
 	svcErr := NewService(NopEmitter{})
-	defer svcErr.packetStore.Close()
-	svcErr.pcap = "capture.pcapng"
+	defer svcErr.captureCtl.packetStore.Close()
+	svcErr.captureCtl.pcap = "capture.pcapng"
 	httpStreamFromFileFn = func(context.Context, string, int64) (model.ReassembledStream, error) {
 		return model.ReassembledStream{}, errors.New("synthetic follow failure")
 	}
@@ -71,15 +71,15 @@ func TestRawStreamCacheIndexCancelAndFileErrorBranches(t *testing.T) {
 	})
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	cacheKey := streamCacheKey("TCP", 3)
-	svc.streamCache[cacheKey] = model.ReassembledStream{
+	svc.streamCtl.streamCache[cacheKey] = model.ReassembledStream{
 		StreamID: 3,
 		Protocol: "TCP",
 		Chunks:   []model.StreamChunk{{PacketID: 1, Direction: "client", Body: "old"}},
 	}
-	svc.streamOverrides[cacheKey] = map[int]string{0: "patched"}
+	svc.streamCtl.streamOverrides[cacheKey] = map[int]string{0: "patched"}
 	cached := svc.RawStream(context.Background(), " tcp ", 3)
 	if len(cached.Chunks) != 1 || cached.Chunks[0].Body != "patched" {
 		t.Fatalf("expected cached stream with override, got %+v", cached)
@@ -89,7 +89,7 @@ func TestRawStreamCacheIndexCancelAndFileErrorBranches(t *testing.T) {
 	}
 
 	indexKey := streamCacheKey("UDP", 4)
-	svc.rawStreamIndex[indexKey] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[indexKey] = model.ReassembledStream{
 		StreamID: 4,
 		Protocol: "UDP",
 		Chunks:   []model.StreamChunk{{PacketID: 2, Direction: "server", Body: "aa"}},
@@ -98,7 +98,7 @@ func TestRawStreamCacheIndexCancelAndFileErrorBranches(t *testing.T) {
 	if len(indexed.Chunks) != 1 || indexed.LoadMeta == nil || !indexed.LoadMeta.IndexHit || indexed.LoadMeta.Source != "index" {
 		t.Fatalf("expected indexed raw stream, got %+v", indexed)
 	}
-	if _, ok := svc.streamCache[indexKey]; !ok {
+	if _, ok := svc.streamCtl.streamCache[indexKey]; !ok {
 		t.Fatalf("expected indexed stream to be cached")
 	}
 
@@ -110,8 +110,8 @@ func TestRawStreamCacheIndexCancelAndFileErrorBranches(t *testing.T) {
 	}
 
 	svcErr := NewService(NopEmitter{})
-	defer svcErr.packetStore.Close()
-	svcErr.pcap = "capture.pcapng"
+	defer svcErr.captureCtl.packetStore.Close()
+	svcErr.captureCtl.pcap = "capture.pcapng"
 	rawStreamFromFileFn = func(context.Context, string, string, int64) (model.ReassembledStream, error) {
 		return model.ReassembledStream{}, errors.New("synthetic raw follow failure")
 	}
@@ -123,10 +123,10 @@ func TestRawStreamCacheIndexCancelAndFileErrorBranches(t *testing.T) {
 
 func TestRawStreamPageFallbackAndEmptyPatchBranches(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	rawKey := streamCacheKey("TCP", 11)
-	svc.streamCache[rawKey] = model.ReassembledStream{
+	svc.streamCtl.streamCache[rawKey] = model.ReassembledStream{
 		StreamID: 11,
 		Protocol: "TCP",
 		Chunks: []model.StreamChunk{
@@ -143,7 +143,7 @@ func TestRawStreamPageFallbackAndEmptyPatchBranches(t *testing.T) {
 	}
 
 	httpKey := streamCacheKey("HTTP", 12)
-	svc.streamCache[httpKey] = model.ReassembledStream{
+	svc.streamCtl.streamCache[httpKey] = model.ReassembledStream{
 		StreamID: 12,
 		Protocol: "HTTP",
 		Chunks: []model.StreamChunk{
@@ -170,7 +170,7 @@ func TestRawStreamPageFallbackAndEmptyPatchBranches(t *testing.T) {
 
 func TestStreamMetaAndOverrideHelperBranches(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	svc.applyOverrideCountToMeta("missing", nil)
 

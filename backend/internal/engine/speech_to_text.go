@@ -130,10 +130,9 @@ func (s *Service) transcribeMediaArtifactWithContext(ctx context.Context, token 
 	if !status.Available {
 		return model.MediaTranscription{}, errors.New(status.Message)
 	}
-
-	s.mu.RLock()
-	cached, ok := s.mediaSpeech[token]
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	cached, ok := s.mediaCtl.mediaSpeech[token]
+	s.captureCtl.mu.RUnlock()
 	if ok && !force {
 		cached.Cached = true
 		cached.Status = "completed"
@@ -170,13 +169,12 @@ func (s *Service) transcribeMediaArtifactWithContext(ctx context.Context, token 
 		DurationSeconds: result.DurationSeconds,
 		Segments:        result.Segments,
 	}
-
-	s.mu.Lock()
-	if s.mediaSpeech == nil {
-		s.mediaSpeech = map[string]model.MediaTranscription{}
+	s.captureCtl.mu.Lock()
+	if s.mediaCtl.mediaSpeech == nil {
+		s.mediaCtl.mediaSpeech = map[string]model.MediaTranscription{}
 	}
-	s.mediaSpeech[token] = transcription
-	s.mu.Unlock()
+	s.mediaCtl.mediaSpeech[token] = transcription
+	s.captureCtl.mu.Unlock()
 	return transcription, nil
 }
 
@@ -192,7 +190,7 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 	}
 
 	items := make([]model.SpeechBatchTaskItem, 0, len(analysis.Sessions))
-	s.mu.RLock()
+	s.captureCtl.mu.RLock()
 	for _, session := range analysis.Sessions {
 		if !strings.EqualFold(session.MediaType, "audio") || session.Artifact == nil {
 			continue
@@ -204,25 +202,24 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 			Title:      buildMediaSessionLabel(session),
 			Status:     "queued",
 		}
-		if cached, ok := s.mediaSpeech[session.Artifact.Token]; ok && !force {
+		if cached, ok := s.mediaCtl.mediaSpeech[session.Artifact.Token]; ok && !force {
 			item.Status = "skipped"
 			item.Cached = true
 			item.Text = cached.Text
 		}
 		items = append(items, item)
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
 	if len(items) == 0 {
 		return model.SpeechBatchTaskStatus{}, errors.New("当前抓包没有可转写的音频会话")
 	}
-
-	s.mu.Lock()
-	if s.speechBatch != nil && !s.speechBatch.Done && !s.speechBatch.Cancelled {
-		defer s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	if s.mediaCtl.speechBatch != nil && !s.mediaCtl.speechBatch.Done && !s.mediaCtl.speechBatch.Cancelled {
+		defer s.captureCtl.mu.Unlock()
 		return model.SpeechBatchTaskStatus{}, errors.New("已有批量转写任务正在运行")
 	}
-	s.cancelSpeechBatchLocked()
+	s.mediaCtl.cancelBatchLocked()
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, finishCaptureTask := s.TrackCaptureTask(ctx, "speech-batch")
 	taskSeed := sha1.Sum([]byte(fmt.Sprintf("%d-%d", time.Now().UnixNano(), len(items))))
@@ -231,10 +228,10 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 		Items:  items,
 	}
 	recomputeSpeechBatchCounts(task)
-	s.speechBatch = task
-	s.speechCancel = cancel
+	s.mediaCtl.speechBatch = task
+	s.mediaCtl.speechCancel = cancel
 	out := cloneSpeechBatchTask(task)
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 
 	go func() {
 		defer finishCaptureTask()
@@ -244,41 +241,56 @@ func (s *Service) StartMediaBatchTranscription(force bool) (model.SpeechBatchTas
 }
 
 func (s *Service) MediaBatchTranscriptionStatus() model.SpeechBatchTaskStatus {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.speechBatch == nil {
-		return model.SpeechBatchTaskStatus{}
-	}
-	return cloneSpeechBatchTask(s.speechBatch)
+	return s.mediaCtl.batchStatus(&s.captureCtl.mu)
 }
 
 func (s *Service) CancelMediaBatchTranscription() model.SpeechBatchTaskStatus {
-	s.mu.Lock()
-	s.cancelSpeechBatchLocked()
-	if s.speechBatch != nil {
-		s.speechBatch.Cancelled = true
-		s.speechBatch.Done = true
-		s.speechBatch.CurrentLabel = "批量转写已取消"
-		s.speechBatch.CurrentToken = ""
-		recomputeSpeechBatchCounts(s.speechBatch)
-	}
-	out := cloneSpeechBatchTask(s.speechBatch)
-	s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	out := s.mediaCtl.cancelBatchLocked()
+	s.captureCtl.mu.Unlock()
 	return out
 }
 
 func (s *Service) ExportMediaBatchTranscription() model.MediaTranscriptionBatchExport {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	return s.mediaCtl.exportBatch(&s.captureCtl.mu)
+}
+
+func (ctl *mediaController) batchStatus(mu *sync.RWMutex) model.SpeechBatchTaskStatus {
+	mu.RLock()
+	defer mu.RUnlock()
+	if ctl.speechBatch == nil {
+		return model.SpeechBatchTaskStatus{}
+	}
+	return cloneSpeechBatchTask(ctl.speechBatch)
+}
+
+func (ctl *mediaController) cancelBatchLocked() model.SpeechBatchTaskStatus {
+	if ctl.speechCancel != nil {
+		ctl.speechCancel()
+		ctl.speechCancel = nil
+	}
+	if ctl.speechBatch != nil {
+		ctl.speechBatch.Cancelled = true
+		ctl.speechBatch.Done = true
+		ctl.speechBatch.CurrentLabel = "批量转写已取消"
+		ctl.speechBatch.CurrentToken = ""
+		recomputeSpeechBatchCounts(ctl.speechBatch)
+	}
+	return cloneSpeechBatchTask(ctl.speechBatch)
+}
+
+func (ctl *mediaController) exportBatch(mu *sync.RWMutex) model.MediaTranscriptionBatchExport {
+	mu.RLock()
+	defer mu.RUnlock()
 	export := model.MediaTranscriptionBatchExport{
 		Engine:   speechEngineName,
 		Language: speechLanguageCode,
 	}
-	if s.speechBatch == nil {
+	if ctl.speechBatch == nil {
 		return export
 	}
-	export.TaskID = s.speechBatch.TaskID
-	for _, item := range s.speechBatch.Items {
+	export.TaskID = ctl.speechBatch.TaskID
+	for _, item := range ctl.speechBatch.Items {
 		if strings.TrimSpace(item.Text) == "" {
 			continue
 		}
@@ -293,21 +305,20 @@ func (s *Service) ExportMediaBatchTranscription() model.MediaTranscriptionBatchE
 	}
 	return export
 }
-
 func (s *Service) runSpeechBatchTask(ctx context.Context, taskID string, force bool) {
-	s.mu.Lock()
-	task := s.speechBatch
+	s.captureCtl.mu.Lock()
+	task := s.mediaCtl.speechBatch
 	if task == nil || task.TaskID != taskID {
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 		return
 	}
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 
 	for idx := range task.Items {
-		s.mu.Lock()
-		task = s.speechBatch
+		s.captureCtl.mu.Lock()
+		task = s.mediaCtl.speechBatch
 		if task == nil || task.TaskID != taskID {
-			s.mu.Unlock()
+			s.captureCtl.mu.Unlock()
 			return
 		}
 		if task.Cancelled {
@@ -315,13 +326,13 @@ func (s *Service) runSpeechBatchTask(ctx context.Context, taskID string, force b
 			task.CurrentToken = ""
 			task.CurrentLabel = "批量转写已取消"
 			recomputeSpeechBatchCounts(task)
-			s.mu.Unlock()
+			s.captureCtl.mu.Unlock()
 			return
 		}
 		item := &task.Items[idx]
 		if item.Status == "skipped" {
 			recomputeSpeechBatchCounts(task)
-			s.mu.Unlock()
+			s.captureCtl.mu.Unlock()
 			continue
 		}
 		item.Status = "running"
@@ -329,14 +340,13 @@ func (s *Service) runSpeechBatchTask(ctx context.Context, taskID string, force b
 		task.CurrentToken = item.Token
 		task.CurrentLabel = item.Title
 		recomputeSpeechBatchCounts(task)
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 
 		result, err := s.transcribeMediaArtifactWithContext(ctx, item.Token, force)
-
-		s.mu.Lock()
-		task = s.speechBatch
+		s.captureCtl.mu.Lock()
+		task = s.mediaCtl.speechBatch
 		if task == nil || task.TaskID != taskID {
-			s.mu.Unlock()
+			s.captureCtl.mu.Unlock()
 			return
 		}
 		item = &task.Items[idx]
@@ -356,33 +366,32 @@ func (s *Service) runSpeechBatchTask(ctx context.Context, taskID string, force b
 		task.CurrentToken = ""
 		task.CurrentLabel = ""
 		recomputeSpeechBatchCounts(task)
-		s.mu.Unlock()
+		s.captureCtl.mu.Unlock()
 
 		if errors.Is(ctx.Err(), context.Canceled) {
 			break
 		}
 	}
-
-	s.mu.Lock()
-	task = s.speechBatch
+	s.captureCtl.mu.Lock()
+	task = s.mediaCtl.speechBatch
 	if task != nil && task.TaskID == taskID {
 		task.Done = true
 		if task.Cancelled && strings.TrimSpace(task.CurrentLabel) == "" {
 			task.CurrentLabel = "批量转写已取消"
 		}
-		s.speechCancel = nil
+		s.mediaCtl.speechCancel = nil
 		recomputeSpeechBatchCounts(task)
 	}
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 }
 
 func (s *Service) mediaSessionForArtifact(token string) (model.MediaSession, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.mediaAnalysis == nil {
+	s.captureCtl.mu.RLock()
+	defer s.captureCtl.mu.RUnlock()
+	if s.analysisCtl.mediaAnalysis == nil {
 		return model.MediaSession{}, errors.New("media analysis is not ready")
 	}
-	for _, session := range s.mediaAnalysis.Sessions {
+	for _, session := range s.analysisCtl.mediaAnalysis.Sessions {
 		if session.Artifact != nil && session.Artifact.Token == token {
 			return session, nil
 		}
@@ -811,7 +820,7 @@ func convertArtifactToSpeechWav(ctx context.Context, inputPath, outputPath strin
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return ctx.Err()
 		}
-		return fmt.Errorf("ffmpeg convert failed: %s", msg)
+		return fmt.Errorf("ffmpeg convert failed: %s: %w", msg, err)
 	}
 	return nil
 }
@@ -851,7 +860,7 @@ func transcribeAudioFileWithPython(ctx context.Context, pythonCmd []string, mode
 		if msg == "" {
 			msg = err.Error()
 		}
-		return rawTranscriptionPayload{}, fmt.Errorf("vosk transcribe failed: %s", msg)
+		return rawTranscriptionPayload{}, fmt.Errorf("vosk transcribe failed: %s: %w", msg, err)
 	}
 	var payload rawTranscriptionPayload
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {

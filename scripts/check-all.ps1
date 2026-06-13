@@ -79,59 +79,34 @@ Invoke-Step "Backend coverage report" {
   go tool cover -func="$coveragePath"
 }
 
-Invoke-Step "Frontend package manager check" {
+Invoke-Step "Frontend quality checks" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run package-manager:check
+  pnpm run ci:quality
 }
 
-Invoke-Step "Frontend tests" {
+Invoke-Step "Frontend boundary checks" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run test:run
+  pnpm run ci:boundaries
 }
 
-Invoke-Step "Frontend typecheck" {
+Invoke-Step "Frontend desktop IPC checks" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run typecheck
+  pnpm run ci:desktop
 }
 
-Invoke-Step "Frontend lint" {
+Invoke-Step "Frontend tests and build" {
   Set-Location (Join-Path $root "frontend")
-  pnpm run lint
-}
-
-Invoke-Step "Frontend format check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run format:check
-}
-
-Invoke-Step "Frontend size check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run size:check
-}
-
-Invoke-Step "Frontend boundary check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run boundary:check
-}
-
-Invoke-Step "Frontend client any check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run client:any:check
-}
-
-Invoke-Step "Frontend mapper any check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run mapper:any:check
-}
-
-Invoke-Step "Frontend wire any check" {
-  Set-Location (Join-Path $root "frontend")
-  pnpm run wire:any:check
+  pnpm run ci:test-build
 }
 
 Invoke-Step "Frontend Wails build and desktop asset check" {
   Set-Location (Join-Path $root "frontend")
   pnpm run build:wails
+}
+
+Invoke-Step "Ignored tracked files check" {
+  Set-Location $root
+  powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts\check-ignored-tracked-files.ps1")
 }
 
 Write-Host ""

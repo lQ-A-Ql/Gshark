@@ -81,9 +81,9 @@ func TestPayloadSourceHTTPMetaAndStreamBodyFetchRank(t *testing.T) {
 
 func TestFetchStreamRequestBodiesFromChunksAndRequestFallback(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	svc.streamCache[streamCacheKey("HTTP", 5)] = model.ReassembledStream{
+	svc.streamCtl.streamCache[streamCacheKey("HTTP", 5)] = model.ReassembledStream{
 		StreamID: 5,
 		Protocol: "HTTP",
 		Chunks: []model.StreamChunk{
@@ -97,7 +97,7 @@ func TestFetchStreamRequestBodiesFromChunksAndRequestFallback(t *testing.T) {
 		t.Fatalf("fetchStreamRequestBodies(chunks) = %+v", bodies)
 	}
 
-	svc.streamCache[streamCacheKey("HTTP", 6)] = model.ReassembledStream{
+	svc.streamCtl.streamCache[streamCacheKey("HTTP", 6)] = model.ReassembledStream{
 		StreamID: 6,
 		Protocol: "HTTP",
 		Request:  "POST /fallback HTTP/1.1\r\nHost: demo\r\n\r\npass=secret",
@@ -113,7 +113,7 @@ func TestFetchStreamRequestBodiesFromChunksAndRequestFallback(t *testing.T) {
 
 func TestVehicleDBCProfileServiceAddDuplicateAndRemove(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if got := svc.VehicleDBCProfiles(); got != nil {
 		t.Fatalf("empty VehicleDBCProfiles() = %+v, want nil", got)
@@ -131,13 +131,13 @@ BO_ 291 VehicleStatus: 8 ECU
 	if len(profiles) != 1 || profiles[0].Name != "vehicle" || profiles[0].MessageCount != 1 || profiles[0].SignalCount != 1 {
 		t.Fatalf("unexpected DBC profiles after add: %+v", profiles)
 	}
-	svc.vehicleAnalysis = &model.VehicleAnalysis{TotalVehiclePackets: 99}
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{TotalVehiclePackets: 99}
 	profiles, err = svc.AddVehicleDBC(dbcPath)
 	if err != nil {
 		t.Fatalf("duplicate AddVehicleDBC() error = %v", err)
 	}
-	if len(profiles) != 1 || svc.vehicleAnalysis.TotalVehiclePackets != 99 {
-		t.Fatalf("duplicate DBC add should not invalidate analysis or duplicate profile: profiles=%+v analysis=%+v", profiles, svc.vehicleAnalysis)
+	if len(profiles) != 1 || svc.analysisCtl.vehicleAnalysis.TotalVehiclePackets != 99 {
+		t.Fatalf("duplicate DBC add should not invalidate analysis or duplicate profile: profiles=%+v analysis=%+v", profiles, svc.analysisCtl.vehicleAnalysis)
 	}
 
 	second := &tshark.DBCDatabase{Path: filepath.Join(t.TempDir(), "manual.dbc"), Name: "manual", MessageCount: 2, SignalCount: 3}
@@ -145,16 +145,16 @@ BO_ 291 VehicleStatus: 8 ECU
 		t.Fatalf("buildDBCProfilesForService() = %+v", got)
 	}
 
-	svc.vehicleAnalysis = &model.VehicleAnalysis{TotalVehiclePackets: 42}
+	svc.analysisCtl.vehicleAnalysis = &model.VehicleAnalysis{TotalVehiclePackets: 42}
 	profiles = svc.RemoveVehicleDBC(dbcPath)
-	if len(profiles) != 0 || svc.vehicleAnalysis != nil {
-		t.Fatalf("RemoveVehicleDBC() profiles=%+v analysis=%+v, want empty and invalidated", profiles, svc.vehicleAnalysis)
+	if len(profiles) != 0 || svc.analysisCtl.vehicleAnalysis != nil {
+		t.Fatalf("RemoveVehicleDBC() profiles=%+v analysis=%+v, want empty and invalidated", profiles, svc.analysisCtl.vehicleAnalysis)
 	}
 }
 
 func TestVehicleDBCProfileServiceRejectsMissingFile(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if _, err := svc.AddVehicleDBC(filepath.Join(t.TempDir(), "missing.dbc")); err == nil {
 		t.Fatal("expected AddVehicleDBC missing file to fail")
@@ -186,8 +186,8 @@ func TestNTLMSessionMaterialsScanAndSort(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	items, err := svc.ListNTLMSessionMaterialsWithContext(context.Background())
 	if err != nil {
@@ -212,7 +212,7 @@ func TestNTLMSessionMaterialsScanAndSort(t *testing.T) {
 
 func TestNTLMSessionMaterialsErrorsAndHelpers(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	if _, err := svc.ListNTLMSessionMaterials(); err == nil {
 		t.Fatal("expected missing capture error")
 	}
@@ -222,7 +222,7 @@ func TestNTLMSessionMaterialsErrorsAndHelpers(t *testing.T) {
 	scanNTLMSessionRowsWithDisplayFilter = func(string, []string, string, func([]string)) error {
 		return errors.New("tshark failed")
 	}
-	svc.pcap = "capture.pcapng"
+	svc.captureCtl.pcap = "capture.pcapng"
 	if _, err := svc.ListNTLMSessionMaterialsWithContext(context.Background()); err == nil || !strings.Contains(err.Error(), "NTLM") {
 		t.Fatalf("expected scan error mentioning NTLM, got %v", err)
 	}

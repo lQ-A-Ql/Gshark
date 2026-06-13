@@ -655,6 +655,16 @@ export const sourceSizeBudgets = [
     reason: "selected packet resources hook should only compose detail, raw hex, and layers artifact loading",
   },
   {
+    path: "src/app/state/hooks/useSentinelDomainValues.ts",
+    maxLines: 370,
+    reason: "sentinel domain values hook should only memoize domain-specific provider values",
+  },
+  {
+    path: "src/app/state/hooks/useSentinelContextValues.ts",
+    maxLines: 35,
+    reason: "sentinel context values hook should only assemble domain context values and legacy facade value",
+  },
+  {
     path: "src/app/state/hooks/useSentinelDerivedView.ts",
     maxLines: 45,
     reason: "sentinel derived view hook should only memoize pure derived packet state",

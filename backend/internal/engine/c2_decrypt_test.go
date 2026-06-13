@@ -38,8 +38,8 @@ func TestC2DecryptVShellAESGCMWithSaltAndVKey(t *testing.T) {
 	copy(prefixed[4:], frame)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        1,
 		Timestamp: "2026-05-02T10:00:00Z",
 		Protocol:  "TCP",
@@ -86,8 +86,8 @@ func TestC2DecryptVShellAESGCMBigEndianFrame(t *testing.T) {
 	copy(prefixed[4:], frame)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        10,
 		Timestamp: "2026-05-02T10:00:05Z",
 		Protocol:  "TCP",
@@ -123,8 +123,8 @@ func TestC2DecryptVShellRealTrafficSaltOnlyFrame(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        100,
 		Timestamp: "2026-05-02T12:00:00Z",
 		Protocol:  "TCP",
@@ -160,7 +160,7 @@ func TestC2DecryptVShellUsesRawStreamCandidateForSplitFrame(t *testing.T) {
 	splitAt := 10
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	packets := []model.Packet{
 		{
 			ID:         201,
@@ -185,10 +185,10 @@ func TestC2DecryptVShellUsesRawStreamCandidateForSplitFrame(t *testing.T) {
 			StreamID:   23,
 		},
 	}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
 		StreamID: 23,
 		Protocol: "TCP",
 		From:     "192.168.116.129",
@@ -225,7 +225,7 @@ func TestC2DecryptVShellRawStreamCandidateSurvivesPacketCandidateCap(t *testing.
 	splitAt := 4
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	packets := make([]model.Packet, 0, c2DecryptMaxRecords+100)
 	for i := 0; i < c2DecryptMaxRecords+100; i++ {
 		packets = append(packets, model.Packet{
@@ -240,10 +240,10 @@ func TestC2DecryptVShellRawStreamCandidateSurvivesPacketCandidateCap(t *testing.
 			StreamID:   23,
 		})
 	}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
 		StreamID: 23,
 		Protocol: "TCP",
 		From:     "192.168.116.129",
@@ -289,8 +289,8 @@ func TestC2DecryptVShellKeepsHighValueServerFramePastRecordCap(t *testing.T) {
 	serverStream = append(serverStream, encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)...)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         6500,
 			Timestamp:  "2026-05-03T10:00:00Z",
@@ -316,7 +316,7 @@ func TestC2DecryptVShellKeepsHighValueServerFramePastRecordCap(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 23)] = model.ReassembledStream{
 		StreamID: 23,
 		Protocol: "TCP",
 		From:     "192.168.116.1",
@@ -366,8 +366,8 @@ func TestC2DecryptVShellDeprioritizesTimestampANSIAndShortNoisePastRecordCap(t *
 	serverStream := encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{
 			ID:         6600,
 			Timestamp:  "2026-05-03T10:00:00Z",
@@ -393,7 +393,7 @@ func TestC2DecryptVShellDeprioritizesTimestampANSIAndShortNoisePastRecordCap(t *
 	}); err != nil {
 		t.Fatalf("packet append error: %v", err)
 	}
-	svc.rawStreamIndex[streamCacheKey("TCP", 24)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", 24)] = model.ReassembledStream{
 		StreamID: 24,
 		Protocol: "TCP",
 		From:     "10.0.0.5",
@@ -455,7 +455,7 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 	targetFrame := encryptVShellGCMFrameForTest(t, salt, []byte(targetPlaintext), binary.LittleEndian)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	streamIDs := make([]int64, 0, c2DecryptMaxRecords+25)
 	packets := make([]model.Packet, 0, c2DecryptMaxRecords+25)
@@ -474,7 +474,7 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 			Payload:    hex.EncodeToString(noiseFrame),
 			StreamID:   streamID,
 		})
-		svc.rawStreamIndex[streamCacheKey("TCP", streamID)] = model.ReassembledStream{
+		svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", streamID)] = model.ReassembledStream{
 			StreamID: streamID,
 			Protocol: "TCP",
 			From:     "192.168.116.1",
@@ -498,7 +498,7 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 		Payload:    hex.EncodeToString(targetFrame),
 		StreamID:   targetStreamID,
 	})
-	svc.rawStreamIndex[streamCacheKey("TCP", targetStreamID)] = model.ReassembledStream{
+	svc.streamCtl.rawStreamIndex[streamCacheKey("TCP", targetStreamID)] = model.ReassembledStream{
 		StreamID: targetStreamID,
 		Protocol: "TCP",
 		From:     "192.168.116.1",
@@ -507,7 +507,7 @@ func TestC2DecryptVShellKeepsLateRawStreamPastCandidateCap(t *testing.T) {
 			{PacketID: targetPacketID, Direction: "server", Body: bytesToColonHex(targetFrame)},
 		},
 	}
-	if err := svc.packetStore.Append(packets); err != nil {
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
@@ -537,8 +537,8 @@ func TestC2DecryptVShellAESCBCFallback(t *testing.T) {
 	ciphertext := encryptC2AESCBCForTest(t, sum[:], sum[:], plaintext)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        2,
 		Timestamp: "2026-05-02T10:00:01Z",
 		Protocol:  "TCP",
@@ -568,8 +568,8 @@ func TestC2DecryptCSAESDirectKey(t *testing.T) {
 	blob := append(append([]byte{}, iv...), ciphertext...)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        3,
 		Timestamp: "2026-05-02T10:00:02Z",
 		Protocol:  "HTTP",
@@ -603,8 +603,8 @@ func TestC2DecryptCSAesRandHMACVerifiedHTTPResponse(t *testing.T) {
 	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        30,
 		Timestamp: "2026-05-06T10:00:00Z",
 		Protocol:  "HTTP",
@@ -648,8 +648,8 @@ func TestC2DecryptCSLengthPrefixedTruncatedHMAC(t *testing.T) {
 	blob := append(append([]byte{}, body...), mac.Sum(nil)[:16]...)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        33,
 		Timestamp: "2026-05-06T10:00:03Z",
 		Protocol:  "HTTP",
@@ -685,8 +685,8 @@ func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
 	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        31,
 		Timestamp: "2026-05-06T10:00:01Z",
 		Protocol:  "HTTP",
@@ -715,8 +715,8 @@ func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
 
 func TestC2DecryptCSMetadataExplainsRawKeyRequirement(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	if err := svc.packetStore.Append([]model.Packet{{
+	defer svc.captureCtl.packetStore.Close()
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{{
 		ID:        32,
 		Timestamp: "2026-05-06T10:00:02Z",
 		Protocol:  "HTTP",
@@ -789,7 +789,7 @@ func TestAppendCSHTTPFieldCandidatesUsesPlannedProjection(t *testing.T) {
 
 func TestC2DecryptHonorsCanceledContext(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := svc.C2Decrypt(ctx, model.C2DecryptRequest{Family: "vshell", VShell: model.C2VShellDecryptOptions{Salt: "x"}})

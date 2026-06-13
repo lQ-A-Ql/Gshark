@@ -199,12 +199,18 @@ func BatchScanTargetsWithYaraConfigContext(parent context.Context, targets []yar
 			}
 			if ctx.Err() == context.DeadlineExceeded {
 				if firstErr == nil {
-					firstErr = fmt.Errorf("YARA 扫描超时（%s）: %s", timeout, dir)
+					firstErr = fmt.Errorf("YARA 扫描超时（%s）: %s: %w", timeout, dir, ctx.Err())
+				}
+				continue
+			}
+			if ctx.Err() == context.Canceled {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("YARA 扫描已取消: %s: %w", dir, ctx.Err())
 				}
 				continue
 			}
 			if firstErr == nil {
-				firstErr = fmt.Errorf("执行 YARA 失败: %v%s", runErr, summarizeYaraOutput(output))
+				firstErr = fmt.Errorf("执行 YARA 失败%s: %w", summarizeYaraOutput(output), runErr)
 			}
 			continue
 		}

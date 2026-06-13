@@ -27,20 +27,16 @@ const (
 // s.huntMu), the read is guarded by s.toolRuntimeMu so concurrent callers
 // of SetToolRuntimeConfig cannot observe half-applied state.
 func (s *Service) ToolRuntimeConfig() model.ToolRuntimeConfig {
-	s.toolRuntimeMu.RLock()
-	defer s.toolRuntimeMu.RUnlock()
-	return s.toolRuntimeConfigLocked()
+	return s.runtimeCtl.configWithYara(s.huntingCtl.config())
 }
 
-// toolRuntimeConfigLocked returns the current tool runtime configuration.
-// Callers MUST hold s.toolRuntimeMu (read or write). The function briefly
-// takes s.huntMu internally to copy the yaraConf slice; s.huntMu is a
-// different mutex so there is no risk of re-entering s.toolRuntimeMu.
-func (s *Service) toolRuntimeConfigLocked() model.ToolRuntimeConfig {
-	s.huntMu.RLock()
-	yc := s.yaraConf
-	s.huntMu.RUnlock()
+func (ctl *toolRuntimeController) configWithYara(yc model.YaraConfig) model.ToolRuntimeConfig {
+	ctl.toolRuntimeMu.RLock()
+	defer ctl.toolRuntimeMu.RUnlock()
+	return toolRuntimeConfigFromYara(yc)
+}
 
+func toolRuntimeConfigFromYara(yc model.YaraConfig) model.ToolRuntimeConfig {
 	timeoutMS := yc.TimeoutMS
 	if timeoutMS <= 0 {
 		timeoutMS = 25000
@@ -58,38 +54,28 @@ func (s *Service) toolRuntimeConfigLocked() model.ToolRuntimeConfig {
 	}
 }
 
-// SetToolRuntimeConfig atomically applies cfg to the three config backings
-// and returns the resulting coherent snapshot. Holding s.toolRuntimeMu for
-// the entire critical section — including the concluding read — guarantees
-// no other reader or writer can interleave.
 func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig {
-	s.toolRuntimeMu.Lock()
-	defer s.toolRuntimeMu.Unlock()
-
-	tshark.SetBinaryPath(strings.TrimSpace(cfg.TSharkPath))
-	setEnvOrUnset(ffmpegEnvVar, cfg.FFmpegPath)
-	setEnvOrUnset(pythonEnvVar, cfg.PythonPath)
-	setEnvOrUnset(voskModelEnvVar, cfg.VoskModelPath)
-
-	s.huntMu.Lock()
-	s.yaraConf = model.YaraConfig{
+	s.runtimeCtl.applyConfig(cfg)
+	s.huntingCtl.setConfig(model.YaraConfig{
 		Enabled:   cfg.YaraEnabled,
 		Bin:       strings.TrimSpace(cfg.YaraBin),
 		Rules:     strings.TrimSpace(cfg.YaraRules),
 		TimeoutMS: cfg.YaraTimeoutMS,
-	}
-	s.huntMu.Unlock()
-
-	s.yaraMu.Lock()
-	s.yaraLoaded = false
-	s.yaraScanning = false
-	s.yaraHits = nil
-	s.yaraLastError = ""
-	s.yaraMu.Unlock()
+	})
+	s.resetYaraScanState()
 	clearSpeechRuntimeProbeCache()
 	tshark.ClearCapabilityCache()
 
-	return s.toolRuntimeConfigLocked()
+	return s.ToolRuntimeConfig()
+}
+
+func (ctl *toolRuntimeController) applyConfig(cfg model.ToolRuntimeConfig) {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	tshark.SetBinaryPath(strings.TrimSpace(cfg.TSharkPath))
+	setEnvOrUnset(ffmpegEnvVar, cfg.FFmpegPath)
+	setEnvOrUnset(pythonEnvVar, cfg.PythonPath)
+	setEnvOrUnset(voskModelEnvVar, cfg.VoskModelPath)
 }
 
 // ToolRuntimeSnapshot composes the configuration with the status reports
@@ -110,8 +96,8 @@ func (s *Service) ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model
 	}
 	mode := normalizeToolRuntimeProbeMode(opts.Mode)
 	if mode == ToolRuntimeProbeModeFull {
-		s.toolRuntimeFullProbeMu.Lock()
-		defer s.toolRuntimeFullProbeMu.Unlock()
+		s.runtimeCtl.toolRuntimeFullProbeMu.Lock()
+		defer s.runtimeCtl.toolRuntimeFullProbeMu.Unlock()
 	}
 
 	probeTimings := map[string]int64{}
@@ -214,11 +200,7 @@ func (s *Service) SetTSharkPath(path string) model.TSharkToolStatus {
 }
 
 func (s *Service) SetTSharkPathWithContext(ctx context.Context, path string) model.TSharkToolStatus {
-	s.toolRuntimeMu.Lock()
-	defer s.toolRuntimeMu.Unlock()
-	tshark.SetBinaryPath(strings.TrimSpace(path))
-	tshark.ClearCapabilityCache()
-	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	return s.runtimeCtl.setTSharkPath(ctx, path)
 }
 
 func (s *Service) TSharkStatusPath() string {
@@ -230,13 +212,34 @@ func (s *Service) TSharkUsingCustomPath() bool {
 }
 
 func (s *Service) YaraStatus() model.YaraToolStatus {
-	s.huntMu.RLock()
-	yc := s.yaraConf
-	s.huntMu.RUnlock()
-	s.yaraMu.Lock()
-	lastScanMessage := strings.TrimSpace(s.yaraLastError)
-	s.yaraMu.Unlock()
+	return s.huntingCtl.status()
+}
 
+func (ctl *toolRuntimeController) setTSharkPath(ctx context.Context, path string) model.TSharkToolStatus {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	tshark.SetBinaryPath(strings.TrimSpace(path))
+	tshark.ClearCapabilityCache()
+	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+}
+
+func (ctl *yaraHuntingController) config() model.YaraConfig {
+	ctl.huntMu.RLock()
+	defer ctl.huntMu.RUnlock()
+	return ctl.yaraConf
+}
+
+func (ctl *yaraHuntingController) setConfig(yc model.YaraConfig) {
+	ctl.huntMu.Lock()
+	ctl.yaraConf = yc
+	ctl.huntMu.Unlock()
+}
+
+func (ctl *yaraHuntingController) status() model.YaraToolStatus {
+	yc := ctl.config()
+	ctl.yaraMu.Lock()
+	lastScanMessage := strings.TrimSpace(ctl.yaraLastError)
+	ctl.yaraMu.Unlock()
 	timeoutMS := yc.TimeoutMS
 	if timeoutMS <= 0 {
 		timeoutMS = 25000

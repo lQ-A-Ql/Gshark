@@ -16,11 +16,11 @@ import (
 
 func TestCancelMediaBatchTranscriptionMarksTaskAndInvokesCancel(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	cancelCalled := atomic.Bool{}
-	svc.speechCancel = func() { cancelCalled.Store(true) }
-	svc.speechBatch = &model.SpeechBatchTaskStatus{
+	svc.mediaCtl.speechCancel = func() { cancelCalled.Store(true) }
+	svc.mediaCtl.speechBatch = &model.SpeechBatchTaskStatus{
 		TaskID:       "speech-batch-test",
 		CurrentToken: "tok-running",
 		CurrentLabel: "running item",
@@ -45,14 +45,14 @@ func TestCancelMediaBatchTranscriptionMarksTaskAndInvokesCancel(t *testing.T) {
 	}
 
 	status.Items[0].Status = "mutated"
-	if svc.speechBatch.Items[0].Status == "mutated" {
+	if svc.mediaCtl.speechBatch.Items[0].Status == "mutated" {
 		t.Fatal("CancelMediaBatchTranscription should return a cloned task snapshot")
 	}
 }
 
 func TestCancelAndExportMediaBatchTranscriptionWithoutTask(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	status := svc.CancelMediaBatchTranscription()
 	if status.TaskID != "" || len(status.Items) != 0 || status.Done || status.Cancelled {
@@ -67,9 +67,9 @@ func TestCancelAndExportMediaBatchTranscriptionWithoutTask(t *testing.T) {
 
 func TestExportMediaBatchTranscriptionFiltersBlankText(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	svc.speechBatch = &model.SpeechBatchTaskStatus{
+	svc.mediaCtl.speechBatch = &model.SpeechBatchTaskStatus{
 		TaskID: "speech-batch-export",
 		Items: []model.SpeechBatchTaskItem{
 			{Token: "tok-1", SessionID: "s1", Title: "first", Status: "completed", Text: "hello", Cached: true},
@@ -133,13 +133,13 @@ func TestTranscribeMediaArtifactWithContextCachesAndHonorsForce(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	audioPath := filepath.Join(t.TempDir(), "audio.ulaw")
 	if err := os.WriteFile(audioPath, []byte("audio"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	svc.mediaArtifacts["tok-audio"] = audioPath
-	svc.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
+	svc.mediaCtl.mediaArtifacts["tok-audio"] = audioPath
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
 		ID: "audio-1", MediaType: "audio", Application: "RTP", Codec: "PCMU",
 		Source: "10.1.1.1", SourcePort: 4000, Destination: "10.1.1.2", DestinationPort: 5000,
 		Artifact: &model.MediaArtifact{Token: "tok-audio", Name: "friendly.ulaw"},
@@ -190,7 +190,7 @@ func TestTranscribeMediaArtifactWithContextRejectsBadInputs(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 	if _, err := svc.TranscribeMediaArtifactWithContext(context.Background(), " ", false); err == nil || !strings.Contains(err.Error(), "missing media artifact token") {
 		t.Fatalf("expected missing token error, got %v", err)
 	}
@@ -198,10 +198,10 @@ func TestTranscribeMediaArtifactWithContextRejectsBadInputs(t *testing.T) {
 		t.Fatalf("expected media analysis not ready error, got %v", err)
 	}
 
-	svc.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
 		ID: "video-1", MediaType: "video", Artifact: &model.MediaArtifact{Token: "tok-video", Name: "video.h264"},
 	}}}
-	svc.mediaArtifacts["tok-video"] = filepath.Join(t.TempDir(), "video.h264")
+	svc.mediaCtl.mediaArtifacts["tok-video"] = filepath.Join(t.TempDir(), "video.h264")
 	if _, err := svc.TranscribeMediaArtifactWithContext(context.Background(), "tok-video", false); err == nil || !strings.Contains(err.Error(), "not an audio session") {
 		t.Fatalf("expected non-audio error, got %v", err)
 	}

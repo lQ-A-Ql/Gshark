@@ -10,7 +10,7 @@ import (
 
 func TestVShellWebSocketFromRealPCAP(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	pcapPath := `C:\Users\QAQ\Downloads\challenge (2)\新建文件夹\challenge.pcap`

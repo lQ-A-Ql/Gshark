@@ -136,8 +136,8 @@ func TestServiceAnalysisWrappersAndMediaEvidence(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
-	svc.pcap = "capture.pcapng"
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
+	svc.captureCtl.pcap = "capture.pcapng"
 	stats, err := svc.GlobalTrafficStats()
 	if err != nil {
 		t.Fatalf("GlobalTrafficStats() error = %v", err)
@@ -153,19 +153,19 @@ func TestServiceAnalysisWrappersAndMediaEvidence(t *testing.T) {
 	if media.TotalMediaPackets != 222 || len(media.Sessions) != 2 {
 		t.Fatalf("unexpected media analysis: %+v", media)
 	}
-	if len(svc.mediaPlayback) != 0 || len(svc.mediaSpeech) != 0 {
+	if len(svc.mediaCtl.mediaPlayback) != 0 || len(svc.mediaCtl.mediaSpeech) != 0 {
 		t.Fatalf("refresh should reset playback/speech caches")
 	}
 
-	svc.mu.Lock()
-	svc.mediaSpeech["audio-1"] = model.MediaTranscription{
+	svc.captureCtl.mu.Lock()
+	svc.mediaCtl.mediaSpeech["audio-1"] = model.MediaTranscription{
 		Token: "audio-1", Title: "Call", Text: strings.Repeat("hello ", 60),
 		Engine: "vosk", Language: "zh", Segments: []model.MediaTranscriptionSegment{
 			{Text: "1"}, {Text: "2"}, {Text: "3"}, {Text: "4"}, {Text: "5"}, {Text: "6"},
 		},
 	}
-	svc.mediaSpeech["blank"] = model.MediaTranscription{Token: "blank", Text: " "}
-	svc.mu.Unlock()
+	svc.mediaCtl.mediaSpeech["blank"] = model.MediaTranscription{Token: "blank", Text: " "}
+	svc.captureCtl.mu.Unlock()
 
 	records, err := svc.gatherMediaEvidence(context.Background())
 	if err != nil {

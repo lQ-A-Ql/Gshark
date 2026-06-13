@@ -4,6 +4,8 @@ import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { buildTimelineBucketsFromPacketTimes } from "./trafficTimeline";
 import type { FeaturePreloadContract } from "../../preload/preloadContracts";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
@@ -22,8 +24,7 @@ export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   protocolHierarchy: [],
 };
 
-const trafficStatsCache = new Map<string, GlobalTrafficStats>();
-const trafficStatsInflight = new Map<string, Promise<GlobalTrafficStats>>();
+const trafficStatsCache = createAnalysisResourceCache<GlobalTrafficStats>();
 
 export interface UseTrafficGraphOptions {
   backendConnected: boolean;
@@ -53,7 +54,7 @@ export function useTrafficGraph({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { run: runStatsRequest, cancel: cancelStatsRequest } = useAbortableRequest();
-  const hasCaptureForStats = useMemo(() => filePath.trim().length > 0 && totalPackets > 0, [filePath, totalPackets]);
+  const hasCaptureForStats = useMemo(() => hasUsableCapturePath(filePath, totalPackets), [filePath, totalPackets]);
 
   const refreshStats = useCallback(
     (force = false) => {
@@ -118,10 +119,10 @@ export const trafficStatsPreloadContract: FeaturePreloadContract<TrafficStatsPre
     if (key) trafficStatsCache.set(key, data);
   },
   getInflight(key) {
-    return trafficStatsInflight.get(key);
+    return trafficStatsCache.getInflight(key);
   },
   async prefetch(input, signal) {
-    if (!input.backendConnected || input.filePath.trim().length === 0 || input.totalPackets <= 0)
+    if (!input.backendConnected || !hasUsableCapturePath(input.filePath, input.totalPackets))
       return EMPTY_TRAFFIC_STATS;
     const key = trafficStatsPreloadContract.getCacheKey(input);
     return requestTrafficStats(key, signal, { force: false });
@@ -130,7 +131,6 @@ export const trafficStatsPreloadContract: FeaturePreloadContract<TrafficStatsPre
 
 export function resetTrafficStatsPreloadForTest() {
   trafficStatsCache.clear();
-  trafficStatsInflight.clear();
 }
 
 function requestTrafficStats(
@@ -138,28 +138,11 @@ function requestTrafficStats(
   signal: AbortSignal,
   options: { force: boolean },
 ): Promise<GlobalTrafficStats> {
-  if (!options.force && cacheKey) {
-    const cached = trafficStatsCache.get(cacheKey);
-    if (cached) return Promise.resolve(cached);
-    const existing = trafficStatsInflight.get(cacheKey);
-    if (existing) return existing;
-  }
-
-  const promise = fetchTrafficStats(signal).then((payload) => {
-    if (cacheKey && !signal.aborted) {
-      trafficStatsCache.set(cacheKey, payload);
-    }
-    return payload;
+  return trafficStatsCache.request(cacheKey, {
+    force: options.force,
+    signal,
+    load: () => fetchTrafficStats(signal),
   });
-
-  if (!options.force && cacheKey) {
-    trafficStatsInflight.set(cacheKey, promise);
-    promise.then(
-      () => trafficStatsInflight.delete(cacheKey),
-      () => trafficStatsInflight.delete(cacheKey),
-    );
-  }
-  return promise;
 }
 
 function fetchTrafficStats(signal: AbortSignal): Promise<GlobalTrafficStats> {

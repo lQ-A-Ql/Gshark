@@ -37,4 +37,19 @@ describe("useC2Analysis", () => {
     expect(result.current.error).toContain("后端请求超时");
     expect(backendClients.analysis.getC2SampleAnalysis).toHaveBeenCalledTimes(1);
   });
+  it("short-circuits empty captures without requesting analysis", async () => {
+    const { result } = renderHook(() =>
+      useC2Analysis({
+        backendConnected: true,
+        isPreloadingCapture: false,
+        filePath: "empty.pcapng",
+        totalPackets: 0,
+        captureRevision: 992,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("");
+    expect(backendClients.analysis.getC2SampleAnalysis).not.toHaveBeenCalled();
+  });
 });

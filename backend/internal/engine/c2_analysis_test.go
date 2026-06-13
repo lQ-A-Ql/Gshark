@@ -9,7 +9,7 @@ import (
 
 func TestServiceC2SampleAnalysisReturnsInitializedEmptyState(t *testing.T) {
 	svc := NewService(nil)
-	svc.pcap = "fixture.pcapng"
+	svc.captureCtl.pcap = "fixture.pcapng"
 
 	analysis, err := svc.C2SampleAnalysis(context.Background())
 	if err != nil {

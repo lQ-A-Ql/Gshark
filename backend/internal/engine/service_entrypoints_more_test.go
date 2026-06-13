@@ -72,7 +72,7 @@ func TestToolAnalysisServiceEntrypointsUsePacketStore(t *testing.T) {
 
 func TestToolAnalysisServiceEntrypointsValidateCaptureAndCancellation(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	if _, err := svc.HTTPLoginAnalysis(context.Background()); err == nil {
 		t.Fatal("HTTPLoginAnalysis without capture should fail")
@@ -106,7 +106,7 @@ func TestToolAnalysisServiceEntrypointsValidateCaptureAndCancellation(t *testing
 
 func TestSavedSearchHypothesisAndNoopEmitterEntrypoints(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	createdSearch, err := svc.CreateSavedSearch(model.SavedSearch{Name: "Find flags", Query: "flag{"})
 	if err != nil {
@@ -158,9 +158,9 @@ func TestSavedSearchHypothesisAndNoopEmitterEntrypoints(t *testing.T) {
 func serviceWithPackets(t *testing.T, packets []model.Packet) *Service {
 	t.Helper()
 	svc := NewService(NopEmitter{})
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
-	svc.pcap = "capture.pcapng"
-	if err := svc.packetStore.Append(packets); err != nil {
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
+	svc.captureCtl.pcap = "capture.pcapng"
+	if err := svc.captureCtl.packetStore.Append(packets); err != nil {
 		t.Fatalf("append packets: %v", err)
 	}
 	return svc

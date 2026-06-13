@@ -50,6 +50,11 @@ jobs:
           go test ./... -covermode=count -coverprofile="${RUNNER_TEMP}/gshark-backend-cover.out"
           go tool cover -func="${RUNNER_TEMP}/gshark-backend-cover.out"
 
+      - name: Ignored tracked files check
+        working-directory: .
+        run: |
+          test -z "$(git ls-files -ci --exclude-standard)" || (git ls-files -ci --exclude-standard && exit 1)
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -84,8 +89,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Frontend checks
-        run: pnpm run ci
+      - name: Frontend quality
+        run: pnpm run ci:quality
+
+      - name: Frontend boundaries
+        run: pnpm run ci:boundaries
+
+      - name: Desktop IPC policy
+        run: pnpm run ci:desktop
+
+      - name: Tests and build
+        run: pnpm run ci:test-build
 
   desktop:
     runs-on: windows-latest

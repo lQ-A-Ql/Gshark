@@ -1,3 +1,5 @@
+import type { KnownOrUnknown } from "./unknownEnum";
+
 export interface StreamChunk {
   packetId: number;
   direction: "client" | "server";
@@ -47,7 +49,7 @@ export interface StreamPayloadInspection {
   normalizedPayload: string;
   candidates: StreamPayloadCandidate[];
   suggestedCandidateId?: string;
-  suggestedDecoder?: StreamDecoderKind | string;
+  suggestedDecoder?: KnownOrUnknown<StreamDecoderKind>;
   suggestedFamily?: string;
   confidence?: number;
   reasons?: string[];

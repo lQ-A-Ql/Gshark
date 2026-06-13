@@ -72,7 +72,8 @@ function validPackageJson() {
   return {
     scripts: {
       "desktop-generic-ipc-rollback:check": "node scripts/check-desktop-generic-ipc-rollback-guard.mjs",
-      ci: "pnpm run desktop-generic-ipc-rollback:check",
+      "ci:desktop": "pnpm run desktop-generic-ipc-rollback:check",
+      ci: "pnpm run ci:desktop",
     },
   };
 }

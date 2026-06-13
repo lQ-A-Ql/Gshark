@@ -128,13 +128,12 @@ func (s *Service) gatherMediaEvidence(ctx context.Context) ([]model.EvidenceReco
 			Caveats:      dedupeStrings(caveats),
 		})
 	}
-
-	s.mu.RLock()
-	transcriptions := make(map[string]model.MediaTranscription, len(s.mediaSpeech))
-	for k, v := range s.mediaSpeech {
+	s.captureCtl.mu.RLock()
+	transcriptions := make(map[string]model.MediaTranscription, len(s.mediaCtl.mediaSpeech))
+	for k, v := range s.mediaCtl.mediaSpeech {
 		transcriptions[k] = v
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 	for _, tr := range transcriptions {
 		if strings.TrimSpace(tr.Text) == "" {
 			continue

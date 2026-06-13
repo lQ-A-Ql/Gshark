@@ -190,18 +190,20 @@ func (s *Service) GlobalTrafficStats() (model.GlobalTrafficStats, error) {
 }
 
 func (s *Service) GlobalTrafficStatsWithContext(ctx context.Context) (model.GlobalTrafficStats, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	s.mu.RUnlock()
-	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.GlobalTrafficStats]{
-		getCached: func() *model.GlobalTrafficStats { return s.globalTrafficStats },
-		setCached: func(v *model.GlobalTrafficStats) { s.globalTrafficStats = v },
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.captureCtl.mu, pcap, analysisCacheInput[model.GlobalTrafficStats]{
+		getCached: func() *model.GlobalTrafficStats { return s.analysisCtl.globalTrafficStats },
+		setCached: func(v *model.GlobalTrafficStats) {
+			s.analysisCtl.globalTrafficStats = v
+		},
 		builder: func(_ context.Context, pcap string) (model.GlobalTrafficStats, error) {
 			return buildGlobalTrafficStatsFromFileFn(pcap)
 		},
-		inFlight:  &s.inFlightAnalysis,
+		inFlight:  &s.analysisCtl.inFlightAnalysis,
 		key:       analysisInFlightKey(pcap, "global-traffic-stats"),
-		isCurrent: func(candidate string) bool { return s.pcap == candidate },
+		isCurrent: func(candidate string) bool { return s.captureCtl.pcap == candidate },
 	})
 }
 
@@ -210,12 +212,14 @@ func (s *Service) IndustrialAnalysis() (model.IndustrialAnalysis, error) {
 }
 
 func (s *Service) IndustrialAnalysisWithContext(ctx context.Context) (model.IndustrialAnalysis, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	s.mu.RUnlock()
-	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.IndustrialAnalysis]{
-		getCached: func() *model.IndustrialAnalysis { return s.industrialAnalysis },
-		setCached: func(v *model.IndustrialAnalysis) { s.industrialAnalysis = v },
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.captureCtl.mu, pcap, analysisCacheInput[model.IndustrialAnalysis]{
+		getCached: func() *model.IndustrialAnalysis { return s.analysisCtl.industrialAnalysis },
+		setCached: func(v *model.IndustrialAnalysis) {
+			s.analysisCtl.industrialAnalysis = v
+		},
 		builder: func(ctx context.Context, pcap string) (model.IndustrialAnalysis, error) {
 			return limitedAnalysisValue(s, ctx, "industrial", func(runCtx context.Context) (model.IndustrialAnalysis, error) {
 				if err := warmSpecializedFieldCacheFn(runCtx, pcap); err != nil {
@@ -232,9 +236,9 @@ func (s *Service) IndustrialAnalysisWithContext(ctx context.Context) (model.Indu
 				return analysis, nil
 			})
 		},
-		inFlight:  &s.inFlightAnalysis,
+		inFlight:  &s.analysisCtl.inFlightAnalysis,
 		key:       analysisInFlightKey(pcap, "industrial"),
-		isCurrent: func(candidate string) bool { return s.pcap == candidate },
+		isCurrent: func(candidate string) bool { return s.captureCtl.pcap == candidate },
 	})
 }
 
@@ -243,12 +247,14 @@ func (s *Service) VehicleAnalysis() (model.VehicleAnalysis, error) {
 }
 
 func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.VehicleAnalysis, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	s.mu.RUnlock()
-	return cachedAnalysis(ctx, &s.mu, pcap, analysisCacheInput[model.VehicleAnalysis]{
-		getCached: func() *model.VehicleAnalysis { return s.vehicleAnalysis },
-		setCached: func(v *model.VehicleAnalysis) { s.vehicleAnalysis = v },
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	s.captureCtl.mu.RUnlock()
+	return cachedAnalysis(ctx, &s.captureCtl.mu, pcap, analysisCacheInput[model.VehicleAnalysis]{
+		getCached: func() *model.VehicleAnalysis { return s.analysisCtl.vehicleAnalysis },
+		setCached: func(v *model.VehicleAnalysis) {
+			s.analysisCtl.vehicleAnalysis = v
+		},
 		builder: func(ctx context.Context, pcap string) (model.VehicleAnalysis, error) {
 			return limitedAnalysisValue(s, ctx, "vehicle", func(runCtx context.Context) (model.VehicleAnalysis, error) {
 				if err := warmSpecializedFieldCacheFn(runCtx, pcap); err != nil {
@@ -257,9 +263,9 @@ func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.Vehicle
 				if err := runCtx.Err(); err != nil {
 					return model.VehicleAnalysis{}, err
 				}
-				s.mu.RLock()
-				dbcDefs := append([]*tshark.DBCDatabase(nil), s.vehicleDBCDefs...)
-				s.mu.RUnlock()
+				s.captureCtl.mu.RLock()
+				dbcDefs := append([]*tshark.DBCDatabase(nil), s.analysisCtl.vehicleDBCDefs...)
+				s.captureCtl.mu.RUnlock()
 
 				analysis, err := buildVehicleAnalysisFromFileFn(pcap, dbcDefs...)
 				if err != nil {
@@ -269,9 +275,9 @@ func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.Vehicle
 				return analysis, nil
 			})
 		},
-		inFlight:  &s.inFlightAnalysis,
+		inFlight:  &s.analysisCtl.inFlightAnalysis,
 		key:       analysisInFlightKey(pcap, "vehicle"),
-		isCurrent: func(candidate string) bool { return s.pcap == candidate },
+		isCurrent: func(candidate string) bool { return s.captureCtl.pcap == candidate },
 	})
 }
 
@@ -284,10 +290,10 @@ func (s *Service) RefreshMediaAnalysis() (model.MediaAnalysis, error) {
 }
 
 func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error) {
-	s.mu.RLock()
-	pcap := s.pcap
-	cached := s.mediaAnalysis
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	cached := s.analysisCtl.mediaAnalysis
+	s.captureCtl.mu.RUnlock()
 
 	if !force && cached != nil {
 		return *cached, nil
@@ -296,10 +302,10 @@ func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error
 		return model.MediaAnalysis{}, errors.New("no capture loaded")
 	}
 	if !force {
-		return doInFlightAnalysis(context.Background(), &s.inFlightAnalysis, analysisInFlightKey(pcap, "media"), func() (model.MediaAnalysis, error) {
-			s.mu.RLock()
-			cached := s.mediaAnalysis
-			s.mu.RUnlock()
+		return doInFlightAnalysis(context.Background(), &s.analysisCtl.inFlightAnalysis, analysisInFlightKey(pcap, "media"), func() (model.MediaAnalysis, error) {
+			s.captureCtl.mu.RLock()
+			cached := s.analysisCtl.mediaAnalysis
+			s.captureCtl.mu.RUnlock()
 			if cached != nil {
 				return *cached, nil
 			}
@@ -328,10 +334,10 @@ func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysi
 		artifacts map[string]string
 	)
 
-	if s.packetStore != nil && s.packetStore.Count() > 0 {
-		packetCount := s.packetStore.Count()
+	if s.captureCtl.packetStore != nil && s.captureCtl.packetStore.Count() > 0 {
+		packetCount := s.captureCtl.packetStore.Count()
 		analysis, artifacts, err = buildMediaAnalysisFromPacketStreamFn(tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
-			return s.packetStore.Iterate(nil, onPacket)
+			return s.captureCtl.packetStore.Iterate(nil, onPacket)
 		})
 		if err != nil {
 			log.Printf("engine: media analysis packet-store fast path failed, falling back to tshark file scan: %v", err)
@@ -351,51 +357,50 @@ func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysi
 		s.emitStatus("媒体流分析失败: " + err.Error())
 		return model.MediaAnalysis{}, err
 	}
-
-	s.mu.Lock()
-	if s.pcap != pcap {
-		s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	if s.captureCtl.pcap != pcap {
+		s.captureCtl.mu.Unlock()
 		_ = os.RemoveAll(tempDir)
 		return model.MediaAnalysis{}, context.Canceled
 	}
 	if force {
-		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
-			_ = os.RemoveAll(s.mediaExportDir)
+		if s.mediaCtl.mediaExportDir != "" && s.mediaCtl.mediaExportDir != tempDir {
+			_ = os.RemoveAll(s.mediaCtl.mediaExportDir)
 		}
-		s.mediaAnalysis = &analysis
-		s.mediaExportDir = tempDir
-		s.mediaArtifacts = artifacts
-		s.mediaPlayback = map[string]string{}
-		s.mediaSpeech = map[string]model.MediaTranscription{}
-		s.cancelSpeechBatchLocked()
-		s.speechBatch = nil
-	} else if s.mediaAnalysis == nil {
-		if s.mediaExportDir != "" && s.mediaExportDir != tempDir {
-			_ = os.RemoveAll(s.mediaExportDir)
+		s.analysisCtl.mediaAnalysis = &analysis
+		s.mediaCtl.mediaExportDir = tempDir
+		s.mediaCtl.mediaArtifacts = artifacts
+		s.mediaCtl.mediaPlayback = map[string]string{}
+		s.mediaCtl.mediaSpeech = map[string]model.MediaTranscription{}
+		s.mediaCtl.cancelBatchLocked()
+		s.mediaCtl.speechBatch = nil
+	} else if s.analysisCtl.mediaAnalysis == nil {
+		if s.mediaCtl.mediaExportDir != "" && s.mediaCtl.mediaExportDir != tempDir {
+			_ = os.RemoveAll(s.mediaCtl.mediaExportDir)
 		}
-		s.mediaAnalysis = &analysis
-		s.mediaExportDir = tempDir
-		s.mediaArtifacts = artifacts
-		s.mediaPlayback = map[string]string{}
-		s.mediaSpeech = map[string]model.MediaTranscription{}
-		s.cancelSpeechBatchLocked()
-		s.speechBatch = nil
+		s.analysisCtl.mediaAnalysis = &analysis
+		s.mediaCtl.mediaExportDir = tempDir
+		s.mediaCtl.mediaArtifacts = artifacts
+		s.mediaCtl.mediaPlayback = map[string]string{}
+		s.mediaCtl.mediaSpeech = map[string]model.MediaTranscription{}
+		s.mediaCtl.cancelBatchLocked()
+		s.mediaCtl.speechBatch = nil
 	} else {
 		_ = os.RemoveAll(tempDir)
 	}
-	out := *s.mediaAnalysis
-	s.mu.Unlock()
+	out := *s.analysisCtl.mediaAnalysis
+	s.captureCtl.mu.Unlock()
 	s.emitStatus("媒体流分析完成")
 	return out, nil
 }
 
 func (s *Service) buildMediaScanConfig(pcap string) tshark.MediaScanConfig {
 	cfg := tshark.MediaScanConfig{}
-	if s.packetStore == nil || strings.TrimSpace(pcap) == "" {
+	if s.captureCtl.packetStore == nil || strings.TrimSpace(pcap) == "" {
 		return cfg
 	}
 
-	candidatePorts, err := s.packetStore.TopUDPDestinationPorts(10, 32)
+	candidatePorts, err := s.captureCtl.packetStore.TopUDPDestinationPorts(10, 32)
 	if err != nil {
 		log.Printf("engine: media preflight failed to query udp ports: %v", err)
 		return cfg
@@ -486,16 +491,16 @@ func (s *Service) USBAnalysisWithOptions(ctx context.Context, opts model.USBAnal
 	hidEventLimit := model.NormalizeUSBHIDEventLimit(opts.HIDEventLimit)
 	cacheKey := usbAnalysisCacheKey(mode, hidEventLimit)
 	defaultCacheKey := usbAnalysisCacheKey(model.USBHIDSourceAuto, model.DefaultUSBHIDEventLimit)
-	s.mu.RLock()
-	pcap := s.pcap
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
 	var cached *model.USBAnalysis
 	if cacheKey == defaultCacheKey {
-		cached = s.usbAnalysis
+		cached = s.analysisCtl.usbAnalysis
 	}
-	if cached == nil && s.usbAnalysisBySource != nil {
-		cached = s.usbAnalysisBySource[cacheKey]
+	if cached == nil && s.analysisCtl.usbAnalysisBySource != nil {
+		cached = s.analysisCtl.usbAnalysisBySource[cacheKey]
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
 	if cached != nil {
 		return *cached, nil
@@ -508,7 +513,7 @@ func (s *Service) USBAnalysisWithOptions(ctx context.Context, opts model.USBAnal
 	}
 
 	inflightKey, fallbackKey := warmupAnalysisInFlightKey(ctx, pcap, "usb:"+cacheKey)
-	analysis, err := doInFlightAnalysisWithFallback(ctx, &s.inFlightAnalysis, inflightKey, fallbackKey, func() (model.USBAnalysis, error) {
+	analysis, err := doInFlightAnalysisWithFallback(ctx, &s.analysisCtl.inFlightAnalysis, inflightKey, fallbackKey, func() (model.USBAnalysis, error) {
 		return limitedAnalysisValue(s, ctx, "usb", func(runCtx context.Context) (model.USBAnalysis, error) {
 			if err := runCtx.Err(); err != nil {
 				return model.USBAnalysis{}, err
@@ -524,28 +529,27 @@ func (s *Service) USBAnalysisWithOptions(ctx context.Context, opts model.USBAnal
 	if err != nil {
 		return model.USBAnalysis{}, err
 	}
-
-	s.mu.Lock()
-	if s.pcap != pcap {
-		s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	if s.captureCtl.pcap != pcap {
+		s.captureCtl.mu.Unlock()
 		return model.USBAnalysis{}, context.Canceled
 	}
-	if s.usbAnalysisBySource == nil {
-		s.usbAnalysisBySource = make(map[string]*model.USBAnalysis)
+	if s.analysisCtl.usbAnalysisBySource == nil {
+		s.analysisCtl.usbAnalysisBySource = make(map[string]*model.USBAnalysis)
 	}
-	if s.usbAnalysisBySource[cacheKey] == nil {
-		s.usbAnalysisBySource[cacheKey] = &analysis
+	if s.analysisCtl.usbAnalysisBySource[cacheKey] == nil {
+		s.analysisCtl.usbAnalysisBySource[cacheKey] = &analysis
 	}
-	if cacheKey == defaultCacheKey && s.usbAnalysis == nil {
-		s.usbAnalysis = &analysis
+	if cacheKey == defaultCacheKey && s.analysisCtl.usbAnalysis == nil {
+		s.analysisCtl.usbAnalysis = &analysis
 	}
 	out := analysis
-	if cacheKey == defaultCacheKey && s.usbAnalysis != nil {
-		out = *s.usbAnalysis
-	} else if s.usbAnalysisBySource[cacheKey] != nil {
-		out = *s.usbAnalysisBySource[cacheKey]
+	if cacheKey == defaultCacheKey && s.analysisCtl.usbAnalysis != nil {
+		out = *s.analysisCtl.usbAnalysis
+	} else if s.analysisCtl.usbAnalysisBySource[cacheKey] != nil {
+		out = *s.analysisCtl.usbAnalysisBySource[cacheKey]
 	}
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 	return out, nil
 }
 
@@ -560,18 +564,17 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 	if err := ctx.Err(); err != nil {
 		return model.C2SampleAnalysis{}, err
 	}
-
-	s.mu.RLock()
-	cached := s.c2Analysis
-	pcap := strings.TrimSpace(s.pcap)
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	cached := s.analysisCtl.c2Analysis
+	pcap := strings.TrimSpace(s.captureCtl.pcap)
+	s.captureCtl.mu.RUnlock()
 
 	if cached != nil {
 		return *cached, nil
 	}
 
 	inflightKey, fallbackKey := warmupAnalysisInFlightKey(ctx, pcap, "c2-sample")
-	analysis, err := doInFlightAnalysisWithFallback(ctx, &s.inFlightAnalysis, inflightKey, fallbackKey, func() (model.C2SampleAnalysis, error) {
+	analysis, err := doInFlightAnalysisWithFallback(ctx, &s.analysisCtl.inFlightAnalysis, inflightKey, fallbackKey, func() (model.C2SampleAnalysis, error) {
 		return limitedAnalysisValue(s, ctx, "c2", func(runCtx context.Context) (model.C2SampleAnalysis, error) {
 			return s.buildC2SampleAnalysisCold(runCtx, pcap)
 		})
@@ -579,13 +582,12 @@ func (s *Service) C2SampleAnalysis(ctx context.Context) (model.C2SampleAnalysis,
 	if err != nil {
 		return model.C2SampleAnalysis{}, err
 	}
-
-	s.mu.Lock()
-	if s.c2Analysis == nil && strings.TrimSpace(s.pcap) == pcap {
-		s.c2Analysis = &analysis
+	s.captureCtl.mu.Lock()
+	if s.analysisCtl.c2Analysis == nil && strings.TrimSpace(s.captureCtl.pcap) == pcap {
+		s.analysisCtl.c2Analysis = &analysis
 	}
-	cached = s.c2Analysis
-	s.mu.Unlock()
+	cached = s.analysisCtl.c2Analysis
+	s.captureCtl.mu.Unlock()
 	if cached == nil {
 		return model.C2SampleAnalysis{}, context.Canceled
 	}
@@ -599,10 +601,10 @@ func (s *Service) buildC2SampleAnalysisCold(ctx context.Context, pcap string) (m
 		analysis = emptyC2SampleAnalysis()
 		analysis.Notes = append(analysis.Notes, "当前未加载抓包，C2 分析暂未形成候选证据。")
 	} else {
-		if s.packetStore == nil {
+		if s.captureCtl.packetStore == nil {
 			return model.C2SampleAnalysis{}, errors.New("当前抓包尚未建立本地数据包索引")
 		}
-		packets, err := s.packetStore.All(nil)
+		packets, err := s.captureCtl.packetStore.All(nil)
 		if err != nil {
 			return model.C2SampleAnalysis{}, err
 		}
@@ -659,11 +661,10 @@ func (s *Service) APTAnalysis(ctx context.Context) (model.APTAnalysis, error) {
 	if err := ctx.Err(); err != nil {
 		return model.APTAnalysis{}, err
 	}
-
-	s.mu.RLock()
-	cached := s.aptAnalysis
-	pcap := strings.TrimSpace(s.pcap)
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	cached := s.analysisCtl.aptAnalysis
+	pcap := strings.TrimSpace(s.captureCtl.pcap)
+	s.captureCtl.mu.RUnlock()
 
 	if cached != nil {
 		return *cached, nil
@@ -696,13 +697,12 @@ func (s *Service) APTAnalysis(ctx context.Context) (model.APTAnalysis, error) {
 	if err := ctx.Err(); err != nil {
 		return model.APTAnalysis{}, err
 	}
-
-	s.mu.Lock()
-	if s.aptAnalysis == nil {
-		s.aptAnalysis = &analysis
+	s.captureCtl.mu.Lock()
+	if s.analysisCtl.aptAnalysis == nil {
+		s.analysisCtl.aptAnalysis = &analysis
 	}
-	out := *s.aptAnalysis
-	s.mu.Unlock()
+	out := *s.analysisCtl.aptAnalysis
+	s.captureCtl.mu.Unlock()
 	return out, nil
 }
 
@@ -947,10 +947,10 @@ func appendOrReplaceAPTProfile(items []model.APTActorProfile, next model.APTActo
 }
 
 func (s *Service) MediaArtifact(token string) (string, string, error) {
-	s.mu.RLock()
-	path := s.mediaArtifacts[token]
-	analysis := s.mediaAnalysis
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	path := s.mediaCtl.mediaArtifacts[token]
+	analysis := s.analysisCtl.mediaAnalysis
+	s.captureCtl.mu.RUnlock()
 
 	if strings.TrimSpace(path) == "" {
 		return "", "", errors.New("media artifact not found")
@@ -970,9 +970,9 @@ func (s *Service) MediaArtifact(token string) (string, string, error) {
 }
 
 func (s *Service) VehicleDBCProfiles() []model.DBCProfile {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return buildDBCProfilesForService(s.vehicleDBCDefs)
+	s.captureCtl.mu.RLock()
+	defer s.captureCtl.mu.RUnlock()
+	return buildDBCProfilesForService(s.analysisCtl.vehicleDBCDefs)
 }
 
 func (s *Service) AddVehicleDBC(path string) ([]model.DBCProfile, error) {
@@ -980,37 +980,35 @@ func (s *Service) AddVehicleDBC(path string) ([]model.DBCProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	defer s.captureCtl.mu.Unlock()
 
 	cleanPath := filepath.Clean(strings.TrimSpace(path))
-	for _, existing := range s.vehicleDBCDefs {
+	for _, existing := range s.analysisCtl.vehicleDBCDefs {
 		if existing != nil && strings.EqualFold(existing.Path, cleanPath) {
-			return buildDBCProfilesForService(s.vehicleDBCDefs), nil
+			return buildDBCProfilesForService(s.analysisCtl.vehicleDBCDefs), nil
 		}
 	}
-
-	s.vehicleDBCDefs = append(s.vehicleDBCDefs, db)
-	s.vehicleAnalysis = nil
-	return buildDBCProfilesForService(s.vehicleDBCDefs), nil
+	s.analysisCtl.vehicleDBCDefs = append(s.analysisCtl.vehicleDBCDefs, db)
+	s.analysisCtl.vehicleAnalysis = nil
+	return buildDBCProfilesForService(s.analysisCtl.vehicleDBCDefs), nil
 }
 
 func (s *Service) RemoveVehicleDBC(path string) []model.DBCProfile {
 	cleanPath := filepath.Clean(strings.TrimSpace(path))
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	defer s.captureCtl.mu.Unlock()
 
-	filtered := s.vehicleDBCDefs[:0]
-	for _, db := range s.vehicleDBCDefs {
+	filtered := s.analysisCtl.vehicleDBCDefs[:0]
+	for _, db := range s.analysisCtl.vehicleDBCDefs {
 		if db == nil || strings.EqualFold(db.Path, cleanPath) {
 			continue
 		}
 		filtered = append(filtered, db)
 	}
-	s.vehicleDBCDefs = filtered
-	s.vehicleAnalysis = nil
-	return buildDBCProfilesForService(s.vehicleDBCDefs)
+	s.analysisCtl.vehicleDBCDefs = filtered
+	s.analysisCtl.vehicleAnalysis = nil
+	return buildDBCProfilesForService(s.analysisCtl.vehicleDBCDefs)
 }
 
 func buildDBCProfilesForService(databases []*tshark.DBCDatabase) []model.DBCProfile {

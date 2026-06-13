@@ -46,7 +46,12 @@ pnpm install --frozen-lockfile
 | `pnpm run build` | 仅执行 Vite 生产构建 |
 | `pnpm run build:wails` | Vite 构建、复制后端二进制、检查桌面资源 |
 | `pnpm run ci` | 包管理、类型、lint、格式、体积、边界、IPC、Vitest、Vite 构建全套检查 |
+| `pnpm run ci:quality` | 包管理、typecheck、lint、format、size 检查 |
+| `pnpm run ci:boundaries` | 前端架构、preload、client/mapper/wire 边界检查 |
+| `pnpm run ci:desktop` | Wails binding、desktop transport、generic IPC、old binding、MISC compat 检查 |
+| `pnpm run ci:test-build` | Vitest 全量测试与 Vite 生产构建 |
 | `pnpm run boundary:check` | 前端架构边界检查 |
+| `pnpm run type-governance:check` | 阻止新增裸 `as any`、开放核心 `| string` union、未登记宽 wire DTO |
 
 ## 本地开发
 
@@ -119,6 +124,7 @@ go test ./internal/architecture -run TestBackendArchitectureBoundaries -count=1 
 go test ./...
 
 cd ..\frontend
+pnpm run type-governance:check
 pnpm run boundary:check
 pnpm run test:run
 pnpm run typecheck
@@ -131,7 +137,13 @@ pnpm run lint
 powershell -ExecutionPolicy Bypass -File .\scripts\check-all.ps1
 ```
 
-`check-all.ps1` 会构建桌面资源，分别用 `dev` 和 `production` tag 跑桌面壳测试，检查后端格式和架构边界，运行后端测试，并执行前端包管理、测试、类型、lint、格式、体积、边界、client、mapper、wire 和 Wails 资源检查。
+`check-all.ps1` 会构建桌面资源，分别用 `dev` 和 `production` tag 跑桌面壳测试，检查后端格式和架构边界，运行后端测试与覆盖率报告，并执行前端 quality、boundaries、desktop IPC、test-build 四组 CI、Wails 资源检查和 ignored tracked files 检查。
+
+忽略文件不允许继续被 Git 跟踪。若误提交了 `.gitignore` 覆盖的文件，使用 `git rm --cached <path>` 从索引移除，并运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-ignored-tracked-files.ps1
+```
 
 ## 文档维护规则
 
@@ -145,3 +157,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-all.ps1
 | 新增 MISC 包交付形态 | `docs/misc-module-interface.md` |
 | 新增威胁狩猎规则、YARA 或 playbook 契约 | `docs/api/openapi.yaml`、架构文档或约束文档 |
 | 新增 CI、构建、包管理约束 | 本文档；如影响阅读入口则同步 `docs/README.md` |
+| 新增全局工程治理规则或阶段性整改状态 | `docs/full-governance-phase1-register.md` 或 `docs/governance-defect-register.json` |

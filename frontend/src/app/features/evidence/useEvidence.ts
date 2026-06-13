@@ -3,10 +3,10 @@ import type { UnifiedEvidenceRecord } from "./evidenceSchema";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import type { FeaturePreloadContract } from "../../preload/preloadContracts";
-import { LRUCache } from "../../utils/lruCache";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 
-const evidenceCache = new LRUCache<string, UnifiedEvidenceRecord[]>(10);
-const evidenceInflight = new Map<string, Promise<UnifiedEvidenceRecord[]>>();
+const evidenceCache = createAnalysisResourceCache<UnifiedEvidenceRecord[]>({ capacity: 10 });
 const EMPTY_EVIDENCE: UnifiedEvidenceRecord[] = [];
 
 export interface UseEvidenceOptions {
@@ -34,7 +34,7 @@ export function useEvidence({
   const modulesKey = buildEvidenceModulesKey(modules);
   const normalizedModules = useMemo(() => parseEvidenceModulesKey(modulesKey), [modulesKey]);
   const hasCaptureForEvidence = useMemo(
-    () => backendConnected && filePath.trim().length > 0 && totalPackets > 0,
+    () => backendConnected && hasUsableCapturePath(filePath, totalPackets),
     [backendConnected, filePath, totalPackets],
   );
   const [evidence, setEvidence] = useState<UnifiedEvidenceRecord[]>(EMPTY_EVIDENCE);
@@ -97,7 +97,12 @@ export function useEvidence({
   };
 }
 
-export function buildEvidenceCacheKey(captureRevision: number, filePath: string, totalPackets: number, modules?: string[]) {
+export function buildEvidenceCacheKey(
+  captureRevision: number,
+  filePath: string,
+  totalPackets: number,
+  modules?: string[],
+) {
   if (!filePath.trim() || totalPackets <= 0) return "";
   const base = `${captureRevision}::${filePath}::${totalPackets}`;
   const modulesKey = buildEvidenceModulesKey(modules);
@@ -109,7 +114,9 @@ export function buildEvidenceCacheKey(captureRevision: number, filePath: string,
 
 export function buildEvidenceModulesKey(modules?: readonly string[]) {
   if (!modules || modules.length === 0) return "";
-  return Array.from(new Set(modules.map((module) => module.trim()).filter(Boolean))).sort().join(",");
+  return Array.from(new Set(modules.map((module) => module.trim()).filter(Boolean)))
+    .sort()
+    .join(",");
 }
 
 function parseEvidenceModulesKey(modulesKey: string) {
@@ -127,10 +134,11 @@ export const evidencePreloadContract: FeaturePreloadContract<EvidencePreloadInpu
     if (key) evidenceCache.set(key, data);
   },
   getInflight(key) {
-    return evidenceInflight.get(key);
+    return evidenceCache.getInflight(key);
   },
   prefetch(input, signal) {
-    if (!input.backendConnected || !input.filePath || input.totalPackets <= 0) return Promise.resolve([]);
+    if (!input.backendConnected || !hasUsableCapturePath(input.filePath, input.totalPackets))
+      return Promise.resolve([]);
     if (!input.modules || input.modules.length === 0) {
       return Promise.reject(new Error("evidence preload requires explicit modules"));
     }
@@ -141,7 +149,6 @@ export const evidencePreloadContract: FeaturePreloadContract<EvidencePreloadInpu
 
 export function resetEvidencePreloadForTest() {
   evidenceCache.clear();
-  evidenceInflight.clear();
 }
 
 function requestEvidence(
@@ -150,26 +157,9 @@ function requestEvidence(
   signal: AbortSignal,
   options: { force: boolean },
 ): Promise<UnifiedEvidenceRecord[]> {
-  if (!options.force && cacheKey) {
-    const cached = evidenceCache.get(cacheKey);
-    if (cached) return Promise.resolve(cached);
-    const existing = evidenceInflight.get(cacheKey);
-    if (existing) return existing;
-  }
-
-  const promise = backendClients.evidence.getEvidenceWithFilter(modules, signal).then((payload) => {
-    if (cacheKey && !signal.aborted) {
-      evidenceCache.set(cacheKey, payload);
-    }
-    return payload;
+  return evidenceCache.request(cacheKey, {
+    force: options.force,
+    signal,
+    load: () => backendClients.evidence.getEvidenceWithFilter(modules, signal),
   });
-
-  if (!options.force && cacheKey) {
-    evidenceInflight.set(cacheKey, promise);
-    promise.then(
-      () => evidenceInflight.delete(cacheKey),
-      () => evidenceInflight.delete(cacheKey),
-    );
-  }
-  return promise;
 }

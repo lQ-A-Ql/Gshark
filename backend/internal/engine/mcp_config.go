@@ -5,17 +5,17 @@ import "github.com/gshark/sentinel/backend/internal/model"
 const mcpEndpoint = "http://127.0.0.1:17891/api/mcp"
 
 func (s *Service) MCPConfig() model.MCPConfig {
-	s.mcpMu.RLock()
-	defer s.mcpMu.RUnlock()
-	return s.mcpConfig
+	s.mcpCtl.mcpMu.RLock()
+	defer s.mcpCtl.mcpMu.RUnlock()
+	return s.mcpCtl.mcpConfig
 }
 
 func (s *Service) SetMCPConfig(cfg model.MCPConfig) model.MCPConfig {
-	s.mcpMu.Lock()
-	s.mcpConfig = model.MCPConfig{
+	s.mcpCtl.mcpMu.Lock()
+	s.mcpCtl.mcpConfig = model.MCPConfig{
 		Enabled: cfg.Enabled,
 	}
-	s.mcpMu.Unlock()
+	s.mcpCtl.mcpMu.Unlock()
 	return s.MCPConfig()
 }
 

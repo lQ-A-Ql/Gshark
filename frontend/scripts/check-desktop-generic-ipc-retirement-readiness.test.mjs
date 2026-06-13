@@ -123,7 +123,8 @@ function validPackageJson() {
   return {
     scripts: {
       "desktop-generic-ipc-retirement:check": "node scripts/check-desktop-generic-ipc-retirement-readiness.mjs",
-      ci: "pnpm run desktop-generic-ipc-retirement:check",
+      "ci:desktop": "pnpm run desktop-generic-ipc-retirement:check",
+      ci: "pnpm run ci:desktop",
     },
   };
 }

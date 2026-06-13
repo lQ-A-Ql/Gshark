@@ -165,7 +165,7 @@ func loadThreatSampleService(t *testing.T, relPath string) *Service {
 	}
 	svc := NewService(NopEmitter{})
 	t.Cleanup(func() {
-		_ = svc.packetStore.Close()
+		_ = svc.captureCtl.packetStore.Close()
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

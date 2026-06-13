@@ -1,5 +1,6 @@
 import type { InvestigationReport } from "./report";
 import type { TrafficBucket } from "./traffic";
+import type { KnownOrUnknown } from "./unknownEnum";
 
 export const USB_HID_SOURCE_MODES = ["auto", "usbhid", "capdata", "btatt", "raw"] as const;
 export type USBHIDSourceMode = (typeof USB_HID_SOURCE_MODES)[number];
@@ -66,7 +67,7 @@ export interface USBMassStorageOperation {
   endpoint: string;
   lun: string;
   command: string;
-  operation: "read" | "write" | "other" | string;
+  operation: KnownOrUnknown<"read" | "write" | "other">;
   transferLength: number;
   direction: string;
   status: string;

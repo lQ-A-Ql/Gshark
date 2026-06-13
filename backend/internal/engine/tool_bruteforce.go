@@ -20,13 +20,7 @@ func (s *Service) BruteforceAnalysis(ctx context.Context) (model.BruteforceAnaly
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if s.CurrentCapturePath() == "" {
-		return model.BruteforceAnalysis{}, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
-	}
-	if s.packetStore == nil {
-		return model.BruteforceAnalysis{}, fmt.Errorf("当前抓包尚未建立本地数据包索引")
-	}
-	packets, err := s.packetStore.All(nil)
+	packets, err := s.packetsForToolAnalysis()
 	if err != nil {
 		return model.BruteforceAnalysis{}, err
 	}

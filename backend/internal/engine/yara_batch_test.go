@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,7 +100,7 @@ func TestCachedYaraHitsIncludesWarningWhenYaraFails(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	tempDir := t.TempDir()
 	fakeExe := filepath.Join(tempDir, "fake-yara.exe")
@@ -121,14 +122,14 @@ rule DUMMY_RULE {
 		t.Fatalf("WriteFile(rule) error = %v", err)
 	}
 
-	svc.huntMu.Lock()
-	svc.yaraConf = model.YaraConfig{
+	svc.huntingCtl.huntMu.Lock()
+	svc.huntingCtl.yaraConf = model.YaraConfig{
 		Enabled:   true,
 		Bin:       fakeExe,
 		Rules:     ruleFile,
 		TimeoutMS: 25000,
 	}
-	svc.huntMu.Unlock()
+	svc.huntingCtl.huntMu.Unlock()
 
 	hits := svc.cachedYaraHits([]model.ObjectFile{{
 		ID:       1,
@@ -153,19 +154,19 @@ func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	tempDir := t.TempDir()
-	svc.huntMu.Lock()
-	svc.yaraConf = model.YaraConfig{
+	svc.huntingCtl.huntMu.Lock()
+	svc.huntingCtl.yaraConf = model.YaraConfig{
 		Enabled:   true,
 		Bin:       filepath.Join(tempDir, "missing-yara.exe"),
 		Rules:     filepath.Join(tempDir, "missing-rules.yar"),
 		TimeoutMS: 25000,
 	}
-	svc.huntMu.Unlock()
+	svc.huntingCtl.huntMu.Unlock()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 41, Protocol: "HTTP", StreamID: 3, SourceIP: "10.0.0.1", SourcePort: 50123, DestIP: "10.0.0.2", DestPort: 80, Info: "GET /payload HTTP/1.1", Payload: "GET /payload HTTP/1.1\r\nHost: demo\r\n\r\n"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -177,6 +178,68 @@ func TestCachedYaraHitsPreflightsYaraBeforeBuildingStreamTargets(t *testing.T) {
 	}
 	if hits[0].Rule != "YARA 扫描异常" || !strings.Contains(hits[0].Preview, "yara 自定义路径") {
 		t.Fatalf("unexpected preflight warning hit: %+v", hits[0])
+	}
+}
+
+func TestCachedYaraHitsWaitsForScanCompletionSignal(t *testing.T) {
+	oldRun := runYaraCommand
+	t.Cleanup(func() {
+		runYaraCommand = oldRun
+	})
+
+	dir := t.TempDir()
+	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	ruleFile := filepath.Join(dir, "rule.yarc")
+	objectPath := filepath.Join(dir, "payload.bin")
+	for _, item := range []string{fakeExe, ruleFile, objectPath} {
+		if err := os.WriteFile(item, []byte("ok"), 0o755); err != nil {
+			t.Fatalf("write %s: %v", item, err)
+		}
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var runCalls int32
+	runYaraCommand = func(context.Context, string, string, string) ([]byte, error) {
+		if atomic.AddInt32(&runCalls, 1) == 1 {
+			close(started)
+		}
+		<-release
+		return []byte("WEBSHELL_DONE " + filepath.Base(objectPath) + "\n"), nil
+	}
+
+	svc := NewService(NopEmitter{})
+	objects := []model.ObjectFile{{ID: 1, PacketID: 42, Name: "payload.bin", Path: objectPath}}
+	firstDone := make(chan []model.ThreatHit, 1)
+	go func() {
+		firstDone <- svc.cachedYaraHitsWithContext(context.Background(), objects)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("first YARA scan did not start")
+	}
+
+	secondDone := make(chan []model.ThreatHit, 1)
+	go func() {
+		secondDone <- svc.cachedYaraHitsWithContext(context.Background(), objects)
+	}()
+
+	select {
+	case <-secondDone:
+		t.Fatal("second caller returned before the scan completion signal")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(release)
+	firstHits := <-firstDone
+	secondHits := <-secondDone
+	if len(firstHits) != 1 || len(secondHits) != 1 {
+		t.Fatalf("expected both callers to observe cached hit, first=%+v second=%+v", firstHits, secondHits)
+	}
+	if atomic.LoadInt32(&runCalls) != 1 {
+		t.Fatalf("expected one shared scan, got %d", runCalls)
 	}
 }
 
@@ -198,7 +261,7 @@ func TestThreatHuntYaraScansHTTPReassembledStream(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
 	tempDir := t.TempDir()
 	fakeExe := filepath.Join(tempDir, "fake-yara.exe")
@@ -221,16 +284,16 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 		t.Fatalf("WriteFile(rule) error = %v", err)
 	}
 
-	svc.huntMu.Lock()
-	svc.yaraConf = model.YaraConfig{
+	svc.huntingCtl.huntMu.Lock()
+	svc.huntingCtl.yaraConf = model.YaraConfig{
 		Enabled:   true,
 		Bin:       fakeExe,
 		Rules:     ruleFile,
 		TimeoutMS: 25000,
 	}
-	svc.huntMu.Unlock()
+	svc.huntingCtl.huntMu.Unlock()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 11, Protocol: "HTTP", StreamID: 7, SourceIP: "10.0.0.1", SourcePort: 50123, DestIP: "10.0.0.2", DestPort: 80, Info: "GET /SetupWizard.aspx HTTP/1.1", Payload: "GET /SetupWizard.aspx HTTP/1.1\r\nHost: demo\r\n\r\n"},
 		{ID: 12, Protocol: "HTTP", StreamID: 7, SourceIP: "10.0.0.2", SourcePort: 80, DestIP: "10.0.0.1", DestPort: 50123, Info: "HTTP/1.1 200 OK", Payload: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"},
 	}); err != nil {
@@ -258,11 +321,62 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 	}
 }
 
+func TestBatchScanTargetsWithYaraConfigPropagatesCancelAndTimeoutCauses(t *testing.T) {
+	dir := t.TempDir()
+	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	ruleFile := filepath.Join(dir, "rule.yarc")
+	targetPath := filepath.Join(dir, "payload.bin")
+	for _, item := range []string{fakeExe, ruleFile, targetPath} {
+		if err := os.WriteFile(item, []byte("ok"), 0o755); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", item, err)
+		}
+	}
+
+	oldRun := runYaraCommand
+	t.Cleanup(func() { runYaraCommand = oldRun })
+
+	t.Run("parent cancel", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		runYaraCommand = func(runCtx context.Context, _, _, _ string) ([]byte, error) {
+			cancel()
+			<-runCtx.Done()
+			return nil, runCtx.Err()
+		}
+
+		hits, err := BatchScanTargetsWithYaraConfigContext(ctx, []yaraScanTarget{{name: "payload.bin", path: targetPath}}, model.YaraConfig{
+			Enabled:   true,
+			Bin:       fakeExe,
+			Rules:     ruleFile,
+			TimeoutMS: 25000,
+		})
+		if len(hits) != 0 || !errors.Is(err, context.Canceled) {
+			t.Fatalf("parent cancel = hits=%+v err=%v", hits, err)
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		runYaraCommand = func(runCtx context.Context, _, _, _ string) ([]byte, error) {
+			<-runCtx.Done()
+			return nil, runCtx.Err()
+		}
+
+		hits, err := BatchScanTargetsWithYaraConfigContext(context.Background(), []yaraScanTarget{{name: "payload.bin", path: targetPath}}, model.YaraConfig{
+			Enabled:   true,
+			Bin:       fakeExe,
+			Rules:     ruleFile,
+			TimeoutMS: 1,
+		})
+		if len(hits) != 0 || !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("timeout = hits=%+v err=%v", hits, err)
+		}
+	})
+}
+
 func TestBuildYaraScanTargetsRespectsCanceledContext(t *testing.T) {
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
+	defer svc.captureCtl.packetStore.Close()
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 41, Protocol: "HTTP", StreamID: 3, SourceIP: "10.0.0.1", SourcePort: 50123, DestIP: "10.0.0.2", DestPort: 80, Info: "GET /payload HTTP/1.1", Payload: "GET /payload HTTP/1.1\r\nHost: demo\r\n\r\n"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)

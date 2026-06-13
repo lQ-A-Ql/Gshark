@@ -179,9 +179,9 @@ func TestMediaPlaybackWithContextGeneratesAndCachesAsset(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.mediaArtifacts["tok-audio"] = inputPath
-	svc.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
+	defer svc.captureCtl.packetStore.Close()
+	svc.mediaCtl.mediaArtifacts["tok-audio"] = inputPath
+	svc.analysisCtl.mediaAnalysis = &model.MediaAnalysis{Sessions: []model.MediaSession{{
 		ID: "audio-session", MediaType: "audio", Application: "RTP", Codec: "PCMU",
 		Source: "10.0.0.1", SourcePort: 4000, Destination: "10.0.0.2", DestinationPort: 5000,
 		Artifact: &model.MediaArtifact{Token: "tok-audio", Name: "friendly-name.ulaw", Format: "ulaw"},
@@ -201,7 +201,7 @@ func TestMediaPlaybackWithContextGeneratesAndCachesAsset(t *testing.T) {
 		t.Fatalf("generated playback payload = %q err=%v", string(payload), err)
 	}
 
-	if got := svc.mediaPlayback["tok-audio"]; got != path {
+	if got := svc.mediaCtl.mediaPlayback["tok-audio"]; got != path {
 		t.Fatalf("media playback cache = %q, want %q", got, path)
 	}
 	secondPath, secondName, err := svc.MediaPlaybackWithContext(context.Background(), "tok-audio")

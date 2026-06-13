@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -36,9 +35,9 @@ func (s *Service) ListNTLMSessionMaterials() ([]model.NTLMSessionMaterial, error
 }
 
 func (s *Service) ListNTLMSessionMaterialsWithContext(ctx context.Context) ([]model.NTLMSessionMaterial, error) {
-	capturePath := s.CurrentCapturePath()
-	if capturePath == "" {
-		return nil, fmt.Errorf("当前未加载抓包，请先导入 pcapng 文件")
+	capturePath, err := s.requireCapturePathForToolAnalysis()
+	if err != nil {
+		return nil, err
 	}
 	return scanNTLMSessionMaterials(ctx, capturePath)
 }
@@ -128,7 +127,7 @@ func scanNTLMSessionMaterials(ctx context.Context, capturePath string) ([]model.
 		lastErr = err
 	}
 	if lastErr != nil && len(rows) == 0 {
-		return nil, fmt.Errorf("扫描 NTLM 会话材料失败: %s", explainWinRMScanError(lastErr))
+		return nil, wrapToolAnalysisError("ntlm-session-material-scan", "扫描 NTLM 会话材料失败: "+explainWinRMScanError(lastErr), lastErr)
 	}
 
 	result := make([]model.NTLMSessionMaterial, 0, len(rows))

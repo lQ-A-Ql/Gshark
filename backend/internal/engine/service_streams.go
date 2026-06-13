@@ -12,17 +12,17 @@ import (
 )
 
 func (s *Service) CaptureStatus() model.CaptureStatus {
-	s.mu.RLock()
-	filePath := strings.TrimSpace(s.pcap)
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	filePath := strings.TrimSpace(s.captureCtl.pcap)
+	s.captureCtl.mu.RUnlock()
 
 	packetCount := 0
-	if s.packetStore != nil {
-		packetCount = s.packetStore.Count()
+	if s.captureCtl.packetStore != nil {
+		packetCount = s.captureCtl.packetStore.Count()
 	}
-	s.activeLoadMu.Lock()
-	loadStatus := cloneCaptureLoadStatus(s.activeLoadStatus)
-	s.activeLoadMu.Unlock()
+	s.captureCtl.activeLoadMu.Lock()
+	loadStatus := cloneCaptureLoadStatus(s.captureCtl.activeLoadStatus)
+	s.captureCtl.activeLoadMu.Unlock()
 	return model.CaptureStatus{
 		FilePath:    filePath,
 		HasCapture:  filePath != "" && packetCount > 0,
@@ -32,10 +32,10 @@ func (s *Service) CaptureStatus() model.CaptureStatus {
 }
 
 func (s *Service) Packets() []model.Packet {
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return nil
 	}
-	out, err := s.packetStore.All(nil)
+	out, err := s.captureCtl.packetStore.All(nil)
 	if err != nil {
 		log.Printf("engine: packetStore.All failed: %v", err)
 		return nil
@@ -49,7 +49,7 @@ func (s *Service) PacketsPageWithError(cursor, limit int, filter string) ([]mode
 }
 
 func (s *Service) PacketsPageWithState(cursor, limit int, filter string) ([]model.Packet, int, int, bool, error) {
-	if s.packetStore == nil {
+	if s.captureCtl.packetStore == nil {
 		return nil, 0, 0, false, nil
 	}
 	filtered, filterErr := s.filteredPacketIndex(filter)
@@ -58,7 +58,7 @@ func (s *Service) PacketsPageWithState(cursor, limit int, filter string) ([]mode
 		if err != nil {
 			return []model.Packet{}, 0, 0, false, err
 		}
-		out, err := s.packetStore.PacketsByIDsSummary(ids)
+		out, err := s.captureCtl.packetStore.PacketsByIDsSummary(ids)
 		if err != nil {
 			s.emitStatus("数据包分页查询失败: " + err.Error())
 			return []model.Packet{}, 0, 0, false, err
@@ -73,7 +73,7 @@ func (s *Service) PacketsPageWithState(cursor, limit int, filter string) ([]mode
 	}
 
 	predicate := compilePacketFilter(filter)
-	out, next, total, err := s.packetStore.PageSummaries(cursor, limit, predicate)
+	out, next, total, err := s.captureCtl.packetStore.PageSummaries(cursor, limit, predicate)
 	if err != nil {
 		s.emitStatus("数据包分页查询失败: " + err.Error())
 		return []model.Packet{}, 0, 0, false, err
@@ -87,7 +87,7 @@ func (s *Service) PacketsPage(cursor, limit int, filter string) ([]model.Packet,
 }
 
 func (s *Service) PacketPageCursorWithError(packetID int64, limit int, filter string) (int, int, bool, error) {
-	if packetID <= 0 || s.packetStore == nil {
+	if packetID <= 0 || s.captureCtl.packetStore == nil {
 		return 0, 0, false, nil
 	}
 	if limit <= 0 {
@@ -107,7 +107,7 @@ func (s *Service) PacketPageCursorWithError(packetID int64, limit int, filter st
 	predicate := compilePacketFilter(filter)
 	matchIndex := -1
 	total := 0
-	_ = s.packetStore.Iterate(predicate, func(packet model.Packet) error {
+	_ = s.captureCtl.packetStore.Iterate(predicate, func(packet model.Packet) error {
 		if packet.ID == packetID && matchIndex < 0 {
 			matchIndex = total
 		}
@@ -127,10 +127,10 @@ func (s *Service) PacketPageCursor(packetID int64, limit int, filter string) (in
 }
 
 func (s *Service) Packet(packetID int64) (model.Packet, error) {
-	if packetID <= 0 || s.packetStore == nil {
+	if packetID <= 0 || s.captureCtl.packetStore == nil {
 		return model.Packet{}, errors.New("invalid packet id")
 	}
-	packet, ok, err := s.packetStore.PacketByID(packetID)
+	packet, ok, err := s.captureCtl.packetStore.PacketByID(packetID)
 	if err != nil {
 		return model.Packet{}, err
 	}
@@ -149,21 +149,21 @@ func (s *Service) HTTPStream(ctx context.Context, streamID int64) model.Reassemb
 	}
 	key := streamCacheKey("HTTP", streamID)
 	log.Printf("engine: http stream request stream=%d", streamID)
-	s.mu.RLock()
-	pcap := s.pcap
-	if cached, ok := s.streamCache[key]; ok {
-		s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	if cached, ok := s.streamCtl.streamCache[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream := s.streamWithOverrides(key, cached)
 		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: http stream stream=%d source=cache chunks=%d", streamID, len(stream.Chunks))
 		return stream
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
-	if s.packetStore != nil {
+	if s.captureCtl.packetStore != nil {
 		stream := ReassembleHTTPStreamFromIterate(func(fn func(model.Packet) error) error {
-			return s.packetStore.Iterate(nil, fn)
+			return s.captureCtl.packetStore.Iterate(nil, fn)
 		}, streamID)
 		if len(stream.Chunks) > 0 || strings.TrimSpace(stream.Request) != "" || strings.TrimSpace(stream.Response) != "" {
 			stream = s.streamWithOverrides(key, stream)
@@ -208,19 +208,18 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 	}
 	key := streamCacheKey(normalized, streamID)
 	log.Printf("engine: raw stream request protocol=%s stream=%d", normalized, streamID)
-
-	s.mu.RLock()
-	pcap := s.pcap
-	if cached, ok := s.streamCache[key]; ok {
-		s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	if cached, ok := s.streamCtl.streamCache[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream := s.streamWithOverrides(key, cached)
 		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: raw stream protocol=%s stream=%d source=cache chunks=%d", normalized, streamID, len(stream.Chunks))
 		return stream
 	}
-	if indexed, ok := s.rawStreamIndex[key]; ok {
-		s.mu.RUnlock()
+	if indexed, ok := s.streamCtl.rawStreamIndex[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream := s.streamWithOverrides(key, indexed)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
@@ -228,7 +227,7 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 		log.Printf("engine: raw stream protocol=%s stream=%d source=index chunks=%d", normalized, streamID, len(stream.Chunks))
 		return stream
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
 	if pcap != "" {
 		log.Printf("engine: raw stream protocol=%s stream=%d source=file-fallback start", normalized, streamID)
@@ -262,24 +261,23 @@ func (s *Service) RawStream(ctx context.Context, protocol string, streamID int64
 func (s *Service) peekRawStreamInMemory(protocol string, streamID int64) (model.ReassembledStream, bool) {
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	key := streamCacheKey(normalized, streamID)
-
-	s.mu.RLock()
-	if cached, ok := s.streamCache[key]; ok {
-		s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	if cached, ok := s.streamCtl.streamCache[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream := s.streamWithOverrides(key, cached)
 		stream.LoadMeta = newStreamLoadMeta("cache", true, false, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		return stream, true
 	}
-	if indexed, ok := s.rawStreamIndex[key]; ok {
-		s.mu.RUnlock()
+	if indexed, ok := s.streamCtl.rawStreamIndex[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream := s.streamWithOverrides(key, indexed)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		s.cacheStream(key, stream)
 		return stream, true
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 	return model.ReassembledStream{StreamID: streamID, Protocol: normalized}, false
 }
 
@@ -290,17 +288,16 @@ func (s *Service) RawStreamPage(ctx context.Context, protocol string, streamID i
 	normalized := strings.ToUpper(strings.TrimSpace(protocol))
 	key := streamCacheKey(normalized, streamID)
 	log.Printf("engine: raw stream page request protocol=%s stream=%d cursor=%d limit=%d", normalized, streamID, cursor, limit)
-
-	s.mu.RLock()
-	if indexed, ok := s.rawStreamIndex[key]; ok {
-		s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	if indexed, ok := s.streamCtl.rawStreamIndex[key]; ok {
+		s.captureCtl.mu.RUnlock()
 		stream, next, total := cloneRawStreamWindow(s.streamWithOverrides(key, indexed), cursor, limit)
 		stream.LoadMeta = newStreamLoadMeta("index", false, true, false, 0)
 		s.applyOverrideCountToMeta(key, stream.LoadMeta)
 		log.Printf("engine: raw stream page protocol=%s stream=%d source=index returned=%d total=%d next=%d", normalized, streamID, len(stream.Chunks), total, next)
 		return stream, next, total
 	}
-	s.mu.RUnlock()
+	s.captureCtl.mu.RUnlock()
 
 	stream := s.RawStream(ctx, normalized, streamID)
 	window, next, total := cloneRawStreamWindow(stream, cursor, limit)
@@ -341,29 +338,28 @@ func (s *Service) UpdateStreamPayloads(ctx context.Context, protocol string, str
 	if len(normalizedPatches) == 0 {
 		return model.ReassembledStream{}, fmt.Errorf("no valid patches")
 	}
-
-	s.mu.Lock()
-	if s.streamOverrides == nil {
-		s.streamOverrides = map[string]map[int]string{}
+	s.captureCtl.mu.Lock()
+	if s.streamCtl.streamOverrides == nil {
+		s.streamCtl.streamOverrides = map[string]map[int]string{}
 	}
-	existing := s.streamOverrides[key]
+	existing := s.streamCtl.streamOverrides[key]
 	if existing == nil {
 		existing = map[int]string{}
-		s.streamOverrides[key] = existing
+		s.streamCtl.streamOverrides[key] = existing
 	}
 	for index, body := range normalizedPatches {
 		existing[index] = body
 	}
 
-	if cached, ok := s.streamCache[key]; ok {
+	if cached, ok := s.streamCtl.streamCache[key]; ok {
 		updated := applyChunkOverrides(cloneReassembledStream(cached), existing)
-		s.streamCache[key] = cloneReassembledStream(updated)
+		s.streamCtl.streamCache[key] = cloneReassembledStream(updated)
 	}
-	if indexed, ok := s.rawStreamIndex[key]; ok {
+	if indexed, ok := s.streamCtl.rawStreamIndex[key]; ok {
 		updated := applyChunkOverrides(cloneReassembledStream(indexed), existing)
-		s.rawStreamIndex[key] = cloneReassembledStream(updated)
+		s.streamCtl.rawStreamIndex[key] = cloneReassembledStream(updated)
 	}
-	s.mu.Unlock()
+	s.captureCtl.mu.Unlock()
 
 	if normalized == "HTTP" {
 		return s.HTTPStream(ctx, streamID), nil
@@ -372,30 +368,30 @@ func (s *Service) UpdateStreamPayloads(ctx context.Context, protocol string, str
 }
 
 func (s *Service) cacheStream(key string, stream model.ReassembledStream) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.captureCtl.mu.Lock()
+	defer s.captureCtl.mu.Unlock()
 
-	if s.streamCache == nil {
-		s.streamCache = map[string]model.ReassembledStream{}
+	if s.streamCtl.streamCache == nil {
+		s.streamCtl.streamCache = map[string]model.ReassembledStream{}
 	}
-	s.streamCache[key] = cloneReassembledStream(stream)
+	s.streamCtl.streamCache[key] = cloneReassembledStream(stream)
 	s.markStreamCacheKeyNewestLocked(key)
-	for len(s.streamCacheOrder) > streamCacheLimitValue() {
-		oldest := s.streamCacheOrder[0]
-		s.streamCacheOrder = s.streamCacheOrder[1:]
-		delete(s.streamCache, oldest)
+	for len(s.streamCtl.streamCacheOrder) > streamCacheLimitValue() {
+		oldest := s.streamCtl.streamCacheOrder[0]
+		s.streamCtl.streamCacheOrder = s.streamCtl.streamCacheOrder[1:]
+		delete(s.streamCtl.streamCache, oldest)
 	}
 }
 
 func (s *Service) markStreamCacheKeyNewestLocked(key string) {
 	s.removeStreamCacheOrderLocked(key)
-	s.streamCacheOrder = append(s.streamCacheOrder, key)
+	s.streamCtl.streamCacheOrder = append(s.streamCtl.streamCacheOrder, key)
 }
 
 func (s *Service) removeStreamCacheOrderLocked(key string) {
-	for i, v := range s.streamCacheOrder {
+	for i, v := range s.streamCtl.streamCacheOrder {
 		if v == key {
-			s.streamCacheOrder = append(s.streamCacheOrder[:i], s.streamCacheOrder[i+1:]...)
+			s.streamCtl.streamCacheOrder = append(s.streamCtl.streamCacheOrder[:i], s.streamCtl.streamCacheOrder[i+1:]...)
 			return
 		}
 	}
@@ -419,9 +415,9 @@ func cloneReassembledStream(in model.ReassembledStream) model.ReassembledStream 
 }
 
 func (s *Service) streamWithOverrides(key string, in model.ReassembledStream) model.ReassembledStream {
-	s.mu.RLock()
-	overrides := cloneChunkOverrideMap(s.streamOverrides[key])
-	s.mu.RUnlock()
+	s.captureCtl.mu.RLock()
+	overrides := cloneChunkOverrideMap(s.streamCtl.streamOverrides[key])
+	s.captureCtl.mu.RUnlock()
 	return applyChunkOverrides(cloneReassembledStream(in), overrides)
 }
 
@@ -437,9 +433,9 @@ func cloneChunkOverrideMap(in map[int]string) map[int]string {
 }
 
 func (s *Service) countStreamOverrides(key string) int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.streamOverrides[key])
+	s.captureCtl.mu.RLock()
+	defer s.captureCtl.mu.RUnlock()
+	return len(s.streamCtl.streamOverrides[key])
 }
 
 func (s *Service) applyOverrideCountToMeta(key string, meta *model.StreamLoadMeta) {

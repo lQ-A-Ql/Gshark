@@ -13,7 +13,7 @@ import (
 
 func TestCreatePlaybookRequiresName(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	_, err := svc.CreatePlaybook(model.HuntingPlaybook{})
 	if err == nil {
@@ -23,7 +23,7 @@ func TestCreatePlaybookRequiresName(t *testing.T) {
 
 func TestCreatePlaybookRequiresSteps(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	_, err := svc.CreatePlaybook(model.HuntingPlaybook{Name: "test"})
 	if err == nil {
@@ -33,7 +33,7 @@ func TestCreatePlaybookRequiresSteps(t *testing.T) {
 
 func TestCreateAndListPlaybooks(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	pb, err := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name:        "CTF Flag Hunt",
@@ -63,7 +63,7 @@ func TestCreateAndListPlaybooks(t *testing.T) {
 
 func TestGetPlaybook(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	created, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name:  "test",
@@ -86,7 +86,7 @@ func TestGetPlaybook(t *testing.T) {
 
 func TestUpdatePlaybook(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	created, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name:  "original",
@@ -108,7 +108,7 @@ func TestUpdatePlaybook(t *testing.T) {
 
 func TestDeletePlaybook(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	created, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name:  "to-delete",
@@ -132,10 +132,10 @@ func TestDeletePlaybook(t *testing.T) {
 
 func TestRunPlaybookWithThreatHuntStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// Add test packets with a flag.
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "flag{test_flag}", Payload: "flag{test_flag}", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 		{ID: 2, Info: "normal traffic", SourceIP: "10.0.0.1", DestIP: "10.0.0.3", DestPort: 443, Protocol: "HTTPS"},
 	}); err != nil {
@@ -175,7 +175,7 @@ func TestRunPlaybookWithThreatHuntStep(t *testing.T) {
 
 func TestRunPlaybookWithDisabledStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name: "Mixed",
@@ -195,7 +195,7 @@ func TestRunPlaybookWithDisabledStep(t *testing.T) {
 
 func TestRunPlaybookNotFound(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	_, err := svc.RunPlaybook(context.Background(), "nonexistent")
 	if err == nil {
@@ -205,9 +205,9 @@ func TestRunPlaybookNotFound(t *testing.T) {
 
 func TestRunPlaybookWithConditions(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "flag{test}", Payload: "flag{test}", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -243,7 +243,7 @@ func TestRunPlaybookWithConditions(t *testing.T) {
 
 func TestRunPlaybookConditionFails(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name: "FailCondition",
@@ -275,7 +275,7 @@ func TestRunPlaybookConditionFails(t *testing.T) {
 
 func TestGetPlaybookLastRun(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name:  "test",
@@ -302,7 +302,7 @@ func TestGetPlaybookLastRun(t *testing.T) {
 
 func TestCreateSavedSearch(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	_, err := svc.CreateSavedSearch(model.SavedSearch{})
 	if err == nil {
@@ -323,7 +323,7 @@ func TestCreateSavedSearch(t *testing.T) {
 
 func TestListAndGetSavedSearch(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	svc.CreateSavedSearch(model.SavedSearch{Name: "s1", Query: "q1"})
 	svc.CreateSavedSearch(model.SavedSearch{Name: "s2", Query: "q2"})
@@ -336,7 +336,7 @@ func TestListAndGetSavedSearch(t *testing.T) {
 
 func TestDeleteSavedSearch(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	ss, _ := svc.CreateSavedSearch(model.SavedSearch{Name: "s1", Query: "q1"})
 	if !svc.DeleteSavedSearch(ss.ID) {
@@ -349,9 +349,9 @@ func TestDeleteSavedSearch(t *testing.T) {
 
 func TestExecuteSavedSearch(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "flag{test}", Payload: "flag{test}", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -373,7 +373,7 @@ func TestExecuteSavedSearch(t *testing.T) {
 
 func TestCreateHypothesis(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	_, err := svc.CreateHypothesis(model.Hypothesis{})
 	if err == nil {
@@ -394,7 +394,7 @@ func TestCreateHypothesis(t *testing.T) {
 
 func TestListHypothesesWithStatusFilter(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	svc.CreateHypothesis(model.Hypothesis{Title: "h1"})
 	svc.CreateHypothesis(model.Hypothesis{Title: "h2"})
@@ -417,7 +417,7 @@ func TestListHypothesesWithStatusFilter(t *testing.T) {
 
 func TestUpdateHypothesisStatus(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	h, _ := svc.CreateHypothesis(model.Hypothesis{Title: "test"})
 
@@ -435,7 +435,7 @@ func TestUpdateHypothesisStatus(t *testing.T) {
 
 func TestAddHypothesisEvidence(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	h, _ := svc.CreateHypothesis(model.Hypothesis{Title: "test"})
 
@@ -457,7 +457,7 @@ func TestAddHypothesisEvidence(t *testing.T) {
 
 func TestDeleteHypothesis(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	h, _ := svc.CreateHypothesis(model.Hypothesis{Title: "to-delete"})
 	if !svc.DeleteHypothesis(h.ID) {
@@ -537,9 +537,9 @@ func TestMatchDisplayFilter(t *testing.T) {
 
 func TestRunPlaybookWithFilterQueryStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "HTTP GET /login", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 		{ID: 2, Info: "DNS query example.com", SourceIP: "10.0.0.1", DestIP: "8.8.8.8", DestPort: 53, Protocol: "DNS"},
 		{ID: 3, Info: "HTTP POST /api", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
@@ -577,7 +577,7 @@ func TestRunPlaybookWithFilterQueryStep(t *testing.T) {
 
 func TestRunPlaybookWithFilterQueryStepMissingFilter(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
 		Name: "Bad Filter",
@@ -603,7 +603,7 @@ func TestRunPlaybookWithFilterQueryStepMissingFilter(t *testing.T) {
 
 func TestRunPlaybookWithYARAScanStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// YARA scan with no objects loaded — should return 0 hits without error.
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
@@ -632,7 +632,7 @@ func TestRunPlaybookWithYARAScanStep(t *testing.T) {
 
 func TestRunPlaybookWithC2AnalysisStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// C2 analysis without loaded pcap — should complete without error.
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
@@ -661,7 +661,7 @@ func TestRunPlaybookWithC2AnalysisStep(t *testing.T) {
 
 func TestRunPlaybookWithAPTAnalysisStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// APT analysis without loaded pcap — should complete without error.
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
@@ -690,7 +690,7 @@ func TestRunPlaybookWithAPTAnalysisStep(t *testing.T) {
 
 func TestRunPlaybookWithCustomStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// Custom step with unknown command — returns nil (no hits, no error).
 	pb, _ := svc.CreatePlaybook(model.HuntingPlaybook{
@@ -720,10 +720,10 @@ func TestRunPlaybookWithCustomStep(t *testing.T) {
 
 func TestRunPlaybookWithDNSTunnelStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// Add DNS packets with long subdomain labels (potential tunnel signal).
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "DNS query", SourceIP: "10.0.0.1", DestIP: "8.8.8.8", DestPort: 53, Protocol: "DNS",
 			Payload: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com"},
 		{ID: 2, Info: "normal HTTP", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
@@ -758,10 +758,10 @@ func TestRunPlaybookWithDNSTunnelStep(t *testing.T) {
 
 func TestRunPlaybookWithBruteForceStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// Add HTTP auth-like packets.
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "POST /login 401 Unauthorized", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 		{ID: 2, Info: "POST /login 401 Unauthorized", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
 		{ID: 3, Info: "POST /login 200 OK", SourceIP: "10.0.0.1", DestIP: "10.0.0.2", DestPort: 80, Protocol: "HTTP"},
@@ -796,10 +796,10 @@ func TestRunPlaybookWithBruteForceStep(t *testing.T) {
 
 func TestRunPlaybookWithDataExfiltrationStep(t *testing.T) {
 	svc := NewService(nil)
-	t.Cleanup(func() { _ = svc.packetStore.Close() })
+	t.Cleanup(func() { _ = svc.captureCtl.packetStore.Close() })
 
 	// Add packets that may trigger data exfiltration detection.
-	if err := svc.packetStore.Append([]model.Packet{
+	if err := svc.captureCtl.packetStore.Append([]model.Packet{
 		{ID: 1, Info: "POST /upload HTTP/1.1", SourceIP: "10.0.0.1", DestIP: "45.33.32.156", DestPort: 443, Protocol: "HTTPS"},
 		{ID: 2, Info: "FTP STOR secret.zip", SourceIP: "10.0.0.1", DestIP: "45.33.32.156", DestPort: 21, Protocol: "FTP"},
 	}); err != nil {

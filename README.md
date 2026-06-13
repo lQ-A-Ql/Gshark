@@ -392,6 +392,7 @@ python .\scripts\build_release_package.py v0.0.5 --skip-build
 - [项目开发指南](./docs/project-development-guide.md)
 - [设计与工程约束](./docs/project-design-and-constraints.md)
 - [工程化全量审计方案](./docs/engineering-full-audit-plan.md)
+- [全量一期治理登记表](./docs/full-governance-phase1-register.md)
 - [架构总览与 Mermaid 流程图](./docs/architecture/README.md)
 - [HTTP OpenAPI 文档](./docs/api/openapi.yaml)
 - [MISC 模块接口文档](./docs/misc-module-interface.md)

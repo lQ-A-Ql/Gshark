@@ -21,10 +21,10 @@ func nextID(prefix string) string {
 
 // ListPlaybooks returns all stored playbooks.
 func (s *Service) ListPlaybooks() []model.HuntingPlaybook {
-	s.playbookMu.RLock()
-	defer s.playbookMu.RUnlock()
-	out := make([]model.HuntingPlaybook, 0, len(s.playbooks))
-	for _, pb := range s.playbooks {
+	s.playbookCtl.playbookMu.RLock()
+	defer s.playbookCtl.playbookMu.RUnlock()
+	out := make([]model.HuntingPlaybook, 0, len(s.playbookCtl.playbooks))
+	for _, pb := range s.playbookCtl.playbooks {
 		out = append(out, *pb)
 	}
 	return out
@@ -32,9 +32,9 @@ func (s *Service) ListPlaybooks() []model.HuntingPlaybook {
 
 // GetPlaybook returns a single playbook by ID.
 func (s *Service) GetPlaybook(id string) (*model.HuntingPlaybook, bool) {
-	s.playbookMu.RLock()
-	defer s.playbookMu.RUnlock()
-	pb, ok := s.playbooks[id]
+	s.playbookCtl.playbookMu.RLock()
+	defer s.playbookCtl.playbookMu.RUnlock()
+	pb, ok := s.playbookCtl.playbooks[id]
 	if !ok {
 		return nil, false
 	}
@@ -70,10 +70,9 @@ func (s *Service) CreatePlaybook(pb model.HuntingPlaybook) (*model.HuntingPlaybo
 			pb.Steps[i].Config = map[string]any{}
 		}
 	}
-
-	s.playbookMu.Lock()
-	s.playbooks[pb.ID] = &pb
-	s.playbookMu.Unlock()
+	s.playbookCtl.playbookMu.Lock()
+	s.playbookCtl.playbooks[pb.ID] = &pb
+	s.playbookCtl.playbookMu.Unlock()
 
 	copy := pb
 	return &copy, nil
@@ -84,37 +83,37 @@ func (s *Service) UpdatePlaybook(pb model.HuntingPlaybook) (*model.HuntingPlaybo
 	if strings.TrimSpace(pb.ID) == "" {
 		return nil, fmt.Errorf("playbook ID is required")
 	}
-	s.playbookMu.Lock()
-	existing, ok := s.playbooks[pb.ID]
+	s.playbookCtl.playbookMu.Lock()
+	existing, ok := s.playbookCtl.playbooks[pb.ID]
 	if !ok {
-		s.playbookMu.Unlock()
+		s.playbookCtl.playbookMu.Unlock()
 		return nil, fmt.Errorf("playbook %s not found", pb.ID)
 	}
 	pb.CreatedAt = existing.CreatedAt
 	pb.UpdatedAt = time.Now().UTC()
-	s.playbooks[pb.ID] = &pb
-	s.playbookMu.Unlock()
+	s.playbookCtl.playbooks[pb.ID] = &pb
+	s.playbookCtl.playbookMu.Unlock()
 	copy := pb
 	return &copy, nil
 }
 
 // DeletePlaybook removes a playbook by ID.
 func (s *Service) DeletePlaybook(id string) bool {
-	s.playbookMu.Lock()
-	defer s.playbookMu.Unlock()
-	if _, ok := s.playbooks[id]; !ok {
+	s.playbookCtl.playbookMu.Lock()
+	defer s.playbookCtl.playbookMu.Unlock()
+	if _, ok := s.playbookCtl.playbooks[id]; !ok {
 		return false
 	}
-	delete(s.playbooks, id)
-	delete(s.lastRun, id)
+	delete(s.playbookCtl.playbooks, id)
+	delete(s.playbookCtl.lastRun, id)
 	return true
 }
 
 // GetPlaybookLastRun returns the last run result for a playbook.
 func (s *Service) GetPlaybookLastRun(playbookID string) (*model.PlaybookRunResult, bool) {
-	s.playbookMu.RLock()
-	defer s.playbookMu.RUnlock()
-	result, ok := s.lastRun[playbookID]
+	s.playbookCtl.playbookMu.RLock()
+	defer s.playbookCtl.playbookMu.RUnlock()
+	result, ok := s.playbookCtl.lastRun[playbookID]
 	if !ok {
 		return nil, false
 	}
@@ -127,15 +126,14 @@ func (s *Service) RunPlaybook(ctx context.Context, playbookID string) (*model.Pl
 	if ctx == nil {
 		ctx = context.Background()
 	}
-
-	s.playbookMu.RLock()
-	pb, ok := s.playbooks[playbookID]
+	s.playbookCtl.playbookMu.RLock()
+	pb, ok := s.playbookCtl.playbooks[playbookID]
 	if !ok {
-		s.playbookMu.RUnlock()
+		s.playbookCtl.playbookMu.RUnlock()
 		return nil, fmt.Errorf("playbook %s not found", playbookID)
 	}
 	pbCopy := *pb
-	s.playbookMu.RUnlock()
+	s.playbookCtl.playbookMu.RUnlock()
 
 	ctx, finishTask := s.TrackCaptureTask(ctx, "playbook-"+playbookID)
 	defer finishTask()
@@ -190,14 +188,13 @@ func (s *Service) RunPlaybook(ctx context.Context, playbookID string) (*model.Pl
 			}
 		}
 	}
-
 	// Update playbook status.
-	s.playbookMu.Lock()
-	s.lastRun[playbookID] = result
-	if pb, ok := s.playbooks[playbookID]; ok {
+	s.playbookCtl.playbookMu.Lock()
+	s.playbookCtl.lastRun[playbookID] = result
+	if pb, ok := s.playbookCtl.playbooks[playbookID]; ok {
 		pb.Status = result.Status
 	}
-	s.playbookMu.Unlock()
+	s.playbookCtl.playbookMu.Unlock()
 
 	s.emitStatus(fmt.Sprintf("剧本执行完成: %s (%d 命中)", pbCopy.Name, result.TotalHits))
 
@@ -279,8 +276,8 @@ func (s *Service) executeStepThreatHunt(ctx context.Context, step model.Playbook
 	}
 
 	hunter := newThreatHunter(prefixes, 1)
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -309,9 +306,9 @@ func (s *Service) executeStepFilterQuery(ctx context.Context, step model.Playboo
 	}
 
 	var hits []model.ThreatHit
-	if s.packetStore != nil {
+	if s.captureCtl.packetStore != nil {
 		var nextID int64 = 1
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -339,9 +336,9 @@ func (s *Service) executeStepYARAScan(ctx context.Context, step model.PlaybookSt
 	if len(objects) == 0 {
 		return nil, nil
 	}
-	s.huntMu.RLock()
-	yc := s.yaraConf
-	s.huntMu.RUnlock()
+	s.huntingCtl.huntMu.RLock()
+	yc := s.huntingCtl.yaraConf
+	s.huntingCtl.huntMu.RUnlock()
 	if !yc.Enabled {
 		return nil, fmt.Errorf("YARA is not enabled")
 	}
@@ -425,8 +422,8 @@ func (s *Service) executeStepCustom(ctx context.Context, step model.PlaybookStep
 
 func (s *Service) runDNSTunnelDetection(ctx context.Context) ([]model.ThreatHit, error) {
 	h := newThreatHunter(nil, 1)
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -439,8 +436,8 @@ func (s *Service) runDNSTunnelDetection(ctx context.Context) ([]model.ThreatHit,
 
 func (s *Service) runBruteForceDetection(ctx context.Context) ([]model.ThreatHit, error) {
 	h := newThreatHunter(nil, 1)
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -453,8 +450,8 @@ func (s *Service) runBruteForceDetection(ctx context.Context) ([]model.ThreatHit
 
 func (s *Service) runDataExfiltrationDetection(ctx context.Context) ([]model.ThreatHit, error) {
 	h := newThreatHunter(nil, 1)
-	if s.packetStore != nil {
-		_ = s.packetStore.Iterate(nil, func(packet model.Packet) error {
+	if s.captureCtl.packetStore != nil {
+		_ = s.captureCtl.packetStore.Iterate(nil, func(packet model.Packet) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}

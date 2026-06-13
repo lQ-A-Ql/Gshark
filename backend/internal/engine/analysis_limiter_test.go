@@ -166,8 +166,8 @@ func TestC2WarmupUsesLimiterAndPropagatesContext(t *testing.T) {
 	}
 
 	svc := NewService(NopEmitter{})
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	ctx := servicecontract.WithAnalysisRequestMeta(context.Background(), servicecontract.AnalysisRequestMeta{
 		Source:   servicecontract.AnalysisRequestSourceWarmup,
@@ -196,8 +196,8 @@ func TestWarmupTelemetryRecordsStatusAndMetrics(t *testing.T) {
 
 	emitter := &recordingAnalysisEmitter{}
 	svc := NewService(emitter)
-	defer svc.packetStore.Close()
-	svc.pcap = "capture.pcapng"
+	defer svc.captureCtl.packetStore.Close()
+	svc.captureCtl.pcap = "capture.pcapng"
 
 	ctx := servicecontract.WithAnalysisRequestMeta(context.Background(), servicecontract.AnalysisRequestMeta{
 		Source:   servicecontract.AnalysisRequestSourceWarmup,
@@ -211,7 +211,7 @@ func TestWarmupTelemetryRecordsStatusAndMetrics(t *testing.T) {
 	if !emitter.hasStatusPrefix("__analysis_warmup__:c2:") {
 		t.Fatalf("expected warmup telemetry status, got %#v", emitter.statuses)
 	}
-	snapshot := svc.analysisMetrics.snapshot()
+	snapshot := svc.analysisCtl.analysisMetrics.snapshot()
 	if snapshot.WarmupFulfilled != 1 {
 		t.Fatalf("WarmupFulfilled = %d, want 1", snapshot.WarmupFulfilled)
 	}

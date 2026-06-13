@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { APTAnalysis } from "../../core/types";
 import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
-import { LRUCache } from "../../utils/lruCache";
+import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
+import { hasUsableCapturePath } from "../../core/usableCapture";
 import { buildAPTDisplayProfiles } from "./actorRegistry";
 
 export const EMPTY_APT_ANALYSIS: APTAnalysis = {
@@ -18,7 +19,7 @@ export const EMPTY_APT_ANALYSIS: APTAnalysis = {
   notes: [],
 };
 
-const aptAnalysisCache = new LRUCache<string, APTAnalysis>(10);
+const aptAnalysisCache = createAnalysisResourceCache<APTAnalysis>({ capacity: 10 });
 
 export interface UseAPTAnalysisOptions {
   backendConnected: boolean;
@@ -44,45 +45,65 @@ export function useAPTAnalysis({
   const [error, setError] = useState("");
   const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  const cacheKey = useMemo(() => buildAPTAnalysisCacheKey(captureRevision, filePath, totalPackets), [captureRevision, filePath, totalPackets]);
+  const cacheKey = useMemo(
+    () => buildAPTAnalysisCacheKey(captureRevision, filePath, totalPackets),
+    [captureRevision, filePath, totalPackets],
+  );
 
-  const refreshAnalysis = useCallback((force = false) => {
-    if (!filePath || !backendConnected) {
-      cancelAnalysisRequest();
-      setAnalysis(EMPTY_APT_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-    if (!force && cacheKey && aptAnalysisCache.has(cacheKey)) {
-      cancelAnalysisRequest();
-      setAnalysis(aptAnalysisCache.get(cacheKey) ?? EMPTY_APT_ANALYSIS);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    return runAnalysisRequest({
-      request: (signal) => backendClients.analysis.getAPTAnalysis(signal),
-      onSuccess: (payload) => {
-        if (cacheKey) {
-          aptAnalysisCache.set(cacheKey, payload);
-        }
-        setAnalysis(payload);
-        const nextProfiles = buildAPTDisplayProfiles(payload.profiles);
-        if (nextProfiles.length > 0 && !nextProfiles.some((profile) => profile.id === activeActorId)) {
-          onActiveActorChange(nextProfiles[0].id);
-        }
-      },
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : "APT 组织画像加载失败");
+  const refreshAnalysis = useCallback(
+    (force = false) => {
+      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
+        cancelAnalysisRequest();
         setAnalysis(EMPTY_APT_ANALYSIS);
-      },
-      onSettled: () => setLoading(false),
-    });
-  }, [activeActorId, backendConnected, cacheKey, cancelAnalysisRequest, filePath, onActiveActorChange, runAnalysisRequest]);
+        setLoading(false);
+        setError("");
+        return;
+      }
+      if (!force && cacheKey && aptAnalysisCache.has(cacheKey)) {
+        cancelAnalysisRequest();
+        setAnalysis(aptAnalysisCache.get(cacheKey) ?? EMPTY_APT_ANALYSIS);
+        setLoading(false);
+        setError("");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      return runAnalysisRequest({
+        request: (signal) =>
+          aptAnalysisCache.request(cacheKey, {
+            force,
+            signal,
+            load: () => backendClients.analysis.getAPTAnalysis(signal),
+          }),
+        onSuccess: (payload) => {
+          if (cacheKey) {
+            aptAnalysisCache.set(cacheKey, payload);
+          }
+          setAnalysis(payload);
+          const nextProfiles = buildAPTDisplayProfiles(payload.profiles);
+          if (nextProfiles.length > 0 && !nextProfiles.some((profile) => profile.id === activeActorId)) {
+            onActiveActorChange(nextProfiles[0].id);
+          }
+        },
+        onError: (err) => {
+          setError(err instanceof Error ? err.message : "APT 组织画像加载失败");
+          setAnalysis(EMPTY_APT_ANALYSIS);
+        },
+        onSettled: () => setLoading(false),
+      });
+    },
+    [
+      activeActorId,
+      backendConnected,
+      cacheKey,
+      cancelAnalysisRequest,
+      filePath,
+      onActiveActorChange,
+      runAnalysisRequest,
+      totalPackets,
+    ],
+  );
 
   useEffect(() => {
     if (isPreloadingCapture) return;
