@@ -78,7 +78,7 @@ flowchart LR
 约束：
 
 - 桌面数据面调用必须优先走明确的 typed Wails binding。
-- 已迁移的桌面数据面缺少 typed binding 时，应以 `generic_ipc_disabled` 失败，不允许静默回退到浏览器 HTTP。
+- 已迁移的桌面数据面缺少 typed binding 时，应以 `typed_binding_required` 失败，不允许静默回退到浏览器 HTTP。
 - 普通 browser-dev 模式继续使用 HTTP REST 和 SSE。
 - Wails 桌面构建产物不得让 WebView 直接请求 `127.0.0.1:17891`；HTTP/SSE 只保留给 browser-dev/CLI。
 - wire DTO 表示后端 JSON；mapper 负责归一化到 `core/types`；feature hooks 和 pages 只消费归一化类型。

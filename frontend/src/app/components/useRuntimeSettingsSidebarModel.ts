@@ -8,7 +8,6 @@ import type { ToolRuntimeConfigExplicitFields } from "../state/toolRuntimeStorag
 import { copyTextToClipboard } from "../utils/browserFile";
 import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
 import { normalizeConfig } from "./RuntimeSettingsSidebarParts";
-import { buildBackendEndpoint } from "../integrations/backendEndpoint";
 
 export function useRuntimeSettingsSidebarModel() {
   const runtime = useBackend();
@@ -55,7 +54,7 @@ export function useRuntimeSettingsSidebarModel() {
     return runtime.toolRuntimeSnapshot.speech.message || "等待检测";
   }, [runtime.backendConnected, runtime.toolRuntimeSnapshot, speechIssues, unknownMessage]);
   const tokenAvailable = runtime.backendAuthToken.trim().length > 0;
-  const mcpEndpoint = runtime.mcpStatus?.endpoint || buildBackendEndpoint("/api/mcp");
+  const mcpEndpoint = runtime.mcpStatus?.endpoint || "";
 
   const save = async () => {
     setBusy(true);

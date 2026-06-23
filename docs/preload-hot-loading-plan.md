@@ -44,7 +44,7 @@
 ### 桌面 IPC 边界
 
 1. Desktop preload 与正常请求共用 typed IPC/domain client contract。
-2. 缺 typed binding 时继续 fail-fast `generic_ipc_disabled`。
+2. 缺 typed binding 时继续 fail-fast `typed_binding_required`。
 3. 不允许为 preload 恢复 generic IPC data-plane 或 browser HTTP silent fallback。
 4. Browser-dev HTTP/SSE fallback 不能被 preload 改造误删。
 

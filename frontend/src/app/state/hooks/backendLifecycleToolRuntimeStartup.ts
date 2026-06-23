@@ -9,6 +9,7 @@ import { toTSharkStatus } from "../tsharkStatusState";
 import {
   describeToolRuntimeProbeError,
   detectToolRuntimeProbeTransport,
+  normalizeToolRuntimeProbeTransport,
   type ToolRuntimeProbeState,
   type ToolRuntimeProbeTransport,
 } from "../toolRuntimeProbeState";
@@ -120,7 +121,7 @@ export async function syncSavedToolRuntimeConfig({
       "startup fast tool runtime config sync timed out",
     );
     setToolRuntimeCheckDegraded(false);
-    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+    setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
     applyStartupRuntimeSnapshot({
       isCancelled,
       setBackendStatus,
@@ -186,7 +187,7 @@ export async function loadFullToolRuntimeInBackground({
       "background full tool runtime check timed out",
     );
     setToolRuntimeCheckDegraded(false);
-    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+    setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
     applyStartupRuntimeSnapshot({
       isCancelled,
       setBackendStatus,

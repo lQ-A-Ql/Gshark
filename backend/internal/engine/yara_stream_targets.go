@@ -14,10 +14,6 @@ import (
 
 const maxStreamContentBytes = 1 << 20 // 1 MB
 
-func (s *Service) buildYaraScanTargets(objects []model.ObjectFile) ([]yaraScanTarget, func(), error) {
-	return s.buildYaraScanTargetsWithContext(context.Background(), objects)
-}
-
 func (s *Service) buildYaraScanTargetsWithContext(ctx context.Context, objects []model.ObjectFile) ([]yaraScanTarget, func(), error) {
 	if ctx == nil {
 		ctx = context.Background()

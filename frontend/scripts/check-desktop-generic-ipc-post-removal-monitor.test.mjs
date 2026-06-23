@@ -70,7 +70,7 @@ function validGeneratedJs() {
 function validReadme() {
   return [
     "Wails desktop data-plane now uses typed IPC first.",
-    "Missing typed routes fail with generic_ipc_disabled.",
+    "Missing typed routes fail with typed_binding_required.",
     "browser-dev HTTP/SSE remains available.",
     "Wails runtime events remain the desktop event channel.",
   ].join("\n");
@@ -97,8 +97,6 @@ function validTracker() {
           evidence: {
             directBackendApiRequestCount: 0,
             totalInstrumentedNetworkRequests: 0,
-            genericIpcPolicy: "disabled",
-            genericIpcDisableExperimentBuildFlag: true,
             browserDevOk: true,
           },
         },
@@ -186,7 +184,7 @@ describe("check-desktop-generic-ipc-post-removal-monitor script", () => {
       packageJson: {
         scripts: {
           "desktop-generic-ipc-post-removal:check": "node scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
-          ci: "pnpm run desktop-generic-ipc-removal-preflight:check",
+          ci: "pnpm run desktop-route-classification:check",
         },
       },
     });

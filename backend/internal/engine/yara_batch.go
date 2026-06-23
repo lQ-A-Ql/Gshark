@@ -368,10 +368,6 @@ func readableYaraTargetSource(source string) string {
 	}
 }
 
-func resolveYaraExecutable(customBin string) (string, string, error) {
-	return resolveYaraExecutableWithAllowedDirs(customBin, nil)
-}
-
 func resolveYaraExecutableWithAllowedDirs(customBin string, allowedDirs []string) (string, string, error) {
 	if custom := strings.TrimSpace(customBin); custom != "" {
 		warning, err := ValidateExecutablePathWithWarning(custom, []string{"yara", "yara64"}, allowedDirs...)

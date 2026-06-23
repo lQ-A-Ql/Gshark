@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -98,7 +99,7 @@ func (s *Service) ExecuteSavedSearch(id string) (*model.SavedSearch, []model.Thr
 	prefixes := []string{ssCopy.Query}
 	prefixes = append(prefixes, ssCopy.Filters...)
 
-	hits := s.ThreatHuntWithContext(nil, prefixes)
+	hits := s.ThreatHuntWithContext(context.TODO(), prefixes)
 	// Update hit count.
 	s.savedSearchCtl.searchMu.Lock()
 	if existing, ok := s.savedSearchCtl.savedSearches[id]; ok {

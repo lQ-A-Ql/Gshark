@@ -292,7 +292,6 @@ export namespace main {
 	    enabled: boolean;
 	    capture_path?: string;
 	    misc_package_dir?: string;
-	    generic_ipc_disable_experiment?: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new desktopWebviewSmokeConfig(source);
@@ -303,7 +302,6 @@ export namespace main {
 	        this.enabled = source["enabled"];
 	        this.capture_path = source["capture_path"];
 	        this.misc_package_dir = source["misc_package_dir"];
-	        this.generic_ipc_disable_experiment = source["generic_ipc_disable_experiment"];
 	    }
 	}
 	export class desktopWinRMDecryptRequest {

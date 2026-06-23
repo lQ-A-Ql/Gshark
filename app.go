@@ -34,10 +34,9 @@ type openCaptureDialogResult struct {
 }
 
 type desktopWebviewSmokeConfig struct {
-	Enabled                     bool   `json:"enabled"`
-	CapturePath                 string `json:"capture_path,omitempty"`
-	MiscPackageDir              string `json:"misc_package_dir,omitempty"`
-	GenericIPCDisableExperiment bool   `json:"generic_ipc_disable_experiment,omitempty"`
+	Enabled        bool   `json:"enabled"`
+	CapturePath    string `json:"capture_path,omitempty"`
+	MiscPackageDir string `json:"misc_package_dir,omitempty"`
 }
 
 func NewDesktopApp() *DesktopApp {
@@ -81,19 +80,9 @@ func (a *DesktopApp) GetDesktopWebviewSmokeConfig() desktopWebviewSmokeConfig {
 		miscPackageDir = strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_MISC_PACKAGE_DIR"))
 	}
 	return desktopWebviewSmokeConfig{
-		Enabled:                     true,
-		CapturePath:                 strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH")),
-		MiscPackageDir:              miscPackageDir,
-		GenericIPCDisableExperiment: isTruthyEnv("MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT"),
-	}
-}
-
-func isTruthyEnv(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
+		Enabled:        true,
+		CapturePath:    strings.TrimSpace(os.Getenv("MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH")),
+		MiscPackageDir: miscPackageDir,
 	}
 }
 

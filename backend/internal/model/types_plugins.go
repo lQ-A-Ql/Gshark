@@ -1,26 +1,5 @@
 package model
 
-type Plugin struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Version      string   `json:"version"`
-	Tag          string   `json:"tag"`
-	Author       string   `json:"author"`
-	Enabled      bool     `json:"enabled"`
-	Entry        string   `json:"entry,omitempty"`
-	Runtime      string   `json:"runtime,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
-}
-
-type PluginSource struct {
-	ID            string `json:"id"`
-	ConfigPath    string `json:"config_path"`
-	ConfigContent string `json:"config_content"`
-	LogicPath     string `json:"logic_path,omitempty"`
-	LogicContent  string `json:"logic_content,omitempty"`
-	Entry         string `json:"entry,omitempty"`
-}
-
 type AuditEntry struct {
 	Time          string `json:"time"`
 	Method        string `json:"method"`

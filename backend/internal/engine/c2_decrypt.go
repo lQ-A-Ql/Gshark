@@ -70,7 +70,6 @@ type c2DecryptCandidate struct {
 type c2CSDecryptStats struct {
 	total           int
 	httpFocused     int
-	metadata        int
 	hmacVerified    int
 	decryptedWeak   int
 	hmacRejected    int
@@ -309,9 +308,7 @@ func extractC2PacketCandidateBytes(packet model.Packet, family string) []c2Decry
 		if body := httpBody(packet.Payload); body != "" {
 			values = append(values, body)
 		}
-		for _, value := range httpPayloadValues(packet.Payload) {
-			values = append(values, value)
-		}
+		values = append(values, httpPayloadValues(packet.Payload)...)
 	}
 	if transportPayload := extractPacketTransportPayload(packet); transportPayload != "" {
 		values = append(values, transportPayload)

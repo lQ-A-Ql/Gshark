@@ -690,10 +690,7 @@ func isLikelyHexCipher(raw string) bool {
 		return false
 	}
 	decoded := decodeLooseHex(candidate)
-	if len(decoded) == 0 {
-		return false
-	}
-	return true
+	return len(decoded) != 0
 }
 
 func isPureHexToken(raw string) bool {

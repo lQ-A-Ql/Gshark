@@ -18,6 +18,7 @@ import {
 import {
   describeToolRuntimeProbeError,
   detectToolRuntimeProbeTransport,
+  normalizeToolRuntimeProbeTransport,
   type ToolRuntimeProbeState,
   type ToolRuntimeProbeTransport,
 } from "../toolRuntimeProbeState";
@@ -66,7 +67,7 @@ export function useToolRuntime() {
       const snapshot = await probeToolRuntimeSnapshot("fast");
       setToolRuntimeCheckDegraded(false);
       setToolRuntimeProbeState("partial");
-      setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+      setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
       setLastToolRuntimeProbeError("");
       setToolRuntimeSnapshot(snapshot);
       setTsharkStatus(toTSharkStatus(snapshot.tshark));
@@ -114,7 +115,7 @@ export function useToolRuntime() {
         writeUserToolRuntimeConfig(snapshot.config, fields);
         setToolRuntimeCheckDegraded(false);
         setToolRuntimeProbeState("partial");
-        setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+        setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
         setLastToolRuntimeProbeError("");
         setToolRuntimeSnapshot(snapshot);
         setTsharkStatus(toTSharkStatus(snapshot.tshark));

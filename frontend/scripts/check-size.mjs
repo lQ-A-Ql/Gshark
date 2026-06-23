@@ -6,11 +6,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const sourceSizeBudgets = [
   {
-    path: "src/app/integrations/wailsBridge.ts",
-    maxLines: 30,
-    reason: "wails bridge compatibility facade should only re-export stable entry points and types",
-  },
-  {
     path: "src/app/integrations/backendClients.ts",
     maxLines: 20,
     reason: "backend client singleton should only compose the compatibility bridge into domain clients",
@@ -43,7 +38,7 @@ export const sourceSizeBudgets = [
   {
     path: "src/app/integrations/desktopTransportBindingShell.ts",
     maxLines: 50,
-    reason: "desktop shell binding should only cover Wails shell, auth, dialog, and generic IPC adapter methods",
+    reason: "desktop shell binding should only cover Wails shell, auth, dialog, and typed IPC methods",
   },
   {
     path: "src/app/integrations/desktopTransportBindingControl.ts",
@@ -1752,16 +1747,6 @@ export const sourceSizeBudgets = [
     path: "src/app/misc/MiscToolsShell.tsx",
     maxLines: 105,
     reason: "MISC shell should orchestrate category filtering and module list composition only",
-  },
-  {
-    path: "src/app/misc/MiscToolsHero.tsx",
-    maxLines: 115,
-    reason: "MISC hero should own import and category presentation only",
-  },
-  {
-    path: "src/app/misc/MiscModuleCard.tsx",
-    maxLines: 120,
-    reason: "MISC module card should own module header and renderer mount presentation only",
   },
   {
     path: "src/app/misc/miscModuleRules.ts",

@@ -691,7 +691,7 @@
         "modifiedFiles": [
           "app.go",
           "scripts/build_release_package.py",
-          "app_backend_extract_test.go"
+          "desktop_backend_proxy_test.go"
         ],
         "validationCommands": [
           "go test -tags dev ./...",
@@ -699,7 +699,7 @@
           "python scripts/build_release_package.py --skip-build v1.0.4-rc.1"
         ],
         "evidenceTests": [
-          "app_backend_extract_test.go"
+          "desktop_backend_proxy_test.go"
         ],
         "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
       }

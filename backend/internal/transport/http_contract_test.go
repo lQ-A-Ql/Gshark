@@ -1075,14 +1075,6 @@ func requireJSONKeys(t *testing.T, payload map[string]any, keys ...string) {
 	}
 }
 
-func requireExactJSONKeys(t *testing.T, payload map[string]any, keys ...string) {
-	t.Helper()
-	requireJSONKeys(t, payload, keys...)
-	if len(payload) != len(keys) {
-		t.Fatalf("payload keys = %#v, want exactly %#v", payload, keys)
-	}
-}
-
 func requireJSONString(t *testing.T, payload map[string]any, key string) {
 	t.Helper()
 	if _, ok := payload[key].(string); !ok {

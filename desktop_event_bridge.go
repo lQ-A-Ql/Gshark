@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -51,8 +50,8 @@ func (a *DesktopApp) runBackendEventBridge(ctx context.Context) {
 	}
 }
 
-func emitDesktopBackendEvent(ctx context.Context, eventName string, rawData string) bool {
-	runtimeEvent, payload, ok := parseDesktopBackendEvent(eventName, rawData)
+func emitDesktopBackendRuntimeEvent(ctx context.Context, eventName string, payload any) bool {
+	runtimeEvent, ok := desktopBackendRuntimeEventName(eventName)
 	if !ok {
 		return false
 	}
@@ -60,25 +59,10 @@ func emitDesktopBackendEvent(ctx context.Context, eventName string, rawData stri
 	return true
 }
 
-func emitDesktopBackendRuntimeEvent(ctx context.Context, eventName string, payload any) bool {
+func desktopBackendRuntimeEventName(eventName string) (string, bool) {
 	eventName = strings.TrimSpace(eventName)
 	if eventName == "" || eventName == "message" {
-		return false
+		return "", false
 	}
-	wruntime.EventsEmit(ctx, "meow:backend:"+eventName, payload)
-	return true
-}
-
-func parseDesktopBackendEvent(eventName string, rawData string) (string, any, bool) {
-	eventName = strings.TrimSpace(eventName)
-	if eventName == "" || eventName == "message" {
-		return "", nil, false
-	}
-	var payload any = map[string]any{}
-	if strings.TrimSpace(rawData) != "" {
-		if err := json.Unmarshal([]byte(rawData), &payload); err != nil {
-			payload = map[string]any{"message": rawData}
-		}
-	}
-	return "meow:backend:" + eventName, payload, true
+	return "meow:backend:" + eventName, true
 }

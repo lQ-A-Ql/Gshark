@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"testing"
@@ -30,7 +31,7 @@ func TestBuildMySQLAnalysisFromPacketsReconstructsLoginAndQueries(t *testing.T) 
 		{ID: 7, Protocol: "TCP", DisplayProtocol: "MySQL", SourceIP: "10.0.0.20", SourcePort: 3306, DestIP: "10.0.0.10", DestPort: 51514, StreamID: 6, Timestamp: "00:00:07", Payload: fmt.Sprintf("%x", err)},
 	}
 
-	analysis, err2 := buildMySQLAnalysisFromPackets(nil, packets)
+	analysis, err2 := buildMySQLAnalysisFromPackets(context.TODO(), packets)
 	if err2 != nil {
 		t.Fatalf("buildMySQLAnalysisFromPackets returned error: %v", err2)
 	}
@@ -83,7 +84,7 @@ func TestBuildMySQLAnalysisFromPacketsParsesInitDBCommand(t *testing.T) {
 		{ID: 10, Protocol: "TCP", DisplayProtocol: "MySQL", SourceIP: "10.0.0.11", SourcePort: 60000, DestIP: "10.0.0.30", DestPort: 3306, StreamID: 9, Timestamp: "00:00:10", Payload: fmt.Sprintf("%x", initDB)},
 		{ID: 11, Protocol: "TCP", DisplayProtocol: "MySQL", SourceIP: "10.0.0.30", SourcePort: 3306, DestIP: "10.0.0.11", DestPort: 60000, StreamID: 9, Timestamp: "00:00:11", Payload: fmt.Sprintf("%x", ok)},
 	}
-	analysis, err := buildMySQLAnalysisFromPackets(nil, packets)
+	analysis, err := buildMySQLAnalysisFromPackets(context.TODO(), packets)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

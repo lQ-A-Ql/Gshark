@@ -4,9 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -260,56 +258,4 @@ func decodeLooseHex(raw string) []byte {
 
 func decodedString(decoded []byte) string {
 	return string(decoded)
-}
-
-func decodeAntSwordChr(raw string) (string, bool) {
-	if !strings.Contains(raw, "chr(") {
-		return "", false
-	}
-	var result strings.Builder
-	parts := strings.Split(raw, ".")
-	decoded := false
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, "chr(") && strings.HasSuffix(part, ")") {
-			numStr := part[4 : len(part)-1]
-			num, ok := parseByte(numStr)
-			if ok {
-				result.WriteByte(num)
-				decoded = true
-				continue
-			}
-		}
-		if result.Len() > 0 {
-			result.WriteString(part)
-		}
-	}
-	if !decoded {
-		return "", false
-	}
-	return result.String(), true
-}
-
-func parseByte(raw string) (byte, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, false
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < 0 || value > 255 {
-		return 0, false
-	}
-	return byte(value), true
-}
-
-func applyURLDecodeRounds(candidate string, rounds int) string {
-	current := candidate
-	for i := 0; i < rounds; i++ {
-		decoded, err := url.QueryUnescape(current)
-		if err != nil {
-			break
-		}
-		current = decoded
-	}
-	return current
 }

@@ -40,7 +40,7 @@ func TestHTTPStreamFileFallbackAndErrorBranches(t *testing.T) {
 		}, nil
 	}
 
-	stream := svc.HTTPStream(nil, 12)
+	stream := svc.HTTPStream(context.TODO(), 12)
 	if called != 1 {
 		t.Fatalf("expected file fallback call, got %d", called)
 	}
@@ -134,7 +134,7 @@ func TestRawStreamPageFallbackAndEmptyPatchBranches(t *testing.T) {
 			{PacketID: 2, Direction: "server", Body: "bb"},
 		},
 	}
-	page, next, total := svc.RawStreamPage(nil, "tcp", 11, -5, 0)
+	page, next, total := svc.RawStreamPage(context.TODO(), "tcp", 11, -5, 0)
 	if total != 2 || next != 2 || len(page.Chunks) != 2 {
 		t.Fatalf("unexpected RawStreamPage fallback result stream=%+v next=%d total=%d", page, next, total)
 	}

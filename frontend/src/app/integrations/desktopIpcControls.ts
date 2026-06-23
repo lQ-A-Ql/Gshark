@@ -1,4 +1,3 @@
-import type { EventHandlers } from "./clients/eventClient";
 import { OperationTimeoutError } from "../utils/asyncControl";
 
 type DesktopIpcResponseKind = "json" | "blob" | "text" | "typed-ipc";
@@ -7,20 +6,12 @@ export type DesktopIpcErrorCode =
   | "ipc_unavailable"
   | "ipc_timeout"
   | "invalid_request"
-  | "generic_ipc_disabled"
   | "typed_binding_required"
   | "backend_proxy_failed"
   | "backend_error"
   | "blob_too_large";
 
 export const DESKTOP_IPC_BLOB_MAX_BYTES = 50 * 1024 * 1024;
-
-export interface IpcBackendTransport {
-  requestJSON<T>(path: string, init?: RequestInit): Promise<T>;
-  requestBlob(path: string, init?: RequestInit): Promise<Blob>;
-  requestText(path: string, init?: RequestInit): Promise<string>;
-  subscribeEvents(handlers: EventHandlers): () => void;
-}
 
 export class DesktopIpcRequestError extends Error {
   readonly code: DesktopIpcErrorCode;

@@ -392,9 +392,7 @@ func TestBuildPlannedFieldArgsForUSBAnalysisSkipsMissingOptionalFields(t *testin
 	}
 
 	scanned := make([]string, len(planned.TSharkFields))
-	for idx, field := range planned.TSharkFields {
-		scanned[idx] = field
-	}
+	copy(scanned, planned.TSharkFields)
 	projected := planned.ProjectRow(scanned)
 	if len(projected) != usbFieldCount {
 		t.Fatalf("projected len = %d, want %d", len(projected), usbFieldCount)

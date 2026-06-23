@@ -5,7 +5,7 @@ import { toTSharkStatus } from "./tsharkStatusState";
 import { probeToolRuntimeSnapshot } from "./toolRuntimeProbeActions";
 import {
   describeToolRuntimeProbeError,
-  detectToolRuntimeProbeTransport,
+  normalizeToolRuntimeProbeTransport,
   type ToolRuntimeProbeState,
   type ToolRuntimeProbeTransport,
 } from "./toolRuntimeProbeState";
@@ -32,7 +32,7 @@ export function startFullToolRuntimeProbe({
     .then((snapshot) => {
       setToolRuntimeCheckDegraded(false);
       setToolRuntimeProbeState("ready");
-      setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+      setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
       setLastToolRuntimeProbeError("");
       setToolRuntimeSnapshot(snapshot);
       setTsharkStatus(toTSharkStatus(snapshot.tshark));

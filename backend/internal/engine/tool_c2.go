@@ -164,7 +164,6 @@ type c2VShellStreamWork struct {
 	shortPackets  int
 	longPackets   int
 	transitions   int
-	lastKind      string
 	heartbeatAvg  string
 	heartbeatJit  string
 	hasWebSocket  bool

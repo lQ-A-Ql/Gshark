@@ -3,6 +3,8 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
+const isWailsDesktopBuild = process.env.VITE_WAILS_DESKTOP_BUILD === '1'
+
 export default defineConfig({
   plugins: [
     // The React and Tailwind plugins are both required for Make, even if
@@ -14,6 +16,11 @@ export default defineConfig({
     alias: {
       // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
+      ...(isWailsDesktopBuild
+        ? {
+            './bridgeFactory': path.resolve(__dirname, './src/app/integrations/bridgeFactory.desktop.ts'),
+          }
+        : {}),
     },
   },
 

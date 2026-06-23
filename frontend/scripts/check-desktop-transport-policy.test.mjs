@@ -74,16 +74,12 @@ describe("check-desktop-transport-policy script", () => {
     ).toEqual([]);
   });
 
-  it("allows desktopBridge to compose generic IPC fallback outside typed override files", () => {
+  it("keeps desktopBridge outside typed override file scanning", () => {
     const frontendRoot = writePolicyFixture(
       'export const typedBindingRequirements = { getHttpStream: "GetHttpStream" };\n',
       "export function createStreamTypedOverrides(desktopApp) { return desktopApp.GetHttpStream!(7); }\n",
     );
-    writeFixtureFile(
-      frontendRoot,
-      "src/app/integrations/desktopBridge.ts",
-      "const ipcTransport = desktopApp.InvokeBackendJSON ? createIpcBackendTransport(desktopApp) : null;\n",
-    );
+    writeFixtureFile(frontendRoot, "src/app/integrations/desktopBridge.ts", "export const shellBridge = {};\n");
 
     expect(
       findDesktopTransportPolicyViolations({

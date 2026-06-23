@@ -12,15 +12,11 @@ import { asMCPStatus } from "./mappers/mcpStatusMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
 import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
-import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
 import { createTypedDesktopOverrides } from "./desktopTypedBridge";
-import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
+import { createDesktopMissingBindingBridge } from "./desktopMissingBindingBridge";
 import { DesktopIpcRequestError, withDesktopIpcControls } from "./desktopIpcControls";
-import { isLegacyDesktopGenericIpcDisableExperimentEnabled } from "./desktopGenericIpcPolicy";
 import { asPlainObject } from "./mappers/mapperPrimitives";
 import type { MCPStatusWireDTO } from "./wire/mcpWireDtos";
-
-export { resolveDesktopGenericIpcPolicy } from "./desktopGenericIpcPolicy";
 
 interface DesktopBridgeContext {
   desktopApp: DesktopTransportBinding;
@@ -31,18 +27,22 @@ const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
 const START_CAPTURE_IPC_TIMEOUT_MS = 15000;
 
 export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): BackendBridge {
-  // isDesktopGenericIpcDisabled is now always true for the removed generic adapter path.
-  const disabledTransport = createDisabledGenericIpcBackendTransport();
-  const dataBridge = createBackendBridgeFromTransport({
-    requestJSON: disabledTransport.requestJSON,
-    requestBlob: disabledTransport.requestBlob,
-    requestText: disabledTransport.requestText,
-    subscribeEvents: disabledTransport.subscribeEvents,
-    getDesktopAppBinding: () => desktopApp,
-  });
+  const missingBindingBridge = createDesktopMissingBindingBridge();
+  const getToolRuntimeSnapshot: BackendBridge["getToolRuntimeSnapshot"] = async (signal, mode = "full") => {
+    const ipcSnapshot = runtimeSnapshotMethod(desktopApp, mode);
+    if (!ipcSnapshot) {
+      throw missingTypedBindingError(`DesktopApp.GetToolRuntimeSnapshot(${mode})`);
+    }
+    const payload = await withDesktopIpcControls(ipcSnapshot, {
+      endpoint: `DesktopApp.GetToolRuntimeSnapshot(${mode})`,
+      responseKind: "typed-ipc",
+      signal,
+      timeoutMs: mode === "fast" ? FAST_RUNTIME_IPC_TIMEOUT_MS : DEFAULT_TYPED_IPC_TIMEOUT_MS,
+    });
+    return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
+  };
 
-  return {
-    ...dataBridge,
+  const bridge: Partial<BackendBridge> = {
     ...createTypedDesktopOverrides(desktopApp),
     async isAvailable() {
       try {
@@ -67,38 +67,27 @@ export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): Backe
       }
       return String(await desktopApp.BackendStatus()).trim();
     },
-    async getToolRuntimeSnapshot(signal?: AbortSignal, mode = "full") {
-      const ipcSnapshot = runtimeSnapshotMethod(desktopApp, mode);
-      if (!ipcSnapshot) {
-        throw missingTypedBindingError(`DesktopApp.GetToolRuntimeSnapshot(${mode})`);
-      }
-      const payload = await withDesktopIpcControls(ipcSnapshot, {
-        endpoint: `DesktopApp.GetToolRuntimeSnapshot(${mode})`,
-        responseKind: "typed-ipc",
-        signal,
-        timeoutMs: mode === "fast" ? FAST_RUNTIME_IPC_TIMEOUT_MS : DEFAULT_TYPED_IPC_TIMEOUT_MS,
-      });
-      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
-    },
+    getToolRuntimeSnapshot,
+
     async checkTShark(): Promise<TSharkStatus> {
       try {
-        const snapshot = await this.getToolRuntimeSnapshot();
+        const snapshot = await getToolRuntimeSnapshot();
         return { ...snapshot.tshark, customPath: snapshot.tshark.customPath ?? "" };
       } catch {
-        return { available: false, path: "", message: "tshark 状态探测失败", customPath: "", usingCustomPath: false };
+        return { available: false, path: "", message: "tshark status probe failed", customPath: "", usingCustomPath: false };
       }
     },
     async checkFFmpeg(): Promise<FFmpegStatus> {
       try {
-        const snapshot = await this.getToolRuntimeSnapshot();
+        const snapshot = await getToolRuntimeSnapshot();
         return snapshot.ffmpeg;
       } catch {
-        return { available: false, path: "", message: "ffmpeg 状态探测失败" };
+        return { available: false, path: "", message: "ffmpeg status probe failed" };
       }
     },
     async checkSpeechToText(): Promise<SpeechToTextStatus> {
       try {
-        const snapshot = await this.getToolRuntimeSnapshot();
+        const snapshot = await getToolRuntimeSnapshot();
         return snapshot.speech;
       } catch {
         return {
@@ -109,7 +98,7 @@ export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): Backe
           ffmpegAvailable: false,
           voskAvailable: false,
           modelAvailable: false,
-          message: "语音转写状态探测失败",
+          message: "speech status probe failed",
         };
       }
     },
@@ -283,9 +272,7 @@ export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): Backe
     },
     async listPacketsPage(cursor: number, limit: number, filter = "", signal?: AbortSignal) {
       if (!desktopApp.ListPacketsPage) {
-        return signal
-          ? await dataBridge.listPacketsPage(cursor, limit, filter, signal)
-          : await dataBridge.listPacketsPage(cursor, limit, filter);
+        throw missingTypedBindingError("DesktopApp.ListPacketsPage");
       }
       const payload = await withDesktopIpcControls(() => desktopApp.ListPacketsPage!(cursor, limit, filter), {
         endpoint: "DesktopApp.ListPacketsPage",
@@ -318,12 +305,15 @@ export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): Backe
       });
     },
   };
-}
 
-export function isDesktopGenericIpcDisableExperimentEnabled(): boolean {
-  // VITE_DESKTOP_DISABLE_GENERIC_IPC remains the legacy Round 20 experiment alias.
-  // VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but no longer enables the removed adapter path.
-  return isLegacyDesktopGenericIpcDisableExperimentEnabled();
+  return new Proxy(bridge, {
+    get(target, property, receiver) {
+      if (property in target) {
+        return Reflect.get(target, property, receiver);
+      }
+      return Reflect.get(missingBindingBridge as unknown as Record<PropertyKey, unknown>, property, receiver);
+    },
+  }) as BackendBridge;
 }
 
 function asTSharkStatusFromPayload(payload: unknown): TSharkStatus {
@@ -362,7 +352,7 @@ async function resolveMCPThroughDesktopIPC({
 function missingTypedBindingError(endpoint: string): DesktopIpcRequestError {
   return new DesktopIpcRequestError(
     "typed_binding_required",
-    `桌面构建要求 Wails typed IPC binding：${endpoint}。请重新生成 Wails bindings 后再运行。`,
+    `Wails desktop build requires typed IPC binding: ${endpoint}. Regenerate Wails bindings and retry.`,
     endpoint,
     0,
   );

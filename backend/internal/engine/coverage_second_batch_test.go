@@ -199,8 +199,8 @@ func TestRuntimeDNP3WinRMAndDecoderBoundaryHelpers(t *testing.T) {
 	if got := svc.ToolRuntimeSnapshot(); got.ProbeMode != ToolRuntimeProbeModeFull || got.UpdatedAt == "" {
 		t.Fatalf("ToolRuntimeSnapshot wrapper returned bad diagnostics: %+v", got)
 	}
-	if got := svc.ToolRuntimeSnapshotWithContext(nil); got.ProbeMode != ToolRuntimeProbeModeFull {
-		t.Fatalf("ToolRuntimeSnapshotWithContext nil ctx = %+v", got)
+	if got := svc.ToolRuntimeSnapshotWithContext(context.TODO()); got.ProbeMode != ToolRuntimeProbeModeFull {
+		t.Fatalf("ToolRuntimeSnapshotWithContext TODO ctx = %+v", got)
 	}
 	if got := svc.SetTSharkPath(" C:/definitely/missing/tshark.exe "); got.UsingCustomPath && got.Available {
 		t.Fatalf("SetTSharkPath should not report invalid custom path as usable: %+v", got)

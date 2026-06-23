@@ -1,5 +1,3 @@
-import { isDesktopGenericIpcDisabled, resolveDesktopGenericIpcPolicy } from "./integrations/desktopGenericIpcPolicy";
-
 type DesktopSmokeBinding = {
   GetDesktopWebviewSmokeConfig?: () => Promise<unknown>;
   WriteDesktopWebviewSmokeResult?: (payload: unknown) => Promise<void>;
@@ -37,7 +35,7 @@ type NetworkProbe = {
   url: string;
 };
 
-const DIRECT_BACKEND_API_PATTERN = /^https?:\/\/127\.0\.0\.1:17891\/api\//i;
+const DIRECT_BACKEND_API_PATTERN = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/api\//i;
 
 export async function runDesktopWebviewSmokeIfEnabled(): Promise<boolean> {
   const desktopApp = getDesktopAppBinding();
@@ -49,7 +47,6 @@ export async function runDesktopWebviewSmokeIfEnabled(): Promise<boolean> {
     enabled?: unknown;
     capture_path?: unknown;
     misc_package_dir?: unknown;
-    generic_ipc_disable_experiment?: unknown;
   };
   if (!config?.enabled) {
     return false;
@@ -67,9 +64,6 @@ export async function runDesktopWebviewSmokeIfEnabled(): Promise<boolean> {
       ok: true,
       updatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      genericIpcPolicy: resolveDesktopGenericIpcPolicy(),
-      genericIpcDisableExperimentRequested: Boolean(config.generic_ipc_disable_experiment),
-      genericIpcDisableExperimentBuildFlag: isGenericIpcDisableExperimentBuildEnabled(),
       network: summarizeNetworkProbes(networkProbes),
       ...summary,
     });
@@ -78,9 +72,6 @@ export async function runDesktopWebviewSmokeIfEnabled(): Promise<boolean> {
       ok: false,
       updatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      genericIpcPolicy: resolveDesktopGenericIpcPolicy(),
-      genericIpcDisableExperimentRequested: Boolean(config.generic_ipc_disable_experiment),
-      genericIpcDisableExperimentBuildFlag: isGenericIpcDisableExperimentBuildEnabled(),
       error: error instanceof Error ? error.message : String(error),
       network: summarizeNetworkProbes(networkProbes),
     });
@@ -236,10 +227,6 @@ async function waitDesktopBackendReady(desktopApp: DesktopSmokeBinding): Promise
   throw new Error(`desktop backend did not become ready for WebView smoke: ${lastStatus}`);
 }
 
-function isGenericIpcDisableExperimentBuildEnabled(): boolean {
-  return isDesktopGenericIpcDisabled();
-}
-
 function samePath(left: string, right: string): boolean {
   return normalizePath(left) === normalizePath(right);
 }
@@ -282,15 +269,6 @@ function installNetworkProbe(): NetworkProbe[] {
     return originalXHROpen.call(this, method, url, async ?? true, username ?? null, password ?? null);
   };
 
-  const OriginalEventSource = window.EventSource;
-  if (typeof OriginalEventSource === "function") {
-    window.EventSource = class SmokeEventSource extends OriginalEventSource {
-      constructor(url: string | URL, eventSourceInitDict?: EventSourceInit) {
-        probes.push({ kind: "eventsource", url: String(url) });
-        super(url, eventSourceInitDict);
-      }
-    };
-  }
   return probes;
 }
 

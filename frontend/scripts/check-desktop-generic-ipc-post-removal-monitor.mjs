@@ -14,7 +14,7 @@ const requiredPackageScripts = {
   "desktop-generic-ipc-post-removal:check": "node scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
 };
 
-const requiredReadmeTokens = ["typed IPC", "generic_ipc_disabled", "browser-dev HTTP/SSE", "Wails runtime events"];
+const requiredReadmeTokens = ["typed IPC", "typed_binding_required", "browser-dev HTTP/SSE", "Wails runtime events"];
 
 export function findDesktopGenericIpcPostRemovalMonitorViolations({
   rootDir = repoRoot,
@@ -177,13 +177,6 @@ function validateTracker(trackerPath, violations) {
     evidence.totalInstrumentedNetworkRequests,
     0,
     "postRemovalAudit.evidence.totalInstrumentedNetworkRequests",
-    violations,
-  );
-  requireField(evidence.genericIpcPolicy, "disabled", "postRemovalAudit.evidence.genericIpcPolicy", violations);
-  requireField(
-    evidence.genericIpcDisableExperimentBuildFlag,
-    true,
-    "postRemovalAudit.evidence.genericIpcDisableExperimentBuildFlag",
     violations,
   );
   requireField(evidence.browserDevOk, true, "postRemovalAudit.evidence.browserDevOk", violations);

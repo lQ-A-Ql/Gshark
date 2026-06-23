@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -584,18 +583,4 @@ func isNewerVersion(a, b model.RuleVersion) bool {
 func sha256Hex(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
-}
-
-// init ensures cache directory exists.
-func (rm *RuleManager) init() error {
-	cacheDir := rm.getCacheDir()
-	return os.MkdirAll(cacheDir, 0o755)
-}
-
-// init is called on first use; no-op if already initialized.
-func (rm *RuleManager) ensureInit() {
-	// Lazy init: just ensure cache dir exists
-	if err := rm.init(); err != nil {
-		log.Printf("rule manager: init cache dir: %v", err)
-	}
 }

@@ -30,16 +30,12 @@ const exitPlanTokens = [
   "removed InvokeBackendJSON",
   "removed InvokeBackendBlob",
   "removed InvokeBackendText",
-  "generic_ipc_disabled",
+  "typed_binding_required",
   "Three consecutive green rounds",
   "desktopWebviewTyped.directBackendApiRequestCount = 0",
-  "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
-  "VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
-  "DisableGenericIpcAdapterExperiment",
-  "genericIpcDisableExperimentBuildFlag = true",
   "Browser-dev HTTP/SSE remains green",
   "Do not remove browser-dev HTTP/SSE debugging",
-  "documented no-op",
+  "generic IPC data-plane removed",
 ];
 
 export function findDesktopOldBindingCompatViolations({

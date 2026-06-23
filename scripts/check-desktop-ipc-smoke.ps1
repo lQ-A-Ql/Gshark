@@ -5,8 +5,7 @@ param(
   [int]$FrontendPort = 5174,
   [int]$TimeoutSeconds = 180,
   [switch]$SkipDesktop,
-  [switch]$SkipBrowserDev,
-  [switch]$DisableGenericIpcAdapterExperiment
+  [switch]$SkipBrowserDev
 )
 
 $ErrorActionPreference = "Stop"
@@ -236,18 +235,12 @@ function Invoke-DesktopWebviewTypedSmoke {
   $previousCapturePath = $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH
   $previousSmokeMiscPackageDir = $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR
   $previousMiscPackageDir = $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR
-  $previousDisableExperiment = $env:MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT
   $process = $null
   try {
     $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH = $resultPath
     $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH = $CapturePath
     $env:MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
     $env:MEOW_TRAFFIC_MISC_PACKAGE_DIR = $DesktopWebviewMiscPackageDir
-    if ($DisableGenericIpcAdapterExperiment) {
-      $env:MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT = "1"
-    } else {
-      Remove-Item "Env:\MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" -ErrorAction SilentlyContinue
-    }
     $process = Start-Process -FilePath "go" -ArgumentList @("run", "-tags", "dev", ".") -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -281,16 +274,11 @@ function Invoke-DesktopWebviewTypedSmoke {
     Assert-Condition ([int]$result.httpStreams -gt 0) "Desktop WebView typed smoke returned no HTTP streams"
     Assert-Condition ([int]$result.objectCount -gt 0) "Desktop WebView typed smoke returned no objects"
     Assert-Condition ([int]$result.network.directBackendApiRequestCount -eq 0) "Desktop WebView directly requested backend /api routes: $($result.network.directBackendApiRequests | ConvertTo-Json -Depth 6)"
-    if ($DisableGenericIpcAdapterExperiment) {
-      Assert-Condition ($result.genericIpcDisableExperimentRequested -eq $true) "Desktop WebView typed smoke did not receive generic IPC disable experiment request"
-      Assert-Condition ($result.genericIpcDisableExperimentBuildFlag -eq $true) "Desktop WebView typed smoke requested generic IPC disable experiment, but frontend assets were not built with VITE_DESKTOP_DISABLE_GENERIC_IPC=1"
-    }
   } finally {
     Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_RESULT_PATH" $previousResultPath
     Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_CAPTURE_PATH" $previousCapturePath
     Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_WEBVIEW_SMOKE_MISC_PACKAGE_DIR" $previousSmokeMiscPackageDir
     Restore-EnvValue "MEOW_TRAFFIC_MISC_PACKAGE_DIR" $previousMiscPackageDir
-    Restore-EnvValue "MEOW_TRAFFIC_DESKTOP_DISABLE_GENERIC_IPC_EXPERIMENT" $previousDisableExperiment
     if ($process -and -not $process.HasExited) {
       Stop-ProcessTree $process.Id
     }
@@ -339,9 +327,6 @@ function Invoke-DesktopWebviewTypedSmoke {
     objectEvidenceCount = [int]$result.objectEvidenceCount
     directBackendApiRequestCount = [int]$result.network.directBackendApiRequestCount
     totalInstrumentedNetworkRequests = [int]$result.network.totalRequests
-    genericIpcPolicy = [string]$result.genericIpcPolicy
-    genericIpcDisableExperimentRequested = [bool]$result.genericIpcDisableExperimentRequested
-    genericIpcDisableExperimentBuildFlag = [bool]$result.genericIpcDisableExperimentBuildFlag
   }
 }
 
@@ -453,7 +438,6 @@ $summary = [ordered]@{
   updatedAt = (Get-Date).ToString("o")
   capturePath = $CapturePath
   outputDir = $OutputDir
-  genericIpcDisableExperiment = [bool]$DisableGenericIpcAdapterExperiment
   desktopRelease = if ($SkipDesktop) { [ordered]@{ skipped = $true } } else { Invoke-DesktopReleaseSmoke }
   desktopWebviewTyped = if ($SkipDesktop) { [ordered]@{ skipped = $true } } else { Invoke-DesktopWebviewTypedSmoke }
   browserDev = if ($SkipBrowserDev) { [ordered]@{ skipped = $true } } else { Invoke-BrowserDevSmoke }

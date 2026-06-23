@@ -10,16 +10,12 @@ const exitPlan = [
   "removed InvokeBackendJSON",
   "removed InvokeBackendBlob",
   "removed InvokeBackendText",
-  "generic_ipc_disabled",
+  "typed_binding_required",
   "Three consecutive green rounds",
   "desktopWebviewTyped.directBackendApiRequestCount = 0",
-  "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
-  "VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
-  "DisableGenericIpcAdapterExperiment",
-  "genericIpcDisableExperimentBuildFlag = true",
   "Browser-dev HTTP/SSE remains green",
   "Do not remove browser-dev HTTP/SSE debugging",
-  "documented no-op",
+  "generic IPC data-plane removed",
 ].join("\n");
 
 function writeFixtureFile(frontendRoot, relativePath, content) {
@@ -86,16 +82,12 @@ describe("check-desktop-old-binding-compat script", () => {
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token removed InvokeBackendJSON",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token removed InvokeBackendBlob",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token removed InvokeBackendText",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token generic_ipc_disabled",
+      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token typed_binding_required",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token Three consecutive green rounds",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token desktopWebviewTyped.directBackendApiRequestCount = 0",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token DisableGenericIpcAdapterExperiment",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token genericIpcDisableExperimentBuildFlag = true",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token Browser-dev HTTP/SSE remains green",
       "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token Do not remove browser-dev HTTP/SSE debugging",
-      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token documented no-op",
+      "docs/desktop-ipc-old-binding-exit-plan.md: missing exit-plan token generic IPC data-plane removed",
     ]);
   });
 

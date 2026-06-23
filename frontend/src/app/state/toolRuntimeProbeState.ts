@@ -9,7 +9,8 @@ export type ToolRuntimeProbeState =
   | "ready"
   | "timeout_background"
   | "failed";
-export type ToolRuntimeProbeTransport = "desktop-ipc" | "http-fallback" | "unknown";
+export type ToolRuntimeProbeTransport = "desktop-ipc" | "browser-dev" | "unknown";
+type RuntimeSnapshotTransport = ToolRuntimeProbeTransport | string | null | undefined;
 
 type ToolRuntimeProbeWindow = Window & {
   go?: {
@@ -27,7 +28,14 @@ export function detectToolRuntimeProbeTransport(): ToolRuntimeProbeTransport {
     return "unknown";
   }
   const desktopApp = (window as ToolRuntimeProbeWindow).go?.main?.DesktopApp;
-  return desktopApp?.GetToolRuntimeSnapshotFast || desktopApp?.GetToolRuntimeSnapshot ? "desktop-ipc" : "http-fallback";
+  return desktopApp?.GetToolRuntimeSnapshotFast || desktopApp?.GetToolRuntimeSnapshot ? "desktop-ipc" : "browser-dev";
+}
+
+export function normalizeToolRuntimeProbeTransport(transport: RuntimeSnapshotTransport): ToolRuntimeProbeTransport {
+  if (transport === "desktop-ipc" || transport === "browser-dev" || transport === "unknown") {
+    return transport;
+  }
+  return typeof transport === "string" && transport.trim() ? "browser-dev" : detectToolRuntimeProbeTransport();
 }
 
 export function describeToolRuntimeProbeError(error: unknown): string {
@@ -64,8 +72,8 @@ export function toolRuntimeProbeTransportText(transport: ToolRuntimeProbeTranspo
   switch (transport) {
     case "desktop-ipc":
       return "Wails IPC";
-    case "http-fallback":
-      return "HTTP fallback";
+    case "browser-dev":
+      return "Browser dev";
     default:
       return "未知链路";
   }
@@ -80,7 +88,7 @@ function normalizeProbeErrorMessage(message: string): string {
     return "运行时组件探测鉴权失败：后端 token 不匹配或已过期，请重启 Wails dev 后重试。";
   }
   if (text.includes("actively refused") || text.includes("积极拒绝") || text.includes("Failed to fetch")) {
-    return "运行时组件探测无法连接后端：请确认 127.0.0.1:17891 没有被旧进程或非兼容服务占用。";
+    return "运行时组件探测无法连接后端：请确认本地开发后端没有被旧进程或非兼容服务占用。";
   }
   return text;
 }

@@ -77,7 +77,6 @@ func IsDisplayFilterError(err error) bool {
 
 var (
 	estimatePacketsFn     = tshark.EstimatePackets
-	filterFrameIDsFn      = tshark.FilterFrameIDs
 	scanFrameIDsFn        = tshark.ScanFrameIDs
 	streamPacketsFn       = tshark.StreamPackets
 	streamPacketsFirstFn  = tshark.StreamPacketsFirstScreen

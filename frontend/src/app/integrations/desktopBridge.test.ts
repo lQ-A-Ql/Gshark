@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
-import { createDesktopBridge, resolveDesktopGenericIpcPolicy } from "./desktopBridge";
+import { createDesktopBridge } from "./desktopBridge";
 import { DEFAULT_TYPED_IPC_TIMEOUT_MS } from "./desktopTypedBridgeCore";
 import { EVIDENCE_TYPED_IPC_TIMEOUT_MS } from "./desktopTypedBridgeAnalysis";
 import { EventsOn } from "../../../wailsjs/runtime";
@@ -114,7 +114,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("routes supported desktop control-plane calls through Wails IPC", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const desktopApp: DesktopTransportBinding = {
       IsBackendReady: vi.fn(async () => true),
       PingBackendDataPlane: vi.fn(async () => ({ ready: true })),
@@ -177,7 +176,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("does not report desktop availability until the Wails data-plane probe passes", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       isAvailable: vi.fn(async () => true),
     });
@@ -205,7 +203,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("fails missing typed data-plane calls but keeps events on Wails runtime", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const unsubscribe = vi.fn();
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
@@ -276,28 +273,28 @@ describe("createDesktopBridge", () => {
     });
 
     await expect(bridge.listPacketsPage(100, 50, "http")).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/packets/page?cursor=100&limit=50&filter=http",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.ListPacketsPage",
       transport: "desktop-ipc",
     });
     await expect(bridge.getRawStreamPage("TCP", 3, 0, 4096)).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/streams/raw/page?protocol=TCP&streamId=3&cursor=0&limit=4096",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetRawStreamPage",
       transport: "desktop-ipc",
     });
     await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/analysis/industrial",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetIndustrialAnalysis",
       transport: "desktop-ipc",
     });
     await expect(bridge.getHTTPLoginAnalysis()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/tools/http-login-analysis",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetHTTPLoginAnalysis",
       transport: "desktop-ipc",
     });
     await expect(bridge.getEvidenceWithFilter(["vehicle"])).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/evidence?modules=vehicle",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetEvidenceWithFilter",
       transport: "desktop-ipc",
     });
     const stop = bridge.subscribeEvents({ status: vi.fn() });
@@ -315,8 +312,7 @@ describe("createDesktopBridge", () => {
     expect(unsubscribe).not.toHaveBeenCalled();
   });
 
-  it("fails fast when a data-plane typed binding is missing instead of using generic IPC", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
+  it("fails fast when a data-plane typed binding is missing", async () => {
     const fallbackBridge = createFallbackBridge({
       getIndustrialAnalysis: vi.fn(),
       getEvidenceWithFilter: vi.fn(),
@@ -327,18 +323,18 @@ describe("createDesktopBridge", () => {
     });
 
     await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/analysis/industrial",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetIndustrialAnalysis",
       transport: "desktop-ipc",
     });
     await expect(bridge.getEvidenceWithFilter(["vehicle"])).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/evidence?modules=vehicle",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetEvidenceWithFilter",
       transport: "desktop-ipc",
     });
     await expect(bridge.listMiscModules()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/tools/misc/modules",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.ListMiscModules",
       transport: "desktop-ipc",
     });
     expect(fallbackBridge.getIndustrialAnalysis).not.toHaveBeenCalled();
@@ -346,7 +342,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listMiscModules).not.toHaveBeenCalled();
   });
 
-  it("routes migrated packet/hunting/vehicle-dbc/plugin/misc/stream/object/tooling/analysis/media domains through typed Wails IPC before generic IPC", async () => {
+  it("routes migrated packet/hunting/vehicle-dbc/misc/stream/object/tooling/analysis/media domains through typed Wails IPC", async () => {
     const fallbackBridge = createFallbackBridge({
       locatePacketPage: vi.fn(),
       getPacket: vi.fn(),
@@ -605,7 +601,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.cancelMediaBatchTranscription).not.toHaveBeenCalled();
   });
 
-  it("routes playbook workspace domains through typed Wails IPC before generic IPC", async () => {
+  it("routes playbook workspace domains through typed Wails IPC", async () => {
     const fallbackBridge = createFallbackBridge({
       listPlaybooks: vi.fn(),
       getPlaybook: vi.fn(),
@@ -752,7 +748,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listHypotheses).not.toHaveBeenCalled();
   });
 
-  it("routes migrated media blob calls through typed Wails IPC before generic IPC", async () => {
+  it("routes migrated media blob calls through typed Wails IPC", async () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const originalAnchorClick = HTMLAnchorElement.prototype.click;
@@ -812,8 +808,7 @@ describe("createDesktopBridge", () => {
     }
   });
 
-  it("does not restore generic IPC when compat policy is set and a migrated typed binding is missing", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
+  it("requires a typed binding when a migrated desktop route is missing", async () => {
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(),
     });
@@ -822,17 +817,15 @@ describe("createDesktopBridge", () => {
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/objects",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.ListObjects",
       transport: "desktop-ipc",
     });
 
-    expect(resolveDesktopGenericIpcPolicy()).toBe("compat");
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
-  it("fails fast instead of using generic IPC or HTTP when the disable experiment is enabled", async () => {
-    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
+  it("fails fast instead of using browser HTTP when a typed binding is absent", async () => {
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(async () => []),
     });
@@ -841,53 +834,14 @@ describe("createDesktopBridge", () => {
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/objects",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.ListObjects",
       transport: "desktop-ipc",
     });
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
-  it("fails fast through the explicit generic IPC disabled policy preflight switch", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "disabled");
-    const fallbackBridge = createFallbackBridge({
-      listObjects: vi.fn(async () => []),
-    });
-    const bridge = createDesktopBridge({
-      desktopApp: {},
-    });
-
-    await expect(bridge.listObjects()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/objects",
-      transport: "desktop-ipc",
-    });
-    expect(resolveDesktopGenericIpcPolicy()).toBe("disabled");
-    expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
-  });
-
-  it("keeps explicit compat policy as a documented no-op after adapter removal", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
-    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
-    const fallbackBridge = createFallbackBridge({
-      listObjects: vi.fn(),
-    });
-    const bridge = createDesktopBridge({
-      desktopApp: {},
-    });
-
-    await expect(bridge.listObjects()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/objects",
-      transport: "desktop-ipc",
-    });
-
-    expect(resolveDesktopGenericIpcPolicy()).toBe("compat");
-    expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
-  });
-
-  it("keeps typed desktop bindings working when the generic IPC disable experiment is enabled", async () => {
-    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
+  it("keeps typed desktop bindings working after generic adapter removal", async () => {
     const fallbackBridge = createFallbackBridge({
       listObjects: vi.fn(async () => {
         throw new Error("HTTP fallback should not run");
@@ -904,8 +858,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listObjects).not.toHaveBeenCalled();
   });
 
-  it("keeps desktop event subscription on Wails runtime when the generic IPC disable experiment is enabled", () => {
-    vi.stubEnv("VITE_DESKTOP_DISABLE_GENERIC_IPC", "1");
+  it("keeps desktop event subscription on Wails runtime", () => {
     const fallbackUnsubscribe = vi.fn();
     const fallbackBridge = createFallbackBridge({
       subscribeEvents: vi.fn(() => fallbackUnsubscribe),
@@ -1041,15 +994,14 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getEvidenceWithFilter).not.toHaveBeenCalled();
   });
 
-  it("fails with generic_ipc_disabled instead of invoking legacy adapter failures", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
+  it("fails with typed_binding_required instead of invoking legacy adapter failures", async () => {
     const bridge = createDesktopBridge({
       desktopApp: {},
     });
 
     await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
-      code: "generic_ipc_disabled",
-      endpoint: "/api/analysis/industrial",
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetIndustrialAnalysis",
       transport: "desktop-ipc",
     });
   });
@@ -1078,7 +1030,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("requires typed control-plane bindings instead of falling back to HTTP", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       startStreamingPackets: vi.fn(async () => undefined),
       getCaptureStatus: vi.fn(async () => ({
@@ -1121,7 +1072,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("surfaces Wails runtime snapshot IPC failures without HTTP fallback", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge();
     const desktopApp: DesktopTransportBinding = {
       GetToolRuntimeSnapshot: vi.fn(async () => {
@@ -1140,7 +1090,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("times out fast Wails runtime snapshots without HTTP fallback", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     vi.useFakeTimers();
     try {
       const fallbackBridge = createFallbackBridge();
@@ -1164,8 +1113,7 @@ describe("createDesktopBridge", () => {
     }
   });
 
-  it("surfaces typed fast runtime snapshot failures instead of generic IPC or HTTP", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
+  it("surfaces typed fast runtime snapshot failures instead of browser HTTP", async () => {
     const fallbackBridge = createFallbackBridge({
       getToolRuntimeSnapshot: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot(undefined, "fast")),
     });
@@ -1220,7 +1168,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("surfaces Wails runtime config update IPC failures without HTTP fallback", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       updateToolRuntimeConfig: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot()),
     });
@@ -1314,7 +1261,6 @@ describe("createDesktopBridge", () => {
   });
 
   it("requires Wails IPC for MCP status and config in desktop mode", async () => {
-    vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const expectedStatus = {
       config: { enabled: true },
       enabled: true,

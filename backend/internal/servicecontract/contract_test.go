@@ -6,6 +6,7 @@ import (
 )
 
 func TestWithAnalysisRequestMetaDefaultsNilContext(t *testing.T) {
+	//lint:ignore SA1012 verifies the public helper's nil-context fallback contract.
 	ctx := WithAnalysisRequestMeta(nil, AnalysisRequestMeta{})
 
 	meta := AnalysisRequestMetaFromContext(ctx)
@@ -54,6 +55,7 @@ func TestIsAnalysisWarmupOnlyForWarmupSource(t *testing.T) {
 	if IsAnalysisWarmup(user) {
 		t.Fatal("IsAnalysisWarmup(user) = true, want false")
 	}
+	//lint:ignore SA1012 verifies nil context is treated as non-warmup metadata.
 	if IsAnalysisWarmup(nil) {
 		t.Fatal("IsAnalysisWarmup(nil) = true, want false")
 	}

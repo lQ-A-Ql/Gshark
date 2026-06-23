@@ -4,73 +4,30 @@ package main
 
 import "testing"
 
-func TestParseDesktopBackendEvent(t *testing.T) {
+func TestEmitDesktopBackendRuntimeEventNamePolicy(t *testing.T) {
 	cases := []struct {
-		name          string
-		eventName     string
-		rawData       string
-		wantRuntime   string
-		wantForwarded bool
+		name      string
+		eventName string
+		wantName  string
+		want      bool
 	}{
-		{
-			name:          "ready",
-			eventName:     "ready",
-			rawData:       `{"message":"ready"}`,
-			wantRuntime:   "meow:backend:ready",
-			wantForwarded: true,
-		},
-		{
-			name:          "status",
-			eventName:     "status",
-			rawData:       `{"message":"解析完成"}`,
-			wantRuntime:   "meow:backend:status",
-			wantForwarded: true,
-		},
-		{
-			name:          "packet",
-			eventName:     "packet",
-			rawData:       `{"id":7}`,
-			wantRuntime:   "meow:backend:packet",
-			wantForwarded: true,
-		},
-		{
-			name:          "error",
-			eventName:     "error",
-			rawData:       `{"message":"boom"}`,
-			wantRuntime:   "meow:backend:error",
-			wantForwarded: true,
-		},
-		{
-			name:          "message ignored",
-			eventName:     "message",
-			rawData:       `{"message":"ignored"}`,
-			wantForwarded: false,
-		},
+		{name: "ready", eventName: "ready", wantName: "meow:backend:ready", want: true},
+		{name: "status", eventName: "status", wantName: "meow:backend:status", want: true},
+		{name: "packet", eventName: "packet", wantName: "meow:backend:packet", want: true},
+		{name: "error", eventName: "error", wantName: "meow:backend:error", want: true},
+		{name: "message ignored", eventName: "message", want: false},
+		{name: "empty ignored", eventName: "   ", want: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			runtimeEvent, _, ok := parseDesktopBackendEvent(tc.eventName, tc.rawData)
-			if ok != tc.wantForwarded {
-				t.Fatalf("forwarded = %v, want %v", ok, tc.wantForwarded)
+			gotName, got := desktopBackendRuntimeEventName(tc.eventName)
+			if got != tc.want {
+				t.Fatalf("desktopBackendRuntimeEventName() ok = %v, want %v", got, tc.want)
 			}
-			if runtimeEvent != tc.wantRuntime {
-				t.Fatalf("runtime event = %q, want %q", runtimeEvent, tc.wantRuntime)
+			if gotName != tc.wantName {
+				t.Fatalf("desktopBackendRuntimeEventName() name = %q, want %q", gotName, tc.wantName)
 			}
 		})
-	}
-}
-
-func TestParseDesktopBackendEventMalformedData(t *testing.T) {
-	runtimeEvent, payload, ok := parseDesktopBackendEvent("status", "not-json")
-	if !ok {
-		t.Fatal("expected malformed event to be forwarded")
-	}
-	if runtimeEvent != "meow:backend:status" {
-		t.Fatalf("runtime event = %q", runtimeEvent)
-	}
-	message, _ := payload.(map[string]any)["message"].(string)
-	if message != "not-json" {
-		t.Fatalf("malformed payload = %#v", payload)
 	}
 }

@@ -777,9 +777,7 @@ func parseIntSafe(raw string) int {
 func splitNonEmptyLines(text string) []string {
 	rawLines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	lines := make([]string, 0, len(rawLines))
-	for _, line := range rawLines {
-		lines = append(lines, line)
-	}
+	lines = append(lines, rawLines...)
 	return lines
 }
 

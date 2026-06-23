@@ -1,7 +1,7 @@
 import { backendClients } from "../../integrations/backendClients";
 import { withAbortableTimeout } from "../../utils/asyncControl";
 import { STARTUP_TOOL_RUNTIME_TIMEOUT_MS } from "../captureConstants";
-import { detectToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
+import { detectToolRuntimeProbeTransport, normalizeToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
 import { readToolRuntimeConfigState, writeObservedToolRuntimeSnapshotConfig } from "../toolRuntimeStorage";
 import {
   applyStartupRuntimeSnapshot,
@@ -41,7 +41,7 @@ export async function loadStartupToolRuntime(options: StartupToolRuntimeOptions)
       STARTUP_TOOL_RUNTIME_TIMEOUT_MS,
       "startup fast tool runtime check timed out",
     );
-    setToolRuntimeProbeTransport(snapshot.transport ?? detectToolRuntimeProbeTransport());
+    setToolRuntimeProbeTransport(normalizeToolRuntimeProbeTransport(snapshot.transport));
     const syncConfig = startupToolRuntimeConfigForSync(savedState, snapshot.config);
     const shouldSyncSavedConfig = syncConfig !== null && !toolRuntimeConfigsEqual(syncConfig, snapshot.config);
     applyStartupRuntimeSnapshot({

@@ -16,6 +16,8 @@ Post-removal facts required by guardrails:
 - removed InvokeBackendBlob
 - removed InvokeBackendText
 - `deletionReady = true`
+- typed_binding_required
+- generic IPC data-plane removed
 
 ## Approved uses
 
@@ -37,22 +39,15 @@ Post-removal facts required by guardrails:
 - `frontend/scripts/check-desktop-misc-compat-inventory.mjs` reports no MISC desktop compatibility routes.
 - `cd frontend && pnpm run ci` and `cd frontend && pnpm run build:wails` pass in the same round.
 - Browser-dev HTTP/SSE remains green, including HTTP auth bootstrap and EventSource readiness.
-- A real Wails WebView smoke run passes after the adapter is disabled in a feature branch.
-- The disabled-adapter smoke is built with either `VITE_DESKTOP_GENERIC_IPC_POLICY=disabled` or legacy `VITE_DESKTOP_DISABLE_GENERIC_IPC=1` and run with `scripts/check-desktop-ipc-smoke.ps1 -DisableGenericIpcAdapterExperiment`, so `genericIpcDisableExperimentBuildFlag = true` and `desktopWebviewTyped.directBackendApiRequestCount = 0` are recorded in the smoke summary.
-- A release-candidate rollback/no-op contract is documented and tested: after Round 29, `VITE_DESKTOP_GENERIC_IPC_POLICY=compat` must remain recognizable but must not force adapter-enabled compatibility.
-- The default-disabled release candidate must complete three consecutive default-disabled observation rounds before adapter removal is considered.
+- A real Wails WebView smoke run passes with `desktopWebviewTyped.directBackendApiRequestCount = 0`.
 - `frontend/scripts/check-wails-bindings.mjs` forbids removed `InvokeBackendJSON`, `InvokeBackendBlob`, and `InvokeBackendText`.
-- `frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs` reports `deletionReady = true`.
+- `frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs` rejects restored generic IPC data-plane source.
 
 ## Removal sequence
 
-1. Round 24 makes desktop release default to disabled generic IPC adapter routing. `VITE_DESKTOP_DISABLE_GENERIC_IPC=1` remains only a legacy alias; do not promote it to the default control path.
-2. Keep `VITE_DESKTOP_GENERIC_IPC_POLICY=compat` as a recognizable policy value. After Round 29 it is a documented no-op for adapter enablement; source-level rollback would require restoring the `desktopBridge` adapter construction.
-3. Record each default-disabled observation round in `docs/desktop-ipc-iteration-status.json`, including default-disabled smoke, compat rollback smoke, `directBackendApiRequestCount = 0`, and browser-dev green.
-4. Do not remove adapter code until three consecutive default-disabled observation rounds are recorded and all guardrails remain green.
-5. Run the full gate and Wails smoke with the frontend adapter construction removed.
-6. If smoke still reports `directBackendApiRequestCount = 0`, consider backend/generated `InvokeBackend*` cleanup only in a separate preflight round; do not remove backend/generated bindings in the same round as frontend adapter construction removal.
-7. Keep `GetBackendAuthToken`, `OpenCaptureDialog`, `BackendStatus`, update methods, and native dialog methods until each is replaced by an explicit typed shell contract or intentionally retained as shell API.
+1. Keep `desktopBridge` typed-only for desktop data-plane calls.
+2. Keep `frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs` and `frontend/scripts/check-wails-bindings.mjs` in CI.
+3. Keep `GetBackendAuthToken`, `OpenCaptureDialog`, `BackendStatus`, update methods, and native dialog methods until each is replaced by an explicit typed shell contract or intentionally retained as shell API.
 
 ## Adapter removal preflight
 
@@ -72,12 +67,11 @@ Round 29 removes only the frontend construction/use of `createIpcBackendTranspor
 
 Post-candidate facts:
 
-- `desktopBridge` builds its base data bridge from `createDisabledGenericIpcBackendTransport`.
+- `desktopBridge` no longer builds a generic IPC data bridge.
 - Typed desktop overrides still take precedence.
-- Missing typed data-plane bindings fail with `generic_ipc_disabled` and do not call `InvokeBackendJSON`.
+- Missing typed data-plane bindings fail with `typed_binding_required` and do not call `InvokeBackendJSON`.
 - Runtime/MCP/capture/TLS control-plane compatibility fallback explicitly uses `fallbackBridge`, not generic IPC.
 - Wails runtime event subscription remains active through `EventsOn`.
-- `VITE_DESKTOP_GENERIC_IPC_POLICY=compat` remains recognizable for telemetry/tests but does not re-enable adapter construction.
 
 ## Backend/generated generic IPC binding cleanup preflight
 
@@ -131,14 +125,21 @@ Round 35 update:
 - Post-removal monitoring is now CI-enforced by `frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs`.
 - `pnpm run ci` runs `desktop-generic-ipc-post-removal:check`.
 - The monitor blocks restored `ipcBackendTransport.ts`, restored `InvokeBackendJSON` / `InvokeBackendBlob` / `InvokeBackendText`, restored `createIpcBackendTransport`, stale README wording, stale tracker audit evidence, and missing CI wiring.
-- README now documents typed IPC first, `generic_ipc_disabled` fail-fast, browser-dev HTTP/SSE retained, and Wails runtime events retained.
+- README now documents typed IPC first, `typed_binding_required` fail-fast, browser-dev HTTP/SSE retained, and Wails runtime events retained.
 - Round 35 did not change runtime transport and reused Round 34 post-removal Wails smoke evidence.
+
+Round 38 dead-code cleanup update:
+
+- Removed `desktopDisabledGenericIpcTransport.ts`, `desktopGenericIpcPolicy.ts`, and their obsolete pre/post-removal readiness scripts.
+- `desktopBridge` now fails missing desktop data-plane bindings directly with `typed_binding_required` through `desktopMissingBindingBridge`.
+- `scripts/check-desktop-ipc-smoke.ps1` no longer carries the generic IPC disable experiment switch or smoke fields.
+- Current CI keeps route classification, Wails binding, old-binding compatibility, MISC compatibility, desktop transport policy, and post-removal generic IPC reintroduction monitoring.
 
 Next safe step:
 
 - Round 36 final closure audit is complete.
 - Full gates, `build:wails`, desktop assets, post-removal monitor, removal preflight, binding cleanup preflight, Wails binding, old-binding compatibility, desktop release smoke, WebView typed smoke, and browser-dev smoke are green.
-- WebView typed smoke records `directBackendApiRequestCount = 0`, `totalInstrumentedNetworkRequests = 0`, `genericIpcPolicy = disabled`, and `genericIpcDisableExperimentBuildFlag = true`.
+- WebView typed smoke records `directBackendApiRequestCount = 0` and `totalInstrumentedNetworkRequests = 0`.
 - Remaining old generated binding access is shell/control-plane compatibility only: backend auth token, native file/dialog/update APIs, and `window.go.main.DesktopApp` discovery.
 - Do not treat shell/control-plane compatibility methods as data-plane migration debt unless they begin carrying business-domain payloads.
 - Do not restore generic IPC data-plane without a deliberate rollback plan.

@@ -79,8 +79,5 @@ func IsSafeRelativePath(path string) bool {
 		}
 	}
 	clean := filepath.Clean(path)
-	if filepath.IsAbs(clean) {
-		return false
-	}
-	return true
+	return !filepath.IsAbs(clean)
 }

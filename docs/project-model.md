@@ -152,7 +152,7 @@ flowchart LR
 - `pages`、`features` 不直接 `fetch` 后端数据面。
 - 后端 JSON shape 先进入 `wire`，再经 mapper 转成 `core/types`。
 - 分析 hook 使用 capture revision、filePath、totalPackets、force refresh 和 inflight 去重作为缓存键语义。
-- 桌面模式缺少已迁移 typed binding 时返回 `generic_ipc_disabled`，不静默回退 HTTP。
+- 桌面模式缺少已迁移 typed binding 时返回 `typed_binding_required`，不静默回退 HTTP。
 - `clients`、`mappers`、`wire` 层不新增裸 `any`；需要动态结构必须登记治理例外。
 
 ## 6. 后端模型

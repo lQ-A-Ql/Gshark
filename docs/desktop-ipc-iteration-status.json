@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-06-23T21:57:23+08:00",
-  "currentPhase": "post-phase-5",
-  "currentRound": 37,
+  "updatedAt": "2026-06-24T00:20:42+08:00",
+  "currentPhase": "post-phase-5-maintenance",
+  "currentRound": 39,
   "desktopPolicy": {
     "desktopRelease": "typed-ipc-only to an in-process backend/desktopruntime mount; no backend child process, no loopback HTTP/SSE dependency, no browser-http fallback when Wails binding exists",
     "desktopDev": "same as desktop release with current Wails bindings; missing typed control/data bindings fail explicitly instead of falling back to browser HTTP",
@@ -20,7 +20,7 @@
         "packet-page",
         "tls"
       ],
-      "fallbackPolicy": "missing Wails typed binding fails with typed_binding_required or generic_ipc_disabled in desktop mode; browser HTTP fallback is created only when no Wails binding exists"
+      "fallbackPolicy": "missing Wails typed binding fails with typed_binding_required in desktop mode; browser HTTP fallback is created only when no Wails binding exists"
     },
     "stream": {
       "phase": 2,
@@ -166,88 +166,60 @@
       ],
       "guardrails": [
         "frontend/scripts/check-desktop-transport-policy.mjs",
-        "frontend/scripts/check-desktop-generic-ipc-allowlist.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-allowlist.mjs (package alias: desktop-route-classification:check)",
+        "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
         "frontend/scripts/check-desktop-misc-compat-inventory.mjs",
         "frontend package ci runs desktop-transport-policy:check",
-        "frontend package ci runs desktop-generic-ipc:check",
+        "frontend package ci runs desktop-route-classification:check",
+        "frontend package ci runs desktop-generic-ipc-post-removal:check",
         "frontend package ci runs desktop-misc-compat:check",
         "typed desktop override files must not wire direct /api paths or generic InvokeBackend* calls",
-        "createIpcBackendTransport rejects generic IPC when a matching migrated typed binding exists",
-        "client backend route literals must be classified as migrated typed routes or explicit compatibility routes",
-        "desktop release no longer constructs the frontend generic IPC adapter or browser HTTP fallback when Wails binding exists; VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but does not re-enable it",
-        "VITE_DESKTOP_DISABLE_GENERIC_IPC=1 remains a legacy alias that disables the adapter while preserving Wails runtime events",
-        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the release-candidate default-disabled policy and smoke evidence before adapter removal"
+        "client backend route literals must be classified as migrated typed routes or explicit browser-dev compatibility routes",
+        "desktop release no longer constructs the frontend generic IPC adapter or browser HTTP fallback when Wails binding exists",
+        "missing desktop typed bindings fail with typed_binding_required"
       ]
     },
     "genericIpcAdapterDisableExperiment": {
-      "phase": "post-phase-5",
-      "status": "release-candidate-default-disabled",
-      "policySwitch": "VITE_DESKTOP_GENERIC_IPC_POLICY=disabled",
-      "flag": "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
-      "smokeSwitch": "scripts/check-desktop-ipc-smoke.ps1 -DisableGenericIpcAdapterExperiment",
-      "failureCode": "generic_ipc_disabled",
-      "policy": "Desktop release no longer constructs createIpcBackendTransport or browser HTTP fallback from desktopBridge. VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains a recognizable policy value but does not re-enable adapter construction. Missing typed data-plane routes fail fast with generic_ipc_disabled or typed_binding_required instead of falling back to generic IPC or browser HTTP. Typed overrides and Wails runtime event subscription remain active.",
-      "lastExperimentSmoke": {
-        "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
-        "genericIpcDisableExperiment": false,
-        "genericIpcPolicy": "disabled",
-        "genericIpcDisableExperimentRequested": false,
-        "genericIpcDisableExperimentBuildFlag": true,
-        "desktopWebviewDirectBackendApiRequestCount": 0,
-        "browserDevOk": true,
-        "capturePackets": 7074,
-        "httpStreams": 119,
-        "objectCount": 205
-      },
-      "guardrails": [
-        "frontend/src/app/integrations/desktopBridge.test.ts covers fail-fast missing-typed behavior, typed override success, and Wails runtime event subscription under the flag",
-        "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.test.ts covers createDisabledGenericIpcBackendTransport",
-        "docs/desktop-ipc-old-binding-exit-plan.md records the flag and smoke switch",
-        "frontend/scripts/check-desktop-old-binding-compat.mjs validates the exit-plan tokens",
-        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the default-disabled release candidate and compat no-op evidence"
-      ]
+      "phase": "post-phase-5-maintenance",
+      "status": "retired",
+      "policy": "The temporary generic IPC disable experiment and policy resolver were removed after desktop data-plane routing became typed-only. Missing desktop data-plane typed bindings now fail with typed_binding_required.",
+      "removedFiles": [
+        "frontend/src/app/integrations/desktopGenericIpcPolicy.ts",
+        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts",
+        "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts",
+        "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.test.ts"
+      ],
+      "currentFailureCode": "typed_binding_required"
     },
     "genericIpcAdapterRetirementReadiness": {
-      "phase": "post-phase-5",
-      "status": "post-removal-audit-completed",
-      "scope": "desktopBridge does not construct the generic IPC adapter; backend/generated InvokeBackendJSON/Blob/Text bindings and frontend legacy adapter inventory are removed; desktopDisabledGenericIpcTransport and desktopIpcControls own the post-removal fail-fast/control path.",
-      "policySwitch": "VITE_DESKTOP_GENERIC_IPC_POLICY=disabled",
-      "guardrails": [
+      "phase": "post-phase-5-maintenance",
+      "status": "retired-after-cleanup",
+      "scope": "Old retirement/readiness scripts were deleted after backend/generated InvokeBackend* bindings and frontend generic IPC adapter code were removed. Current CI keeps post-removal reintroduction monitoring instead.",
+      "removedGuardrails": [
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs",
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.test.mjs",
-        "frontend package ci runs desktop-generic-ipc-retirement:check",
-        "frontend/src/app/integrations/desktopGenericIpcPolicy.ts resolves disabled by default and keeps explicit VITE_DESKTOP_GENERIC_IPC_POLICY=compat as a no-op policy value",
-        "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts covers default disabled, explicit disabled policy, legacy alias, and explicit compat no-op behavior",
-        "the readiness check rejects promoting the legacy VITE_DESKTOP_DISABLE_GENERIC_IPC alias to the default",
-        "the readiness check requires release-candidate default disabled policy and explicit compat no-op behavior after adapter removal candidate",
-        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs requires VITE_DESKTOP_GENERIC_IPC_POLICY=compat no-op coverage",
-        "the readiness check requires tracker smoke evidence with genericIpcDisableExperimentBuildFlag = true, directBackendApiRequestCount = 0, and browserDevOk = true"
+        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.test.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-removal-preflight.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-removal-preflight.test.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.test.mjs"
       ],
-      "lastReadinessAudit": {
-        "focusedFrontendVitest": "passed: 7 files / 63 tests for desktopBridge, disabled transport, desktopIpcControls, post-removal monitor, removal preflight, binding cleanup preflight, and old-binding compatibility",
-        "frontendCi": "passed: 238 files / 766 tests",
-        "rootGoDev": "passed",
-        "rootGoProduction": "passed",
-        "backendGo": "passed",
-        "buildWails": "passed during final closure audit",
-        "desktopAssets": "passed through build:wails",
-        "wailsBindingCheck": "passed; removed InvokeBackend* bindings are forbidden",
-        "oldBindingCompat": "passed; shell/bootstrap compatibility only",
-        "bindingCleanupPreflight": "passed; deletionReady=true",
-        "removalPreflight": "passed; adapterRemoved=true after backend/generated cleanup",
-        "postRemovalMonitor": "passed; frontend CI runs desktop-generic-ipc-post-removal:check and production source/README reject removed generic IPC tokens",
-        "defaultDisabledDesktopSmoke": "passed in Round 36 final closure audit; genericIpcPolicy=disabled, genericIpcDisableExperimentBuildFlag=true, directBackendApiRequestCount=0, totalInstrumentedNetworkRequests=0, browser-dev green",
-        "finalDefaultDisabledAssetsBuilt": true,
-        "adapterRemoved": true
-      }
+      "activeGuardrails": [
+        "frontend/scripts/check-wails-bindings.mjs",
+        "frontend/scripts/check-desktop-transport-policy.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-allowlist.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
+        "frontend/scripts/check-desktop-old-binding-compat.mjs"
+      ]
     },
     "genericIpcAdapterDefaultDisabledReleaseCandidate": {
       "phase": "post-phase-5",
-      "status": "observation-round-3-completed",
+      "status": "historical-completed",
       "defaultPolicy": "disabled",
       "rollbackPolicy": "VITE_DESKTOP_GENERIC_IPC_POLICY=compat",
       "adapterRemoved": false,
-      "policy": "Desktop release defaults to disabled generic IPC adapter routing. After Round 29, explicit compat policy remains recognizable but does not restore adapter-enabled behavior; browser-dev HTTP/SSE remains available through the HTTP bridge.",
+      "policy": "Historical evidence for adapter removal. The policy resolver and compat/no-op switch have been deleted in the current typed-only desktop path.",
       "guardrails": [
         "frontend/src/app/integrations/desktopGenericIpcPolicy.test.ts verifies default disabled and explicit compat no-op behavior",
         "frontend/src/app/integrations/desktopBridge.test.ts verifies VITE_DESKTOP_GENERIC_IPC_POLICY=compat does not restore generic IPC adapter construction",
@@ -328,13 +300,13 @@
       "adapterRemoved": true,
       "frontendAdapterConstructionRemoved": true,
       "backendGeneratedBindingsRemoved": true,
-      "policy": "Round 34 removed backend DesktopApp.InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText, removed generated Wails InvokeBackendJSON/Blob/Text bindings, removed the frontend shell binding fields, and deleted the unreachable ipcBackendTransport adapter implementation. desktopDisabledGenericIpcTransport.ts remains the active fail-fast data-plane base transport, and browser-dev HTTP/SSE remains independent.",
+      "policy": "Historical removal preflight. The active post-removal monitor now blocks restored InvokeBackend* bindings, createIpcBackendTransport, and ipcBackendTransport.ts.",
       "inventory": {
         "productionSource": [
           "frontend/src/app/integrations/desktopBridge.ts no longer imports or constructs createIpcBackendTransport",
-          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts contains the active generic_ipc_disabled fail-fast transport",
-          "frontend/src/app/integrations/desktopIpcControls.ts owns shared DesktopIpcRequestError, IpcBackendTransport, withDesktopIpcControls, and blob limit checks",
-          "frontend/src/app/integrations/ipcBackendTransport.ts is removed"
+          "frontend/src/app/integrations/ipcBackendTransport.ts is removed",
+          "frontend/src/app/integrations/desktopMissingBindingBridge.ts provides typed_binding_required failures for missing typed data-plane bindings",
+          "frontend/src/app/integrations/desktopIpcControls.ts owns shared DesktopIpcRequestError, withDesktopIpcControls, and blob limit checks"
         ],
         "generatedBindings": [
           "frontend/wailsjs/go/main/DesktopApp.d.ts no longer exports InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText",
@@ -350,7 +322,7 @@
       "reversibleDeletionPlan": [
         "restore createIpcBackendTransport construction only with an explicit rollback branch if Wails smoke or full gates reveal a regression",
         "restore backend InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText and regenerate Wails bindings only as a coordinated rollback",
-        "keep desktopDisabledGenericIpcTransport.ts and desktopIpcControls.ts as the supported post-removal data-plane failure/control modules"
+        "keep desktopMissingBindingBridge.ts and desktopIpcControls.ts as the supported post-removal data-plane failure/control modules"
       ],
       "preflightChecks": [
         "three consecutive default-disabled observation rounds are recorded",
@@ -372,19 +344,19 @@
       "deletionReady": true,
       "backendGeneratedBindingsRemoved": true,
       "frontendAdapterConstructionRemoved": true,
-      "policy": "Round 34 removed backend DesktopApp.InvokeBackendJSON/InvokeBackendBlob/InvokeBackendText, removed generated Wails InvokeBackendJSON/Blob/Text bindings, removed DesktopShellBinding InvokeBackendJSON/Blob/Text fields, deleted the unreachable ipcBackendTransport legacy adapter file, and moved shared IPC controls into desktopIpcControls.ts. check-wails-bindings now forbids removed InvokeBackend* bindings, and old-binding compatibility no longer allows ipcBackendTransport InvokeBackend* inventory.",
+      "policy": "Historical cleanup preflight retired after Round 38 dead-code cleanup. Active CI keeps check-wails-bindings and post-removal monitor instead.",
       "inventory": {
         "backendExportedMethods": [],
         "typedHelperReuse": [],
         "generatedBindings": [],
         "frontendBindingSurfaces": [
-          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts exports createDisabledGenericIpcBackendTransport",
-          "frontend/src/app/integrations/desktopDisabledGenericIpcTransport.ts reports generic_ipc_disabled",
-          "frontend/src/app/integrations/desktopIpcControls.ts exports DesktopIpcRequestError, IpcBackendTransport, withDesktopIpcControls, and blob limit checks"
+          "frontend/src/app/integrations/desktopIpcControls.ts exports DesktopIpcRequestError, withDesktopIpcControls, and blob limit checks",
+          "frontend/src/app/integrations/desktopMissingBindingBridge.ts rejects missing typed bindings with typed_binding_required"
         ],
         "guardrailDependencies": [
           "frontend/scripts/check-wails-bindings.mjs forbids removed InvokeBackend* bindings",
-          "frontend/scripts/check-desktop-old-binding-compat.mjs rejects unapproved InvokeBackend* inventory"
+          "frontend/scripts/check-desktop-old-binding-compat.mjs rejects unapproved InvokeBackend* inventory",
+          "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs rejects restored generic IPC adapter source"
         ]
       },
       "blockers": [],
@@ -393,7 +365,7 @@
         "frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs validates backend/exported, generated, frontend shell, adapter implementation, and guardrail dependency facts",
         "frontend CI runs desktop-generic-ipc-binding-cleanup-preflight:check",
         "typed helper reuse remains zero after Round 31",
-        "desktopDisabledGenericIpcTransport.ts owns active generic_ipc_disabled fail-fast behavior after Round 32",
+        "desktopMissingBindingBridge.ts owns active typed_binding_required fail-fast behavior after Round 38",
         "desktop_backend_proxy_test.go no longer directly calls exported InvokeBackendJSON after Round 33",
         "deletionReady = true because backend/generated InvokeBackend* bindings and frontend legacy adapter inventory are removed"
       ],
@@ -426,35 +398,39 @@
         "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
         "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.test.mjs",
         "frontend package ci runs desktop-generic-ipc-post-removal:check",
-        "README.md must describe typed IPC, generic_ipc_disabled, browser-dev HTTP/SSE, and Wails runtime events without stale InvokeBackendJSON/Blob/Text wording",
+        "README.md must describe typed IPC, typed_binding_required, browser-dev HTTP/SSE, and Wails runtime events without stale InvokeBackendJSON/Blob/Text wording",
         "production desktop source must not reintroduce InvokeBackendJSON, InvokeBackendBlob, InvokeBackendText, createIpcBackendTransport, or frontend/src/app/integrations/ipcBackendTransport.ts"
       ],
       "lastMonitorAudit": {
-        "focusedFrontendVitest": "passed: 7 files / 63 tests in final closure audit",
-        "rootGoDev": "passed",
-        "rootGoProduction": "passed",
-        "backendGo": "passed",
-        "frontendCi": "passed: 238 files / 766 tests",
-        "buildWails": "passed",
-        "postRemovalMonitor": "passed",
-        "removalPreflight": "passed",
-        "bindingCleanupPreflight": "passed",
-        "wailsBindingCheck": "passed",
-        "productionTokenScan": "post-removal monitor passed; no README/production source matches for InvokeBackendJSON, InvokeBackendBlob, InvokeBackendText, createIpcBackendTransport, or ipcBackendTransport outside guardrail/test/docs history",
-        "readmeDriftFix": "README desktop IPC section now states typed IPC first, generic_ipc_disabled fail-fast, browser-dev HTTP/SSE, and Wails runtime events",
-        "gitDiffCheck": "passed"
+        "status": "completed",
+        "removedDeadCode": [
+          "generic IPC policy resolver and tests",
+          "disabled generic IPC transport and tests",
+          "retirement/readiness/rollback/removal/binding-cleanup preflight scripts and tests",
+          "generic IPC disable experiment smoke fields"
+        ],
+        "activeChecks": [
+          "wails-binding:check",
+          "desktop-transport-policy:check",
+          "desktop-route-classification:check",
+          "desktop-generic-ipc-post-removal:check",
+          "desktop-old-binding:check",
+          "desktop-misc-compat:check"
+        ],
+        "validation": {
+          "frontendCi": "cd frontend && pnpm run ci passed: 276 files / 899 tests plus production build",
+          "ciDesktop": "cd frontend && pnpm run ci:desktop passed",
+          "focusedVitest": "passed: 6 files / 53 tests",
+          "rootGoDev": "go test -tags dev ./... passed after build:wails resource sync",
+          "buildWails": "cd frontend && pnpm run build:wails passed with Wails dist transport check",
+          "tokenScan": "active frontend source/scripts/package/Wails model contain no generic IPC policy, disable experiment, disabled transport, or generic_ipc_disabled tokens",
+          "gitDiffCheck": "git diff --check passed"
+        }
       },
       "lastSmokeEvidence": {
-        "source": "Round 36 final closure Wails smoke",
-        "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
+        "source": "Round 38 build:wails dist guard",
         "directBackendApiRequestCount": 0,
-        "totalInstrumentedNetworkRequests": 0,
-        "genericIpcPolicy": "disabled",
-        "genericIpcDisableExperimentBuildFlag": true,
-        "browserDevOk": true,
-        "capturePackets": 7074,
-        "httpStreams": 119,
-        "objectCount": 205
+        "distTransportCheck": "passed; no loopback backend HTTP/SSE fallback markers in Wails dist"
       }
     },
     "inProcessBackendRuntime": {
@@ -510,8 +486,7 @@
       "guardrails": [
         "frontend/scripts/check-desktop-old-binding-compat.mjs",
         "docs/desktop-ipc-old-binding-exit-plan.md",
-        "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs",
-        "frontend/scripts/check-desktop-generic-ipc-rollback-guard.mjs",
+        "frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs",
         "frontend package ci runs desktop-old-binding:check",
         "production integration clients cannot add direct old generated DesktopApp data-plane bindings"
       ],
@@ -566,71 +541,49 @@
     }
   },
   "phaseAudit": {
-    "id": "desktop-ipc-in-process-runtime-round-37",
-    "status": "in-process-runtime-completed",
-    "score": {
-      "total": 98,
-      "contractCorrectness": 25,
-      "desktopPolicyCompliance": 20,
-      "regressionSafety": 20,
-      "diagnosticsAndFailureShape": 15,
-      "docsAndTraceability": 10,
-      "devBrowserCompatibility": 8
-    },
+    "id": "module-dead-code-audit-round-39",
+    "status": "completed",
     "hardBlockers": [],
     "fullGatesRun": true,
-    "desktopWebviewSmokeRun": false,
-    "browserDevSmokeRun": false,
     "evidence": {
-      "commit": "01da7dd8 Migrate Wails desktop backend in-process",
+      "auditReport": "docs/module-dead-code-audit-2026-06-24.md",
+      "backendGo": "cd backend && go test ./... passed",
+      "backendStaticcheck": "cd backend && go run honnef.co/go/tools/cmd/staticcheck@latest ./... passed",
+      "rootStaticcheckDev": "go run honnef.co/go/tools/cmd/staticcheck@latest -tags dev ./... passed",
+      "typecheck": "passed through frontend CI",
+      "frontendCi": "passed: 275 files / 897 tests plus production build",
+      "ciDesktop": "passed",
       "rootGoDev": "passed",
       "rootGoProduction": "passed",
-      "backendGo": "passed",
-      "frontendCi": "passed",
-      "wailsBindingCheck": "passed",
-      "desktopAssets": "passed after sync-wails-assets",
-      "buildWails": "passed with -s -skipembedcreate -nopackage",
-      "desktopHTTPFallbackAudit": "bridgeFactory creates httpBridge only when no Wails binding exists; desktopBridge has no fallbackBridge parameter; desktop_event_bridge contains no HTTP SSE client",
-      "smokeScript": "not rerun after Round 37 because subagent validation used full frontend/root/backend/build gates; Round 36 smoke remains the last real WebView/browser-dev smoke evidence"
+      "backendGofmt": "cd backend && gofmt -l . returned empty",
+      "buildWails": "passed with Wails dist transport check",
+      "gitDiffCheck": "passed"
     }
   },
   "lastRound": {
-    "id": "desktop-ipc-in-process-runtime-round-37",
-    "phase": "post-phase-5",
-    "primaryDomain": "Wails in-process backend runtime",
-    "score": {
-      "total": 98,
-      "contractCorrectness": 25,
-      "desktopPolicyCompliance": 20,
-      "regressionSafety": 20,
-      "diagnosticsAndFailureShape": 15,
-      "docsAndTraceability": 10,
-      "devBrowserCompatibility": 8
-    },
+    "id": "module-dead-code-audit-round-39",
+    "phase": "post-phase-5-maintenance",
+    "primaryDomain": "module-by-module dead-code and redundancy audit",
     "hardBlockers": [],
     "fullGatesRun": true,
-    "focusedTestsRun": true,
+    "focusedTestsRun": false,
     "manualSmokeRun": false,
-    "decision": "in-process-runtime-completed; Wails desktop now mounts backend/desktopruntime in-process, desktop IPC no longer falls back to browser HTTP when Wails binding exists, and packaged desktop no longer embeds or launches sentinel-backend.exe. Future rounds should be maintenance-only unless a new typed IPC domain is explicitly introduced.",
+    "decision": "removed unreachable frontend modules, obsolete generic IPC artifacts, Wails child-backend leftovers, stale plugin model types, and backend private dead code; retained browser-dev HTTP/SSE and current post-removal guardrails",
     "evidence": {
-      "bugCause": "old desktop event bridge connected to http://127.0.0.1:17891/api/events and failed when the loopback backend process was absent or incompatible",
-      "focusedBackendRuntimeTest": "cd backend && go test ./desktopruntime passed; TestDoRawReturnsWhenContextExpires covers runtime context deadline behavior",
-      "focusedFrontendVitest": "desktop bridge focused suite passed earlier in the round; frontend CI passed after bridgeFactory/desktopBridge changes",
-      "rootGoDev": "go test -tags dev ./... passed",
-      "rootGoProduction": "go test -tags production ./... passed",
+      "auditReport": "docs/module-dead-code-audit-2026-06-24.md",
       "backendGo": "cd backend && go test ./... passed",
-      "frontendCi": "cd frontend && pnpm run ci passed: 282 files / 938 tests",
-      "desktopAssets": "scripts/sync-wails-assets.ps1 plus scripts/check-desktop-assets.ps1 passed",
-      "buildWails": "wails build -s -skipembedcreate -nopackage passed",
-      "wailsBindingCheck": "cd frontend && pnpm run wails-binding:check passed",
-      "postRemovalMonitorCheck": "covered by pnpm run ci",
-      "bindingCleanupPreflight": "covered by pnpm run ci",
-      "removalPreflight": "covered by pnpm run ci",
-      "oldBindingCompat": "covered by pnpm run ci",
-      "desktopSmoke": "not rerun after Round 37; last real WebView/browser-dev smoke remains Round 36",
-      "gitDiffCheck": "git diff --check and git diff --cached --check passed"
+      "backendStaticcheck": "passed",
+      "rootStaticcheckDev": "passed",
+      "typecheck": "passed through frontend CI",
+      "frontendCi": "passed: 275 files / 897 tests plus production build",
+      "ciDesktop": "passed",
+      "rootGoDev": "passed",
+      "rootGoProduction": "passed",
+      "backendGofmt": "passed",
+      "buildWails": "passed with Wails dist transport check",
+      "gitDiffCheck": "passed"
     }
   },
   "openBlockers": [],
-  "recommendedNextSlice": "Maintenance-only unless explicitly scoped: keep browser-dev HTTP/SSE, keep native shell/dialog/update bindings, keep desktop runtime in-process, run post-removal/Wails binding guardrails in CI, and do not restore desktop HTTP fallback or generic IPC data-plane without a deliberate rollback plan."
+  "recommendedNextSlice": "Maintenance-only: keep browser-dev HTTP/SSE, keep native shell/dialog/update bindings, keep desktop runtime in-process, and do not restore desktop HTTP fallback or generic IPC data-plane without a deliberate rollback plan."
 }

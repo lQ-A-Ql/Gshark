@@ -101,7 +101,7 @@ flowchart LR
 
 - pages/features 不直接调用后端 `fetch`，而是通过 bridge/client。
 - wire DTO 表示后端 JSON；mapper 负责归一化；`core/types` 是功能层消费的稳定类型。
-- 已迁移桌面数据面缺少 typed binding 时，应以 `generic_ipc_disabled` 失败，不静默回退 HTTP。
+- 已迁移桌面数据面缺少 typed binding 时，应以 `typed_binding_required` 失败，不静默回退 HTTP。
 
 ## 4. Capture 生命周期
 

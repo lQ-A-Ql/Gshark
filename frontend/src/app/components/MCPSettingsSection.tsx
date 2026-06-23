@@ -1,7 +1,6 @@
 import { Bot, Copy, RefreshCw } from "lucide-react";
 
 import type { MCPStatus } from "../core/types";
-import { buildBackendEndpoint } from "../integrations/backendEndpoint";
 import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
 
 type InfoCardTone = "default" | "ok" | "muted";
@@ -36,7 +35,7 @@ export function MCPSettingsSection({
   onCopyToken,
 }: MCPSettingsSectionProps) {
   const enabled = Boolean(mcpStatus?.config.enabled);
-  const endpoint = mcpStatus?.endpoint || buildBackendEndpoint("/api/mcp");
+  const endpoint = mcpStatus?.endpoint || "";
   const statusText = !backendConnected ? "后端未连接" : mcpStatus?.enabled ? "本地 MCP 已启用" : "本地 MCP 已关闭";
   const transportText = mcpStatus?.transport || "streamable-http";
   const tokenPreview = authToken ? maskToken(authToken) : "桌面 token 暂不可用";
