@@ -53,14 +53,18 @@ type captureStartRequest struct {
 }
 
 type desktopToolRuntimeConfig struct {
-	TSharkPath    string `json:"tshark_path"`
-	FFmpegPath    string `json:"ffmpeg_path"`
-	PythonPath    string `json:"python_path"`
-	VoskModelPath string `json:"vosk_model_path"`
-	YaraEnabled   bool   `json:"yara_enabled"`
-	YaraBin       string `json:"yara_bin"`
-	YaraRules     string `json:"yara_rules"`
-	YaraTimeoutMS int    `json:"yara_timeout_ms"`
+	TSharkPath        string   `json:"tshark_path"`
+	TSharkAllowedDirs []string `json:"tshark_allowed_dirs,omitempty"`
+	FFmpegPath        string   `json:"ffmpeg_path"`
+	FFmpegAllowedDirs []string `json:"ffmpeg_allowed_dirs,omitempty"`
+	PythonPath        string   `json:"python_path"`
+	PythonAllowedDirs []string `json:"python_allowed_dirs,omitempty"`
+	VoskModelPath     string   `json:"vosk_model_path"`
+	YaraEnabled       bool     `json:"yara_enabled"`
+	YaraBin           string   `json:"yara_bin"`
+	YaraAllowedDirs   []string `json:"yara_allowed_dirs,omitempty"`
+	YaraRules         string   `json:"yara_rules"`
+	YaraTimeoutMS     int      `json:"yara_timeout_ms"`
 }
 
 type desktopMCPConfig struct {
@@ -142,8 +146,9 @@ type desktopRulePackToggleRequest struct {
 }
 
 type desktopRulePackDownloadRequest struct {
-	PackID string `json:"pack_id"`
-	URL    string `json:"url"`
+	PackID   string `json:"pack_id"`
+	URL      string `json:"url"`
+	Checksum string `json:"checksum"`
 }
 
 type desktopRuleValidationRequest struct {
@@ -905,10 +910,11 @@ func (a *DesktopApp) CheckRuleUpdates() (any, error) {
 	return a.desktopPostJSON("/api/rules/check-updates", map[string]any{}, 30*time.Second)
 }
 
-func (a *DesktopApp) DownloadRulePack(packID, remoteURL string) (any, error) {
+func (a *DesktopApp) DownloadRulePack(packID, remoteURL, checksum string) (any, error) {
 	return a.desktopPostJSON("/api/rules/download", desktopRulePackDownloadRequest{
-		PackID: strings.TrimSpace(packID),
-		URL:    strings.TrimSpace(remoteURL),
+		PackID:   strings.TrimSpace(packID),
+		URL:      strings.TrimSpace(remoteURL),
+		Checksum: strings.TrimSpace(checksum),
 	}, 60*time.Second)
 }
 

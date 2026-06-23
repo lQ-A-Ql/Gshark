@@ -40,13 +40,13 @@ func (s *Server) handleCaptureStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "missing capture file path")
 		return
 	}
-	if strings.Contains(options.FilePath, "..") {
+	if _, err := SafePathUnder("", options.FilePath); err != nil {
 		writeError(w, http.StatusBadRequest, "path traversal not allowed")
 		return
 	}
 	info, err := os.Stat(options.FilePath)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("capture file is not accessible: %v", err))
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("capture file is not accessible: %s", sanitizeErrorMessage(err)))
 		return
 	}
 	if info.IsDir() {

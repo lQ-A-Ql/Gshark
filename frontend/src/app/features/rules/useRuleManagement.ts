@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useBackend } from "../../state/contexts/BackendContext";
 import { backendClients } from "../../integrations/backendClients";
 import type {
@@ -19,19 +19,32 @@ export function useRuleManagement() {
   const [status, setStatus] = useState<RuleStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchStatus = useCallback(async () => {
-    if (!backendConnected) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setStatus(await backendClients.rules.getRuleStatus());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch rule status");
-    } finally {
-      setLoading(false);
-    }
-  }, [backendConnected]);
+  const resetAbortController = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    return abortRef.current;
+  }, []);
+
+  const fetchStatus = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!backendConnected) return;
+      setLoading(true);
+      setError(null);
+      try {
+        setStatus(await backendClients.rules.getRuleStatus(signal));
+      } catch (e) {
+        if (signal?.aborted) return;
+        setError(e instanceof Error ? e.message : "Failed to fetch rule status");
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [backendConnected],
+  );
 
   const togglePack = useCallback(
     async (packId: string, enabled: boolean) => {
@@ -57,9 +70,9 @@ export function useRuleManagement() {
   }, [fetchStatus]);
 
   const downloadPack = useCallback(
-    async (packId: string, url: string): Promise<RulePack | null> => {
+    async (packId: string, url: string, checksum: string): Promise<RulePack | null> => {
       try {
-        const pack = await backendClients.rules.downloadRulePack(packId, url);
+        const pack = await backendClients.rules.downloadRulePack(packId, url, checksum);
         await fetchStatus();
         return pack;
       } catch (e) {
@@ -82,20 +95,22 @@ export function useRuleManagement() {
     [fetchStatus],
   );
 
-  const fetchConflicts = useCallback(async (): Promise<RuleConflict[]> => {
+  const fetchConflicts = useCallback(async (signal?: AbortSignal): Promise<RuleConflict[]> => {
     try {
-      return await backendClients.rules.listRuleConflicts();
+      return await backendClients.rules.listRuleConflicts(signal);
     } catch (e) {
+      if (signal?.aborted) return [];
       setError(e instanceof Error ? e.message : "Failed to fetch conflicts");
       return [];
     }
   }, []);
 
   const validateRules = useCallback(
-    async (content: string): Promise<{ valid: boolean; errors: RuleValidationError[] }> => {
+    async (content: string, signal?: AbortSignal): Promise<{ valid: boolean; errors: RuleValidationError[] }> => {
       try {
-        return await backendClients.rules.validateRuleContent(content);
+        return await backendClients.rules.validateRuleContent(content, signal);
       } catch (e) {
+        if (signal?.aborted) return { valid: false, errors: [] };
         setError(e instanceof Error ? e.message : "Failed to validate rules");
         return { valid: false, errors: [] };
       }
@@ -104,8 +119,12 @@ export function useRuleManagement() {
   );
 
   useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+    const controller = resetAbortController();
+    void fetchStatus(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [fetchStatus, resetAbortController]);
 
   return {
     status,

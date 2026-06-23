@@ -130,6 +130,14 @@ func TestObjectsDownloadCoversSelectionAndPayloadErrors(t *testing.T) {
 	}
 }
 
+func (erroringMediaService) MediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, errors.New("media failed")
+}
+
+func (erroringMediaService) RefreshMediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, errors.New("refresh failed")
+}
+
 type erroringAnalysisService struct{ contractAnalysisService }
 
 func (erroringAnalysisService) GlobalTrafficStatsWithContext(context.Context) (model.GlobalTrafficStats, error) {

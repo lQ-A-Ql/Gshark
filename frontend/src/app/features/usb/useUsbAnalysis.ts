@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { USBAnalysis as USBAnalysisData, USBHIDSourceMode } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 
 export const EMPTY_USB_ANALYSIS: USBAnalysisData = {
   totalUSBPackets: 0,
@@ -84,65 +84,17 @@ export function useUsbAnalysis({
     () => buildUSBAnalysisCacheKey(captureRevision, filePath, totalPackets, hidSource, hidEventLimit),
     [captureRevision, filePath, hidEventLimit, hidSource, totalPackets],
   );
-  const [analysis, setAnalysis] = useState<USBAnalysisData>(EMPTY_USB_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-  const refreshAnalysis = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
-        cancelAnalysisRequest();
-        setLoading(false);
-        setError("");
-        setAnalysis(EMPTY_USB_ANALYSIS);
-        return;
-      }
-      if (!force && cacheKey && usbAnalysisCache.has(cacheKey)) {
-        cancelAnalysisRequest();
-        setAnalysis(readUSBAnalysisCache(cacheKey) ?? EMPTY_USB_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      setLoading(true);
-      setError("");
-      return runAnalysisRequest({
-        request: (signal) =>
-          usbAnalysisCache.request(cacheKey, {
-            force,
-            signal,
-            load: () => backendClients.analysis.getUSBAnalysis(signal, hidSource, hidEventLimit),
-          }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            writeUSBAnalysisCache(cacheKey, payload);
-          }
-          setAnalysis(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "USB 分析加载失败");
-          setAnalysis(EMPTY_USB_ANALYSIS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [
-      backendConnected,
-      cacheKey,
-      cancelAnalysisRequest,
-      filePath,
-      hidEventLimit,
-      hidSource,
-      runAnalysisRequest,
-      totalPackets,
-    ],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
+  const { data: analysis, loading, error, refresh: refreshAnalysis } = useAnalysisResult<USBAnalysisData>({
+    cache: usbAnalysisCache,
+    cacheKey,
+    emptyValue: EMPTY_USB_ANALYSIS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "USB 分析加载失败",
+    fetch: (signal) => backendClients.analysis.getUSBAnalysis(signal, hidSource, hidEventLimit),
+  });
 
   return { analysis, loading, error, refreshAnalysis };
 }

@@ -12,8 +12,11 @@ import {
   createSMB3SessionCandidatesFixture,
   createSMTPAnalysisFixture,
 } from "./MiscTools.mockData";
+import { getMiscToolsMocks } from "./MiscTools.testHarness";
 
-export function resetMiscToolsMocks(mocks: any) {
+type MiscToolsMocks = ReturnType<typeof getMiscToolsMocks>;
+
+export function resetMiscToolsMocks(mocks: MiscToolsMocks) {
   window.localStorage.clear();
   mocks.sentinelState.fileMeta.path = "C:/captures/capture.pcapng";
   mocks.sentinelState.fileMeta.name = "capture.pcapng";

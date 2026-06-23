@@ -8,8 +8,7 @@ import type { ToolRuntimeConfigExplicitFields } from "../state/toolRuntimeStorag
 import { copyTextToClipboard } from "../utils/browserFile";
 import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
 import { normalizeConfig } from "./RuntimeSettingsSidebarParts";
-
-const DEFAULT_MCP_ENDPOINT = "http://127.0.0.1:17891/api/mcp";
+import { buildBackendEndpoint } from "../integrations/backendEndpoint";
 
 export function useRuntimeSettingsSidebarModel() {
   const runtime = useBackend();
@@ -56,7 +55,7 @@ export function useRuntimeSettingsSidebarModel() {
     return runtime.toolRuntimeSnapshot.speech.message || "等待检测";
   }, [runtime.backendConnected, runtime.toolRuntimeSnapshot, speechIssues, unknownMessage]);
   const tokenAvailable = runtime.backendAuthToken.trim().length > 0;
-  const mcpEndpoint = runtime.mcpStatus?.endpoint || DEFAULT_MCP_ENDPOINT;
+  const mcpEndpoint = runtime.mcpStatus?.endpoint || buildBackendEndpoint("/api/mcp");
 
   const save = async () => {
     setBusy(true);
@@ -67,6 +66,29 @@ export function useRuntimeSettingsSidebarModel() {
       setNotice("工具路径已保存并应用。");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "工具路径保存失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allowToolDir = async (
+    field: "ffmpegAllowedDirs" | "pythonAllowedDirs" | "yaraAllowedDirs",
+    dir: string,
+  ) => {
+    const cleanDir = dir.trim();
+    if (!cleanDir) return;
+    const existing = form[field] ?? [];
+    if (existing.some((item) => item.toLowerCase() === cleanDir.toLowerCase())) return;
+    const nextForm = { ...form, [field]: [...existing, cleanDir] };
+    setForm(nextForm);
+    setBusy(true);
+    setNotice("");
+    try {
+      const snapshot = await runtime.saveToolRuntimeConfig(nextForm, { [field]: true });
+      setForm(normalizeConfig(snapshot.config));
+      setNotice("工具目录已加入白名单。");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "工具目录加白失败。");
     } finally {
       setBusy(false);
     }
@@ -154,6 +176,11 @@ export function useRuntimeSettingsSidebarModel() {
 
   return {
     ...runtime,
+    tsharkDirControls: {
+      allowTSharkDir: runtime.allowTSharkDir,
+      removeTSharkAllowedDir: runtime.removeTSharkAllowedDir,
+      refreshTSharkAllowedDirs: runtime.refreshTSharkAllowedDirs,
+    },
     busy,
     dirty,
     form,
@@ -162,6 +189,7 @@ export function useRuntimeSettingsSidebarModel() {
     notice,
     probeTransportError: runtime.toolRuntimeSnapshot?.transportError ?? "",
     setForm,
+    allowToolDir,
     speechIssues,
     speechSummary,
     authToken: runtime.backendAuthToken,

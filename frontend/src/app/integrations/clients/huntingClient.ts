@@ -16,7 +16,7 @@ export interface HuntingRuntimeConfig {
 export interface HuntingClient {
   listThreatHits(prefixes?: string[], signal?: AbortSignal): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(signal?: AbortSignal): Promise<HuntingRuntimeConfig>;
-  updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
+  updateHuntingRuntimeConfig(config: HuntingRuntimeConfig, signal?: AbortSignal): Promise<HuntingRuntimeConfig>;
 }
 
 export function asHuntingRuntimeConfig(input: unknown): HuntingRuntimeConfig {
@@ -47,9 +47,10 @@ export function createHuntingClient(request: JsonRequest): HuntingClient {
       return asHuntingRuntimeConfig(payload);
     },
 
-    async updateHuntingRuntimeConfig(config: HuntingRuntimeConfig) {
+    async updateHuntingRuntimeConfig(config: HuntingRuntimeConfig, signal?: AbortSignal) {
       const payload = await request<HuntingRuntimeConfigWireDTO>("/api/hunting/config", {
         method: "POST",
+        signal,
         body: JSON.stringify({
           prefixes: config.prefixes,
           yara_enabled: config.yaraEnabled,

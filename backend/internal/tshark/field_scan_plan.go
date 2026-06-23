@@ -187,11 +187,11 @@ func (scan PlannedFieldScan) ProjectRow(parts []string) []string {
 // it runs tshark with the caller's args, then projects every raw row through
 // plan before invoking onRow. Used by streaming callers that want planner-
 // driven graceful degradation without the shared cache path.
-func runDirectFieldScanWithPlan(args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
+func runDirectFieldScanWithPlan(ctx context.Context, args []string, plan fieldScanCapabilityPlan, onRow func([]string)) error {
 	if len(plan.tsharkFields) == 0 {
 		return nil
 	}
-	return runDirectFieldScan(args, len(plan.tsharkFields), func(parts []string) {
+	return runDirectFieldScan(ctx, args, len(plan.tsharkFields), func(parts []string) {
 		row := projectCapabilityFieldScanRow(parts, plan)
 		if onRow != nil {
 			onRow(row)

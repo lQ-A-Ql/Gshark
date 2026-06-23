@@ -456,9 +456,12 @@ func extractBundledBackendFromAssets(filename string) (string, error) {
 	target := filepath.Join(targetDir, filename)
 	fmt.Fprintf(os.Stdout, "desktop startup: extracting bundled backend asset path=%q target=%q\n", embeddedPath, target)
 	if st, statErr := os.Stat(target); statErr == nil && !st.IsDir() {
-		fmt.Fprintf(os.Stdout, "desktop startup: reusing extracted bundled backend %q\n", target)
-		_ = extractOptionalBundledRules(targetDir)
-		return target, nil
+		if extractedBackendMatches(target, digest) {
+			fmt.Fprintf(os.Stdout, "desktop startup: reusing verified extracted bundled backend %q\n", target)
+			_ = extractOptionalBundledRules(targetDir)
+			return target, nil
+		}
+		fmt.Fprintf(os.Stdout, "desktop startup: replacing stale extracted bundled backend %q\n", target)
 	}
 
 	tempFile, err := os.CreateTemp(targetDir, filename+".*.tmp")
@@ -491,6 +494,15 @@ func extractBundledBackendFromAssets(filename string) (string, error) {
 		fmt.Fprintf(os.Stderr, "desktop startup: optional bundled rules extraction failed target=%q err=%v\n", targetDir, err)
 	}
 	return target, nil
+}
+
+func extractedBackendMatches(path string, expected [32]byte) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	actual := sha256.Sum256(data)
+	return actual == expected
 }
 
 func extractOptionalBundledRules(targetDir string) error {

@@ -35,7 +35,7 @@ describe("createBridge", () => {
     const bridge = createBridge({
       getDesktopAppBinding: () => undefined,
     });
-    expect((bridge as any).id).toBe("http");
+    expect((bridge as unknown as { id: string }).id).toBe("http");
     expect(mocks.createDesktopBridge).not.toHaveBeenCalled();
   });
 
@@ -47,8 +47,8 @@ describe("createBridge", () => {
     const bridge = createBridge({
       getDesktopAppBinding: () => binding,
     });
-    expect((bridge as any).id).toBe("desktop");
-    expect((bridge as any).fallbackBridge.id).toBe("http");
+    expect((bridge as unknown as { id: string }).id).toBe("desktop");
+    expect((bridge as unknown as { fallbackBridge: { id: string } }).fallbackBridge.id).toBe("http");
   });
 
   it("passes the report/evidence-capable http bridge into desktop composition", async () => {
@@ -60,7 +60,7 @@ describe("createBridge", () => {
     const bridge = createBridge({
       getDesktopAppBinding: () => binding,
     });
-    void (bridge as any).id;
+    void (bridge as unknown as { id: string }).id;
 
     expect(mocks.createDesktopBridge).toHaveBeenCalledTimes(1);
     const args = mocks.createDesktopBridge.mock.calls[0]?.[0] as {
@@ -68,9 +68,9 @@ describe("createBridge", () => {
       desktopApp: DesktopTransportBinding;
     };
     expect(args.desktopApp).toBe(binding);
-    expect(typeof (args.fallbackBridge as any).getEvidenceWithFilter).toBe("function");
-    expect(typeof (args.fallbackBridge as any).listObjects).toBe("function");
-    expect(typeof (args.fallbackBridge as any).listThreatHits).toBe("function");
+    expect(typeof (args.fallbackBridge as unknown as { getEvidenceWithFilter: unknown }).getEvidenceWithFilter).toBe("function");
+    expect(typeof (args.fallbackBridge as unknown as { listObjects: unknown }).listObjects).toBe("function");
+    expect(typeof (args.fallbackBridge as unknown as { listThreatHits: unknown }).listThreatHits).toBe("function");
   });
 
   it("resolves a Wails binding that appears after bridge creation", async () => {
@@ -80,10 +80,10 @@ describe("createBridge", () => {
       getDesktopAppBinding: () => bindingState.binding,
     });
 
-    expect((bridge as any).id).toBe("http");
+    expect((bridge as unknown as { id: string }).id).toBe("http");
     bindingState.binding = { BackendStatus: vi.fn(async () => "running") };
 
-    expect((bridge as any).id).toBe("desktop");
+    expect((bridge as unknown as { id: string }).id).toBe("desktop");
     expect(mocks.createDesktopBridge).toHaveBeenCalledTimes(1);
   });
 });

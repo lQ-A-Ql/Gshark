@@ -39,6 +39,9 @@ interface UseSentinelDomainValuesOptions {
   readonly toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
   readonly lastToolRuntimeProbeError: string;
   readonly setTSharkPath: (path: string) => Promise<void>;
+  readonly allowTSharkDir: (dir: string) => Promise<TSharkStatus>;
+  readonly removeTSharkAllowedDir: (dir: string) => Promise<TSharkStatus>;
+  readonly refreshTSharkAllowedDirs: () => Promise<string[]>;
   readonly toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   readonly isToolRuntimeLoading: boolean;
   readonly refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;
@@ -131,6 +134,9 @@ export function useSentinelDomainValues({
   toolRuntimeProbeTransport,
   lastToolRuntimeProbeError,
   setTSharkPath,
+  allowTSharkDir,
+  removeTSharkAllowedDir,
+  refreshTSharkAllowedDirs,
   toolRuntimeSnapshot,
   isToolRuntimeLoading,
   refreshToolRuntimeSnapshot,
@@ -203,6 +209,9 @@ export function useSentinelDomainValues({
       toolRuntimeProbeTransport,
       lastToolRuntimeProbeError,
       setTSharkPath,
+      allowTSharkDir,
+      removeTSharkAllowedDir,
+      refreshTSharkAllowedDirs,
       toolRuntimeSnapshot,
       isToolRuntimeLoading,
       refreshToolRuntimeSnapshot,
@@ -225,6 +234,9 @@ export function useSentinelDomainValues({
       toolRuntimeProbeTransport,
       lastToolRuntimeProbeError,
       setTSharkPath,
+      allowTSharkDir,
+      removeTSharkAllowedDir,
+      refreshTSharkAllowedDirs,
       toolRuntimeSnapshot,
       isToolRuntimeLoading,
       refreshToolRuntimeSnapshot,

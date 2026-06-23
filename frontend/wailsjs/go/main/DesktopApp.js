@@ -38,8 +38,8 @@ export function DownloadObjectsZip(ids) {
   return window['go']['main']['DesktopApp']['DownloadObjectsZip'](ids);
 }
 
-export function DownloadRulePack(packID, remoteURL) {
-  return window['go']['main']['DesktopApp']['DownloadRulePack'](packID, remoteURL);
+export function DownloadRulePack(packID, remoteURL, checksum) {
+  return window['go']['main']['DesktopApp']['DownloadRulePack'](packID, remoteURL, checksum);
 }
 
 export function ExecuteSavedSearch(id) {

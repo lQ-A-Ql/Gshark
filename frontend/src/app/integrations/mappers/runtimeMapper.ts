@@ -1,7 +1,8 @@
 import type { ToolRuntimeSnapshot } from "../../core/types";
 import type { ToolRuntimeConfigWireDTO, ToolRuntimeSnapshotWireDTO } from "../wire/runtimeWireDtos";
 import { asPlainObject } from "./mapperPrimitives";
-import { asFFmpegStatus, asRuntimeConfig, asSpeechStatus, asYaraStatus } from "./runtimeComponentMapper";
+import { asRuntimeConfig } from "./runtimeConfigMapper";
+import { asFFmpegStatus, asSpeechStatus, asYaraStatus } from "./runtimeComponentMapper";
 import { asNumberRecord, asStringRecord } from "./runtimeDiagnosticsMapper";
 import { asTSharkStatus } from "./tsharkStatusMapper";
 export { asSpeechBatchTaskStatus } from "./speechBatchMapper";

@@ -80,7 +80,7 @@ def ensure_release_inputs() -> None:
 
 def run_release_smoke_check(exe_path: Path) -> None:
     env = os.environ.copy()
-    env["GSHARK_RELEASE_SMOKE_CHECK"] = "1"
+    env["MEOW_TRAFFIC_RELEASE_SMOKE_CHECK"] = "1"
     completed = subprocess.run(
         [str(exe_path)],
         cwd=str(exe_path.parent),

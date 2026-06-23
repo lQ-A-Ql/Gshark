@@ -35,7 +35,8 @@ func TestImportZipBytesAndInvokeJavaScriptModule(t *testing.T) {
 }`,
 		"ioc-demo/api.json": `{
   "method": "POST",
-  "entry": "backend.js"
+  "entry": "backend.js",
+  "permissions": ["exec.local", "capture.read", "host.scan"]
 }`,
 		"ioc-demo/form.json": `{
   "description": "schema module",
@@ -108,7 +109,7 @@ func TestInvokeJavaScriptModuleCanUseScanFieldsHostAPI(t *testing.T) {
 	}
 	payload := createModuleZip(t, map[string]string{
 		"scan-demo/manifest.json": `{"id":"scan-demo","title":"Scan Demo","summary":"scan demo","backend":"backend.js"}`,
-		"scan-demo/api.json":      `{"method":"POST","entry":"backend.js"}`,
+		"scan-demo/api.json":      `{"method":"POST","entry":"backend.js","permissions":["exec.local","host.scan","capture.read"]}`,
 		"scan-demo/form.json":     `{"fields":[{"name":"keyword","label":"Keyword","type":"text"}]}`,
 		"scan-demo/backend.js": `export function onRequest(input, ctx) {
   const result = ctx.scanFields(["frame.number", "ip.src"], "tcp");
@@ -136,6 +137,94 @@ func TestInvokeJavaScriptModuleCanUseScanFieldsHostAPI(t *testing.T) {
 	}
 }
 
+func TestImportZipRejectsUnsupportedMiscPermission(t *testing.T) {
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	files := minimalModuleFiles("bad-permission")
+	files["bad-permission/manifest.json"] = `{"id":"bad-permission","title":"Bad Permission","summary":"bad","permissions":["process.env"]}`
+	_, err := manager.ImportZipBytes(createModuleZip(t, files))
+	if err == nil || !strings.Contains(err.Error(), "unsupported misc module permission") {
+		t.Fatalf("expected unsupported permission error, got %v", err)
+	}
+}
+
+func TestImportZipDefaultsMissingMiscPermissions(t *testing.T) {
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	result, err := manager.ImportZipBytes(createModuleZip(t, minimalModuleFiles("default-permission")))
+	if err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+	got := result.Module.InterfaceSchema
+	if got == nil || len(got.Permissions) != 1 || got.Permissions[0] != "exec.local" {
+		t.Fatalf("expected default exec.local permission, got %+v", got)
+	}
+}
+
+func TestInvokeJavaScriptModuleRequiresHostScanPermission(t *testing.T) {
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	payload := createModuleZip(t, map[string]string{
+		"scan-denied/manifest.json": `{"id":"scan-denied","title":"Scan Denied","summary":"scan denied","backend":"backend.js"}`,
+		"scan-denied/api.json":      `{"method":"POST","entry":"backend.js","permissions":["exec.local"]}`,
+		"scan-denied/form.json":     `{"fields":[{"name":"keyword","label":"Keyword","type":"text"}]}`,
+		"scan-denied/backend.js": `export function onRequest(input, ctx) {
+  ctx.scanFields(["frame.number"], "tcp");
+  return { text: "unexpected" };
+}`,
+	})
+	if _, err := manager.ImportZipBytes(payload); err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+	_, err := manager.Invoke(context.Background(), "scan-denied", model.MiscModuleRunRequest{}, InvokeContext{
+		CapturePath: "demo.pcapng",
+		ScanFields: func(filePath string, fields []string, displayFilter string) ([]map[string]string, error) {
+			t.Fatal("scan fields should not be called without host.scan")
+			return nil, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "host.scan") {
+		t.Fatalf("expected host.scan permission error, got %v", err)
+	}
+}
+
+func TestInvokeJavaScriptModuleHidesCapturePathWithoutPermission(t *testing.T) {
+	manager := NewManager()
+	baseDir := filepath.Join(t.TempDir(), "misc")
+	if err := manager.LoadFromDir(baseDir); err != nil {
+		t.Fatalf("LoadFromDir() error = %v", err)
+	}
+	payload := createModuleZip(t, map[string]string{
+		"capture-hidden/manifest.json": `{"id":"capture-hidden","title":"Capture Hidden","summary":"capture hidden","backend":"backend.js"}`,
+		"capture-hidden/api.json":      `{"method":"POST","entry":"backend.js","permissions":["exec.local"]}`,
+		"capture-hidden/form.json":     `{"fields":[{"name":"keyword","label":"Keyword","type":"text"}]}`,
+		"capture-hidden/backend.js": `export function onRequest(input, ctx) {
+  return { text: String(input.capture_path || "") + "|" + String(ctx.capturePath || "") };
+}`,
+	})
+	if _, err := manager.ImportZipBytes(payload); err != nil {
+		t.Fatalf("ImportZipBytes() error = %v", err)
+	}
+	result, err := manager.Invoke(context.Background(), "capture-hidden", model.MiscModuleRunRequest{}, InvokeContext{
+		CapturePath: "secret.pcapng",
+	})
+	if err != nil {
+		t.Fatalf("Invoke() error = %v", err)
+	}
+	if result.Text != "|" {
+		t.Fatalf("capture path should be hidden without capture.read, got %+v", result)
+	}
+}
+
 func TestInvokeJavaScriptModuleCancelsContextAwareScanFields(t *testing.T) {
 	oldTimeout := miscModuleExecutionTimeout
 	miscModuleExecutionTimeout = 20 * time.Millisecond
@@ -148,7 +237,7 @@ func TestInvokeJavaScriptModuleCancelsContextAwareScanFields(t *testing.T) {
 	}
 	payload := createModuleZip(t, map[string]string{
 		"scan-timeout/manifest.json": `{"id":"scan-timeout","title":"Scan Timeout","summary":"scan timeout","backend":"backend.js"}`,
-		"scan-timeout/api.json":      `{"method":"POST","entry":"backend.js"}`,
+		"scan-timeout/api.json":      `{"method":"POST","entry":"backend.js","permissions":["exec.local","host.scan","capture.read"]}`,
 		"scan-timeout/form.json":     `{"fields":[{"name":"keyword","label":"Keyword","type":"text"}]}`,
 		"scan-timeout/backend.js": `export function onRequest(input, ctx) {
   ctx.scanFields(["frame.number"], "tcp");
@@ -303,7 +392,7 @@ func TestInvokePythonModuleCanUseHostBridge(t *testing.T) {
 	}
 	payload := createModuleZip(t, map[string]string{
 		"py-bridge/manifest.json": `{"id":"py-bridge","title":"Python Bridge","summary":"python host bridge","backend":"backend.py"}`,
-		"py-bridge/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true}`,
+		"py-bridge/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true,"permissions":["exec.local","host.scan","capture.read"]}`,
 		"py-bridge/form.json":     `{"fields":[{"name":"message","label":"Message","type":"text"}]}`,
 		"py-bridge/backend.py": `from MEOW_TRAFFIC_misc_host import run, scan_fields
 
@@ -370,7 +459,7 @@ func TestInvokePythonHostBridgeUsesContextAwareScanFields(t *testing.T) {
 	}
 	payload := createModuleZip(t, map[string]string{
 		"py-context-scan/manifest.json": `{"id":"py-context-scan","title":"Python Context Scan","summary":"python context scan","backend":"backend.py"}`,
-		"py-context-scan/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true}`,
+		"py-context-scan/api.json":      `{"method":"POST","entry":"backend.py","host_bridge":true,"permissions":["exec.local","host.scan","capture.read"]}`,
 		"py-context-scan/form.json":     `{"fields":[{"name":"message","label":"Message","type":"text"}]}`,
 		"py-context-scan/backend.py": `from MEOW_TRAFFIC_misc_host import run, scan_fields
 
@@ -430,6 +519,7 @@ func TestPythonHostBridgeRejectsUnknownMethod(t *testing.T) {
 		"params": map[string]any{},
 	}, InvokeContext{
 		CapturePath: "demo.pcapng",
+		Permissions: []string{"host.scan"},
 		ScanFieldsWithContext: func(ctx context.Context, filePath string, fields []string, displayFilter string) ([]map[string]string, error) {
 			called = true
 			return nil, nil
@@ -557,4 +647,9 @@ func writeFile(t *testing.T, path string, payload any) {
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatalf("WriteFile(%q) error = %v", path, err)
 	}
+}
+
+func TestMain(m *testing.M) {
+	_ = os.Setenv("MEOW_TRAFFIC_ALLOW_UNSIGNED_MISC", "1")
+	os.Exit(m.Run())
 }

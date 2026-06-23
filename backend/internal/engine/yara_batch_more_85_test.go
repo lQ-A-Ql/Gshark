@@ -16,7 +16,7 @@ func TestBatchScanObjectsWithYaraConfigCoversWrappersAndFallbackMeta(t *testing.
 	t.Cleanup(func() { runYaraCommand = oldRun })
 
 	dir := t.TempDir()
-	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	fakeExe := filepath.Join(dir, "yara.exe")
 	ruleFile := filepath.Join(dir, "rules.yarc")
 	objectPath := filepath.Join(dir, "payload.bin")
 	for _, item := range []string{fakeExe, ruleFile, objectPath} {
@@ -70,7 +70,7 @@ func TestBatchScanTargetsWithYaraConfigBoundaryBranches(t *testing.T) {
 	if err := os.WriteFile(targetPath, []byte("payload"), 0o644); err != nil {
 		t.Fatalf("write target: %v", err)
 	}
-	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	fakeExe := filepath.Join(dir, "yara.exe")
 	ruleFile := filepath.Join(dir, "rule.yarc")
 	for _, item := range []string{fakeExe, ruleFile} {
 		if err := os.WriteFile(item, []byte("ok"), 0o755); err != nil {

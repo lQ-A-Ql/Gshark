@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import type { DecryptionConfig } from "../../core/types";
+import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
 import { useBackendLifecycleControls } from "./useBackendLifecycleControls";
 
 const bridgeMocks = vi.hoisted(() => ({
@@ -16,6 +17,9 @@ vi.mock("../../integrations/backendClients", () => ({
 
 function renderControls(backendConnected: boolean) {
   const setTSharkPathImpl = vi.fn().mockResolvedValue(undefined);
+  const allowTSharkDirImpl = vi.fn().mockResolvedValue({ available: true, path: "tshark.exe", message: "ok", usingCustomPath: false } as TSharkStatus);
+  const removeTSharkAllowedDirImpl = vi.fn().mockResolvedValue({ available: true, path: "tshark.exe", message: "ok", usingCustomPath: false } as TSharkStatus);
+  const refreshTSharkAllowedDirsImpl = vi.fn().mockResolvedValue([]);
   const refreshToolRuntimeSnapshotImpl = vi.fn().mockResolvedValue(null);
   const saveToolRuntimeConfigImpl = vi.fn().mockResolvedValue({});
   const result = renderHook(() => {
@@ -30,12 +34,15 @@ function renderControls(backendConnected: boolean) {
       setBackendStatus,
       setDecryptionConfig,
       setTSharkPathImpl,
+      allowTSharkDirImpl,
+      removeTSharkAllowedDirImpl,
+      refreshTSharkAllowedDirsImpl,
       refreshToolRuntimeSnapshotImpl,
       saveToolRuntimeConfigImpl,
     });
     return { ...controls, backendStatus, decryptionConfig };
   });
-  return { ...result, refreshToolRuntimeSnapshotImpl, saveToolRuntimeConfigImpl, setTSharkPathImpl };
+  return { ...result, refreshToolRuntimeSnapshotImpl, saveToolRuntimeConfigImpl, setTSharkPathImpl, allowTSharkDirImpl, removeTSharkAllowedDirImpl, refreshTSharkAllowedDirsImpl };
 }
 
 describe("useBackendLifecycleControls", () => {

@@ -21,6 +21,12 @@ var registeredAPIRouteContractCases = map[string]string{
 	"/health":                                     "TestHandlerRegistersCoreReadRoutes",
 	"/api/runtime/identity":                       "TestHandlerRegistersCoreReadRoutes",
 	"/api/tools/tshark":                           "TestToolRuntimeConfigContract",
+	"/api/tools/tshark/allow-dir":                 "TestToolRuntimeConfigContract",
+	"/api/tools/tshark/allowed-dirs":              "TestToolRuntimeAllowedDirsContract",
+	"/api/tools/tshark/allowed-dirs/remove":       "TestToolRuntimeAllowedDirsContract",
+	"/api/tools/allow-dir":                        "TestHandleGenericToolAllowedDirs",
+	"/api/tools/allowed-dirs":                     "TestHandleGenericToolAllowedDirs",
+	"/api/tools/allowed-dirs/remove":              "TestHandleGenericToolAllowedDirs",
 	"/api/tools/runtime-config":                   "TestToolRuntimeConfigContract",
 	"/api/mcp/config":                             "TestMCPConfigContract",
 	"/api/mcp":                                    "TestMCPRouteContractInitializeAndTools",
@@ -417,7 +423,7 @@ func TestRulesAPIContract(t *testing.T) {
 	requireStatus(t, rec, http.StatusBadRequest)
 
 	rec = httptest.NewRecorder()
-	server.handleRulesDownload(rec, httptest.NewRequest(http.MethodPost, "/api/rules/download", strings.NewReader(`{"pack_id":"remote-demo","url":"`+ruleHTTP.URL+`/demo.yar"}`)))
+	server.handleRulesDownload(rec, httptest.NewRequest(http.MethodPost, "/api/rules/download", strings.NewReader(`{"pack_id":"remote-demo","url":"`+ruleHTTP.URL+`/demo.yar","checksum":"d5cb5c5c948df18955d8ce2d4400d6fed6e3e5eca5be504f9e5ef04bc62fd125"}`)))
 	requireStatus(t, rec, http.StatusOK)
 	requireJSONKeys(t, decodeJSONMap(t, rec), "id", "name", "source", "version", "enabled", "rule_count", "checksum", "updated_at")
 
@@ -659,6 +665,14 @@ func (s *apiContractMediaService) MediaAnalysis() (model.MediaAnalysis, error) {
 		Sessions:          []model.MediaSession{{ID: "media-1", MediaType: "audio"}},
 		Notes:             []string{"contract"},
 	}, nil
+}
+
+func (s *apiContractMediaService) MediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
+	return s.MediaAnalysis()
+}
+
+func (s *apiContractMediaService) RefreshMediaAnalysisWithContext(ctx context.Context) (model.MediaAnalysis, error) {
+	return s.MediaAnalysisWithContext(ctx)
 }
 
 func (s *apiContractMediaService) MediaArtifact(token string) (string, string, error) {

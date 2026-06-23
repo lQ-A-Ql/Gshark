@@ -44,8 +44,10 @@ var (
 )
 
 type SpeechStatusOptions struct {
-	Fast            bool
-	FFmpegAvailable *bool
+	Fast                  bool
+	FFmpegAvailable       *bool
+	PythonPathWarning     string
+	PythonExtraAllowedDir string
 }
 
 type speechPythonCacheEntry struct {
@@ -82,7 +84,9 @@ const speechEnhancementFilter = "highpass=f=120,lowpass=f=3800,acompressor=thres
 
 func (s *Service) SpeechToTextStatus() model.SpeechToTextStatus {
 	status := speechToTextStatusFn()
-	status.FFmpegAvailable = s.ffmpegStatus().Available
+	ffmpeg := s.ffmpegStatus()
+	status.FFmpegAvailable = ffmpeg.Available
+	status.PythonPathWarning, status.PythonExtraAllowedDir = s.pythonRuntimeWarnings()
 	if !status.FFmpegAvailable && strings.TrimSpace(status.Message) == "" {
 		status.Message = "未检测到 ffmpeg，请先安装 ffmpeg 或在设置中配置其路径。"
 	}
@@ -91,6 +95,9 @@ func (s *Service) SpeechToTextStatus() model.SpeechToTextStatus {
 }
 
 func (s *Service) SpeechToTextStatusWithContext(ctx context.Context, opts SpeechStatusOptions) model.SpeechToTextStatus {
+	if opts.PythonPathWarning == "" && opts.PythonExtraAllowedDir == "" {
+		opts.PythonPathWarning, opts.PythonExtraAllowedDir = s.pythonRuntimeWarnings()
+	}
 	status := resolveSpeechToTextStatusWithContext(ctx, opts)
 	if opts.FFmpegAvailable != nil {
 		status.FFmpegAvailable = *opts.FFmpegAvailable
@@ -479,9 +486,11 @@ func resolveSpeechToTextStatusWithResolver(
 		ctx = context.Background()
 	}
 	status := model.SpeechToTextStatus{
-		Engine:    speechEngineName,
-		Language:  speechLanguageCode,
-		ModelPath: defaultSpeechModelPath(),
+		Engine:                speechEngineName,
+		Language:              speechLanguageCode,
+		ModelPath:             defaultSpeechModelPath(),
+		PythonPathWarning:     opts.PythonPathWarning,
+		PythonExtraAllowedDir: opts.PythonExtraAllowedDir,
 	}
 
 	pythonCmd, err := resolvePython(ctx, !opts.Fast)

@@ -46,6 +46,8 @@ export interface SpeechToTextStatus {
   language: string;
   pythonAvailable: boolean;
   pythonCommand?: string;
+  pythonPathWarning?: string;
+  pythonExtraAllowedDir?: string;
   ffmpegAvailable: boolean;
   voskAvailable: boolean;
   modelAvailable: boolean;

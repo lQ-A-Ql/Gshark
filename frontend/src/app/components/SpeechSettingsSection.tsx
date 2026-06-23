@@ -1,10 +1,11 @@
-import { Bot, FolderCog, MicVocal } from "lucide-react";
+import { Bot } from "lucide-react";
 
-import { RuntimeDependencyCard } from "./RuntimeDependencyCard";
 import { pythonPathHint, voskModelPathHint } from "./RuntimeSettingsHints";
+import { RuntimeToolPathAllowWarning } from "./RuntimeToolPathAllowWarning";
+import { SpeechDependencyDetails } from "./SpeechDependencyDetails";
 import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
 import { Field, StatusLine } from "./RuntimeSettingsSidebarParts";
-import type { SpeechSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
+import type { SpeechSettingsSectionProps } from "./SpeechSettingsSectionProps";
 
 export function SpeechSettingsSection({
   form,
@@ -13,6 +14,7 @@ export function SpeechSettingsSection({
   speechSummary,
   setForm,
   unknownStateText,
+  allowToolDir,
 }: SpeechSettingsSectionProps) {
   return (
     <RuntimeSettingsSectionShell>
@@ -44,34 +46,14 @@ export function SpeechSettingsSection({
         path={snapshot?.speech.pythonCommand || snapshot?.speech.modelPath}
         preferMessageWhenUnavailable
       />
-      {speechIssues.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {speechIssues.map((issue) => (
-            <span
-              key={issue}
-              className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700"
-            >
-              缺少：{issue}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        <RuntimeDependencyCard
-          label="Python"
-          Icon={FolderCog}
-          available={snapshot?.speech.pythonAvailable ?? false}
-          known={Boolean(snapshot)}
-          value={snapshot?.speech.pythonCommand || "等待检测"}
-        />
-        <RuntimeDependencyCard
-          label="Vosk 模型"
-          Icon={MicVocal}
-          available={snapshot?.speech.modelAvailable ?? false}
-          known={Boolean(snapshot)}
-          value={snapshot?.speech.modelPath || form.voskModelPath || "等待检测"}
-        />
-      </div>
+      <RuntimeToolPathAllowWarning
+        field="pythonAllowedDirs"
+        path={snapshot?.speech.pythonCommand}
+        customPath={form.pythonPath}
+        pathWarning={snapshot?.speech.pythonPathWarning}
+        allowToolDir={allowToolDir}
+      />
+      <SpeechDependencyDetails form={form} snapshot={snapshot} speechIssues={speechIssues} />
     </RuntimeSettingsSectionShell>
   );
 }

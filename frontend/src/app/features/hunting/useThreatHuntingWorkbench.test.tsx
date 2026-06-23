@@ -60,9 +60,76 @@ describe("useThreatHuntingWorkbench", () => {
       await result.current.runHunt(["owasp"]);
     });
 
-    expect(client.listThreatHits).toHaveBeenCalledWith(["owasp"]);
+    expect(client.listThreatHits).toHaveBeenCalledWith(["owasp"], expect.any(AbortSignal));
     expect(result.current.selectedHit).toBe(2);
     expect(result.current.statusText).toBe("狩猎完成: 1 条命中");
+  });
+
+  it("ignores stale hunting responses and keeps the latest result selected", async () => {
+    const client = createClient();
+    let resolveFirst: (hits: ThreatHit[]) => void = () => undefined;
+    let resolveSecond: (hits: ThreatHit[]) => void = () => undefined;
+    client.listThreatHits
+      .mockImplementationOnce(
+        () =>
+          new Promise<ThreatHit[]>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<ThreatHit[]>((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+    const { result } = renderHook(() =>
+      useThreatHuntingWorkbench({ backendConnected: true, threatHits: seedHits, huntingClient: client }),
+    );
+    await waitFor(() => expect(client.getHuntingRuntimeConfig).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      void result.current.runHunt(["old"]);
+    });
+    await act(async () => {
+      void result.current.runHunt(["new"]);
+    });
+
+    await act(async () => {
+      resolveSecond([{ ...seedHit, id: 3, packetId: 30, category: "Anomaly" }]);
+    });
+    expect(result.current.selectedHit).toBe(3);
+
+    await act(async () => {
+      resolveFirst([{ ...seedHit, id: 2, packetId: 20, category: "OWASP" }]);
+    });
+    expect(result.current.selectedHit).toBe(3);
+    expect(result.current.statusText).toBe("狩猎完成: 1 条命中");
+  });
+
+  it("aborts stale hunting requests when a newer hunt starts", async () => {
+    const client = createClient();
+    let firstSignal: AbortSignal | undefined;
+    client.listThreatHits
+      .mockImplementationOnce(
+        (_prefixes?: string[], signal?: AbortSignal) =>
+          new Promise<ThreatHit[]>(() => {
+            firstSignal = signal;
+          }),
+      )
+      .mockResolvedValueOnce([{ ...seedHit, id: 4, packetId: 40, category: "Anomaly" }]);
+    const { result } = renderHook(() =>
+      useThreatHuntingWorkbench({ backendConnected: true, threatHits: seedHits, huntingClient: client }),
+    );
+    await waitFor(() => expect(client.getHuntingRuntimeConfig).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      void result.current.runHunt(["old"]);
+    });
+    expect(firstSignal?.aborted).toBe(false);
+    await act(async () => {
+      void result.current.runHunt(["new"]);
+    });
+    expect(firstSignal?.aborted).toBe(true);
   });
 
   it("saves config before rerunning hunting", async () => {
@@ -84,13 +151,16 @@ describe("useThreatHuntingWorkbench", () => {
       await result.current.applyConfigAndRun();
     });
 
-    expect(client.updateHuntingRuntimeConfig).toHaveBeenCalledWith({
-      prefixes: ["flag{"],
-      yaraEnabled: false,
-      yaraBin: "custom-yara.exe",
-      yaraRules: "updated",
-      yaraTimeoutMs: 5000,
-    });
-    expect(client.listThreatHits).toHaveBeenCalledWith(["flag{"]);
+    expect(client.updateHuntingRuntimeConfig).toHaveBeenCalledWith(
+      {
+        prefixes: ["flag{"],
+        yaraEnabled: false,
+        yaraBin: "custom-yara.exe",
+        yaraRules: "updated",
+        yaraTimeoutMs: 5000,
+      },
+      expect.any(AbortSignal),
+    );
+    expect(client.listThreatHits).toHaveBeenCalledWith(["flag{"], expect.any(AbortSignal));
   });
 });

@@ -39,7 +39,9 @@ github.com/itchyny/gojq v0.12.13/go.mod h1:JzwzAqenfhrPUuwbmEz3nu3JQmFLlQTQMUcOd
 github.com/itchyny/timefmt-go v0.1.5/go.mod h1:nEP7L+2YmAbT2kZ2HfSs1d8Xtw9LY8D2stDBckWakZ8=
 github.com/jackmordaunt/icns v1.0.0/go.mod h1:7TTQVEuGzVVfOPPlLNHJIkzA6CoV7aH1Dv9dW351oOo=
 github.com/jaypipes/ghw v0.13.0/go.mod h1:In8SsaDqlb1oTyrbmTC14uy+fbBMvp+xdqX51MidlD8=
+github.com/jaypipes/ghw v0.21.3/go.mod h1:GPrvwbtPoxYUenr74+nAnWbardIZq600vJDD5HnPsPE=
 github.com/jaypipes/pcidb v1.0.1/go.mod h1:6xYUz/yYEyOkIkUt2t2J2folIuZ4Yg6uByCGFXMCeE4=
+github.com/jaypipes/pcidb v1.1.1/go.mod h1:x27LT2krrUgjf875KxQXKB0Ha/YXLdZRVmw6hH0G7g8=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
 github.com/kevinburke/ssh_config v1.2.0/go.mod h1:CT57kijsi8u/K/BOFA39wgDQJ9CxiF4nAY/ojJ6r6mM=
 github.com/kr/pretty v0.3.0/go.mod h1:640gp4NfQd8pI5XOwp5fnNeVWj67G7CFk/SaSQn7NBk=
@@ -71,6 +73,7 @@ github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
 github.com/yuin/goldmark v1.7.4/go.mod h1:uzxRWxtg69N339t3louHJ7+O03ezfj6PlliRlaOzY1E=
 github.com/yuin/goldmark-emoji v1.0.3/go.mod h1:tTkZEbwu5wkPmgTcitqddVxY9osFZiavD+r4AzQrh1U=
+github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546/go.mod h1:j/pmGrbnkbPtQfxEe5D0VQhZC6qKbfKifgD0oM7sR70=
 golang.org/x/image v0.12.0/go.mod h1:Lu90jvHG7GfemOIcldsh9A2hS01ocl6oNO7ype5mEnk=
 golang.org/x/mod v0.23.0/go.mod h1:6SkKJ3Xj0I0BrPOZoBy3bdMptDDU9oJrpohJ3eWZ1fY=
@@ -82,4 +85,5 @@ golang.org/x/tools v0.30.0/go.mod h1:c347cR/OJfw5TI+GfX7RUPNMdDRRbjvYTS0jPyvsVtY
 gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/warnings.v0 v0.1.2/go.mod h1:jksf8JmL6Qr/oQM2OXTHunEvvTAsrWBLb6OOjuVWRNI=
 howett.net/plist v1.0.0/go.mod h1:lqaXoTrLY4hg8tnEzNru53gicrbv7rrk+2xJA/7hw9g=
+howett.net/plist v1.0.2-0.20250314012144-ee69052608d9/go.mod h1:fyFX5Hj5tP1Mpk8obqA9MZgXT416Q5711SDT7dQLTLk=
 mvdan.cc/sh/v3 v3.7.0/go.mod h1:K2gwkaesF/D7av7Kxl0HbF5kGOd2ArupNTX3X44+8l8=

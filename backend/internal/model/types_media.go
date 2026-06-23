@@ -41,16 +41,18 @@ type MediaAnalysis struct {
 }
 
 type SpeechToTextStatus struct {
-	Available       bool   `json:"available"`
-	Engine          string `json:"engine"`
-	Language        string `json:"language"`
-	PythonAvailable bool   `json:"python_available"`
-	PythonCommand   string `json:"python_command,omitempty"`
-	FFmpegAvailable bool   `json:"ffmpeg_available"`
-	VoskAvailable   bool   `json:"vosk_available"`
-	ModelAvailable  bool   `json:"model_available"`
-	ModelPath       string `json:"model_path,omitempty"`
-	Message         string `json:"message"`
+	Available             bool   `json:"available"`
+	Engine                string `json:"engine"`
+	Language              string `json:"language"`
+	PythonAvailable       bool   `json:"python_available"`
+	PythonCommand         string `json:"python_command,omitempty"`
+	PythonPathWarning     string `json:"python_path_warning,omitempty"`
+	PythonExtraAllowedDir string `json:"python_extra_allowed_dir,omitempty"`
+	FFmpegAvailable       bool   `json:"ffmpeg_available"`
+	VoskAvailable         bool   `json:"vosk_available"`
+	ModelAvailable        bool   `json:"model_available"`
+	ModelPath             string `json:"model_path,omitempty"`
+	Message               string `json:"message"`
 }
 
 type MediaTranscriptionSegment struct {

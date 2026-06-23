@@ -263,7 +263,7 @@ func preflightYaraScanConfig(yc model.YaraConfig) error {
 }
 
 func resolveYaraScanConfig(yc model.YaraConfig) (string, yaraRuleBundle, error) {
-	yaraExe, _, err := resolveYaraExecutable(yc.Bin)
+	yaraExe, _, err := resolveYaraExecutableWithAllowedDirs(yc.Bin, yc.AllowedDirs)
 	if err != nil {
 		return "", yaraRuleBundle{}, err
 	}
@@ -369,9 +369,22 @@ func readableYaraTargetSource(source string) string {
 }
 
 func resolveYaraExecutable(customBin string) (string, string, error) {
+	return resolveYaraExecutableWithAllowedDirs(customBin, nil)
+}
+
+func resolveYaraExecutableWithAllowedDirs(customBin string, allowedDirs []string) (string, string, error) {
 	if custom := strings.TrimSpace(customBin); custom != "" {
-		if st, err := os.Stat(custom); err == nil && !st.IsDir() {
-			return custom, "", nil
+		warning, err := ValidateExecutablePathWithWarning(custom, []string{"yara", "yara64"}, allowedDirs...)
+		if err == nil {
+			if filepath.IsAbs(custom) {
+				return filepath.Clean(custom), warning, nil
+			}
+			if resolved, lookErr := exec.LookPath(custom); lookErr == nil {
+				return resolved, warning, nil
+			}
+		}
+		if !isMissingExecutablePathError(err) {
+			return "", "", err
 		}
 		// Custom path doesn't exist; fall back but warn.
 		exeCandidates := []string{"yara", "yara64.exe", "yara.exe"}
@@ -412,6 +425,17 @@ func resolveYaraExecutable(customBin string) (string, string, error) {
 	}
 
 	return "", "", fmt.Errorf("yara executable not found")
+}
+
+func isMissingExecutablePathError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not found in path") ||
+		strings.Contains(msg, "cannot access binary") ||
+		strings.Contains(msg, "no such file") ||
+		strings.Contains(msg, "cannot find the file")
 }
 
 func resolveYaraRuleBundle(customRules string) (yaraRuleBundle, error) {

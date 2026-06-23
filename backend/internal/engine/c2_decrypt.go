@@ -46,13 +46,17 @@ import (
 )
 
 const (
-	c2DecryptMaxRecords       = 500
-	c2DecryptMaxStreamRecords = 500
-	c2DecryptPreviewMaxBytes  = 4096
-	c2DecryptKeyStatusNA      = "not_applicable"
-	c2DecryptKeyStatusOK      = "verified"
-	c2DecryptKeyStatusWeak    = "unverified"
-	c2DecryptDirectionUnknown = "unknown"
+	c2DecryptMaxRecords        = 500
+	c2DecryptMaxStreamRecords  = 500
+	c2DecryptMaxCandidateBytes = 8 * 1024 * 1024
+	c2DecryptMaxStreamBytes    = 8 * 1024 * 1024
+	c2DecryptMaxFrameBytes     = 8 * 1024 * 1024
+	c2DecryptMaxFrameCount     = c2DecryptMaxRecords * 4
+	c2DecryptPreviewMaxBytes   = 4096
+	c2DecryptKeyStatusNA       = "not_applicable"
+	c2DecryptKeyStatusOK       = "verified"
+	c2DecryptKeyStatusWeak     = "unverified"
+	c2DecryptDirectionUnknown  = "unknown"
 )
 
 type c2DecryptCandidate struct {
@@ -278,13 +282,21 @@ func appendC2DecryptCandidateWithLimit(out *[]c2DecryptCandidate, seen map[strin
 	if len(candidate.raw) == 0 {
 		return limit > 0 && len(*out) >= limit
 	}
-	key := fmt.Sprintf("%d|%d|%s|%s|%x", candidate.packet.ID, candidate.packet.StreamID, candidate.transform, candidate.direction, candidate.raw)
+	if len(candidate.raw) > c2DecryptMaxCandidateBytes {
+		return limit > 0 && len(*out) >= limit
+	}
+	key := c2DecryptCandidateKey(candidate)
 	if _, ok := seen[key]; ok {
 		return limit > 0 && len(*out) >= limit
 	}
 	seen[key] = struct{}{}
 	*out = append(*out, candidate)
 	return limit > 0 && len(*out) >= limit
+}
+
+func c2DecryptCandidateKey(candidate c2DecryptCandidate) string {
+	sum := sha256.Sum256(candidate.raw)
+	return fmt.Sprintf("%d|%d|%s|%s|%x", candidate.packet.ID, candidate.packet.StreamID, candidate.transform, candidate.direction, sum[:])
 }
 
 func extractC2PacketCandidateBytes(packet model.Packet, family string) []c2DecryptCandidate {
@@ -685,6 +697,9 @@ func (s *Service) emitVShellStreamCandidates(streamID int64, stream model.Reasse
 				if len(inner) < 8 {
 					continue
 				}
+				if len(combined)+len(inner) > c2DecryptMaxCandidateBytes {
+					break
+				}
 				combined = append(combined, inner...)
 			}
 			if len(combined) >= 8 {
@@ -741,6 +756,11 @@ func assembleVShellStreamDirections(stream model.ReassembledStream) []vshellStre
 			state.order = len(order)
 			order = append(order, direction)
 		}
+		body = trimC2StreamBodyToBudget(state.body, body)
+		if body == "" {
+			byDirection[direction] = state
+			continue
+		}
 		state.body = joinStreamChunkBodies(state.body, body)
 		byDirection[direction] = state
 	}
@@ -756,6 +776,51 @@ func assembleVShellStreamDirections(stream model.ReassembledStream) []vshellStre
 		out = append(out, vshellStreamDirectionPayload{direction: direction, body: body})
 	}
 	return out
+}
+
+func trimC2StreamBodyToBudget(existing string, next string) string {
+	remaining := c2DecryptMaxStreamBytes - estimatedDecodedC2BodySize(existing)
+	if remaining <= 0 {
+		return ""
+	}
+	if estimatedDecodedC2BodySize(next) <= remaining {
+		return next
+	}
+	if isColonHexPayload(next) {
+		return trimColonHexToByteBudget(next, remaining)
+	}
+	if remaining > len(next) {
+		return next
+	}
+	return next[:remaining]
+}
+
+func estimatedDecodedC2BodySize(raw string) int {
+	if raw == "" {
+		return 0
+	}
+	if isColonHexPayload(raw) {
+		return (len(raw) + 1) / 3
+	}
+	return len(raw)
+}
+
+func trimColonHexToByteBudget(raw string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	limit := maxBytes*3 - 1
+	if limit <= 0 {
+		return ""
+	}
+	if len(raw) <= limit {
+		return raw
+	}
+	out := strings.TrimRight(raw[:limit], ":")
+	if len(out)%3 == 2 {
+		return out
+	}
+	return strings.TrimRight(out[:len(out)-len(out)%3], ":")
 }
 
 func streamRepresentativePacket(streamID int64, direction string, stream model.ReassembledStream, fallback model.Packet) model.Packet {
@@ -812,7 +877,10 @@ func decodeC2TransformCandidates(raw string, mode string) []c2TransformedBytes {
 			if !ok || len(decoded) == 0 {
 				continue
 			}
-			key := transform + "|" + string(decoded)
+			if len(decoded) > c2DecryptMaxCandidateBytes {
+				continue
+			}
+			key := c2TransformedCandidateKey(transform, decoded)
 			if _, exists := seen[key]; exists {
 				continue
 			}
@@ -821,6 +889,11 @@ func decodeC2TransformCandidates(raw string, mode string) []c2TransformedBytes {
 		}
 	}
 	return out
+}
+
+func c2TransformedCandidateKey(transform string, decoded []byte) string {
+	sum := sha256.Sum256(decoded)
+	return fmt.Sprintf("%s|%x", transform, sum[:])
 }
 
 func extractLoosePayloadTokens(raw string) []string {
@@ -860,21 +933,33 @@ func decodeC2Transform(raw string, transform string) ([]byte, bool) {
 	raw = strings.TrimSpace(raw)
 	switch transform {
 	case "raw":
+		if len(raw) > c2DecryptMaxCandidateBytes {
+			return nil, false
+		}
 		return []byte(raw), true
 	case "hex":
 		cleaned := regexp.MustCompile(`(?i)[^0-9a-f]`).ReplaceAllString(raw, "")
 		if len(cleaned) < 8 || len(cleaned)%2 != 0 {
 			return nil, false
 		}
+		if len(cleaned)/2 > c2DecryptMaxCandidateBytes {
+			return nil, false
+		}
 		decoded, err := hex.DecodeString(cleaned)
 		return decoded, err == nil
 	case "base64":
+		if len(raw) > base64.StdEncoding.EncodedLen(c2DecryptMaxCandidateBytes) {
+			return nil, false
+		}
 		for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding} {
 			if decoded, err := enc.DecodeString(raw); err == nil {
 				return decoded, true
 			}
 		}
 	case "base64url":
+		if len(raw) > base64.URLEncoding.EncodedLen(c2DecryptMaxCandidateBytes) {
+			return nil, false
+		}
 		for _, enc := range []*base64.Encoding{base64.URLEncoding, base64.RawURLEncoding} {
 			if decoded, err := enc.DecodeString(raw); err == nil {
 				return decoded, true
@@ -1200,10 +1285,13 @@ func tryDecryptVShellFrame(candidate c2DecryptCandidate, frame []byte, mode stri
 		}
 	}
 	if mode == "auto" || mode == "aes_cbc_md5_salt" {
-		if plaintext, err := decryptAESCBC(frame, cbcKey, cbcKey); err == nil {
-			record := buildDecryptedRecord(candidate, frame, plaintext, "vshell-aes-cbc-"+keyLabel, verifyVShellPlaintext(plaintext, vkey))
-			record.Tags = append(record.Tags, "key:"+keyLabel)
-			return record, true
+		// VShell AES-CBC frames carry the IV prepended to the ciphertext.
+		if len(frame) > aes.BlockSize && (len(frame)-aes.BlockSize)%aes.BlockSize == 0 {
+			if plaintext, err := decryptAESCBC(frame[aes.BlockSize:], cbcKey, frame[:aes.BlockSize]); err == nil {
+				record := buildDecryptedRecord(candidate, frame, plaintext, "vshell-aes-cbc-"+keyLabel, verifyVShellPlaintext(plaintext, vkey))
+				record.Tags = append(record.Tags, "key:"+keyLabel)
+				return record, true
+			}
 		}
 	}
 	return model.C2DecryptedRecord{}, false
@@ -1222,9 +1310,9 @@ func splitVShellFrames(raw []byte) [][]byte {
 func splitVShellFramesEndian(raw []byte, order binary.ByteOrder) [][]byte {
 	frames := make([][]byte, 0, 4)
 	remaining := raw
-	for len(remaining) >= 4 {
+	for len(remaining) >= 4 && len(frames) < c2DecryptMaxFrameCount {
 		size := int(order.Uint32(remaining[:4]))
-		if size <= 0 || size > len(remaining)-4 || size > 8*1024*1024 {
+		if size <= 0 || size > len(remaining)-4 || size > c2DecryptMaxFrameBytes {
 			break
 		}
 		frames = append(frames, remaining[4:4+size])
@@ -1453,27 +1541,10 @@ func csEncryptedBlobVariants(raw []byte) []csEncryptedBlobVariant {
 }
 
 func decryptCSAESBlob(candidate c2DecryptCandidate, blob []byte, aesKey []byte, keyStatus string) (model.C2DecryptedRecord, bool) {
-	ivs := [][]byte{
-		[]byte("abcdefghijklmnop"),
-		make([]byte, aes.BlockSize),
-	}
-	if len(blob)%aes.BlockSize == 0 && keyStatus == c2DecryptKeyStatusOK {
-		for _, iv := range ivs {
-			if plaintext, err := decryptAESCBC(blob, aesKey, iv); err == nil {
-				return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
-			}
-		}
-	}
+	// CS AES-CBC payloads use a prepended IV; never fall back to zero or
+	// hardcoded IVs, which would be a cryptographic weakness.
 	if len(blob) > aes.BlockSize && (len(blob)-aes.BlockSize)%aes.BlockSize == 0 {
 		if plaintext, err := decryptAESCBC(blob[aes.BlockSize:], aesKey, blob[:aes.BlockSize]); err == nil {
-			return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
-		}
-	}
-	if len(blob)%aes.BlockSize != 0 {
-		return model.C2DecryptedRecord{}, false
-	}
-	for _, iv := range ivs {
-		if plaintext, err := decryptAESCBC(blob, aesKey, iv); err == nil {
 			return buildDecryptedRecord(candidate, blob, plaintext, "cs-aes-cbc", keyStatus), true
 		}
 	}

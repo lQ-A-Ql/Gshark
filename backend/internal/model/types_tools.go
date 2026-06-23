@@ -15,21 +15,26 @@ type HuntingRuntimeConfig struct {
 }
 
 type YaraConfig struct {
-	Enabled   bool
-	Bin       string
-	Rules     string
-	TimeoutMS int
+	Enabled     bool
+	Bin         string
+	AllowedDirs []string
+	Rules       string
+	TimeoutMS   int
 }
 
 type ToolRuntimeConfig struct {
-	TSharkPath    string `json:"tshark_path"`
-	FFmpegPath    string `json:"ffmpeg_path"`
-	PythonPath    string `json:"python_path"`
-	VoskModelPath string `json:"vosk_model_path"`
-	YaraEnabled   bool   `json:"yara_enabled"`
-	YaraBin       string `json:"yara_bin"`
-	YaraRules     string `json:"yara_rules"`
-	YaraTimeoutMS int    `json:"yara_timeout_ms"`
+	TSharkPath        string   `json:"tshark_path"`
+	TSharkAllowedDirs []string `json:"tshark_allowed_dirs,omitempty"`
+	FFmpegPath        string   `json:"ffmpeg_path"`
+	FFmpegAllowedDirs []string `json:"ffmpeg_allowed_dirs,omitempty"`
+	PythonPath        string   `json:"python_path"`
+	PythonAllowedDirs []string `json:"python_allowed_dirs,omitempty"`
+	VoskModelPath     string   `json:"vosk_model_path"`
+	YaraEnabled       bool     `json:"yara_enabled"`
+	YaraBin           string   `json:"yara_bin"`
+	YaraAllowedDirs   []string `json:"yara_allowed_dirs,omitempty"`
+	YaraRules         string   `json:"yara_rules"`
+	YaraTimeoutMS     int      `json:"yara_timeout_ms"`
 }
 
 type MCPConfig struct {
@@ -64,6 +69,8 @@ type YaraToolStatus struct {
 	UsingCustomBin   bool   `json:"using_custom_bin"`
 	UsingCustomRules bool   `json:"using_custom_rules"`
 	TimeoutMS        int    `json:"timeout_ms"`
+	PathWarning      string `json:"path_warning,omitempty"`
+	ExtraAllowedDir  string `json:"extra_allowed_dir,omitempty"`
 }
 
 type TSharkToolStatus struct {
@@ -79,6 +86,13 @@ type TSharkToolStatus struct {
 	MissingOptionalFields   []string `json:"missing_optional_fields,omitempty"`
 	CapabilityMessage       string   `json:"capability_message,omitempty"`
 	CapabilityCheckDegraded bool     `json:"capability_check_degraded,omitempty"`
+	// PathWarning is set when the configured tshark binary is outside the
+	// default allow-list. The binary is still accepted, but the user should be
+	// warned that it is not in a trusted system directory.
+	PathWarning string `json:"path_warning,omitempty"`
+	// ExtraAllowedDir is set when the binary was accepted because the user
+	// explicitly allowed its parent directory.
+	ExtraAllowedDir string `json:"extra_allowed_dir,omitempty"`
 }
 
 type FFmpegToolStatus struct {
@@ -87,6 +101,8 @@ type FFmpegToolStatus struct {
 	Message         string `json:"message"`
 	CustomPath      string `json:"custom_path,omitempty"`
 	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
+	PathWarning     string `json:"path_warning,omitempty"`
+	ExtraAllowedDir string `json:"extra_allowed_dir,omitempty"`
 }
 
 type ToolRuntimeSnapshot struct {

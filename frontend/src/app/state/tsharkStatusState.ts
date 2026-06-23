@@ -15,6 +15,8 @@ export function toTSharkStatus(status: ToolRuntimeSnapshot["tshark"]): TSharkSta
     missingOptionalFields: status.missingOptionalFields ?? [],
     capabilityMessage: status.capabilityMessage,
     capabilityCheckDegraded: status.capabilityCheckDegraded,
+    pathWarning: status.pathWarning,
+    extraAllowedDir: status.extraAllowedDir,
   };
 }
 

@@ -127,6 +127,26 @@ func TestToolRuntimeConfigContract(t *testing.T) {
 	requireJSONKeys(t, yara, "available", "enabled", "message", "using_custom_bin", "using_custom_rules", "timeout_ms")
 }
 
+func TestToolRuntimeAllowedDirsContract(t *testing.T) {
+	server := &Server{toolRuntime: contractToolRuntimeService{}}
+
+	rec := httptest.NewRecorder()
+	server.handleListTSharkAllowedDirs(rec, httptest.NewRequest(http.MethodGet, "/api/tools/tshark/allowed-dirs", nil))
+	requireStatus(t, rec, http.StatusOK)
+	payload := decodeJSONMap(t, rec)
+	requireJSONKeys(t, payload, "dirs")
+
+	rec = httptest.NewRecorder()
+	server.handleAllowTSharkDir(rec, httptest.NewRequest(http.MethodPost, "/api/tools/tshark/allow-dir", strings.NewReader(`{"dir":"C:\\Tools"}`)))
+	requireStatus(t, rec, http.StatusOK)
+	requireJSONKeys(t, decodeJSONMap(t, rec), "available", "path", "message")
+
+	rec = httptest.NewRecorder()
+	server.handleRemoveTSharkAllowedDir(rec, httptest.NewRequest(http.MethodDelete, "/api/tools/tshark/allowed-dirs/remove", strings.NewReader(`{"dir":"C:\\Tools"}`)))
+	requireStatus(t, rec, http.StatusOK)
+	requireJSONKeys(t, decodeJSONMap(t, rec), "available", "path", "message")
+}
+
 func TestToolRuntimeConfigHandlerPreservesGetAndAcceptsEmptyPostContract(t *testing.T) {
 	runtime := &recordingToolRuntimeService{
 		config: model.ToolRuntimeConfig{
@@ -172,8 +192,10 @@ func TestToolRuntimeConfigHandlerPreservesGetAndAcceptsEmptyPostContract(t *test
 
 func TestMCPConfigContract(t *testing.T) {
 	server := &Server{toolRuntime: &recordingToolRuntimeService{}}
+	getReq := httptest.NewRequest(http.MethodGet, "/api/mcp/config", nil)
+	getReq.Host = "127.0.0.1:17891"
 	getRec := httptest.NewRecorder()
-	server.handleMCPConfig(getRec, httptest.NewRequest(http.MethodGet, "/api/mcp/config", nil))
+	server.handleMCPConfig(getRec, getReq)
 
 	requireStatus(t, getRec, http.StatusOK)
 	getPayload := decodeJSONMap(t, getRec)
@@ -890,6 +912,26 @@ func (contractToolRuntimeService) SetTSharkPath(string) model.TSharkToolStatus {
 
 func (contractToolRuntimeService) SetTSharkPathWithContext(context.Context, string) model.TSharkToolStatus {
 	return contractToolRuntimeService{}.TSharkStatus()
+}
+
+func (contractToolRuntimeService) AllowTSharkDirWithContext(context.Context, string) model.TSharkToolStatus {
+	return contractToolRuntimeService{}.TSharkStatus()
+}
+
+func (contractToolRuntimeService) TSharkAllowedDirs() []string { return nil }
+
+func (contractToolRuntimeService) RemoveTSharkAllowedDirWithContext(context.Context, string) model.TSharkToolStatus {
+	return contractToolRuntimeService{}.TSharkStatus()
+}
+
+func (contractToolRuntimeService) AllowToolDirWithContext(context.Context, string, string) model.ToolRuntimeSnapshot {
+	return contractToolRuntimeService{}.ToolRuntimeSnapshot()
+}
+
+func (contractToolRuntimeService) ToolAllowedDirs(string) []string { return nil }
+
+func (contractToolRuntimeService) RemoveToolAllowedDirWithContext(context.Context, string, string) model.ToolRuntimeSnapshot {
+	return contractToolRuntimeService{}.ToolRuntimeSnapshot()
 }
 
 func (contractToolRuntimeService) TSharkStatusPath() string { return "tshark" }

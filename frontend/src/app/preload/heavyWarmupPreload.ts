@@ -5,6 +5,8 @@ import { isPreloadFeatureFlagEnabled, schedulePreload } from "./preloadScheduler
 import { findPreloadTarget } from "./preloadTargets";
 import { recordPreloadEvent } from "./preloadTelemetry";
 
+type WailsDesktopWindow = Window & { go?: { main?: { DesktopApp?: unknown } } };
+
 export type HeavyWarmupInput = {
   backendConnected: boolean;
   captureReady: boolean;
@@ -74,7 +76,7 @@ async function runHeavyWarmup(routePath: string, input: HeavyWarmupInput, signal
 }
 
 function isDesktopRuntime() {
-  return typeof window !== "undefined" && Boolean((window as any).go?.main?.DesktopApp);
+  return typeof window !== "undefined" && Boolean((window as WailsDesktopWindow).go?.main?.DesktopApp);
 }
 
 async function withVehicleDBCProfilePaths(

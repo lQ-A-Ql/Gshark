@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../core/types";
+import { EMPTY_TOOL_RUNTIME_CONFIG } from "../state/toolRuntimeStorageConfig";
 import { buildSpeechIssues } from "./RuntimeSettingsSpeechIssues";
 import { normalizeConfig, statusTone } from "./RuntimeSettingsSidebarParts";
 
 const completeConfig: ToolRuntimeConfig = {
   tsharkPath: "C:\\Wireshark\\tshark.exe",
+  tsharkAllowedDirs: [],
   ffmpegPath: "C:\\ffmpeg\\ffmpeg.exe",
+  ffmpegAllowedDirs: [],
   pythonPath: "C:\\Python311\\python.exe",
+  pythonAllowedDirs: [],
   voskModelPath: "C:\\models\\vosk",
   yaraEnabled: false,
   yaraBin: "C:\\tools\\yara64.exe",
+  yaraAllowedDirs: [],
   yaraRules: "C:\\rules\\traffic.yar",
   yaraTimeoutMs: 15000,
 };
@@ -58,16 +63,7 @@ function createSnapshot(overrides: Partial<ToolRuntimeSnapshot["speech"]> = {}):
 
 describe("RuntimeSettingsSidebarParts", () => {
   it("normalizes missing config and invalid timeout", () => {
-    expect(normalizeConfig(null)).toEqual({
-      tsharkPath: "",
-      ffmpegPath: "",
-      pythonPath: "",
-      voskModelPath: "",
-      yaraEnabled: true,
-      yaraBin: "",
-      yaraRules: "",
-      yaraTimeoutMs: 25000,
-    });
+    expect(normalizeConfig(null)).toEqual(EMPTY_TOOL_RUNTIME_CONFIG);
 
     expect(normalizeConfig({ ...completeConfig, yaraTimeoutMs: 0 })).toEqual({
       ...completeConfig,

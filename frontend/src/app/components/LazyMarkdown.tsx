@@ -2,7 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 
 interface LazyMarkdownProps {
   children: string;
-  components?: Record<string, (props: Record<string, any>) => ReactNode>;
+  components?: Record<string, (props: Record<string, unknown>) => ReactNode>;
   [key: string]: unknown;
 }
 

@@ -43,7 +43,7 @@ import type {
 } from "../core/types";
 import type { CaptureStatus, OpenFileResult, PacketLocateResult, PacketsPageResult } from "./clients/captureClient";
 import type { EventHandlers } from "./clients/eventClient";
-import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
+import type { FFmpegStatus, ToolRuntimeName, TSharkStatus } from "./clients/toolRuntimeClient";
 import type { HuntingRuntimeConfig } from "./clients/huntingClient";
 import type { MiscModuleClient } from "./miscModuleClientTypes";
 import type { PlaybookClient } from "./clients/playbookClient";
@@ -71,6 +71,12 @@ export interface RuntimeClient {
     mode?: "fast" | "full",
   ): Promise<ToolRuntimeSnapshot>;
   setTSharkPath(path: string): Promise<TSharkStatus>;
+  allowTSharkDir(dir: string): Promise<TSharkStatus>;
+  listTSharkAllowedDirs(): Promise<string[]>;
+  removeTSharkAllowedDir(dir: string): Promise<TSharkStatus>;
+  allowToolDir(tool: ToolRuntimeName, dir: string): Promise<ToolRuntimeSnapshot>;
+  listToolAllowedDirs(tool: ToolRuntimeName): Promise<string[]>;
+  removeToolAllowedDir(tool: ToolRuntimeName, dir: string): Promise<ToolRuntimeSnapshot>;
   getMCPStatus(signal?: AbortSignal): Promise<MCPStatus>;
   updateMCPConfig(config: MCPConfig, signal?: AbortSignal): Promise<MCPStatus>;
   subscribeEvents(handlers: EventHandlers): () => void;
@@ -97,12 +103,12 @@ export interface PacketClient {
 export interface HuntingClient {
   listThreatHits(prefixes?: string[], signal?: AbortSignal): Promise<ThreatHit[]>;
   getHuntingRuntimeConfig(signal?: AbortSignal): Promise<HuntingRuntimeConfig>;
-  updateHuntingRuntimeConfig(config: HuntingRuntimeConfig): Promise<HuntingRuntimeConfig>;
+  updateHuntingRuntimeConfig(config: HuntingRuntimeConfig, signal?: AbortSignal): Promise<HuntingRuntimeConfig>;
 }
 
 export interface ObjectClient {
   listObjects(signal?: AbortSignal): Promise<ExtractedObject[]>;
-  downloadObjectsZip(ids: number[]): Promise<void>;
+  downloadObjectsZip(ids: number[], signal?: AbortSignal): Promise<void>;
 }
 
 export interface StreamClient {

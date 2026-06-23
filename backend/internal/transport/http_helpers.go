@@ -70,12 +70,13 @@ func parseInt64(s string, fallback int64) int64 {
 	return v
 }
 
-func (s *Server) currentMCPStatus() model.MCPStatus {
+func (s *Server) currentMCPStatus(r *http.Request) model.MCPStatus {
+	endpoint := mcpEndpointForRequest(r)
 	if s.toolRuntime == nil {
 		return model.MCPStatus{
 			Config:          model.MCPConfig{},
 			Enabled:         false,
-			Endpoint:        "http://127.0.0.1:17891/api/mcp",
+			Endpoint:        endpoint,
 			Transport:       "streamable-http",
 			AuthRequired:    false,
 			ReadOnly:        true,
@@ -84,13 +85,48 @@ func (s *Server) currentMCPStatus() model.MCPStatus {
 			LastError:       "tool runtime service unavailable",
 		}
 	}
-	return s.toolRuntime.MCPStatus(s.authRequired())
+	status := s.toolRuntime.MCPStatus(s.authRequired())
+	status.Endpoint = endpoint
+	return status
+}
+
+func mcpEndpointForRequest(r *http.Request) string {
+	if r == nil {
+		return "http://127.0.0.1:17891/api/mcp"
+	}
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	host := r.Host
+	if host == "" {
+		host = "127.0.0.1:17891"
+	}
+	return scheme + "://" + host + "/api/mcp"
 }
 
 func (s *Server) authRequired() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return strings.TrimSpace(s.authToken) != ""
+}
+
+var allowedLocalOrigins = map[string]bool{
+	"127.0.0.1":       true,
+	"localhost":       true,
+	"::1":             true,
+	"wails.localhost": true,
+}
+
+var allowedOriginPorts = map[string]bool{
+	"":      true, // no explicit port
+	"80":    true,
+	"443":   true,
+	"17891": true,
+	"34115": true,
+	"34116": true,
+	"5173":  true,
+	"4173":  true,
 }
 
 func isAllowedOrigin(origin string) bool {
@@ -101,10 +137,16 @@ func isAllowedOrigin(origin string) bool {
 	if err != nil {
 		return false
 	}
-	switch strings.ToLower(parsed.Hostname()) {
-	case "127.0.0.1", "localhost", "::1", "wails.localhost":
-		return true
-	default:
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
 		return false
 	}
+	if !allowedLocalOrigins[strings.ToLower(parsed.Hostname())] {
+		return false
+	}
+	port := parsed.Port()
+	if port == "" && (scheme == "http" || scheme == "https") {
+		return true
+	}
+	return allowedOriginPorts[port]
 }

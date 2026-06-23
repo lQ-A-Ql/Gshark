@@ -45,7 +45,7 @@ describe("createRuleTypedOverrides", () => {
     await expect(
       bridge.updateRuleConfig?.({ remote_url: "url", auto_update: false, update_interval_hours: 1, cache_dir: "" }),
     ).resolves.toMatchObject({ remote_url: "url", update_interval_hours: 12 });
-    await expect(bridge.downloadRulePack?.("core", "url")).resolves.toMatchObject({
+    await expect(bridge.downloadRulePack?.("core", "url", "checksum")).resolves.toMatchObject({
       id: "core",
       version: { tag: "v2" },
     });

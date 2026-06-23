@@ -3,11 +3,15 @@ import type { ToolRuntimeConfig } from "../core/types";
 export function normalizeConfig(config?: ToolRuntimeConfig | null): ToolRuntimeConfig {
   return {
     tsharkPath: config?.tsharkPath ?? "",
+    tsharkAllowedDirs: config?.tsharkAllowedDirs ?? [],
     ffmpegPath: config?.ffmpegPath ?? "",
+    ffmpegAllowedDirs: config?.ffmpegAllowedDirs ?? [],
     pythonPath: config?.pythonPath ?? "",
+    pythonAllowedDirs: config?.pythonAllowedDirs ?? [],
     voskModelPath: config?.voskModelPath ?? "",
     yaraEnabled: config?.yaraEnabled ?? true,
     yaraBin: config?.yaraBin ?? "",
+    yaraAllowedDirs: config?.yaraAllowedDirs ?? [],
     yaraRules: config?.yaraRules ?? "",
     yaraTimeoutMs: config?.yaraTimeoutMs && config.yaraTimeoutMs > 0 ? config.yaraTimeoutMs : 25000,
   };

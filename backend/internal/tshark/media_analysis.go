@@ -2,6 +2,7 @@ package tshark
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
@@ -133,7 +134,7 @@ var mediaGameStreamUDPFields = []string{
 const gameStreamRTPPayloadOffset = 16
 
 func BuildMediaAnalysisFromFile(filePath, exportDir string) (model.MediaAnalysis, map[string]string, error) {
-	return BuildMediaAnalysisFromFileWithConfig(filePath, exportDir, MediaScanConfig{}, nil)
+	return BuildMediaAnalysisFromFileWithConfig(context.Background(), filePath, exportDir, MediaScanConfig{}, nil)
 }
 
 func BuildMediaAnalysisFromFileWithProgress(
@@ -141,15 +142,19 @@ func BuildMediaAnalysisFromFileWithProgress(
 	exportDir string,
 	progress func(current, total int, label string),
 ) (model.MediaAnalysis, map[string]string, error) {
-	return BuildMediaAnalysisFromFileWithConfig(filePath, exportDir, MediaScanConfig{}, progress)
+	return BuildMediaAnalysisFromFileWithConfig(context.Background(), filePath, exportDir, MediaScanConfig{}, progress)
 }
 
 func BuildMediaAnalysisFromFileWithConfig(
+	ctx context.Context,
 	filePath,
 	exportDir string,
 	cfg MediaScanConfig,
 	progress func(current, total int, label string),
 ) (model.MediaAnalysis, map[string]string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	stats := model.MediaAnalysis{}
 	artifacts := map[string]string{}
 	if strings.TrimSpace(filePath) == "" {
@@ -172,7 +177,7 @@ func BuildMediaAnalysisFromFileWithConfig(
 	step := 1
 	if !cfg.SkipControlHints {
 		reportMediaProgress(progress, step, baseSteps, "扫描媒体控制信令")
-		controlPackets, err := scanMediaControlHints(filePath, controlHints, protocolMap, applicationMap)
+		controlPackets, err := scanMediaControlHints(ctx, filePath, controlHints, protocolMap, applicationMap)
 		if err != nil {
 			return stats, artifacts, err
 		}
@@ -181,7 +186,7 @@ func BuildMediaAnalysisFromFileWithConfig(
 	}
 
 	reportMediaProgress(progress, step, baseSteps, "扫描 RTP / GameStream 会话")
-	rtpPackets, err := scanRTPMediaSessions(filePath, controlHints, sessionBuilders, protocolMap, applicationMap, cfg.RTPDecodeAsPorts)
+	rtpPackets, err := scanRTPMediaSessions(ctx, filePath, controlHints, sessionBuilders, protocolMap, applicationMap, cfg.RTPDecodeAsPorts)
 	if err != nil {
 		return stats, artifacts, err
 	}
@@ -281,12 +286,16 @@ func BuildMediaAnalysisFromFileWithConfig(
 }
 
 func BuildMediaAnalysisFromPacketStream(
+	ctx context.Context,
 	exportDir string,
 	totalPackets int,
 	cfg MediaScanConfig,
 	progress func(current, total int, label string),
 	iterate func(func(model.Packet) error) error,
 ) (model.MediaAnalysis, map[string]string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	stats := model.MediaAnalysis{}
 	artifacts := map[string]string{}
 	if strings.TrimSpace(exportDir) == "" {
@@ -304,7 +313,7 @@ func BuildMediaAnalysisFromPacketStream(
 		totalPackets = 1
 	}
 	reportMediaProgress(progress, 0, totalPackets, "扫描已缓存数据包中的媒体流")
-	mediaPackets, err := scanMediaSessionsFromPacketStream(totalPackets, iterate, sessionBuilders, protocolMap, applicationMap, progress)
+	mediaPackets, err := scanMediaSessionsFromPacketStream(ctx, totalPackets, iterate, sessionBuilders, protocolMap, applicationMap, progress)
 	if err != nil {
 		return stats, artifacts, err
 	}
@@ -413,6 +422,7 @@ func reportMediaProgress(progress func(current, total int, label string), curren
 }
 
 func scanMediaSessionsFromPacketStream(
+	ctx context.Context,
 	totalPackets int,
 	iterate func(func(model.Packet) error) error,
 	sessions map[string]*mediaSessionBuilder,
@@ -421,7 +431,13 @@ func scanMediaSessionsFromPacketStream(
 ) (int, error) {
 	count := 0
 	scanned := 0
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	err := iterate(func(packet model.Packet) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		scanned++
 		if scanned == 1 || scanned%5000 == 0 || scanned == totalPackets {
 			reportMediaProgress(progress, scanned, totalPackets, fmt.Sprintf("扫描已缓存数据包 %d/%d", scanned, totalPackets))
@@ -458,9 +474,9 @@ func scanMediaSessionsFromPacketStream(
 	return count, err
 }
 
-func scanMediaControlHints(filePath string, controlHints map[int][]mediaTrackHint, protocolMap, applicationMap map[string]int) (int, error) {
+func scanMediaControlHints(ctx context.Context, filePath string, controlHints map[int][]mediaTrackHint, protocolMap, applicationMap map[string]int) (int, error) {
 	count := 0
-	err := scanFieldRowsWithOptions(filePath, mediaControlFields, fieldScanOptions{
+	err := scanFieldRowsWithOptionsContext(ctx, filePath, mediaControlFields, fieldScanOptions{
 		DisplayFilter: "rtsp || sdp",
 		Occurrence:    "a",
 		Aggregator:    "|",
@@ -530,10 +546,10 @@ func scanMediaControlHints(filePath string, controlHints map[int][]mediaTrackHin
 	return count, err
 }
 
-func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int, decodeAsPorts []int) (int, error) {
+func scanRTPMediaSessions(ctx context.Context, filePath string, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int, decodeAsPorts []int) (int, error) {
 	count := 0
 	if len(decodeAsPorts) > 0 {
-		targetedCount, err := scanRTPMediaSessionsWithDecodeAs(filePath, decodeAsPorts, controlHints, sessions, protocolMap, applicationMap)
+		targetedCount, err := scanRTPMediaSessionsWithDecodeAs(ctx, filePath, decodeAsPorts, controlHints, sessions, protocolMap, applicationMap)
 		if err != nil {
 			return 0, err
 		}
@@ -545,7 +561,7 @@ func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint
 			return count, nil
 		}
 	}
-	err := scanFieldRowsWithOptions(filePath, mediaRTPFields, fieldScanOptions{
+	err := scanFieldRowsWithOptionsContext(ctx, filePath, mediaRTPFields, fieldScanOptions{
 		DisplayFilter: "rtp",
 	}, func(parts []string) {
 		if consumeRTPMediaRow(parts, controlHints, sessions, protocolMap, applicationMap, nil) {
@@ -558,14 +574,14 @@ func scanRTPMediaSessions(filePath string, controlHints map[int][]mediaTrackHint
 	if hasGameStreamSession(sessions) {
 		return count, nil
 	}
-	gameStreamCount, err := scanGameStreamUDPSessions(filePath, controlHints, sessions, protocolMap, applicationMap)
+	gameStreamCount, err := scanGameStreamUDPSessions(ctx, filePath, controlHints, sessions, protocolMap, applicationMap)
 	if err != nil {
 		return count, err
 	}
 	return count + gameStreamCount, nil
 }
 
-func scanRTPMediaSessionsWithDecodeAs(filePath string, decodeAsPorts []int, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int) (int, error) {
+func scanRTPMediaSessionsWithDecodeAs(ctx context.Context, filePath string, decodeAsPorts []int, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int) (int, error) {
 	fields := normalizeFieldScanFields(mediaRTPFields)
 	args := []string{
 		"-n",
@@ -590,7 +606,7 @@ func scanRTPMediaSessionsWithDecodeAs(filePath string, decodeAsPorts []int, cont
 		return 0, err
 	}
 	count := 0
-	err = runDirectFieldScanWithPlan(args, plan, func(parts []string) {
+	err = runDirectFieldScanWithPlan(ctx, args, plan, func(parts []string) {
 		if consumeRTPMediaRow(parts, controlHints, sessions, protocolMap, applicationMap, []string{"非标准端口 RTP decode-as"}) {
 			count++
 		}
@@ -627,7 +643,7 @@ func DetectLikelyRTPPorts(filePath string, candidatePorts []int, sampleLimit int
 		if err != nil {
 			return matched, err
 		}
-		err = runDirectFieldScanWithPlan(args, plan, func(parts []string) {
+		err = runDirectFieldScanWithPlan(context.Background(), args, plan, func(parts []string) {
 			samples++
 			if isLikelyRTPPayload(parseHexPayload(safeTrim(parts, 0))) {
 				hits++
@@ -1081,9 +1097,9 @@ func hasGameStreamSession(sessions map[string]*mediaSessionBuilder) bool {
 	return false
 }
 
-func scanGameStreamUDPSessions(filePath string, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int) (int, error) {
+func scanGameStreamUDPSessions(ctx context.Context, filePath string, controlHints map[int][]mediaTrackHint, sessions map[string]*mediaSessionBuilder, protocolMap, applicationMap map[string]int) (int, error) {
 	count := 0
-	err := scanFieldRowsWithOptions(filePath, mediaGameStreamUDPFields, fieldScanOptions{
+	err := scanFieldRowsWithOptionsContext(ctx, filePath, mediaGameStreamUDPFields, fieldScanOptions{
 		DisplayFilter: gameStreamPortDisplayFilter(),
 	}, func(parts []string) {
 		raw := parseHexPayload(safeTrim(parts, 8))

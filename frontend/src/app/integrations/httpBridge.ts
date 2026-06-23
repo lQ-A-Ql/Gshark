@@ -2,8 +2,8 @@ import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
 import { createEventClient } from "./clients/eventClient";
 import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { OperationTimeoutError } from "../utils/asyncControl";
+import { API_BASE } from "./backendEndpoint";
 
-const API_BASE = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:17891";
 const BACKEND_AUTH_TOKEN_TIMEOUT_MS = 1500;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 15000;
 const ANALYSIS_HTTP_REQUEST_TIMEOUT_MS = 30000;

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tool"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
@@ -144,6 +145,10 @@ type toolRuntimeState struct {
 	toolRuntimeMu          sync.RWMutex
 	toolRuntimeFullProbeMu sync.Mutex
 	tlsConf                model.TLSConfig
+	tsharkRuntime          *tool.Runtime
+	ffmpegRuntime          *tool.Runtime
+	pythonRuntime          *tool.Runtime
+	yaraRuntime            *tool.Runtime
 }
 
 // mcpState groups the MCP server configuration.

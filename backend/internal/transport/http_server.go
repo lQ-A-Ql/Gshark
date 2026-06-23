@@ -151,6 +151,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/runtime/identity", s.handleRuntimeIdentity)
 	mux.HandleFunc("/api/tools/tshark", s.handleTsharkConfig)
+	mux.HandleFunc("/api/tools/tshark/allow-dir", s.handleAllowTSharkDir)
+	mux.HandleFunc("/api/tools/tshark/allowed-dirs", s.handleListTSharkAllowedDirs)
+	mux.HandleFunc("/api/tools/tshark/allowed-dirs/remove", s.handleRemoveTSharkAllowedDir)
+	mux.HandleFunc("/api/tools/allow-dir", s.handleAllowToolDir)
+	mux.HandleFunc("/api/tools/allowed-dirs", s.handleListToolAllowedDirs)
+	mux.HandleFunc("/api/tools/allowed-dirs/remove", s.handleRemoveToolAllowedDir)
 	mux.HandleFunc("/api/tools/runtime-config", s.handleToolRuntimeConfig)
 	mux.HandleFunc("/api/mcp/config", s.handleMCPConfig)
 	mux.HandleFunc("/api/mcp", s.handleMCP)
@@ -229,7 +235,13 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
-	httpServer := &http.Server{Addr: addr, Handler: s.Handler()}
+	httpServer := &http.Server{
+		Addr:         addr,
+		Handler:      s.Handler(),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 	go func() {
 		<-ctx.Done()
 		_ = httpServer.Shutdown(context.Background())

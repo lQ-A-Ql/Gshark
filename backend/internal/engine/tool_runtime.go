@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tool"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
@@ -31,36 +32,42 @@ func (s *Service) ToolRuntimeConfig() model.ToolRuntimeConfig {
 }
 
 func (ctl *toolRuntimeController) configWithYara(yc model.YaraConfig) model.ToolRuntimeConfig {
-	ctl.toolRuntimeMu.RLock()
-	defer ctl.toolRuntimeMu.RUnlock()
-	return toolRuntimeConfigFromYara(yc)
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	return ctl.toolRuntimeConfigFromYaraLocked(yc)
 }
 
-func toolRuntimeConfigFromYara(yc model.YaraConfig) model.ToolRuntimeConfig {
+func (ctl *toolRuntimeController) toolRuntimeConfigFromYaraLocked(yc model.YaraConfig) model.ToolRuntimeConfig {
 	timeoutMS := yc.TimeoutMS
 	if timeoutMS <= 0 {
 		timeoutMS = 25000
 	}
 
 	return model.ToolRuntimeConfig{
-		TSharkPath:    strings.TrimSpace(tshark.ConfiguredBinaryPath()),
-		FFmpegPath:    strings.TrimSpace(os.Getenv(ffmpegEnvVar)),
-		PythonPath:    strings.TrimSpace(os.Getenv(pythonEnvVar)),
-		VoskModelPath: strings.TrimSpace(os.Getenv(voskModelEnvVar)),
-		YaraEnabled:   yc.Enabled,
-		YaraBin:       strings.TrimSpace(yc.Bin),
-		YaraRules:     strings.TrimSpace(yc.Rules),
-		YaraTimeoutMS: timeoutMS,
+		TSharkPath:        strings.TrimSpace(tshark.ConfiguredBinaryPath()),
+		TSharkAllowedDirs: ctl.tsharkRuntime.AllowedDirs(),
+		FFmpegPath:        configuredPathOrEnv(ctl.ffmpegRuntime, ffmpegEnvVar),
+		FFmpegAllowedDirs: ctl.ffmpegRuntime.AllowedDirs(),
+		PythonPath:        configuredPathOrEnv(ctl.pythonRuntime, pythonEnvVar),
+		PythonAllowedDirs: ctl.pythonRuntime.AllowedDirs(),
+		VoskModelPath:     strings.TrimSpace(os.Getenv(voskModelEnvVar)),
+		YaraEnabled:       yc.Enabled,
+		YaraBin:           configuredPathOrValue(ctl.yaraRuntime, yc.Bin),
+		YaraAllowedDirs:   ctl.yaraRuntime.AllowedDirs(),
+		YaraRules:         strings.TrimSpace(yc.Rules),
+		YaraTimeoutMS:     timeoutMS,
 	}
 }
 
 func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig {
-	s.runtimeCtl.applyConfig(cfg)
+	applied := s.runtimeCtl.applyConfig(cfg)
 	s.huntingCtl.setConfig(model.YaraConfig{
-		Enabled:   cfg.YaraEnabled,
-		Bin:       strings.TrimSpace(cfg.YaraBin),
-		Rules:     strings.TrimSpace(cfg.YaraRules),
-		TimeoutMS: cfg.YaraTimeoutMS,
+		Enabled:     cfg.YaraEnabled,
+		Bin:         applied.YaraBin,
+		AllowedDirs: applied.YaraAllowedDirs,
+		Rules:       strings.TrimSpace(cfg.YaraRules),
+		TimeoutMS:   cfg.YaraTimeoutMS,
 	})
 	s.resetYaraScanState()
 	clearSpeechRuntimeProbeCache()
@@ -69,13 +76,33 @@ func (s *Service) SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRu
 	return s.ToolRuntimeConfig()
 }
 
-func (ctl *toolRuntimeController) applyConfig(cfg model.ToolRuntimeConfig) {
+func (ctl *toolRuntimeController) applyConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig {
 	ctl.toolRuntimeMu.Lock()
 	defer ctl.toolRuntimeMu.Unlock()
-	tshark.SetBinaryPath(strings.TrimSpace(cfg.TSharkPath))
-	setEnvOrUnset(ffmpegEnvVar, cfg.FFmpegPath)
-	setEnvOrUnset(pythonEnvVar, cfg.PythonPath)
+	ctl.ensureRuntimesLocked()
+
+	ctl.tsharkRuntime.SetAllowedDirs(cfg.TSharkAllowedDirs)
+	_, _ = ctl.tsharkRuntime.SetPath(cfg.TSharkPath)
+	tshark.SetBinaryPath(ctl.tsharkRuntime.ConfiguredPath())
+
+	ctl.ffmpegRuntime.SetAllowedDirs(cfg.FFmpegAllowedDirs)
+	_, _ = ctl.ffmpegRuntime.SetPath(cfg.FFmpegPath)
+	setEnvOrUnset(ffmpegEnvVar, ctl.ffmpegRuntime.ConfiguredPath())
+
+	ctl.pythonRuntime.SetAllowedDirs(cfg.PythonAllowedDirs)
+	_, _ = ctl.pythonRuntime.SetPath(cfg.PythonPath)
+	setEnvOrUnset(pythonEnvVar, ctl.pythonRuntime.ConfiguredPath())
+
+	ctl.yaraRuntime.SetAllowedDirs(cfg.YaraAllowedDirs)
+	_, _ = ctl.yaraRuntime.SetPath(cfg.YaraBin)
 	setEnvOrUnset(voskModelEnvVar, cfg.VoskModelPath)
+	return ctl.toolRuntimeConfigFromYaraLocked(model.YaraConfig{
+		Enabled:     cfg.YaraEnabled,
+		Bin:         ctl.yaraRuntime.ConfiguredPath(),
+		AllowedDirs: ctl.yaraRuntime.AllowedDirs(),
+		Rules:       cfg.YaraRules,
+		TimeoutMS:   cfg.YaraTimeoutMS,
+	})
 }
 
 // ToolRuntimeSnapshot composes the configuration with the status reports
@@ -116,9 +143,17 @@ func (s *Service) ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model
 
 	probeCapabilities := mode == ToolRuntimeProbeModeFull
 	snapshot.TShark = timedRuntimeProbe(probeTimings, "tshark", func() model.TSharkToolStatus {
-		return toModelTSharkStatus(tshark.CurrentStatusWithOptions(ctx, tshark.StatusOptions{ProbeCapabilities: probeCapabilities}))
+		status := toModelTSharkStatus(tshark.CurrentStatusWithOptions(ctx, tshark.StatusOptions{ProbeCapabilities: probeCapabilities}))
+		status.PathWarning = s.runtimeCtl.tsharkRuntime.PathWarning()
+		if status.PathWarning == "" && status.ExtraAllowedDir == "" {
+			status.ExtraAllowedDir = s.runtimeCtl.tsharkRuntime.ExtraAllowedDir(tshark.ConfiguredBinaryPath())
+		}
+		return status
 	})
 	recordRuntimeStatusError(probeErrors, "tshark", snapshot.TShark.Available, snapshot.TShark.Message)
+	if snapshot.TShark.PathWarning != "" && probeErrors["tshark"] == "" {
+		probeErrors["tshark"] = snapshot.TShark.PathWarning
+	}
 
 	ffmpegInternal := timedRuntimeProbe(probeTimings, "ffmpeg", func() FFmpegStatus {
 		return s.ffmpegStatus()
@@ -181,6 +216,8 @@ func toModelFFmpegStatus(status FFmpegStatus) model.FFmpegToolStatus {
 		Message:         status.Message,
 		CustomPath:      status.CustomPath,
 		UsingCustomPath: status.UsingCustomPath,
+		PathWarning:     status.PathWarning,
+		ExtraAllowedDir: status.ExtraAllowedDir,
 	}
 }
 
@@ -189,7 +226,20 @@ func (s *Service) TSharkStatus() model.TSharkToolStatus {
 }
 
 func (s *Service) TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus {
-	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	status := toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	status.PathWarning = s.runtimeCtl.tsharkRuntime.PathWarning()
+	if status.PathWarning == "" && status.ExtraAllowedDir == "" {
+		status.ExtraAllowedDir = s.runtimeCtl.tsharkRuntime.ExtraAllowedDir(tshark.ConfiguredBinaryPath())
+	}
+	return status
+}
+
+func toolExtraAllowedDirForStatus(path string, extraAllowedDirs []string) string {
+	return tool.NewAllowedDirList(extraAllowedDirs).MatchingDir(path)
+}
+
+func tsharkExtraAllowedDirForStatus(path string, extraAllowedDirs []string) string {
+	return toolExtraAllowedDirForStatus(path, extraAllowedDirs)
 }
 
 // SetTSharkPath updates the tshark binary path. It takes s.toolRuntimeMu
@@ -203,6 +253,36 @@ func (s *Service) SetTSharkPathWithContext(ctx context.Context, path string) mod
 	return s.runtimeCtl.setTSharkPath(ctx, path)
 }
 
+func (s *Service) AllowTSharkDirWithContext(ctx context.Context, dir string) model.TSharkToolStatus {
+	return s.runtimeCtl.allowTSharkDir(ctx, dir)
+}
+
+func (s *Service) TSharkAllowedDirs() []string {
+	return s.runtimeCtl.tsharkAllowedDirs()
+}
+
+func (s *Service) RemoveTSharkAllowedDirWithContext(ctx context.Context, dir string) model.TSharkToolStatus {
+	return s.runtimeCtl.removeTSharkAllowedDir(ctx, dir)
+}
+
+func (s *Service) AllowToolDirWithContext(ctx context.Context, toolName string, dir string) model.ToolRuntimeSnapshot {
+	s.runtimeCtl.allowToolDir(toolName, dir)
+	clearSpeechRuntimeProbeCache()
+	tshark.ClearCapabilityCache()
+	return s.ToolRuntimeSnapshotWithOptions(ctx, model.ToolRuntimeProbeOptions{Mode: ToolRuntimeProbeModeFast})
+}
+
+func (s *Service) ToolAllowedDirs(toolName string) []string {
+	return s.runtimeCtl.toolAllowedDirs(toolName)
+}
+
+func (s *Service) RemoveToolAllowedDirWithContext(ctx context.Context, toolName string, dir string) model.ToolRuntimeSnapshot {
+	s.runtimeCtl.removeToolAllowedDir(toolName, dir)
+	clearSpeechRuntimeProbeCache()
+	tshark.ClearCapabilityCache()
+	return s.ToolRuntimeSnapshotWithOptions(ctx, model.ToolRuntimeProbeOptions{Mode: ToolRuntimeProbeModeFast})
+}
+
 func (s *Service) TSharkStatusPath() string {
 	return tshark.CurrentStatus().Path
 }
@@ -212,15 +292,88 @@ func (s *Service) TSharkUsingCustomPath() bool {
 }
 
 func (s *Service) YaraStatus() model.YaraToolStatus {
-	return s.huntingCtl.status()
+	return s.huntingCtl.statusWithAllowedDirs(s.runtimeCtl.yaraAllowedDirs())
+}
+
+func (s *Service) pythonRuntimeWarnings() (string, string) {
+	s.runtimeCtl.toolRuntimeMu.Lock()
+	defer s.runtimeCtl.toolRuntimeMu.Unlock()
+	s.runtimeCtl.ensureRuntimesLocked()
+	path := configuredPathOrEnv(s.runtimeCtl.pythonRuntime, pythonEnvVar)
+	return s.runtimeCtl.pythonRuntime.PathWarning(), s.runtimeCtl.pythonRuntime.ExtraAllowedDir(path)
 }
 
 func (ctl *toolRuntimeController) setTSharkPath(ctx context.Context, path string) model.TSharkToolStatus {
 	ctl.toolRuntimeMu.Lock()
 	defer ctl.toolRuntimeMu.Unlock()
-	tshark.SetBinaryPath(strings.TrimSpace(path))
+	ctl.ensureRuntimesLocked()
+
+	warning, err := ctl.tsharkRuntime.SetPath(path)
+	if err != nil {
+		return model.TSharkToolStatus{
+			Available:       false,
+			Message:         err.Error(),
+			CustomPath:      strings.TrimSpace(path),
+			UsingCustomPath: false,
+			PathWarning:     "",
+		}
+	}
+	tshark.SetBinaryPath(ctl.tsharkRuntime.ConfiguredPath())
 	tshark.ClearCapabilityCache()
-	return toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	status := toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	status.PathWarning = warning
+	if warning == "" && status.ExtraAllowedDir == "" {
+		status.ExtraAllowedDir = ctl.tsharkRuntime.ExtraAllowedDir(ctl.tsharkRuntime.ConfiguredPath())
+	}
+	return status
+}
+
+func (ctl *toolRuntimeController) allowTSharkDir(ctx context.Context, dir string) model.TSharkToolStatus {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	ctl.tsharkRuntime.AllowDir(dir)
+	return ctl.revalidateTSharkPathLocked(ctx)
+}
+
+func (ctl *toolRuntimeController) tsharkAllowedDirs() []string {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	return ctl.tsharkRuntime.AllowedDirs()
+}
+
+func (ctl *toolRuntimeController) removeTSharkAllowedDir(ctx context.Context, dir string) model.TSharkToolStatus {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	ctl.tsharkRuntime.RemoveDir(dir)
+	return ctl.revalidateTSharkPathLocked(ctx)
+}
+
+func (ctl *toolRuntimeController) revalidateTSharkPathLocked(ctx context.Context) model.TSharkToolStatus {
+	trimmed := ctl.tsharkRuntime.ConfiguredPath()
+	warning, err := ctl.tsharkRuntime.Revalidate()
+	if err != nil {
+		// Hard validation error on the configured path: surface it as an
+		// unavailable status and drop the stale path so subsequent probes
+		// don't keep using it.
+		ctl.tsharkRuntime.ClearPath()
+		tshark.SetBinaryPath("")
+		return model.TSharkToolStatus{
+			Available:       false,
+			Message:         err.Error(),
+			CustomPath:      trimmed,
+			UsingCustomPath: tshark.CurrentStatus().UsingCustomPath,
+			PathWarning:     "",
+		}
+	}
+	status := toModelTSharkStatus(tshark.CurrentStatusWithContext(ctx))
+	status.PathWarning = warning
+	if warning == "" && status.ExtraAllowedDir == "" {
+		status.ExtraAllowedDir = ctl.tsharkRuntime.ExtraAllowedDir(trimmed)
+	}
+	return status
 }
 
 func (ctl *yaraHuntingController) config() model.YaraConfig {
@@ -235,8 +388,11 @@ func (ctl *yaraHuntingController) setConfig(yc model.YaraConfig) {
 	ctl.huntMu.Unlock()
 }
 
-func (ctl *yaraHuntingController) status() model.YaraToolStatus {
+func (ctl *yaraHuntingController) statusWithAllowedDirs(allowedDirs []string) model.YaraToolStatus {
 	yc := ctl.config()
+	if len(allowedDirs) > 0 {
+		yc.AllowedDirs = append([]string(nil), allowedDirs...)
+	}
 	ctl.yaraMu.Lock()
 	lastScanMessage := strings.TrimSpace(ctl.yaraLastError)
 	ctl.yaraMu.Unlock()
@@ -255,7 +411,7 @@ func (ctl *yaraHuntingController) status() model.YaraToolStatus {
 		LastScanMessage:  lastScanMessage,
 	}
 
-	yaraExe, binWarning, err := resolveYaraExecutable(yc.Bin)
+	yaraExe, binWarning, err := resolveYaraExecutableWithAllowedDirs(yc.Bin, yc.AllowedDirs)
 	if err != nil {
 		status.Available = false
 		if !status.Enabled {
@@ -266,6 +422,10 @@ func (ctl *yaraHuntingController) status() model.YaraToolStatus {
 		return status
 	}
 	status.Path = yaraExe
+	status.PathWarning = binWarning
+	if binWarning == "" {
+		status.ExtraAllowedDir = toolExtraAllowedDirForStatus(yaraExe, yc.AllowedDirs)
+	}
 	if binWarning != "" {
 		status.Message = binWarning
 	}
@@ -287,6 +447,112 @@ func (ctl *yaraHuntingController) status() model.YaraToolStatus {
 		status.Message = "ok（最近一次扫描有告警）"
 	}
 	return status
+}
+
+func (ctl *toolRuntimeController) yaraAllowedDirs() []string {
+	return ctl.toolAllowedDirs("yara")
+}
+
+func (ctl *toolRuntimeController) runtimeByToolNameLocked(toolName string) *tool.Runtime {
+	ctl.ensureRuntimesLocked()
+	switch strings.ToLower(strings.TrimSpace(toolName)) {
+	case "tshark":
+		return ctl.tsharkRuntime
+	case "ffmpeg":
+		return ctl.ffmpegRuntime
+	case "python", "speech", "speech-to-text":
+		return ctl.pythonRuntime
+	case "yara":
+		return ctl.yaraRuntime
+	default:
+		return nil
+	}
+}
+
+func (ctl *toolRuntimeController) allowToolDir(toolName string, dir string) {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	if rt := ctl.runtimeByToolNameLocked(toolName); rt != nil {
+		rt.AllowDir(dir)
+		_, _ = rt.Revalidate()
+		ctl.syncConfiguredPathLocked(rt)
+	}
+}
+
+func (ctl *toolRuntimeController) removeToolAllowedDir(toolName string, dir string) {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	if rt := ctl.runtimeByToolNameLocked(toolName); rt != nil {
+		rt.RemoveDir(dir)
+		_, _ = rt.Revalidate()
+		ctl.syncConfiguredPathLocked(rt)
+	}
+}
+
+func (ctl *toolRuntimeController) setYaraRuntimePath(path string) (string, []string) {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	if _, err := ctl.yaraRuntime.SetPath(path); err != nil {
+		ctl.yaraRuntime.ClearPath()
+	}
+	return ctl.yaraRuntime.ConfiguredPath(), ctl.yaraRuntime.AllowedDirs()
+}
+
+func (ctl *toolRuntimeController) toolAllowedDirs(toolName string) []string {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	if rt := ctl.runtimeByToolNameLocked(toolName); rt != nil {
+		return rt.AllowedDirs()
+	}
+	return nil
+}
+
+func (ctl *toolRuntimeController) syncConfiguredPathLocked(rt *tool.Runtime) {
+	if rt == nil {
+		return
+	}
+	switch rt.Name() {
+	case "tshark":
+		tshark.SetBinaryPath(rt.ConfiguredPath())
+	case "ffmpeg":
+		setEnvOrUnset(ffmpegEnvVar, rt.ConfiguredPath())
+	case "python":
+		setEnvOrUnset(pythonEnvVar, rt.ConfiguredPath())
+	}
+}
+
+func (ctl *toolRuntimeController) ensureRuntimesLocked() {
+	if ctl.tsharkRuntime == nil {
+		ctl.tsharkRuntime = tool.NewRuntime("tshark", []string{"tshark"}, nil)
+	}
+	if ctl.ffmpegRuntime == nil {
+		ctl.ffmpegRuntime = tool.NewRuntime("ffmpeg", []string{"ffmpeg"}, nil)
+	}
+	if ctl.pythonRuntime == nil {
+		ctl.pythonRuntime = tool.NewRuntime("python", []string{"python", "python3"}, nil)
+	}
+	if ctl.yaraRuntime == nil {
+		ctl.yaraRuntime = tool.NewRuntime("yara", []string{"yara", "yara64"}, nil)
+	}
+}
+
+func configuredPathOrEnv(rt *tool.Runtime, envKey string) string {
+	if rt != nil {
+		if configured := strings.TrimSpace(rt.ConfiguredPath()); configured != "" {
+			return configured
+		}
+	}
+	return strings.TrimSpace(os.Getenv(envKey))
+}
+
+func configuredPathOrValue(rt *tool.Runtime, fallback string) string {
+	if rt != nil {
+		if configured := strings.TrimSpace(rt.ConfiguredPath()); configured != "" {
+			return configured
+		}
+	}
+	return strings.TrimSpace(fallback)
 }
 
 func setEnvOrUnset(key, value string) {

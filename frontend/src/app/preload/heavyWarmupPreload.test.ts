@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { backendClients } from "../integrations/backendClients";
+import { asC2SampleAnalysis } from "../integrations/mappers/c2SampleMapper";
+import { asVehicleAnalysis } from "../integrations/mappers/vehicleMapper";
 import { buildHeavyWarmupCacheKey, scheduleRouteHeavyWarmup } from "./heavyWarmupPreload";
 import { resetPreloadSchedulerForTest, setPreloadFeatureFlagOverrideForTest } from "./preloadScheduler";
 import { setPreloadTelemetrySinkForTest } from "./preloadTelemetry";
+
+type TestDesktopWindow = Window & { go?: { main?: { DesktopApp?: Record<string, never> } } };
+
+function desktopWindow() {
+  return window as TestDesktopWindow;
+}
 
 vi.mock("../integrations/backendClients", () => ({
   backendClients: {
@@ -24,7 +32,7 @@ describe("heavy warmup preload", () => {
     setPreloadTelemetrySinkForTest(undefined);
     vi.mocked(backendClients.analysis.getC2SampleAnalysis).mockReset();
     vi.mocked(backendClients.vehicleDBC.listVehicleDBCProfiles).mockReset();
-    delete (window as any).go;
+    delete desktopWindow().go;
   });
 
   it("skips when not in desktop runtime", async () => {
@@ -38,9 +46,9 @@ describe("heavy warmup preload", () => {
   });
 
   it("schedules C2 warmup with background source when desktop and flag enabled", async () => {
-    (window as any).go = { main: { DesktopApp: {} } };
+    desktopWindow().go = { main: { DesktopApp: {} } };
     setPreloadFeatureFlagOverrideForTest(() => true);
-    vi.mocked(backendClients.analysis.getC2SampleAnalysis).mockResolvedValue({} as any);
+    vi.mocked(backendClients.analysis.getC2SampleAnalysis).mockResolvedValue(emptyC2SampleAnalysis());
 
     await scheduleRouteHeavyWarmup("/c2-analysis", "hover", warmupInput());
 
@@ -48,7 +56,7 @@ describe("heavy warmup preload", () => {
   });
 
   it("keeps forbidden heavy targets dark", async () => {
-    (window as any).go = { main: { DesktopApp: {} } };
+    desktopWindow().go = { main: { DesktopApp: {} } };
     setPreloadFeatureFlagOverrideForTest(() => true);
     const events: string[] = [];
     setPreloadTelemetrySinkForTest((event) => events.push(`${event.event}:${event.reason ?? ""}`));
@@ -71,13 +79,13 @@ describe("heavy warmup preload", () => {
   });
 
   it("loads DBC profile paths before vehicle warmup", async () => {
-    (window as any).go = { main: { DesktopApp: {} } };
+    desktopWindow().go = { main: { DesktopApp: {} } };
     setPreloadFeatureFlagOverrideForTest(() => true);
     vi.mocked(backendClients.vehicleDBC.listVehicleDBCProfiles).mockResolvedValue([
       { path: "z.dbc", name: "Z", messageCount: 1, signalCount: 2 },
       { path: "a.dbc", name: "A", messageCount: 2, signalCount: 3 },
     ]);
-    vi.mocked(backendClients.analysis.getVehicleAnalysis).mockResolvedValue({} as any);
+    vi.mocked(backendClients.analysis.getVehicleAnalysis).mockResolvedValue(emptyVehicleAnalysis());
 
     await scheduleRouteHeavyWarmup("/vehicle-analysis", "hover", warmupInput());
 
@@ -95,4 +103,12 @@ function warmupInput() {
     captureRevision: 1,
     currentRouteIdle: true,
   };
+}
+
+function emptyC2SampleAnalysis() {
+  return asC2SampleAnalysis({});
+}
+
+function emptyVehicleAnalysis() {
+  return asVehicleAnalysis({});
 }

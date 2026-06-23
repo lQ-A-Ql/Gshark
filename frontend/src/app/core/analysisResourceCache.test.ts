@@ -15,6 +15,30 @@ describe("createAnalysisResourceCache", () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
+  it("isolates caller cancellation while sharing inflight work", async () => {
+    const cache = createAnalysisResourceCache<number>();
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    let resolveLoad: (value: number) => void = () => undefined;
+    const load = vi.fn(
+      () =>
+        new Promise<number>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+
+    const first = cache.request("capture::evidence", { signal: firstController.signal, load });
+    const second = cache.request("capture::evidence", { signal: secondController.signal, load });
+
+    firstController.abort();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+
+    resolveLoad(42);
+    await expect(second).resolves.toBe(42);
+    await expect(cache.request("capture::evidence", { signal: secondController.signal, load })).resolves.toBe(42);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
   it("serves cached values unless force refresh is requested", async () => {
     const cache = createAnalysisResourceCache<number>();
     const signal = new AbortController().signal;

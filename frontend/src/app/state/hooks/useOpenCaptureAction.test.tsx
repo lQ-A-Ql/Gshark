@@ -19,4 +19,20 @@ describe("useOpenCaptureAction", () => {
     expect(result.current.displayFilter).toBe("");
     expect(startCapture).toHaveBeenCalledWith("sample.pcap", "");
   });
+
+  it("keeps display filter when capture open is canceled", async () => {
+    const startCapture = vi.fn().mockResolvedValue(false);
+    const { result } = renderHook(() => {
+      const [displayFilter, setDisplayFilter] = useState("tcp.port == 443");
+      const openCapture = useOpenCaptureAction({ setDisplayFilter, startCapture });
+      return { displayFilter, openCapture };
+    });
+
+    await act(async () => {
+      await expect(result.current.openCapture()).resolves.toBe(false);
+    });
+
+    expect(result.current.displayFilter).toBe("tcp.port == 443");
+    expect(startCapture).toHaveBeenCalledWith(undefined, "");
+  });
 });

@@ -197,7 +197,9 @@ func TestDecodeStreamPayloadBehinderCBC(t *testing.T) {
 	keyHash := md5.Sum([]byte(pass))
 	key := keyHash[:16]
 	plain := []byte("assert|behinder-cbc")
-	ciphertext := encryptAESCBCForTest(plain, key, nil)
+	iv := []byte("behinderivcbc001")
+	cipherBlock := encryptAESCBCForTest(plain, key, iv)
+	ciphertext := append(append([]byte{}, iv...), cipherBlock...)
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
 		Decoder: "behinder",
 		Payload: base64.StdEncoding.EncodeToString(ciphertext),
@@ -382,8 +384,9 @@ func TestDecodeStreamPayloadGodzillaXorDerivedKey(t *testing.T) {
 
 func TestDecodeStreamPayloadGodzillaAESCBC(t *testing.T) {
 	key := "0123456789abcdef"
+	iv := []byte("fedcba9876543210")
 	plain := []byte("godzilla-aes-cbc")
-	ciphertext := encryptAESCBCForTest(plain, []byte(key), nil)
+	ciphertext := encryptAESCBCForTest(plain, []byte(key), iv)
 	result, err := DecodeStreamPayload(StreamDecodeRequest{
 		Decoder: "godzilla",
 		Payload: base64.StdEncoding.EncodeToString(ciphertext),
@@ -391,6 +394,7 @@ func TestDecodeStreamPayloadGodzillaAESCBC(t *testing.T) {
 			"key":           key,
 			"cipher":        "aes_cbc",
 			"inputEncoding": "base64",
+			"iv":            string(iv),
 		},
 	})
 	if err != nil {
@@ -748,6 +752,35 @@ func TestDecryptAESCBC(t *testing.T) {
 	}
 	if string(result) != string(plain) {
 		t.Fatalf("unexpected decryptAESCBC result: %q", string(result))
+	}
+}
+
+func TestPKCS7UnpadRejectsInvalidFullBlockPadding(t *testing.T) {
+	data := append([]byte("0123456789abcdef"), bytesRepeatForTest(16, aes.BlockSize)...)
+	data[len(data)-aes.BlockSize] = 1
+	if _, err := pkcs7Unpad(data, aes.BlockSize); err == nil {
+		t.Fatal("expected invalid full-block padding to be rejected")
+	}
+}
+
+func TestPKCS7UnpadLenientRejectsRandomWrongKeyPlaintext(t *testing.T) {
+	data := bytesRepeatForTest(0x01, aes.BlockSize)
+	data[len(data)-1] = 8
+	if _, err := pkcs7UnpadLenient(data, aes.BlockSize); err == nil {
+		t.Fatal("expected random invalid padding output to be rejected")
+	}
+}
+
+func TestPKCS7UnpadLenientAcceptsReadableUnpaddedPlaintext(t *testing.T) {
+	plain := []byte("system(\"whoami\");")
+	padded := append([]byte{}, plain...)
+	padded = append(padded, bytesRepeatForTest(0, aes.BlockSize-len(plain)%aes.BlockSize)...)
+	got, err := pkcs7UnpadLenient(padded, aes.BlockSize)
+	if err != nil {
+		t.Fatalf("expected readable unpadded plaintext to be accepted: %v", err)
+	}
+	if string(got) != string(plain) {
+		t.Fatalf("unexpected plaintext: %q", got)
 	}
 }
 

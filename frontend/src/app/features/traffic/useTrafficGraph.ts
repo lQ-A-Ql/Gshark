@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { GlobalTrafficStats, Packet, TrafficConversation } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { buildTimelineBucketsFromPacketTimes } from "./trafficTimeline";
 import type { FeaturePreloadContract } from "../../preload/preloadContracts";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 
 export const EMPTY_TRAFFIC_STATS: GlobalTrafficStats = {
   totalPackets: 0,
@@ -46,58 +46,21 @@ export function useTrafficGraph({
   totalPackets,
   captureRevision,
 }: UseTrafficGraphOptions) {
-  const captureCacheKey = useMemo(
+  const cacheKey = useMemo(
     () => buildTrafficStatsCacheKey(captureRevision, filePath, totalPackets),
     [captureRevision, filePath, totalPackets],
   );
-  const [stats, setStats] = useState<GlobalTrafficStats>(EMPTY_TRAFFIC_STATS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runStatsRequest, cancel: cancelStatsRequest } = useAbortableRequest();
-  const hasCaptureForStats = useMemo(() => hasUsableCapturePath(filePath, totalPackets), [filePath, totalPackets]);
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-  const refreshStats = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasCaptureForStats) {
-        cancelStatsRequest();
-        setStats(EMPTY_TRAFFIC_STATS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-
-      if (!force && captureCacheKey && trafficStatsCache.has(captureCacheKey)) {
-        cancelStatsRequest();
-        setStats(trafficStatsCache.get(captureCacheKey) ?? EMPTY_TRAFFIC_STATS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      return runStatsRequest({
-        request: (signal) => requestTrafficStats(captureCacheKey, signal, { force }),
-        onSuccess: (payload) => {
-          if (captureCacheKey) {
-            trafficStatsCache.set(captureCacheKey, payload);
-          }
-          setStats(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "流量统计加载失败");
-          setStats(EMPTY_TRAFFIC_STATS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [backendConnected, captureCacheKey, cancelStatsRequest, hasCaptureForStats, runStatsRequest],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    refreshStats();
-  }, [isPreloadingCapture, refreshStats]);
+  const { data: stats, loading, error, refresh: refreshStats } = useAnalysisResult<GlobalTrafficStats>({
+    cache: trafficStatsCache,
+    cacheKey,
+    emptyValue: EMPTY_TRAFFIC_STATS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "流量统计加载失败",
+    fetch: (signal) => backendClients.analysis.getGlobalTrafficStats(signal),
+  });
 
   return { stats, loading, error, refreshStats };
 }
@@ -210,7 +173,7 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
       dstIPCounts.set(dst, (dstIPCounts.get(dst) ?? 0) + 1);
     }
     if (src && dst) {
-      const conversationKey = `${src}\u0000${dst}`;
+      const conversationKey = `${src}\0${dst}`;
       conversationCounts.set(conversationKey, (conversationCounts.get(conversationKey) ?? 0) + 1);
     }
     if (packet.dstPort > 0) {
@@ -239,7 +202,7 @@ export function buildStatsFromPackets(packets: Packet[]): GlobalTrafficStats {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 200)
     .map(([conversationKey, count]) => {
-      const [src, dst] = conversationKey.split("\u0000");
+      const [src, dst] = conversationKey.split("\0");
       return {
         src: src ?? "",
         dst: dst ?? "",

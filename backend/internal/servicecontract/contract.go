@@ -106,12 +106,14 @@ type AnalysisReadService interface {
 // consumers.
 type MediaReadService interface {
 	MediaAnalysis() (model.MediaAnalysis, error)
+	MediaAnalysisWithContext(ctx context.Context) (model.MediaAnalysis, error)
 }
 
 // ToolRuntimeReadService defines the tool-runtime snapshot read methods
 // shared across consumers.
 type ToolRuntimeReadService interface {
 	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
+	TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus
 }
 
 // ToolAnalysisReadService defines the per-tool analysis methods shared across

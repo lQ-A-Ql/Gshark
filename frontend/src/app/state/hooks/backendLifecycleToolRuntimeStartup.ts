@@ -208,14 +208,23 @@ export async function loadFullToolRuntimeInBackground({
 export function toolRuntimeConfigsEqual(left: ToolRuntimeConfig, right: ToolRuntimeConfig): boolean {
   return (
     normalizePath(left.tsharkPath) === normalizePath(right.tsharkPath) &&
+    stringArraysEqual(left.tsharkAllowedDirs ?? [], right.tsharkAllowedDirs ?? []) &&
     normalizePath(left.ffmpegPath) === normalizePath(right.ffmpegPath) &&
+    stringArraysEqual(left.ffmpegAllowedDirs ?? [], right.ffmpegAllowedDirs ?? []) &&
     normalizePath(left.pythonPath) === normalizePath(right.pythonPath) &&
+    stringArraysEqual(left.pythonAllowedDirs ?? [], right.pythonAllowedDirs ?? []) &&
     normalizePath(left.voskModelPath) === normalizePath(right.voskModelPath) &&
     Boolean(left.yaraEnabled) === Boolean(right.yaraEnabled) &&
     normalizePath(left.yaraBin) === normalizePath(right.yaraBin) &&
+    stringArraysEqual(left.yaraAllowedDirs ?? [], right.yaraAllowedDirs ?? []) &&
     normalizePath(left.yaraRules) === normalizePath(right.yaraRules) &&
     Number(left.yaraTimeoutMs || 25000) === Number(right.yaraTimeoutMs || 25000)
   );
+}
+
+function stringArraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
 }
 
 export function startupToolRuntimeConfigForSync(

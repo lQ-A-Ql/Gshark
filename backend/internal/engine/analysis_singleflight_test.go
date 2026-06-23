@@ -151,10 +151,10 @@ func TestMediaAnalysisSingleflightCoalescesNonForceColdRequests(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
 	var calls int32
-	buildMediaAnalysisFromPacketStreamFn = func(string, int, tshark.MediaScanConfig, func(int, int, string), func(func(model.Packet) error) error) (model.MediaAnalysis, map[string]string, error) {
+	buildMediaAnalysisFromPacketStreamFn = func(context.Context, string, int, tshark.MediaScanConfig, func(int, int, string), func(func(model.Packet) error) error) (model.MediaAnalysis, map[string]string, error) {
 		return model.MediaAnalysis{}, nil, nil
 	}
-	buildMediaAnalysisFromFileWithConfigFn = func(string, string, tshark.MediaScanConfig, func(int, int, string)) (model.MediaAnalysis, map[string]string, error) {
+	buildMediaAnalysisFromFileWithConfigFn = func(context.Context, string, string, tshark.MediaScanConfig, func(int, int, string)) (model.MediaAnalysis, map[string]string, error) {
 		if atomic.AddInt32(&calls, 1) == 1 {
 			close(started)
 		}

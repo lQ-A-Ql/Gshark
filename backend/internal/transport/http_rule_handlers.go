@@ -105,8 +105,9 @@ func (s *Server) handleRulesDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload struct {
-		PackID string `json:"pack_id"`
-		URL    string `json:"url"`
+		PackID   string `json:"pack_id"`
+		URL      string `json:"url"`
+		Checksum string `json:"checksum"`
 	}
 	if err := decodeJSONBody(w, r, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid payload")
@@ -116,10 +117,14 @@ func (s *Server) handleRulesDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "pack_id is required")
 		return
 	}
+	if strings.TrimSpace(payload.URL) == "" {
+		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
 
-	pack, err := s.ruleManager.DownloadPack(payload.PackID, payload.URL)
+	pack, err := s.ruleManager.DownloadPack(payload.PackID, payload.URL, payload.Checksum)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, http.StatusBadRequest, sanitizeErrorMessage(err))
 		return
 	}
 

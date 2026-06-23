@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tool"
 )
 
 type playbackProfile struct {
@@ -37,18 +38,35 @@ type FFmpegStatus struct {
 	Message         string `json:"message"`
 	CustomPath      string `json:"custom_path,omitempty"`
 	UsingCustomPath bool   `json:"using_custom_path,omitempty"`
+	PathWarning     string `json:"path_warning,omitempty"`
+	ExtraAllowedDir string `json:"extra_allowed_dir,omitempty"`
 }
 
 func (s *Service) FFmpegStatus() model.FFmpegToolStatus {
-	return toModelFFmpegStatus(s.mediaCtl.ffmpegStatus())
+	return toModelFFmpegStatus(s.ffmpegStatus())
 }
 
 func (s *Service) ffmpegStatus() FFmpegStatus {
-	return s.mediaCtl.ffmpegStatus()
+	return s.runtimeCtl.ffmpegStatus()
 }
 
-func (ctl *mediaController) ffmpegStatus() FFmpegStatus {
+func (ctl *toolRuntimeController) ffmpegStatus() FFmpegStatus {
+	ctl.toolRuntimeMu.Lock()
+	defer ctl.toolRuntimeMu.Unlock()
+	ctl.ensureRuntimesLocked()
+	return ffmpegStatusFromRuntime(ctl.ffmpegRuntime)
+}
+
+func ffmpegStatusFromRuntime(rt *tool.Runtime) FFmpegStatus {
 	customPath := strings.TrimSpace(os.Getenv(ffmpegEnvVar))
+	pathWarning := ""
+	extraAllowedDir := ""
+	if rt != nil {
+		if configured := strings.TrimSpace(rt.ConfiguredPath()); configured != "" {
+			customPath = configured
+		}
+		pathWarning = rt.PathWarning()
+	}
 	path, err := resolveFFmpegBinary(customPath)
 	if err != nil {
 		return FFmpegStatus{
@@ -59,12 +77,17 @@ func (ctl *mediaController) ffmpegStatus() FFmpegStatus {
 			UsingCustomPath: customPath != "",
 		}
 	}
+	if rt != nil && pathWarning == "" {
+		extraAllowedDir = rt.ExtraAllowedDir(path)
+	}
 	return FFmpegStatus{
 		Available:       true,
 		Path:            path,
-		Message:         "ok",
+		Message:         firstNonEmpty(pathWarning, "ok"),
 		CustomPath:      customPath,
 		UsingCustomPath: customPath != "",
+		PathWarning:     pathWarning,
+		ExtraAllowedDir: extraAllowedDir,
 	}
 }
 

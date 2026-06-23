@@ -1,7 +1,12 @@
 package transport
 
 import (
+	"bufio"
+	"crypto/sha256"
+	"crypto/subtle"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -72,7 +77,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		if candidate == "" {
 			candidate = strings.TrimSpace(r.Header.Get("X-Meow-Traffic-Auth"))
 		}
-		if candidate != token {
+		if !constantTimeTokenMatch(candidate, token) {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
@@ -81,12 +86,27 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 	})
 }
 
+func constantTimeTokenMatch(candidate, token string) bool {
+	if token == "" {
+		return candidate == ""
+	}
+	// Use SHA-256 to normalize length before constant-time comparison,
+	// avoiding timing leaks from length differences.
+	candidateHash := sha256.Sum256([]byte(candidate))
+	tokenHash := sha256.Sum256([]byte(token))
+	return subtle.ConstantTimeCompare(candidateHash[:], tokenHash[:]) == 1
+}
+
 func (s *Server) withAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/health" || r.URL.Path == "/api/events" || r.URL.Path == "/api/audit/logs" {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		s.mu.Lock()
+		authEnabled := strings.TrimSpace(s.authToken) != ""
+		s.mu.Unlock()
 
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
@@ -100,7 +120,7 @@ func (s *Server) withAudit(next http.Handler) http.Handler {
 			Origin:        strings.TrimSpace(r.Header.Get("Origin")),
 			RemoteAddr:    strings.TrimSpace(r.RemoteAddr),
 			Status:        recorder.status,
-			Authenticated: true,
+			Authenticated: !authEnabled || recorder.status != http.StatusUnauthorized,
 		}
 		s.appendAuditEntry(entry)
 	})
@@ -114,4 +134,21 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+var (
+	_ http.Flusher = (*statusRecorder)(nil)
+)
+
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, fmt.Errorf("statusRecorder: underlying ResponseWriter does not implement http.Hijacker")
 }

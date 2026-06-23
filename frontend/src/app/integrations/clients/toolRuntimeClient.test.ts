@@ -59,11 +59,15 @@ describe("toolRuntimeClient", () => {
       expect(init?.body).toBe(
         JSON.stringify({
           tshark_path: "t.exe",
+          tshark_allowed_dirs: [],
           ffmpeg_path: "f.exe",
+          ffmpeg_allowed_dirs: [],
           python_path: "py.exe",
+          python_allowed_dirs: [],
           vosk_model_path: "model",
           yara_enabled: true,
           yara_bin: "yara.exe",
+          yara_allowed_dirs: [],
           yara_rules: "rules",
           yara_timeout_ms: 12345,
         }),
@@ -84,11 +88,15 @@ describe("toolRuntimeClient", () => {
     expect(snapshot.transport).toBe("http-fallback");
     const updated = await client.updateToolRuntimeConfig({
       tsharkPath: "t.exe",
+      tsharkAllowedDirs: [],
       ffmpegPath: "f.exe",
+      ffmpegAllowedDirs: [],
       pythonPath: "py.exe",
+      pythonAllowedDirs: [],
       voskModelPath: "model",
       yaraEnabled: true,
       yaraBin: "yara.exe",
+      yaraAllowedDirs: [],
       yaraRules: "rules",
       yaraTimeoutMs: 12345,
     });

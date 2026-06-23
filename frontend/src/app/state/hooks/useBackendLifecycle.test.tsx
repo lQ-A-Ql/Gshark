@@ -58,11 +58,15 @@ function createToolRuntimeSnapshot(): ToolRuntimeSnapshot {
   return {
     config: {
       tsharkPath: "",
+      tsharkAllowedDirs: [],
       ffmpegPath: "",
+      ffmpegAllowedDirs: [],
       pythonPath: "",
+      pythonAllowedDirs: [],
       voskModelPath: "",
       yaraEnabled: true,
       yaraBin: "",
+      yaraAllowedDirs: [],
       yaraRules: "",
       yaraTimeoutMs: 25000,
     },
@@ -105,11 +109,15 @@ function createEnvConfiguredToolRuntimeSnapshot(): ToolRuntimeSnapshot {
   const snapshot = createToolRuntimeSnapshot();
   snapshot.config = {
     tsharkPath: "",
+    tsharkAllowedDirs: [],
     ffmpegPath: "C:/Env/ffmpeg.exe",
+    ffmpegAllowedDirs: [],
     pythonPath: "C:/Env/python.exe",
+    pythonAllowedDirs: [],
     voskModelPath: "C:/Env/vosk-model",
     yaraEnabled: true,
     yaraBin: "C:/Env/yara.exe",
+    yaraAllowedDirs: [],
     yaraRules: "C:/Env/default.yar",
     yaraTimeoutMs: 45000,
   };

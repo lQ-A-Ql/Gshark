@@ -23,6 +23,15 @@ func invokeJavaScript(ctx context.Context, path string, input map[string]any, ru
 	defer cancel()
 
 	vm := goja.New()
+	vm.SetMaxCallStackSize(10000)
+	for _, name := range []string{"eval", "Function", "require", "process"} {
+		if err := vm.GlobalObject().Set(name, goja.Undefined()); err != nil {
+			return nil, err
+		}
+	}
+	if err := vm.Set("globalThis.process", goja.Undefined()); err != nil {
+		return nil, err
+	}
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -42,9 +51,13 @@ func invokeJavaScript(ctx context.Context, path string, input map[string]any, ru
 	if !ok {
 		return nil, fmt.Errorf("onRequest not found")
 	}
+	capturePath := ""
+	if hasModulePermission(runtime.Permissions, "capture.read") {
+		capturePath = strings.TrimSpace(runtime.CapturePath)
+	}
 	ctxObj := vm.NewObject()
 	_ = ctxObj.Set("moduleDir", filepath.Dir(path))
-	_ = ctxObj.Set("capturePath", strings.TrimSpace(runtime.CapturePath))
+	_ = ctxObj.Set("capturePath", capturePath)
 	_ = ctxObj.Set("tsharkPath", strings.TrimSpace(runtime.TSharkPath))
 	_ = ctxObj.Set("readText", func(relPath string) string {
 		target, err := resolveManagedPath(filepath.Dir(path), relPath)
@@ -58,6 +71,9 @@ func invokeJavaScript(ctx context.Context, path string, input map[string]any, ru
 		return string(raw)
 	})
 	_ = ctxObj.Set("scanFields", func(call goja.FunctionCall) goja.Value {
+		if !hasModulePermission(runtime.Permissions, "host.scan") {
+			panic(vm.NewGoError(fmt.Errorf("misc module missing required permission: host.scan")))
+		}
 		if strings.TrimSpace(runtime.CapturePath) == "" {
 			panic(vm.NewGoError(fmt.Errorf("当前没有已加载抓包")))
 		}

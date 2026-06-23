@@ -47,6 +47,9 @@ export function useBackendLifecycle({
     lastToolRuntimeProbeError,
     setLastToolRuntimeProbeError,
     setTSharkPath: setTSharkPathImpl,
+    allowTSharkDir: allowTSharkDirImpl,
+    removeTSharkAllowedDir: removeTSharkAllowedDirImpl,
+    refreshTSharkAllowedDirs: refreshTSharkAllowedDirsImpl,
     refreshToolRuntimeSnapshot: refreshToolRuntimeSnapshotImpl,
     saveToolRuntimeConfig: saveToolRuntimeConfigImpl,
   } = useToolRuntime();
@@ -63,12 +66,15 @@ export function useBackendLifecycle({
   const backendRetryTimerRef = useRef<number | null>(null);
   const { backendAuthToken, isBackendAuthTokenLoading } = useBackendAuthToken(backendConnected);
 
-  const { setTSharkPath, refreshToolRuntimeSnapshot, saveToolRuntimeConfig, updateDecryptionConfig } =
+  const { setTSharkPath, allowTSharkDir, removeTSharkAllowedDir, refreshTSharkAllowedDirs, refreshToolRuntimeSnapshot, saveToolRuntimeConfig, updateDecryptionConfig } =
     useBackendLifecycleControls({
       backendConnected,
       setBackendStatus,
       setDecryptionConfig,
       setTSharkPathImpl,
+      allowTSharkDirImpl,
+      removeTSharkAllowedDirImpl,
+      refreshTSharkAllowedDirsImpl,
       refreshToolRuntimeSnapshotImpl,
       saveToolRuntimeConfigImpl,
     });
@@ -147,6 +153,9 @@ export function useBackendLifecycle({
     toolRuntimeProbeTransport,
     lastToolRuntimeProbeError,
     setTSharkPath,
+    allowTSharkDir,
+    removeTSharkAllowedDir,
+    refreshTSharkAllowedDirs,
     toolRuntimeSnapshot,
     isToolRuntimeLoading,
     refreshToolRuntimeSnapshot,

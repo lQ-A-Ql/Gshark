@@ -529,6 +529,11 @@ export const sourceSizeBudgets = [
     reason: "runtime mapper should keep tool runtime snapshot conversion local and re-export speech batch mapping",
   },
   {
+    path: "src/app/integrations/mappers/runtimeConfigMapper.ts",
+    maxLines: 25,
+    reason: "runtime config mapper should isolate persisted tool runtime config field conversion",
+  },
+  {
     path: "src/app/integrations/mappers/runtimeComponentMapper.ts",
     maxLines: 65,
     reason: "runtime component mapper should isolate FFmpeg, speech, YARA, and config field conversion",
@@ -656,7 +661,7 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/state/hooks/useSentinelDomainValues.ts",
-    maxLines: 370,
+    maxLines: 380,
     reason: "sentinel domain values hook should only memoize domain-specific provider values",
   },
   {
@@ -2117,8 +2122,8 @@ export const sourceSizeBudgets = [
   },
   {
     path: "src/app/components/CaptureSettingsSection.tsx",
-    maxLines: 40,
-    reason: "capture runtime settings section should keep TShark path and status fields only",
+    maxLines: 55,
+    reason: "capture runtime settings section should keep TShark path, status, and allowed-directory controls",
   },
   {
     path: "src/app/components/TSharkCapabilityDetails.tsx",

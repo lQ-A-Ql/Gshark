@@ -73,12 +73,15 @@ export interface RuleValidationError {
 
 export interface RuleClient {
   getRuleStatus(signal?: AbortSignal): Promise<RuleStatus>;
-  toggleRulePack(packId: string, enabled: boolean): Promise<void>;
-  checkRuleUpdates(): Promise<RuleUpdateResult[]>;
-  downloadRulePack(packId: string, url: string): Promise<RulePack>;
-  updateRuleConfig(config: RuleUpdateConfig): Promise<RuleUpdateConfig>;
-  listRuleConflicts(): Promise<RuleConflict[]>;
-  validateRuleContent(content: string): Promise<{ valid: boolean; errors: RuleValidationError[] }>;
+  toggleRulePack(packId: string, enabled: boolean, signal?: AbortSignal): Promise<void>;
+  checkRuleUpdates(signal?: AbortSignal): Promise<RuleUpdateResult[]>;
+  downloadRulePack(packId: string, url: string, checksum: string, signal?: AbortSignal): Promise<RulePack>;
+  updateRuleConfig(config: RuleUpdateConfig, signal?: AbortSignal): Promise<RuleUpdateConfig>;
+  listRuleConflicts(signal?: AbortSignal): Promise<RuleConflict[]>;
+  validateRuleContent(
+    content: string,
+    signal?: AbortSignal,
+  ): Promise<{ valid: boolean; errors: RuleValidationError[] }>;
 }
 
 export function createRuleClient(request: JsonRequest): RuleClient {
@@ -86,36 +89,43 @@ export function createRuleClient(request: JsonRequest): RuleClient {
     async getRuleStatus(signal) {
       return request<RuleStatus>("/api/rules/status", { signal });
     },
-    async toggleRulePack(packId, enabled) {
+    async toggleRulePack(packId, enabled, signal) {
       await request<unknown>("/api/rules/pack/toggle", {
         method: "POST",
         body: JSON.stringify({ pack_id: packId, enabled }),
+        signal,
       });
     },
-    async checkRuleUpdates() {
-      const data = await request<{ results?: RuleUpdateResult[] }>("/api/rules/check-updates", { method: "POST" });
+    async checkRuleUpdates(signal) {
+      const data = await request<{ results?: RuleUpdateResult[] }>("/api/rules/check-updates", {
+        method: "POST",
+        signal,
+      });
       return data.results ?? [];
     },
-    async downloadRulePack(packId, url) {
+    async downloadRulePack(packId, url, checksum, signal) {
       return request<RulePack>("/api/rules/download", {
         method: "POST",
-        body: JSON.stringify({ pack_id: packId, url }),
+        body: JSON.stringify({ pack_id: packId, url, checksum }),
+        signal,
       });
     },
-    async updateRuleConfig(config) {
+    async updateRuleConfig(config, signal) {
       return request<RuleUpdateConfig>("/api/rules/config", {
         method: "POST",
         body: JSON.stringify(config),
+        signal,
       });
     },
-    async listRuleConflicts() {
-      const data = await request<{ conflicts?: RuleConflict[] }>("/api/rules/conflicts");
+    async listRuleConflicts(signal) {
+      const data = await request<{ conflicts?: RuleConflict[] }>("/api/rules/conflicts", { signal });
       return data.conflicts ?? [];
     },
-    async validateRuleContent(content) {
+    async validateRuleContent(content, signal) {
       return request<{ valid: boolean; errors: RuleValidationError[] }>("/api/rules/validate", {
         method: "POST",
         body: JSON.stringify({ content }),
+        signal,
       });
     },
   };

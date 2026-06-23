@@ -1,11 +1,10 @@
 import { useCallback, useState } from "react";
 import type { ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
 import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient";
-import { backendClients } from "../../integrations/backendClients";
 import { applyOfflineToolRuntimeConfig } from "../toolRuntimeOfflineApply";
 import { probeToolRuntimeSnapshot, syncToolRuntimeConfig } from "../toolRuntimeProbeActions";
 import { startFullToolRuntimeProbe } from "../toolRuntimeBackgroundProbe";
-import { describeTSharkApplyStatus, describeTSharkReadyStatus, toTSharkStatus } from "../tsharkStatusState";
+import { describeTSharkApplyStatus, toTSharkStatus } from "../tsharkStatusState";
 import { readToolRuntimeConfig, writeUserToolRuntimeConfig } from "../toolRuntimeStorage";
 import {
   explicitFieldsFromPatch,
@@ -15,7 +14,6 @@ import {
 import {
   buildNextToolRuntimeConfig,
   EMPTY_TSHARK_STATUS,
-  mergeTSharkStatusIntoSnapshot,
 } from "../toolRuntimeSnapshotMutations";
 import {
   describeToolRuntimeProbeError,
@@ -23,6 +21,7 @@ import {
   type ToolRuntimeProbeState,
   type ToolRuntimeProbeTransport,
 } from "../toolRuntimeProbeState";
+import { useToolRuntimeTSharkControls } from "./useToolRuntimeTSharkControls";
 
 export function useToolRuntime() {
   const [tsharkStatus, setTsharkStatus] = useState<TSharkStatus>(EMPTY_TSHARK_STATUS);
@@ -45,39 +44,12 @@ export function useToolRuntime() {
     });
   }, []);
 
-  const setTSharkPath = useCallback(
-    async (path: string, backendConnected: boolean, setBackendStatus: (status: string) => void) => {
-      const nextPath = path.trim();
-      writeUserToolRuntimeConfig(
-        {
-          ...(toolRuntimeSnapshot?.config ?? readToolRuntimeConfig()),
-          tsharkPath: nextPath,
-        },
-        { tsharkPath: true },
-      );
-      if (!backendConnected) {
-        setTsharkStatus((prev) => ({
-          ...prev,
-          customPath: nextPath,
-          usingCustomPath: nextPath.length > 0,
-        }));
-        return;
-      }
-
-      const status = await backendClients.runtime.setTSharkPath(nextPath);
-      setToolRuntimeCheckDegraded(false);
-      setTsharkStatus(status);
-      setToolRuntimeSnapshot((prev) => mergeTSharkStatusIntoSnapshot(prev, nextPath, status));
-
-      if (status.available) {
-        setBackendStatus(describeTSharkReadyStatus(status));
-        return;
-      }
-      setBackendStatus(status.message || "tshark is unavailable");
-      throw new Error(status.message || "tshark is unavailable");
-    },
-    [toolRuntimeSnapshot],
-  );
+  const { setTSharkPath, allowTSharkDir, removeTSharkAllowedDir, refreshTSharkAllowedDirs } = useToolRuntimeTSharkControls({
+    toolRuntimeSnapshot,
+    setTsharkStatus,
+    setToolRuntimeCheckDegraded,
+    setToolRuntimeSnapshot,
+  });
 
   const refreshToolRuntimeSnapshot = useCallback(async (backendConnected: boolean) => {
     if (!backendConnected) {
@@ -183,6 +155,9 @@ export function useToolRuntime() {
     lastToolRuntimeProbeError,
     setLastToolRuntimeProbeError,
     setTSharkPath,
+    allowTSharkDir,
+    removeTSharkAllowedDir,
+    refreshTSharkAllowedDirs,
     refreshToolRuntimeSnapshot,
     saveToolRuntimeConfig,
   };

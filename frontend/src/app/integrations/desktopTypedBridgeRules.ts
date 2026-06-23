@@ -35,9 +35,9 @@ export function createRuleTypedOverrides(desktopApp: DesktopTransportBinding): P
       );
       return asArray(asPlainObject(payload)?.results).map(asRuleUpdateResult);
     },
-    async downloadRulePack(packId, url) {
+    async downloadRulePack(packId, url, checksum) {
       const payload = await typedCall(
-        () => desktopApp.DownloadRulePack!(packId, url),
+        () => desktopApp.DownloadRulePack!(packId, url, checksum),
         "DesktopApp.DownloadRulePack",
         undefined,
         LONG_TYPED_IPC_TIMEOUT_MS,

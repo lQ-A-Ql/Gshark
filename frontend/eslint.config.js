@@ -62,9 +62,7 @@ export default [
       "no-control-regex": "off",
       "no-useless-escape": "off",
       "no-unused-vars": "off",
-      "react-hooks/exhaustive-deps": "off",
       "react-hooks/rules-of-hooks": "error",
-      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
         {

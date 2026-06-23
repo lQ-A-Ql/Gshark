@@ -281,6 +281,44 @@ func (s *Service) VehicleAnalysisWithContext(ctx context.Context) (model.Vehicle
 	})
 }
 
+func (s *Service) MediaAnalysisWithContext(ctx context.Context) (model.MediaAnalysis, error) {
+	return s.mediaAnalysisWithForceAndContext(ctx, false)
+}
+
+func (s *Service) RefreshMediaAnalysisWithContext(ctx context.Context) (model.MediaAnalysis, error) {
+	return s.mediaAnalysisWithForceAndContext(ctx, true)
+}
+
+func (s *Service) mediaAnalysisWithForceAndContext(ctx context.Context, force bool) (model.MediaAnalysis, error) {
+	s.captureCtl.mu.RLock()
+	pcap := s.captureCtl.pcap
+	cached := s.analysisCtl.mediaAnalysis
+	s.captureCtl.mu.RUnlock()
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if !force && cached != nil {
+		return *cached, nil
+	}
+	if strings.TrimSpace(pcap) == "" {
+		return model.MediaAnalysis{}, errors.New("no capture loaded")
+	}
+	if !force {
+		return doInFlightAnalysis(ctx, &s.analysisCtl.inFlightAnalysis, analysisInFlightKey(pcap, "media"), func() (model.MediaAnalysis, error) {
+			s.captureCtl.mu.RLock()
+			cached := s.analysisCtl.mediaAnalysis
+			s.captureCtl.mu.RUnlock()
+			if cached != nil {
+				return *cached, nil
+			}
+			return s.mediaAnalysisCold(ctx, pcap, true)
+		})
+	}
+	return s.mediaAnalysisCold(ctx, pcap, true)
+}
+
 func (s *Service) MediaAnalysis() (model.MediaAnalysis, error) {
 	return s.mediaAnalysisWithForce(false)
 }
@@ -290,34 +328,15 @@ func (s *Service) RefreshMediaAnalysis() (model.MediaAnalysis, error) {
 }
 
 func (s *Service) mediaAnalysisWithForce(force bool) (model.MediaAnalysis, error) {
-	s.captureCtl.mu.RLock()
-	pcap := s.captureCtl.pcap
-	cached := s.analysisCtl.mediaAnalysis
-	s.captureCtl.mu.RUnlock()
-
-	if !force && cached != nil {
-		return *cached, nil
-	}
-	if strings.TrimSpace(pcap) == "" {
-		return model.MediaAnalysis{}, errors.New("no capture loaded")
-	}
-	if !force {
-		return doInFlightAnalysis(context.Background(), &s.analysisCtl.inFlightAnalysis, analysisInFlightKey(pcap, "media"), func() (model.MediaAnalysis, error) {
-			s.captureCtl.mu.RLock()
-			cached := s.analysisCtl.mediaAnalysis
-			s.captureCtl.mu.RUnlock()
-			if cached != nil {
-				return *cached, nil
-			}
-			return s.mediaAnalysisCold(pcap, false)
-		})
-	}
-	return s.mediaAnalysisCold(pcap, true)
+	return s.mediaAnalysisWithForceAndContext(context.Background(), force)
 }
 
-func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysis, error) {
+func (s *Service) mediaAnalysisCold(ctx context.Context, pcap string, force bool) (model.MediaAnalysis, error) {
 	s.emitStatus("__progress__:media:0:3:准备媒体流分析")
 	cfg := s.buildMediaScanConfig(pcap)
+	if err := ctx.Err(); err != nil {
+		return model.MediaAnalysis{}, err
+	}
 
 	tempDir, err := os.MkdirTemp("", "meow-traffic-media-")
 	if err != nil {
@@ -336,7 +355,10 @@ func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysi
 
 	if s.captureCtl.packetStore != nil && s.captureCtl.packetStore.Count() > 0 {
 		packetCount := s.captureCtl.packetStore.Count()
-		analysis, artifacts, err = buildMediaAnalysisFromPacketStreamFn(tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
+		analysis, artifacts, err = buildMediaAnalysisFromPacketStreamFn(ctx, tempDir, packetCount, cfg, progressFn, func(onPacket func(model.Packet) error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			return s.captureCtl.packetStore.Iterate(nil, onPacket)
 		})
 		if err != nil {
@@ -350,7 +372,7 @@ func (s *Service) mediaAnalysisCold(pcap string, force bool) (model.MediaAnalysi
 	}
 
 	if err == nil && analysis.TotalMediaPackets == 0 && len(analysis.Sessions) == 0 {
-		analysis, artifacts, err = buildMediaAnalysisFromFileWithConfigFn(pcap, tempDir, cfg, progressFn)
+		analysis, artifacts, err = buildMediaAnalysisFromFileWithConfigFn(ctx, pcap, tempDir, cfg, progressFn)
 	}
 	if err != nil {
 		_ = os.RemoveAll(tempDir)

@@ -76,11 +76,15 @@ describe("toolRuntimeStorage", () => {
 
     expect(readToolRuntimeConfig()).toEqual({
       tsharkPath: "C:/Wireshark/tshark.exe",
+      tsharkAllowedDirs: [],
       ffmpegPath: "C:/ffmpeg.exe",
+      ffmpegAllowedDirs: [],
       pythonPath: "C:/Python/python.exe",
+      pythonAllowedDirs: [],
       voskModelPath: "C:/models/vosk",
       yaraEnabled: false,
       yaraBin: "C:/yara.exe",
+      yaraAllowedDirs: [],
       yaraRules: "C:/rules",
       yaraTimeoutMs: 30000,
     });
@@ -152,11 +156,15 @@ describe("toolRuntimeStorage", () => {
   it("round-trips a complete config through the storage layer", () => {
     const config: ToolRuntimeConfig = {
       tsharkPath: "C:/Wireshark/tshark.exe",
+      tsharkAllowedDirs: [],
       ffmpegPath: "C:/Tools/ffmpeg.exe",
+      ffmpegAllowedDirs: [],
       pythonPath: "C:/Python/python.exe",
+      pythonAllowedDirs: [],
       voskModelPath: "C:/models/vosk",
       yaraEnabled: false,
       yaraBin: "C:/Tools/yara.exe",
+      yaraAllowedDirs: [],
       yaraRules: "C:/rules",
       yaraTimeoutMs: 30000,
     };

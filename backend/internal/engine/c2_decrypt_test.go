@@ -534,7 +534,9 @@ func TestC2DecryptVShellAESCBCFallback(t *testing.T) {
 	salt := "legacy-salt"
 	sum := md5.Sum([]byte(salt))
 	plaintext := []byte(`{"cmd":"ipconfig"}`)
-	ciphertext := encryptC2AESCBCForTest(t, sum[:], sum[:], plaintext)
+	iv := []byte("vshellivlegacy01")
+	ciphertext := encryptC2AESCBCForTest(t, sum[:], iv, plaintext)
+	blob := append(append([]byte{}, iv...), ciphertext...)
 
 	svc := NewService(NopEmitter{})
 	defer svc.captureCtl.packetStore.Close()
@@ -542,7 +544,7 @@ func TestC2DecryptVShellAESCBCFallback(t *testing.T) {
 		ID:        2,
 		Timestamp: "2026-05-02T10:00:01Z",
 		Protocol:  "TCP",
-		Payload:   hex.EncodeToString(ciphertext),
+		Payload:   hex.EncodeToString(blob),
 		StreamID:  10,
 	}}); err != nil {
 		t.Fatalf("Append() error = %v", err)
@@ -597,10 +599,12 @@ func TestC2DecryptCSAesRandHMACVerifiedHTTPResponse(t *testing.T) {
 	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
 	plaintext := []byte{0, 0, 0, 16}
 	plaintext = append(plaintext, []byte("whoami\x00cmd.exe")...)
-	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), plaintext)
+	iv := []byte("csivrandlegacy01")
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, iv, plaintext)
+	body := append(append([]byte{}, iv...), ciphertext...)
 	mac := hmac.New(sha256.New, hmacKey)
-	mac.Write(ciphertext)
-	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
+	mac.Write(body)
+	blob := append(append([]byte{}, body...), mac.Sum(nil)...)
 
 	svc := NewService(NopEmitter{})
 	defer svc.captureCtl.packetStore.Close()
@@ -639,10 +643,12 @@ func TestC2DecryptCSLengthPrefixedTruncatedHMAC(t *testing.T) {
 	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
 	plaintext := []byte{0, 0, 0, 2, 0, 0, 0, 35, 0, 0, 0, 30}
 	plaintext = append(plaintext, []byte(`WIN-TEST\administrator`)...)
-	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), plaintext)
-	body := make([]byte, 4+len(ciphertext))
-	binary.BigEndian.PutUint32(body[:4], uint32(len(ciphertext)))
-	copy(body[4:], ciphertext)
+	iv := []byte("csivprefixedleg1")
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, iv, plaintext)
+	body := make([]byte, 4+aes.BlockSize+len(ciphertext))
+	binary.BigEndian.PutUint32(body[:4], uint32(aes.BlockSize+len(ciphertext)))
+	copy(body[4:4+aes.BlockSize], iv)
+	copy(body[4+aes.BlockSize:], ciphertext)
 	mac := hmac.New(sha256.New, hmacKey)
 	mac.Write(body)
 	blob := append(append([]byte{}, body...), mac.Sum(nil)[:16]...)
@@ -679,10 +685,12 @@ func TestC2DecryptCSLengthPrefixedTruncatedHMAC(t *testing.T) {
 func TestC2DecryptCSRejectsWrongRawKeyHMAC(t *testing.T) {
 	rawKey := []byte("0123456789abcdef")
 	aesKey, hmacKey := deriveCSKeysFromAESRand(rawKey)
-	ciphertext := encryptC2AESCBCForTest(t, aesKey, []byte("abcdefghijklmnop"), []byte("whoami"))
+	iv := []byte("csivwrongkeyleg1")
+	ciphertext := encryptC2AESCBCForTest(t, aesKey, iv, []byte("whoami"))
+	body := append(append([]byte{}, iv...), ciphertext...)
 	mac := hmac.New(sha256.New, hmacKey)
-	mac.Write(ciphertext)
-	blob := append(append([]byte{}, ciphertext...), mac.Sum(nil)...)
+	mac.Write(body)
+	blob := append(append([]byte{}, body...), mac.Sum(nil)...)
 
 	svc := NewService(NopEmitter{})
 	defer svc.captureCtl.packetStore.Close()
@@ -795,6 +803,66 @@ func TestC2DecryptHonorsCanceledContext(t *testing.T) {
 	_, err := svc.C2Decrypt(ctx, model.C2DecryptRequest{Family: "vshell", VShell: model.C2VShellDecryptOptions{Salt: "x"}})
 	if err == nil {
 		t.Fatal("expected canceled context error")
+	}
+}
+
+func TestC2DecryptCandidateKeyUsesDigestNotRawPayload(t *testing.T) {
+	candidate := c2DecryptCandidate{
+		packet:    model.Packet{ID: 1, StreamID: 2},
+		raw:       []byte("very-sensitive-or-large-raw-payload"),
+		transform: "hex",
+		direction: "client_to_server",
+	}
+	key := c2DecryptCandidateKey(candidate)
+	if strings.Contains(key, string(candidate.raw)) {
+		t.Fatalf("candidate key should not include raw payload: %q", key)
+	}
+	if !strings.Contains(key, "hex") || !strings.Contains(key, "client_to_server") {
+		t.Fatalf("candidate key lost metadata: %q", key)
+	}
+}
+
+func TestAppendC2DecryptCandidateRejectsOversizedRaw(t *testing.T) {
+	out := []c2DecryptCandidate{}
+	seen := map[string]struct{}{}
+	appendC2DecryptCandidateWithLimit(&out, seen, c2DecryptCandidate{
+		packet:    model.Packet{ID: 1},
+		raw:       bytesRepeatForTest('A', c2DecryptMaxCandidateBytes+1),
+		transform: "raw",
+	}, c2DecryptMaxRecords)
+	if len(out) != 0 || len(seen) != 0 {
+		t.Fatalf("oversized candidate should be skipped, out=%d seen=%d", len(out), len(seen))
+	}
+}
+
+func TestDecodeC2TransformCandidatesRejectsOversizedDecodedPayload(t *testing.T) {
+	oversizedHex := hex.EncodeToString(bytesRepeatForTest(0x41, c2DecryptMaxCandidateBytes+1))
+	if got := decodeC2TransformCandidates(oversizedHex, "hex"); len(got) != 0 {
+		t.Fatalf("oversized decoded payload should be skipped, got %d candidates", len(got))
+	}
+}
+
+func TestAssembleVShellStreamDirectionsCapsDecodedBodyBytes(t *testing.T) {
+	body := bytesToColonHex(bytesRepeatForTest(0x41, c2DecryptMaxStreamBytes+128))
+	out := assembleVShellStreamDirections(model.ReassembledStream{
+		Chunks: []model.StreamChunk{{Direction: "client", Body: body}},
+	})
+	if len(out) != 1 {
+		t.Fatalf("expected one capped direction, got %+v", out)
+	}
+	if got := len(decodeLooseHex(out[0].body)); got != c2DecryptMaxStreamBytes {
+		t.Fatalf("decoded stream body size = %d, want %d", got, c2DecryptMaxStreamBytes)
+	}
+}
+
+func TestSplitVShellFramesCapsFrameCount(t *testing.T) {
+	raw := make([]byte, 0, c2DecryptMaxFrameCount*5+20)
+	for i := 0; i < c2DecryptMaxFrameCount+20; i++ {
+		raw = append(raw, 1, 0, 0, 0, byte(i))
+	}
+	frames := splitVShellFrames(raw)
+	if len(frames) != c2DecryptMaxFrameCount {
+		t.Fatalf("frame count = %d, want cap %d", len(frames), c2DecryptMaxFrameCount)
 	}
 }
 

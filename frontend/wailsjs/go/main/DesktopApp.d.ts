@@ -10,7 +10,7 @@ export function DecodeStreamPayload(req:any):Promise<any>;
 export function DecryptC2Traffic(req:any):Promise<any>;
 export function DownloadMediaArtifact(token:string):Promise<any>;
 export function DownloadObjectsZip(ids:any):Promise<any>;
-export function DownloadRulePack(packID:string, remoteURL:string):Promise<any>;
+export function DownloadRulePack(packID:string, remoteURL:string, checksum:string):Promise<any>;
 export function ExecuteSavedSearch(id:string):Promise<any>;
 export function ExportMediaBatchTranscription(format:string):Promise<any>;
 export function ExportWinRMDecryptResult(resultID:string):Promise<any>;

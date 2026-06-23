@@ -67,6 +67,30 @@ def run(handler):
     emit_result(handler(get_input()))
 `
 
+func minimalPythonEnv(helperDir, inputJSON string) []string {
+	// Keep a small allowlist of environment variables to avoid leaking the
+	// host process environment into untrusted MISC Python modules.
+	allowed := map[string]bool{
+		"PATH": true,
+	}
+	out := make([]string, 0, len(allowed)+4)
+	for _, e := range os.Environ() {
+		if i := strings.IndexByte(e, '='); i > 0 {
+			if allowed[e[:i]] {
+				out = append(out, e)
+			}
+		}
+	}
+	if inputJSON != "" {
+		out = append(out, "MEOW_TRAFFIC_MISC_INPUT_JSON="+inputJSON)
+	}
+	out = append(out, "PYTHONIOENCODING=utf-8")
+	if helperDir != "" {
+		out = append(out, "PYTHONPATH="+helperDir)
+	}
+	return out
+}
+
 func invokePython(ctx context.Context, path string, input map[string]any, pythonPath string) (any, error) {
 	bin := strings.TrimSpace(pythonPath)
 	if bin == "" {
@@ -77,6 +101,7 @@ func invokePython(ctx context.Context, path string, input map[string]any, python
 	defer cancel()
 
 	cmd := exec.CommandContext(execCtx, bin, path)
+	cmd.Env = minimalPythonEnv("", "")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -98,8 +123,9 @@ func invokePython(ctx context.Context, path string, input map[string]any, python
 		_ = json.NewEncoder(stdin).Encode(input)
 	}()
 
+	stderrDone := readAllAsync(stderr)
 	rawOut, _ := io.ReadAll(stdout)
-	rawErr, _ := io.ReadAll(stderr)
+	rawErr := <-stderrDone
 	if err := cmd.Wait(); err != nil {
 		if strings.TrimSpace(string(rawErr)) != "" {
 			return nil, fmt.Errorf("%v: %s", err, strings.TrimSpace(string(rawErr)))
@@ -156,16 +182,13 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 	if err != nil {
 		return nil, err
 	}
-	cmd.Env = append(os.Environ(),
-		"MEOW_TRAFFIC_MISC_INPUT_JSON="+string(inputJSON),
-		"PYTHONIOENCODING=utf-8",
-		"PYTHONPATH="+joinPythonPath(helperDir, os.Getenv("PYTHONPATH")),
-	)
+	cmd.Env = minimalPythonEnv(helperDir, string(inputJSON))
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
+	stderrDone := readAllAsync(stderr)
 	var result any
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
@@ -197,7 +220,7 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 		return nil, err
 	}
 
-	rawErr, _ := io.ReadAll(stderr)
+	rawErr := <-stderrDone
 	if err := cmd.Wait(); err != nil {
 		if strings.TrimSpace(string(rawErr)) != "" {
 			return nil, fmt.Errorf("%v: %s", err, strings.TrimSpace(string(rawErr)))
@@ -210,6 +233,15 @@ func invokePythonWithHostBridge(ctx context.Context, path string, input map[stri
 	return result, nil
 }
 
+func readAllAsync(r io.Reader) <-chan []byte {
+	done := make(chan []byte, 1)
+	go func() {
+		data, _ := io.ReadAll(r)
+		done <- data
+	}()
+	return done
+}
+
 func handlePythonHostCall(ctx context.Context, message map[string]any, runtime InvokeContext) string {
 	id := strings.TrimSpace(asString(message["id"]))
 	method := strings.TrimSpace(asString(message["method"]))
@@ -220,6 +252,10 @@ func handlePythonHostCall(ctx context.Context, message map[string]any, runtime I
 	}
 	switch method {
 	case "scan_fields":
+		if !hasModulePermission(runtime.Permissions, "host.scan") {
+			response["error"] = "misc module missing required permission: host.scan"
+			break
+		}
 		if strings.TrimSpace(runtime.CapturePath) == "" {
 			response["error"] = "当前没有已加载抓包"
 			break

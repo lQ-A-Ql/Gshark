@@ -61,6 +61,7 @@ type MediaService interface {
 
 	// Transport-only media pipeline methods:
 	RefreshMediaAnalysis() (model.MediaAnalysis, error)
+	RefreshMediaAnalysisWithContext(ctx context.Context) (model.MediaAnalysis, error)
 	MediaArtifact(token string) (string, string, error)
 	MediaPlaybackWithContext(ctx context.Context, token string) (string, string, error)
 	TranscribeMediaArtifact(token string, force bool) (model.MediaTranscription, error)
@@ -83,10 +84,17 @@ type ToolRuntimeService interface {
 	TSharkStatusWithContext(ctx context.Context) model.TSharkToolStatus
 	SetTSharkPath(path string) model.TSharkToolStatus
 	SetTSharkPathWithContext(ctx context.Context, path string) model.TSharkToolStatus
+	AllowTSharkDirWithContext(ctx context.Context, dir string) model.TSharkToolStatus
+	TSharkAllowedDirs() []string
+	RemoveTSharkAllowedDirWithContext(ctx context.Context, dir string) model.TSharkToolStatus
+	AllowToolDirWithContext(ctx context.Context, toolName string, dir string) model.ToolRuntimeSnapshot
+	ToolAllowedDirs(toolName string) []string
+	RemoveToolAllowedDirWithContext(ctx context.Context, toolName string, dir string) model.ToolRuntimeSnapshot
 	TSharkStatusPath() string
 	TSharkUsingCustomPath() bool
 	ToolRuntimeSnapshot() model.ToolRuntimeSnapshot
 	ToolRuntimeSnapshotWithContext(ctx context.Context) model.ToolRuntimeSnapshot
+	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
 	SetToolRuntimeConfig(cfg model.ToolRuntimeConfig) model.ToolRuntimeConfig
 	FFmpegStatus() model.FFmpegToolStatus
 	TLSConfig() model.TLSConfig
@@ -94,6 +102,12 @@ type ToolRuntimeService interface {
 	MCPConfig() model.MCPConfig
 	SetMCPConfig(cfg model.MCPConfig) model.MCPConfig
 	MCPStatus(authRequired bool) model.MCPStatus
+}
+
+// ToolRuntimeReadService defines the tool-runtime snapshot read methods
+// shared across consumers.
+type ToolRuntimeReadService interface {
+	ToolRuntimeSnapshotWithOptions(ctx context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot
 }
 
 // ToolAnalysisService groups per-tool analysis methods (NTLM / HTTP-login /

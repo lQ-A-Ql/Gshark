@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/gshark/sentinel/backend/internal/model"
+	"github.com/gshark/sentinel/backend/internal/tool"
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
@@ -127,6 +128,12 @@ func NewService(emitter EventEmitter) *Service {
 		analysisCtl: analysisController{analysisCache: analysisCache{
 			analysisLimiter: newAnalysisLimiter(1),
 			analysisMetrics: newAnalysisMetrics(),
+		}},
+		runtimeCtl: toolRuntimeController{toolRuntimeState: toolRuntimeState{
+			tsharkRuntime: tool.NewRuntime("tshark", []string{"tshark"}, nil),
+			ffmpegRuntime: tool.NewRuntime("ffmpeg", []string{"ffmpeg"}, nil),
+			pythonRuntime: tool.NewRuntime("python", []string{"python", "python3"}, nil),
+			yaraRuntime:   tool.NewRuntime("yara", []string{"yara", "yara64"}, nil),
 		}},
 		playbookCtl: playbookController{playbookStatePB: playbookStatePB{
 			playbooks: map[string]*model.HuntingPlaybook{},

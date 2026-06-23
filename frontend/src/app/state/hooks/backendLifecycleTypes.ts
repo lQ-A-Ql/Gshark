@@ -5,6 +5,28 @@ import type { TSharkStatus } from "../../integrations/clients/toolRuntimeClient"
 import type { MediaAnalysisProgress, ThreatAnalysisProgress } from "./useAnalysisProgress";
 import type { ToolRuntimeProbeState, ToolRuntimeProbeTransport } from "../toolRuntimeProbeState";
 import type { ToolRuntimeConfigExplicitFields } from "../toolRuntimeStorageConfig";
+import type { UseBackendTSharkDirControlsOptions } from "./useBackendTSharkDirControls";
+
+export interface UseBackendLifecycleControlsOptions extends Pick<
+  UseBackendTSharkDirControlsOptions,
+  "allowTSharkDirImpl" | "removeTSharkAllowedDirImpl" | "refreshTSharkAllowedDirsImpl"
+> {
+  readonly backendConnected: boolean;
+  readonly setBackendStatus: Dispatch<SetStateAction<string>>;
+  readonly setDecryptionConfig: Dispatch<SetStateAction<DecryptionConfig>>;
+  readonly setTSharkPathImpl: (
+    path: string,
+    backendConnected: boolean,
+    setBackendStatus: (status: string) => void,
+  ) => Promise<void>;
+  readonly refreshToolRuntimeSnapshotImpl: (backendConnected: boolean) => Promise<ToolRuntimeSnapshot | null>;
+  readonly saveToolRuntimeConfigImpl: (
+    patch: Partial<ToolRuntimeConfig>,
+    backendConnected: boolean,
+    setBackendStatus: (status: string) => void,
+    explicitFields?: ToolRuntimeConfigExplicitFields,
+  ) => Promise<ToolRuntimeSnapshot>;
+}
 
 export interface UseBackendLifecycleOptions {
   readonly activeCapturePathRef: MutableRefObject<string>;
@@ -36,6 +58,9 @@ export interface BackendLifecycleState {
   toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
   lastToolRuntimeProbeError: string;
   setTSharkPath: (path: string) => Promise<void>;
+  allowTSharkDir: (dir: string) => Promise<TSharkStatus>;
+  removeTSharkAllowedDir: (dir: string) => Promise<TSharkStatus>;
+  refreshTSharkAllowedDirs: () => Promise<string[]>;
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;
   refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;

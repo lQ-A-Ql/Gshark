@@ -52,6 +52,8 @@ func classifyAuditAction(path, method string) string {
 			return "tools.tshark.configure"
 		}
 		return "tools.tshark.inspect"
+	case "/api/tools/tshark/allow-dir":
+		return "tools.tshark.allow_dir"
 	case "/api/tools/runtime-config":
 		if method == http.MethodPost {
 			return "tools.runtime.configure"
@@ -105,7 +107,7 @@ func classifyAuditRisk(path, method string) string {
 	switch path {
 	case "/api/tls", "/api/tools/misc/import":
 		return "high"
-	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/runtime-config", "/api/mcp/config", "/api/hunting/config":
+	case "/api/capture/start", "/api/capture/upload", "/api/analysis/vehicle/dbc", "/api/tools/tshark", "/api/tools/tshark/allow-dir", "/api/tools/runtime-config", "/api/mcp/config", "/api/hunting/config":
 		if method == http.MethodGet {
 			return "low"
 		}

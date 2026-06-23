@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExtractedObject } from "../../core/types";
+import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 
 interface ObjectExportClient {
-  listObjects(): Promise<ExtractedObject[]>;
-  downloadObjectsZip(ids: number[]): Promise<void>;
+  listObjects(signal?: AbortSignal): Promise<ExtractedObject[]>;
+  downloadObjectsZip(ids: number[], signal?: AbortSignal): Promise<void>;
 }
 
 export interface UseObjectExportOptions {
@@ -20,37 +21,34 @@ export function useObjectExport({
 }: UseObjectExportOptions) {
   const [fallbackObjects, setFallbackObjects] = useState<ExtractedObject[] | null>(null);
   const [error, setError] = useState("");
+  const { run: runObjectRequest, cancel: cancelObjectRequest } = useAbortableRequest();
+  const { run: runDownloadRequest } = useAbortableRequest();
+  const resolveDownloadRef = useRef<((value: boolean) => void) | null>(null);
 
   const refreshObjects = useCallback(() => {
     if (!backendConnected) {
+      cancelObjectRequest();
       setFallbackObjects(null);
       return;
     }
     if (extractedObjects.length > 0) {
+      cancelObjectRequest();
       setFallbackObjects(null);
       return;
     }
 
-    let cancelled = false;
-    void objectClient
-      .listObjects()
-      .then((rows) => {
-        if (!cancelled) {
-          setFallbackObjects(rows.length > 0 ? rows : null);
-          setError("");
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setFallbackObjects(null);
-          setError(err instanceof Error ? err.message : "对象列表加载失败");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [backendConnected, extractedObjects, objectClient]);
+    return runObjectRequest({
+      request: (signal) => objectClient.listObjects(signal),
+      onSuccess: (rows) => {
+        setFallbackObjects(rows.length > 0 ? rows : null);
+        setError("");
+      },
+      onError: (err) => {
+        setFallbackObjects(null);
+        setError(err instanceof Error ? err.message : "对象列表加载失败");
+      },
+    });
+  }, [backendConnected, cancelObjectRequest, extractedObjects.length, objectClient, runObjectRequest]);
 
   useEffect(() => {
     return refreshObjects();
@@ -59,15 +57,35 @@ export function useObjectExport({
   const downloadZip = useCallback(
     async (ids: number[]) => {
       if (ids.length === 0) return false;
-      try {
-        await objectClient.downloadObjectsZip(ids);
-        return true;
-      } catch (err) {
-        console.error("下载失败:", err);
-        return false;
-      }
+      resolveDownloadRef.current?.(false);
+      return new Promise<boolean>((resolve) => {
+        resolveDownloadRef.current = resolve;
+        runDownloadRequest({
+          request: (signal) => objectClient.downloadObjectsZip(ids, signal).then(() => true),
+          onSuccess: () => {
+            resolveDownloadRef.current = null;
+            resolve(true);
+          },
+          onError: (err) => {
+            console.error("下载失败:", err);
+            resolveDownloadRef.current = null;
+            resolve(false);
+          },
+          onSettled: () => {
+            resolveDownloadRef.current = null;
+          },
+        });
+      });
     },
-    [objectClient],
+    [objectClient, runDownloadRequest],
+  );
+
+  useEffect(
+    () => () => {
+      resolveDownloadRef.current?.(false);
+      resolveDownloadRef.current = null;
+    },
+    [],
   );
 
   const sourceObjects = extractedObjects.length > 0 ? extractedObjects : (fallbackObjects ?? []);

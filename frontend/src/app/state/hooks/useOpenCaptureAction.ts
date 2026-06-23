@@ -8,8 +8,11 @@ interface UseOpenCaptureActionOptions {
 export function useOpenCaptureAction({ setDisplayFilter, startCapture }: UseOpenCaptureActionOptions) {
   return useCallback(
     async (filePath?: string) => {
-      setDisplayFilter("");
-      return startCapture(filePath, "");
+      const opened = await startCapture(filePath, "");
+      if (opened) {
+        setDisplayFilter("");
+      }
+      return opened;
     },
     [setDisplayFilter, startCapture],
   );

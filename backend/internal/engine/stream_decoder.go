@@ -2,7 +2,9 @@ package engine
 
 import (
 	"bytes"
+	"crypto/aes"
 	"crypto/md5"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -178,6 +180,9 @@ func decodeGodzillaPayload(raw string, options map[string]any) (StreamDecodeResu
 		iv, ivErr := decodeCBCIVOption(options)
 		if ivErr != nil {
 			return StreamDecodeResult{}, ivErr
+		}
+		if len(iv) != aes.BlockSize {
+			return StreamDecodeResult{}, errors.New("AES-CBC 需要提供 iv 选项")
 		}
 		plain, err = decryptAESCBC(cipherBytes, []byte(key), iv)
 		if err != nil {
@@ -862,17 +867,22 @@ func normalizeAESKey(raw []byte) []byte {
 }
 
 func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
-	if len(data) == 0 || len(data)%blockSize != 0 {
+	if blockSize <= 0 || len(data) == 0 || len(data)%blockSize != 0 {
 		return nil, errors.New("PKCS7 unpad failed")
 	}
 	padding := int(data[len(data)-1])
-	if padding <= 0 || padding > blockSize || padding > len(data) {
-		return nil, errors.New("PKCS7 padding invalid")
+	invalid := 1 ^ subtle.ConstantTimeLessOrEq(1, padding)
+	invalid |= 1 ^ subtle.ConstantTimeLessOrEq(padding, blockSize)
+	invalid |= 1 ^ subtle.ConstantTimeLessOrEq(padding, len(data))
+
+	mismatch := 0
+	for i := 0; i < blockSize; i++ {
+		mask := subtle.ConstantTimeLessOrEq(i+1, padding)
+		equal := subtle.ConstantTimeByteEq(data[len(data)-1-i], byte(padding))
+		mismatch |= mask & (1 ^ equal)
 	}
-	for _, b := range data[len(data)-padding:] {
-		if int(b) != padding {
-			return nil, errors.New("PKCS7 padding invalid")
-		}
+	if invalid|mismatch != 0 {
+		return nil, errors.New("PKCS7 padding invalid")
 	}
 	return data[:len(data)-padding], nil
 }

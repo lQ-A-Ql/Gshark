@@ -44,7 +44,7 @@
 安全使用规则：
 
 - 不要导入未知来源 zip 模块。
-- 不要把 `host_bridge` 当作权限模型；它只是宿主能力桥接开关。
+- 不要把 `host_bridge` 当作完整沙箱；它只是 Python 宿主能力桥接开关，实际 host 能力仍受 `permissions` gate 控制。
 - 需要强隔离、远程不可信代码执行或细粒度权限审计时，应在系统级沙箱、虚拟机或独立进程策略中解决，而不是依赖 MISC 模块机制本身。
 - 需要深度访问 Go 服务、长期维护或更强治理的能力，应升级为内置模块，并通过后端代码审查和测试覆盖。
 
@@ -222,28 +222,26 @@ ioc-demo.zip
 - `method`: 当前固定建议 `POST`
 - `entry`: 后端脚本入口，相对模块目录
 - `host_bridge`: 主要给 Python 模块使用，开启后可使用宿主桥接 helper
-- `permissions`: 候选权限声明字段；当前文档化为治理模型，运行时尚未强制校验
+- `permissions`: 运行时权限声明字段；导入/加载时会校验允许列表，执行时会按权限暴露抓包路径和宿主扫描能力
 
-### 6.1 候选权限模型
+### 6.1 权限模型
 
-`permissions` 用于把 MISC 模块的本地执行、抓包读取和宿主桥接能力显式化。它是后续治理模型的兼容字段：旧模块没有该字段时仍按现有行为运行；新模块建议主动声明所需权限，便于后续 UI 提示、导入审查和运行时 gate 逐步落地。
+`permissions` 用于把 MISC 模块的本地执行、抓包读取和宿主桥接能力显式化。导入/加载阶段会拒绝未知权限；执行阶段按权限决定是否暴露 `capture_path`、`ctx.capturePath` 和 host field-scan 能力。旧模块没有该字段时仍按兼容策略补 `exec.local`，但不会默认获得抓包读取或宿主扫描能力。
 
-候选权限如下：
+权限如下：
 
-| Permission | Meaning | Current Compatibility |
+| Permission | Meaning | Runtime behavior |
 |---|---|---|
-| `exec.local` | 允许运行模块脚本后端，即本地 `backend.js` 或 `backend.py`。 | 当前所有 zip 自定义模块隐含具备；未来可要求显式声明。 |
-| `capture.read` | 允许读取当前抓包路径、抓包上下文摘要或使用抓包派生数据。 | 当前 `requires_capture` 和 `capture_path` 已表达部分语义；未来应与该权限合并校验。 |
-| `field.scan` | 允许通过宿主能力扫描抓包字段，例如 JavaScript `ctx.scanFields()` 或 Python host bridge `scan_fields()`。 | 当前已开放给 JS ctx 和 Python `host_bridge`；未来可作为细粒度 gate。 |
-| `host.bridge` | 允许 Python 模块启用宿主桥接 helper。 | 当前由 `host_bridge: true` 控制；未来可要求同时声明该权限。 |
+| `exec.local` | 允许运行模块脚本后端，即本地 `backend.js` 或 `backend.py`。 | 缺失时拒绝执行；旧模块缺少 `permissions` 时自动补该权限。 |
+| `capture.read` | 允许读取当前抓包路径、抓包上下文摘要或使用抓包派生数据。 | 未声明时 `capture_path`、`host_context.capture_path`、`ctx.capturePath` 为空。 |
+| `host.scan` | 允许通过宿主能力扫描抓包字段，例如 JavaScript `ctx.scanFields()` 或 Python host bridge `scan_fields()`。 | 未声明时调用 field-scan helper 会返回权限错误。 |
 
 兼容策略：
 
-- `permissions` 缺失时，宿主按 v3 现有行为处理，不拒绝旧模块。
-- `host_bridge: true` 等价于声明需要 `host.bridge`，但不自动表示未来所有 host 方法都可用。
-- `requires_capture: true` 等价于声明需要 `capture.read`。
-- 使用 `ctx.scanFields()` 或 `scan_fields()` 的模块应声明 `field.scan`。
-- 未来如果运行时强制权限，应先增加导入/执行 warning，再切换到 hard fail，避免直接破坏已安装模块。
+- `permissions` 缺失时，宿主为旧模块补 `exec.local`，不拒绝导入，但不会默认补 `capture.read` 或 `host.scan`。
+- `field.scan` 和 `host.bridge` 作为旧文档别名导入时会归一化为 `host.scan`。
+- 使用 `ctx.scanFields()` 或 `scan_fields()` 的模块必须声明 `host.scan`。
+- 需要读取抓包路径或把抓包路径传给模块逻辑时必须声明 `capture.read`。
 - `permissions` 不是沙箱；它只控制宿主是否暴露能力，不能隔离脚本自己的本地代码执行风险。
 
 当前宿主统一执行地址始终为：

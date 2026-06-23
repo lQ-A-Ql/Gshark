@@ -94,7 +94,7 @@ func TestPythonHostCallValidationErrors(t *testing.T) {
 		"id":     "1",
 		"method": "scan_fields",
 		"params": map[string]any{"fields": []any{"frame.number"}},
-	}, InvokeContext{})
+	}, InvokeContext{Permissions: []string{"host.scan"}})
 	if !hostResponseContainsError(t, resp, "抓") && !hostResponseContainsError(t, resp, "capture") {
 		t.Fatalf("expected missing capture error response, got %s", resp)
 	}
@@ -103,7 +103,7 @@ func TestPythonHostCallValidationErrors(t *testing.T) {
 		"id":     "2",
 		"method": "scan_fields",
 		"params": map[string]any{"fields": []any{}},
-	}, InvokeContext{CapturePath: "demo.pcap"})
+	}, InvokeContext{CapturePath: "demo.pcap", Permissions: []string{"host.scan"}})
 	if !hostResponseContainsError(t, resp, "non-empty fields") {
 		t.Fatalf("expected empty fields error response, got %s", resp)
 	}
@@ -114,6 +114,7 @@ func TestPythonHostCallValidationErrors(t *testing.T) {
 		"params": map[string]any{"fields": []any{"frame.number"}},
 	}, InvokeContext{
 		CapturePath: "demo.pcap",
+		Permissions: []string{"host.scan"},
 		ScanFieldsWithContext: func(context.Context, string, []string, string) ([]map[string]string, error) {
 			return nil, errors.New("scan failed")
 		},

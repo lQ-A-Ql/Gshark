@@ -121,21 +121,37 @@ func TestToolRuntimeControllersPreserveFacadeBehavior(t *testing.T) {
 	t.Setenv(voskModelEnvVar, "")
 
 	svc := NewService(NopEmitter{})
+	toolDir := t.TempDir()
+	tsharkPath := filepath.Join(toolDir, "tshark")
+	ffmpegPath := filepath.Join(toolDir, "ffmpeg")
+	pythonPath := filepath.Join(toolDir, "python")
+	yaraPath := filepath.Join(toolDir, "yara")
+	if runtime.GOOS == "windows" {
+		tsharkPath += ".exe"
+		ffmpegPath += ".exe"
+		pythonPath += ".exe"
+		yaraPath += ".exe"
+	}
+	for _, path := range []string{tsharkPath, ffmpegPath, pythonPath, yaraPath} {
+		if err := os.WriteFile(path, []byte("fake"), 0o755); err != nil {
+			t.Fatalf("write fake tool %s: %v", path, err)
+		}
+	}
 	got := svc.SetToolRuntimeConfig(model.ToolRuntimeConfig{
-		TSharkPath:    " C:/Tools/tshark.exe ",
-		FFmpegPath:    " C:/Tools/ffmpeg.exe ",
-		PythonPath:    " C:/Tools/python.exe ",
+		TSharkPath:    " " + tsharkPath + " ",
+		FFmpegPath:    " " + ffmpegPath + " ",
+		PythonPath:    " " + pythonPath + " ",
 		VoskModelPath: " C:/Models/vosk ",
 		YaraEnabled:   true,
-		YaraBin:       " C:/Tools/yara.exe ",
+		YaraBin:       " " + yaraPath + " ",
 		YaraRules:     " C:/Rules/main.yar ",
 		YaraTimeoutMS: 30000,
 	})
 
-	if got.FFmpegPath != "C:/Tools/ffmpeg.exe" || got.PythonPath != "C:/Tools/python.exe" || got.VoskModelPath != "C:/Models/vosk" {
+	if got.FFmpegPath != ffmpegPath || got.PythonPath != pythonPath || got.VoskModelPath != "C:/Models/vosk" {
 		t.Fatalf("runtime env config not preserved: %+v", got)
 	}
-	if got.YaraBin != "C:/Tools/yara.exe" || got.YaraRules != "C:/Rules/main.yar" || got.YaraTimeoutMS != 30000 || !got.YaraEnabled {
+	if got.YaraBin != yaraPath || got.YaraRules != "C:/Rules/main.yar" || got.YaraTimeoutMS != 30000 || !got.YaraEnabled {
 		t.Fatalf("runtime yara config not preserved: %+v", got)
 	}
 

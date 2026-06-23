@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,7 +130,7 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	goodReq := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(ctx)
 	goodReq.Header.Set("Authorization", "Bearer secret-token")
-	goodRec := httptest.NewRecorder()
+	goodRec := newSafeEventRecorder()
 	done := make(chan struct{})
 	go func() {
 		handler.ServeHTTP(goodRec, goodReq)
@@ -137,11 +138,11 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 	}()
 
 	deadline := time.After(2 * time.Second)
-	for !strings.Contains(goodRec.Body.String(), "event: ready") {
+	for !strings.Contains(goodRec.BodyString(), "event: ready") {
 		select {
 		case <-deadline:
 			cancel()
-			t.Fatalf("timed out waiting for SSE ready event, body=%q", goodRec.Body.String())
+			t.Fatalf("timed out waiting for SSE ready event, body=%q", goodRec.BodyString())
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -153,8 +154,34 @@ func TestHandlerAllowsEventStreamAccessTokenAndRejectsWrongToken(t *testing.T) {
 		t.Fatal("event stream did not stop after request context cancellation")
 	}
 	if goodRec.Code != http.StatusOK {
-		t.Fatalf("expected authorized event stream to connect, got %d body=%s", goodRec.Code, goodRec.Body.String())
+		t.Fatalf("expected authorized event stream to connect, got %d body=%s", goodRec.Code, goodRec.BodyString())
 	}
+}
+
+// safeEventRecorder wraps httptest.ResponseRecorder and mirrors writes to a
+// mutex-protected buffer so the test can inspect the response body while the
+// handler is still running, without triggering a data race.
+type safeEventRecorder struct {
+	*httptest.ResponseRecorder
+	mu   sync.Mutex
+	body bytes.Buffer
+}
+
+func newSafeEventRecorder() *safeEventRecorder {
+	return &safeEventRecorder{ResponseRecorder: httptest.NewRecorder()}
+}
+
+func (r *safeEventRecorder) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	r.body.Write(p)
+	r.mu.Unlock()
+	return r.ResponseRecorder.Write(p)
+}
+
+func (r *safeEventRecorder) BodyString() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.body.String()
 }
 
 func TestWithAuthRequiresTokenForTrustedDesktopOrigin(t *testing.T) {
@@ -657,6 +684,14 @@ func (contractMediaService) MediaAnalysis() (model.MediaAnalysis, error) {
 }
 
 func (contractMediaService) RefreshMediaAnalysis() (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, nil
+}
+
+func (contractMediaService) RefreshMediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{}, nil
+}
+
+func (contractMediaService) MediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
 	return model.MediaAnalysis{}, nil
 }
 
@@ -1228,4 +1263,31 @@ func testMiscModuleZip(t *testing.T, moduleID string) []byte {
 		t.Fatalf("zip Close() error = %v", err)
 	}
 	return buffer.Bytes()
+}
+
+func TestHandleImportMiscModulePackageRejectsOversizedZip(t *testing.T) {
+	server := newTestServerWithTempMiscPackages(t)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "huge.zip")
+	if err != nil {
+		t.Fatalf("CreateFormFile() error = %v", err)
+	}
+	// Write one byte over the 32MB limit.
+	if _, err := part.Write(bytes.Repeat([]byte{0}, (32<<20)+1)); err != nil {
+		t.Fatalf("zip write error = %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("multipart close error = %v", err)
+	}
+
+	importReq := httptest.NewRequest(http.MethodPost, "/api/tools/misc/import", body)
+	importReq.Header.Set("Content-Type", writer.FormDataContentType())
+	importRec := httptest.NewRecorder()
+	server.handleImportMiscModulePackage(importRec, importReq)
+
+	if importRec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d body=%s", importRec.Code, importRec.Body.String())
+	}
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   HuntingPlaybook,
   Hypothesis,
@@ -8,6 +8,10 @@ import type {
 } from "../../core/types/huntingPlaybook";
 import type { PlaybookClient } from "../../integrations/clients/playbookClient";
 import { backendClients } from "../../integrations/backendClients";
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
 
 export interface UsePlaybookManagementOptions {
   backendConnected: boolean;
@@ -42,60 +46,89 @@ export function usePlaybookManagement({
   const [statusText, setStatusText] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const abortRef = useRef<AbortController | null>(null);
+  const resetLoadAbortController = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    return abortRef.current;
+  }, []);
+
   // Load playbooks
-  const loadPlaybooks = useCallback(async () => {
+  const loadPlaybooks = useCallback(async (signal?: AbortSignal) => {
     if (!backendConnected) return;
     setPlaybooksLoading(true);
     setPlaybooksError("");
     try {
-      const list = await playbookClient.listPlaybooks();
+      const list = await playbookClient.listPlaybooks(signal);
+      if (signal?.aborted) return;
       setPlaybooks(list);
     } catch (error) {
+      if (isAbortError(error)) return;
       const message = error instanceof Error ? error.message : "加载剧本失败";
       setPlaybooksError(message);
       setStatusText(message);
     } finally {
-      setPlaybooksLoading(false);
+      if (!signal?.aborted) {
+        setPlaybooksLoading(false);
+      }
     }
   }, [backendConnected, playbookClient]);
 
   // Load saved searches
-  const loadSavedSearches = useCallback(async () => {
+  const loadSavedSearches = useCallback(async (signal?: AbortSignal) => {
     if (!backendConnected) return;
     setSavedSearchesLoading(true);
     setSavedSearchesError("");
     try {
-      const list = await playbookClient.listSavedSearches();
+      const list = await playbookClient.listSavedSearches(signal);
+      if (signal?.aborted) return;
       setSavedSearches(list);
     } catch (error) {
+      if (isAbortError(error)) return;
       const message = error instanceof Error ? error.message : "加载保存的搜索失败";
       setSavedSearchesError(message);
       setStatusText(message);
     } finally {
-      setSavedSearchesLoading(false);
+      if (!signal?.aborted) {
+        setSavedSearchesLoading(false);
+      }
     }
   }, [backendConnected, playbookClient]);
 
   // Load hypotheses
-  const loadHypotheses = useCallback(async () => {
-    if (!backendConnected) return;
-    setHypothesesLoading(true);
-    setHypothesesError("");
-    try {
-      const list = await playbookClient.listHypotheses(hypothesisFilter || undefined);
-      setHypotheses(list);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "加载假设失败";
-      setHypothesesError(message);
-      setStatusText(message);
-    } finally {
-      setHypothesesLoading(false);
-    }
-  }, [backendConnected, playbookClient, hypothesisFilter]);
+  const loadHypotheses = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!backendConnected) return;
+      setHypothesesLoading(true);
+      setHypothesesError("");
+      try {
+        const list = await playbookClient.listHypotheses(hypothesisFilter || undefined, signal);
+        if (signal?.aborted) return;
+        setHypotheses(list);
+      } catch (error) {
+        if (isAbortError(error)) return;
+        const message = error instanceof Error ? error.message : "加载假设失败";
+        setHypothesesError(message);
+        setStatusText(message);
+      } finally {
+        if (!signal?.aborted) {
+          setHypothesesLoading(false);
+        }
+      }
+    },
+    [backendConnected, playbookClient, hypothesisFilter],
+  );
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([loadPlaybooks(), loadSavedSearches(), loadHypotheses()]);
-  }, [loadHypotheses, loadPlaybooks, loadSavedSearches]);
+  const refreshAll = useCallback(
+    async (signal?: AbortSignal) => {
+      await Promise.all([
+        loadPlaybooks(signal),
+        loadSavedSearches(signal),
+        loadHypotheses(signal),
+      ]);
+    },
+    [loadHypotheses, loadPlaybooks, loadSavedSearches],
+  );
 
   // Run playbook
   const runPlaybook = useCallback(
@@ -254,16 +287,28 @@ export function usePlaybookManagement({
 
   // Load data on mount and when filters change
   useEffect(() => {
-    void loadPlaybooks();
-  }, [loadPlaybooks]);
+    const controller = resetLoadAbortController();
+    void loadPlaybooks(controller.signal);
+    return () => controller.abort();
+  }, [loadPlaybooks, resetLoadAbortController]);
 
   useEffect(() => {
-    void loadSavedSearches();
-  }, [loadSavedSearches]);
+    const controller = resetLoadAbortController();
+    void loadSavedSearches(controller.signal);
+    return () => controller.abort();
+  }, [loadSavedSearches, resetLoadAbortController]);
 
   useEffect(() => {
-    void loadHypotheses();
-  }, [loadHypotheses]);
+    const controller = resetLoadAbortController();
+    void loadHypotheses(controller.signal);
+    return () => controller.abort();
+  }, [loadHypotheses, resetLoadAbortController]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   return {
     // Playbook

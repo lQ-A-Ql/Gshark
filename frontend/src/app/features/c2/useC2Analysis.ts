@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { C2FamilyAnalysis, C2SampleAnalysis } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 import { backendClients } from "../../integrations/backendClients";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
@@ -49,68 +49,28 @@ export function useC2Analysis({
   totalPackets,
   captureRevision,
 }: UseC2AnalysisOptions) {
-  const [analysis, setAnalysis] = useState<C2SampleAnalysis>(EMPTY_C2_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
-
   const cacheKey = useMemo(
     () => buildC2SampleAnalysisCacheKey(captureRevision, filePath, totalPackets),
     [captureRevision, filePath, totalPackets],
   );
 
-  const refreshAnalysis = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
-        cancelAnalysisRequest();
-        setAnalysis(EMPTY_C2_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      if (!force && cacheKey && c2AnalysisCache.has(cacheKey)) {
-        cancelAnalysisRequest();
-        setAnalysis(c2AnalysisCache.get(cacheKey) ?? EMPTY_C2_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-      setLoading(true);
-      setError("");
-      return runAnalysisRequest({
-        request: (signal) =>
-          c2AnalysisCache.request(cacheKey, {
-            force,
-            signal,
-            load: () => backendClients.analysis.getC2SampleAnalysis(signal),
-          }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            c2AnalysisCache.set(cacheKey, payload);
-          }
-          setAnalysis(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "C2 样本分析加载失败");
-          setAnalysis(EMPTY_C2_ANALYSIS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
+  const { data, loading, error, refresh } = useAnalysisResult<C2SampleAnalysis>({
+    cache: c2AnalysisCache,
+    cacheKey,
+    emptyValue: EMPTY_C2_ANALYSIS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "C2 样本分析加载失败",
+    fetch: (signal) => backendClients.analysis.getC2SampleAnalysis(signal),
+  });
 
   return {
-    analysis,
+    analysis: data,
     loading,
     error,
-    refreshAnalysis,
+    refreshAnalysis: refresh,
   };
 }
 

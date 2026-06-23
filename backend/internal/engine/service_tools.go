@@ -15,6 +15,8 @@ import (
 	"github.com/gshark/sentinel/backend/internal/tshark"
 )
 
+var exportObjectsContextFn = tshark.ExportObjectsContext
+
 func (s *Service) ThreatHunt(prefixes []string) []model.ThreatHit {
 	return s.ThreatHuntWithContext(context.Background(), prefixes)
 }
@@ -129,12 +131,14 @@ func (s *Service) SetHuntingRuntimeConfig(cfg model.HuntingRuntimeConfig) model.
 			s.huntingCtl.huntMu.Unlock()
 		}
 	}
+	yaraBin, yaraAllowedDirs := s.runtimeCtl.setYaraRuntimePath(cfg.YaraBin)
 	s.huntingCtl.huntMu.Lock()
 	s.huntingCtl.yaraConf = model.YaraConfig{
-		Enabled:   cfg.YaraEnabled,
-		Bin:       strings.TrimSpace(cfg.YaraBin),
-		Rules:     strings.TrimSpace(cfg.YaraRules),
-		TimeoutMS: cfg.YaraTimeoutMS,
+		Enabled:     cfg.YaraEnabled,
+		Bin:         yaraBin,
+		AllowedDirs: yaraAllowedDirs,
+		Rules:       strings.TrimSpace(cfg.YaraRules),
+		TimeoutMS:   cfg.YaraTimeoutMS,
 	}
 	s.huntingCtl.huntMu.Unlock()
 	s.resetYaraScanState()
@@ -314,33 +318,12 @@ func (s *Service) ObjectsWithContext(ctx context.Context) []model.ObjectFile {
 		_ = os.RemoveAll(tempDir)
 	}()
 
-	if err := tshark.ExportObjectsContext(ctx, pcapPath, tempDir); err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		s.objectCtl.objMu.Lock()
-		s.captureCtl.mu.RLock()
-		currentPCAP := s.captureCtl.pcap
-		s.captureCtl.mu.RUnlock()
-		if currentPCAP == pcapPath && !s.objectCtl.objectsLoaded {
-			s.objectCtl.objectsLoaded = true
-			s.objectCtl.objects = nil
-		}
-		s.objectCtl.objMu.Unlock()
+	if err := exportObjectsContextFn(ctx, pcapPath, tempDir); err != nil {
 		return nil
 	}
 
 	entries, err := os.ReadDir(tempDir)
 	if err != nil {
-		s.objectCtl.objMu.Lock()
-		s.captureCtl.mu.RLock()
-		currentPCAP := s.captureCtl.pcap
-		s.captureCtl.mu.RUnlock()
-		if currentPCAP == pcapPath && !s.objectCtl.objectsLoaded {
-			s.objectCtl.objectsLoaded = true
-			s.objectCtl.objects = nil
-		}
-		s.objectCtl.objMu.Unlock()
 		return nil
 	}
 

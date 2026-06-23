@@ -2,6 +2,7 @@ package tshark
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -14,22 +15,22 @@ import (
 )
 
 func TestBuildMediaAnalysisFromPacketStreamCoversErrorAndEmptyBranches(t *testing.T) {
-	if _, _, err := BuildMediaAnalysisFromPacketStream(" ", 1, MediaScanConfig{}, nil, func(func(model.Packet) error) error { return nil }); err == nil {
+	if _, _, err := BuildMediaAnalysisFromPacketStream(context.Background(), " ", 1, MediaScanConfig{}, nil, func(func(model.Packet) error) error { return nil }); err == nil {
 		t.Fatal("empty export dir should fail")
 	}
-	if _, _, err := BuildMediaAnalysisFromPacketStream(t.TempDir(), 1, MediaScanConfig{}, nil, nil); err == nil {
+	if _, _, err := BuildMediaAnalysisFromPacketStream(context.Background(), t.TempDir(), 1, MediaScanConfig{}, nil, nil); err == nil {
 		t.Fatal("nil iterator should fail")
 	}
 
 	iterErr := errors.New("iterator stopped")
-	if _, _, err := BuildMediaAnalysisFromPacketStream(t.TempDir(), 1, MediaScanConfig{}, nil, func(func(model.Packet) error) error {
+	if _, _, err := BuildMediaAnalysisFromPacketStream(context.Background(), t.TempDir(), 1, MediaScanConfig{}, nil, func(func(model.Packet) error) error {
 		return iterErr
 	}); !errors.Is(err, iterErr) {
 		t.Fatalf("iterator error = %v, want %v", err, iterErr)
 	}
 
 	var progress []string
-	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(
+	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(context.Background(),
 		t.TempDir(),
 		0,
 		MediaScanConfig{PreflightNotes: []string{"preflight-note"}},

@@ -1,10 +1,12 @@
 import { ShieldAlert } from "lucide-react";
 
 import { yaraBinHint, yaraRulesHint } from "./RuntimeSettingsHints";
+import { RuntimeToolPathAllowWarning } from "./RuntimeToolPathAllowWarning";
 import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
 import { Field } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
 import { RuntimeToolStatusLine } from "./RuntimeToolStatusLine";
+import { YaraStatusDetails } from "./YaraStatusDetails";
 
 export function YaraSettingsSection(props: RuntimeSettingsSectionProps) {
   const { form, snapshot, setForm, unknownMessage, unknownStateText } = props;
@@ -64,18 +66,14 @@ export function YaraSettingsSection(props: RuntimeSettingsSectionProps) {
         unknownMessage={unknownMessage}
         unknownStateText={unknownStateText}
       />
-      {snapshot?.yara.rulePath ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-          当前使用的规则文件：
-          <span className="break-all text-slate-700"> {snapshot.yara.rulePath}</span>
-        </div>
-      ) : null}
-      {snapshot?.yara.lastScanMessage ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-700">
-          最近一次扫描告警：
-          <span className="break-all"> {snapshot.yara.lastScanMessage}</span>
-        </div>
-      ) : null}
+      <RuntimeToolPathAllowWarning
+        field="yaraAllowedDirs"
+        path={snapshot?.yara.path}
+        customPath={snapshot?.yara.customBin ?? form.yaraBin}
+        pathWarning={snapshot?.yara.pathWarning}
+        allowToolDir={props.allowToolDir}
+      />
+      <YaraStatusDetails yara={snapshot?.yara} />
     </RuntimeSettingsSectionShell>
   );
 }

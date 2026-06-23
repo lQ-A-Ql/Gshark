@@ -17,5 +17,7 @@ export function asTSharkStatus(input: unknown): TSharkStatus {
     missingOptionalFields: asStringList(payload.missing_optional_fields),
     capabilityMessage: String(payload.capability_message ?? "") || undefined,
     capabilityCheckDegraded: Boolean(payload.capability_check_degraded),
+    pathWarning: String(payload.path_warning ?? "") || undefined,
+    extraAllowedDir: String(payload.extra_allowed_dir ?? "") || undefined,
   };
 }

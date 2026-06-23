@@ -110,10 +110,10 @@ func TestServiceAnalysisWrappersAndMediaEvidence(t *testing.T) {
 		}
 		return model.GlobalTrafficStats{TotalPackets: 3, ProtocolKinds: 2}, nil
 	}
-	buildMediaAnalysisFromPacketStreamFn = func(string, int, tshark.MediaScanConfig, func(int, int, string), func(func(model.Packet) error) error) (model.MediaAnalysis, map[string]string, error) {
+	buildMediaAnalysisFromPacketStreamFn = func(context.Context, string, int, tshark.MediaScanConfig, func(int, int, string), func(func(model.Packet) error) error) (model.MediaAnalysis, map[string]string, error) {
 		return model.MediaAnalysis{}, nil, errors.New("force file fallback")
 	}
-	buildMediaAnalysisFromFileWithConfigFn = func(path string, exportDir string, cfg tshark.MediaScanConfig, progress func(int, int, string)) (model.MediaAnalysis, map[string]string, error) {
+	buildMediaAnalysisFromFileWithConfigFn = func(ctx context.Context, path string, exportDir string, cfg tshark.MediaScanConfig, progress func(int, int, string)) (model.MediaAnalysis, map[string]string, error) {
 		if path != "capture.pcapng" || strings.TrimSpace(exportDir) == "" {
 			t.Fatalf("unexpected media build args path=%q exportDir=%q", path, exportDir)
 		}

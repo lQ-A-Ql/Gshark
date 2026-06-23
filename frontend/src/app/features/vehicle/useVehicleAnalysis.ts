@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { DBCProfile, VehicleAnalysis as VehicleAnalysisData } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 
 export const EMPTY_VEHICLE_ANALYSIS: VehicleAnalysisData = {
   totalVehiclePackets: 0,
@@ -56,56 +56,17 @@ export function useVehicleAnalysis({
     () => buildVehicleAnalysisCacheKey(captureRevision, filePath, totalPackets, dbcProfiles),
     [captureRevision, dbcProfiles, filePath, totalPackets],
   );
-  const [analysis, setAnalysis] = useState<VehicleAnalysisData>(EMPTY_VEHICLE_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-  const refreshAnalysis = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
-        cancelAnalysisRequest();
-        setLoading(false);
-        setError("");
-        setAnalysis(EMPTY_VEHICLE_ANALYSIS);
-        return;
-      }
-      if (!force && cacheKey && vehicleAnalysisCache.has(cacheKey)) {
-        cancelAnalysisRequest();
-        setAnalysis(vehicleAnalysisCache.get(cacheKey) ?? EMPTY_VEHICLE_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      setLoading(true);
-      setError("");
-      return runAnalysisRequest({
-        request: (signal) =>
-          vehicleAnalysisCache.request(cacheKey, {
-            force,
-            signal,
-            load: () => backendClients.analysis.getVehicleAnalysis(signal),
-          }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            vehicleAnalysisCache.set(cacheKey, payload);
-          }
-          setAnalysis(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "车机分析加载失败");
-          setAnalysis(EMPTY_VEHICLE_ANALYSIS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
+  const { data: analysis, loading, error, refresh: refreshAnalysis } = useAnalysisResult<VehicleAnalysisData>({
+    cache: vehicleAnalysisCache,
+    cacheKey,
+    emptyValue: EMPTY_VEHICLE_ANALYSIS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "车机分析加载失败",
+    fetch: (signal) => backendClients.analysis.getVehicleAnalysis(signal),
+  });
 
   return { analysis, loading, error, refreshAnalysis };
 }

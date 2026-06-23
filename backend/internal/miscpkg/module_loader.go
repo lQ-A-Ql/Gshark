@@ -42,6 +42,10 @@ func loadModuleFromDir(dir string) (loadedModule, error) {
 	if err != nil {
 		return loadedModule{}, err
 	}
+	permissions, err := normalizeModulePermissions(firstNonEmptyStringSlice(apiSchema.Permissions, pkg.Permissions))
+	if err != nil {
+		return loadedModule{}, err
+	}
 
 	entry := defaultIfEmpty(apiSchema.Entry, pkg.Backend)
 	backendPath, err := resolveManagedPath(dir, entry)
@@ -53,11 +57,12 @@ func loadModuleFromDir(dir string) (loadedModule, error) {
 	}
 
 	interfaceSchema := &model.MiscModuleInterfaceSchema{
-		Method:     defaultIfEmpty(apiSchema.Method, "POST"),
-		InvokePath: fmt.Sprintf("/api/tools/misc/packages/%s/invoke", pkg.ID),
-		Runtime:    runtimeFromPath(backendPath),
-		Entry:      entry,
-		HostBridge: apiSchema.HostBridge,
+		Method:      defaultIfEmpty(apiSchema.Method, "POST"),
+		InvokePath:  fmt.Sprintf("/api/tools/misc/packages/%s/invoke", pkg.ID),
+		Runtime:     runtimeFromPath(backendPath),
+		Entry:       entry,
+		HostBridge:  apiSchema.HostBridge,
+		Permissions: permissions,
 	}
 	manifest := model.MiscModuleManifest{
 		ID:              pkg.ID,
@@ -86,6 +91,49 @@ func loadAPISchema(path string) (packageAPI, error) {
 	api.Method = strings.ToUpper(strings.TrimSpace(api.Method))
 	api.Entry = strings.TrimSpace(api.Entry)
 	return api, nil
+}
+
+func firstNonEmptyStringSlice(values ...[]string) []string {
+	for _, value := range values {
+		if len(value) > 0 {
+			return value
+		}
+	}
+	return nil
+}
+
+func normalizeModulePermissions(raw []string) ([]string, error) {
+	allowed := map[string]string{
+		"exec.local":   "exec.local",
+		"capture.read": "capture.read",
+		"host.scan":    "host.scan",
+		"field.scan":   "host.scan",
+		"host.bridge":  "host.scan",
+	}
+	if len(raw) == 0 {
+		return []string{"exec.local"}, nil
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, item := range raw {
+		permission := strings.ToLower(strings.TrimSpace(item))
+		if permission == "" {
+			continue
+		}
+		canonical, ok := allowed[permission]
+		if !ok {
+			return nil, fmt.Errorf("unsupported misc module permission: %s", permission)
+		}
+		if _, ok := seen[canonical]; ok {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		out = append(out, canonical)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("misc module permissions cannot be empty")
+	}
+	return out, nil
 }
 
 func loadFormSchema(path string) (*model.MiscModuleFormSchema, error) {

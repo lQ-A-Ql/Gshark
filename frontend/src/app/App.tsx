@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { toolRuntimeProbeStateText, toolRuntimeProbeTransportText } from "./state/toolRuntimeProbeState";
 import { cn } from "./components/ui/utils";
 
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 export function StartupGate() {
   const {
     backendConnected,
@@ -273,7 +275,9 @@ export default function App() {
 
   return (
     <SentinelProvider>
-      <StartupGate />
+      <ErrorBoundary>
+        <StartupGate />
+      </ErrorBoundary>
     </SentinelProvider>
   );
 }

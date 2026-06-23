@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { MediaAnalysis as MediaAnalysisData, MediaTranscription, SpeechBatchTaskStatus } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 
 export const EMPTY_MEDIA_ANALYSIS: MediaAnalysisData = {
   totalMediaPackets: 0,
@@ -47,58 +47,20 @@ export function useMediaAnalysis({
     () => buildMediaAnalysisCacheKey(captureRevision, filePath, totalPackets),
     [captureRevision, filePath, totalPackets],
   );
-  const [analysis, setAnalysis] = useState<MediaAnalysisData>(EMPTY_MEDIA_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
+
+  const { data: analysis, loading, error, refresh: refreshAnalysis } = useAnalysisResult<MediaAnalysisData>({
+    cache: mediaAnalysisCache,
+    cacheKey,
+    emptyValue: EMPTY_MEDIA_ANALYSIS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "媒体分析加载失败",
+    fetch: (signal, force) => backendClients.media.getMediaAnalysis(force, signal),
+  });
+
   const [batchStatus, setBatchStatus] = useState<SpeechBatchTaskStatus>(EMPTY_BATCH_STATUS);
   const [transcriptions, setTranscriptions] = useState<Record<string, MediaTranscription>>({});
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
-
-  const refreshAnalysis = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
-        cancelAnalysisRequest();
-        setLoading(false);
-        setError("");
-        setAnalysis(EMPTY_MEDIA_ANALYSIS);
-        return;
-      }
-      if (!force && cacheKey && mediaAnalysisCache.has(cacheKey)) {
-        cancelAnalysisRequest();
-        setAnalysis(mediaAnalysisCache.get(cacheKey) ?? EMPTY_MEDIA_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      setLoading(true);
-      setError("");
-      return runAnalysisRequest({
-        request: (signal) =>
-          mediaAnalysisCache.request(cacheKey, {
-            force,
-            signal,
-            load: () => backendClients.media.getMediaAnalysis(force, signal),
-          }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            mediaAnalysisCache.set(cacheKey, payload);
-          }
-          setAnalysis(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "媒体分析加载失败");
-          setAnalysis(EMPTY_MEDIA_ANALYSIS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
 
   return {
     analysis,

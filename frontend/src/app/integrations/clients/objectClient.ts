@@ -8,7 +8,7 @@ type BlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
 
 export interface ObjectClient {
   listObjects(signal?: AbortSignal): Promise<ExtractedObject[]>;
-  downloadObjectsZip(ids: number[]): Promise<void>;
+  downloadObjectsZip(ids: number[], signal?: AbortSignal): Promise<void>;
 }
 
 export function createObjectClient(request: JsonRequest, requestBlob: BlobRequest): ObjectClient {
@@ -18,9 +18,10 @@ export function createObjectClient(request: JsonRequest, requestBlob: BlobReques
       return asObjectList(rows);
     },
 
-    async downloadObjectsZip(ids: number[]) {
+    async downloadObjectsZip(ids: number[], signal?: AbortSignal) {
       const blob = await requestBlob("/api/objects/download", {
         method: "POST",
+        signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });

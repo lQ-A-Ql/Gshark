@@ -12,150 +12,174 @@ type JsonRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 export interface PlaybookClient {
   // Playbook CRUD
-  listPlaybooks(): Promise<HuntingPlaybook[]>;
-  getPlaybook(id: string): Promise<HuntingPlaybook>;
-  createPlaybook(playbook: Partial<HuntingPlaybook>): Promise<HuntingPlaybook>;
-  updatePlaybook(id: string, playbook: Partial<HuntingPlaybook>): Promise<HuntingPlaybook>;
-  deletePlaybook(id: string): Promise<void>;
-  runPlaybook(id: string): Promise<PlaybookRunResult>;
-  getPlaybookLastRun(id: string): Promise<PlaybookRunResult>;
+  listPlaybooks(signal?: AbortSignal): Promise<HuntingPlaybook[]>;
+  getPlaybook(id: string, signal?: AbortSignal): Promise<HuntingPlaybook>;
+  createPlaybook(playbook: Partial<HuntingPlaybook>, signal?: AbortSignal): Promise<HuntingPlaybook>;
+  updatePlaybook(id: string, playbook: Partial<HuntingPlaybook>, signal?: AbortSignal): Promise<HuntingPlaybook>;
+  deletePlaybook(id: string, signal?: AbortSignal): Promise<void>;
+  runPlaybook(id: string, signal?: AbortSignal): Promise<PlaybookRunResult>;
+  getPlaybookLastRun(id: string, signal?: AbortSignal): Promise<PlaybookRunResult>;
 
   // Saved search CRUD
-  listSavedSearches(): Promise<SavedSearch[]>;
-  getSavedSearch(id: string): Promise<SavedSearch>;
-  createSavedSearch(search: Partial<SavedSearch>): Promise<SavedSearch>;
-  updateSavedSearch(id: string, search: Partial<SavedSearch>): Promise<SavedSearch>;
-  deleteSavedSearch(id: string): Promise<void>;
-  executeSavedSearch(id: string): Promise<{ search: SavedSearch; hits: ThreatHit[]; total: number }>;
+  listSavedSearches(signal?: AbortSignal): Promise<SavedSearch[]>;
+  getSavedSearch(id: string, signal?: AbortSignal): Promise<SavedSearch>;
+  createSavedSearch(search: Partial<SavedSearch>, signal?: AbortSignal): Promise<SavedSearch>;
+  updateSavedSearch(id: string, search: Partial<SavedSearch>, signal?: AbortSignal): Promise<SavedSearch>;
+  deleteSavedSearch(id: string, signal?: AbortSignal): Promise<void>;
+  executeSavedSearch(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ search: SavedSearch; hits: ThreatHit[]; total: number }>;
 
   // Hypothesis CRUD
-  listHypotheses(status?: HypothesisStatus): Promise<Hypothesis[]>;
-  getHypothesis(id: string): Promise<Hypothesis>;
-  createHypothesis(hypothesis: Partial<Hypothesis>): Promise<Hypothesis>;
-  updateHypothesis(id: string, hypothesis: Partial<Hypothesis>): Promise<Hypothesis>;
-  deleteHypothesis(id: string): Promise<void>;
-  addHypothesisEvidence(hypothesisId: string, evidence: Partial<HypothesisEvidence>): Promise<Hypothesis>;
-  updateHypothesisStatus(id: string, status: HypothesisStatus, conclusion?: string): Promise<Hypothesis>;
+  listHypotheses(status?: HypothesisStatus, signal?: AbortSignal): Promise<Hypothesis[]>;
+  getHypothesis(id: string, signal?: AbortSignal): Promise<Hypothesis>;
+  createHypothesis(hypothesis: Partial<Hypothesis>, signal?: AbortSignal): Promise<Hypothesis>;
+  updateHypothesis(id: string, hypothesis: Partial<Hypothesis>, signal?: AbortSignal): Promise<Hypothesis>;
+  deleteHypothesis(id: string, signal?: AbortSignal): Promise<void>;
+  addHypothesisEvidence(
+    hypothesisId: string,
+    evidence: Partial<HypothesisEvidence>,
+    signal?: AbortSignal,
+  ): Promise<Hypothesis>;
+  updateHypothesisStatus(
+    id: string,
+    status: HypothesisStatus,
+    conclusion?: string,
+    signal?: AbortSignal,
+  ): Promise<Hypothesis>;
 }
 
 export function createPlaybookClient(request: JsonRequest): PlaybookClient {
   return {
     // Playbook CRUD
-    async listPlaybooks() {
-      return request<HuntingPlaybook[]>("/api/playbooks");
+    async listPlaybooks(signal) {
+      return request<HuntingPlaybook[]>("/api/playbooks", { signal });
     },
 
-    async getPlaybook(id) {
-      return request<HuntingPlaybook>(`/api/playbooks/${encodeURIComponent(id)}`);
+    async getPlaybook(id, signal) {
+      return request<HuntingPlaybook>(`/api/playbooks/${encodeURIComponent(id)}`, { signal });
     },
 
-    async createPlaybook(playbook) {
+    async createPlaybook(playbook, signal) {
       return request<HuntingPlaybook>("/api/playbooks", {
         method: "POST",
         body: JSON.stringify(playbook),
+        signal,
       });
     },
 
-    async updatePlaybook(id, playbook) {
+    async updatePlaybook(id, playbook, signal) {
       return request<HuntingPlaybook>(`/api/playbooks/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(playbook),
+        signal,
       });
     },
 
-    async deletePlaybook(id) {
+    async deletePlaybook(id, signal) {
       await request<void>(`/api/playbooks/${encodeURIComponent(id)}`, {
         method: "DELETE",
+        signal,
       });
     },
 
-    async runPlaybook(id) {
+    async runPlaybook(id, signal) {
       return request<PlaybookRunResult>(`/api/playbooks/${encodeURIComponent(id)}/run`, {
         method: "POST",
+        signal,
       });
     },
 
-    async getPlaybookLastRun(id) {
-      return request<PlaybookRunResult>(`/api/playbooks/${encodeURIComponent(id)}/last-run`);
+    async getPlaybookLastRun(id, signal) {
+      return request<PlaybookRunResult>(`/api/playbooks/${encodeURIComponent(id)}/last-run`, { signal });
     },
 
     // Saved search CRUD
-    async listSavedSearches() {
-      return request<SavedSearch[]>("/api/hunting/saved-searches");
+    async listSavedSearches(signal) {
+      return request<SavedSearch[]>("/api/hunting/saved-searches", { signal });
     },
 
-    async getSavedSearch(id) {
-      return request<SavedSearch>(`/api/hunting/saved-searches/${encodeURIComponent(id)}`);
+    async getSavedSearch(id, signal) {
+      return request<SavedSearch>(`/api/hunting/saved-searches/${encodeURIComponent(id)}`, { signal });
     },
 
-    async createSavedSearch(search) {
+    async createSavedSearch(search, signal) {
       return request<SavedSearch>("/api/hunting/saved-searches", {
         method: "POST",
         body: JSON.stringify(search),
+        signal,
       });
     },
 
-    async updateSavedSearch(id, search) {
+    async updateSavedSearch(id, search, signal) {
       return request<SavedSearch>(`/api/hunting/saved-searches/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(search),
+        signal,
       });
     },
 
-    async deleteSavedSearch(id) {
+    async deleteSavedSearch(id, signal) {
       await request<void>(`/api/hunting/saved-searches/${encodeURIComponent(id)}`, {
         method: "DELETE",
+        signal,
       });
     },
 
-    async executeSavedSearch(id) {
+    async executeSavedSearch(id, signal) {
       return request<{ search: SavedSearch; hits: ThreatHit[]; total: number }>(
         `/api/hunting/saved-searches/${encodeURIComponent(id)}/execute`,
-        { method: "POST" },
+        { method: "POST", signal },
       );
     },
 
     // Hypothesis CRUD
-    async listHypotheses(status) {
+    async listHypotheses(status, signal) {
       const query = status ? `?status=${encodeURIComponent(status)}` : "";
-      return request<Hypothesis[]>(`/api/hunting/hypotheses${query}`);
+      return request<Hypothesis[]>(`/api/hunting/hypotheses${query}`, { signal });
     },
 
-    async getHypothesis(id) {
-      return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(id)}`);
+    async getHypothesis(id, signal) {
+      return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(id)}`, { signal });
     },
 
-    async createHypothesis(hypothesis) {
+    async createHypothesis(hypothesis, signal) {
       return request<Hypothesis>("/api/hunting/hypotheses", {
         method: "POST",
         body: JSON.stringify(hypothesis),
+        signal,
       });
     },
 
-    async updateHypothesis(id, hypothesis) {
+    async updateHypothesis(id, hypothesis, signal) {
       return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(hypothesis),
+        signal,
       });
     },
 
-    async deleteHypothesis(id) {
+    async deleteHypothesis(id, signal) {
       await request<void>(`/api/hunting/hypotheses/${encodeURIComponent(id)}`, {
         method: "DELETE",
+        signal,
       });
     },
 
-    async addHypothesisEvidence(hypothesisId, evidence) {
+    async addHypothesisEvidence(hypothesisId, evidence, signal) {
       return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(hypothesisId)}/evidence`, {
         method: "POST",
         body: JSON.stringify(evidence),
+        signal,
       });
     },
 
-    async updateHypothesisStatus(id, status, conclusion) {
+    async updateHypothesisStatus(id, status, conclusion, signal) {
       return request<Hypothesis>(`/api/hunting/hypotheses/${encodeURIComponent(id)}/status`, {
         method: "POST",
         body: JSON.stringify({ status, conclusion }),
+        signal,
       });
     },
   };

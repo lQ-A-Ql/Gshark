@@ -15,6 +15,9 @@ export interface BackendContextValue {
   toolRuntimeProbeTransport: ToolRuntimeProbeTransport;
   lastToolRuntimeProbeError: string;
   setTSharkPath: (path: string) => Promise<void>;
+  allowTSharkDir: (dir: string) => Promise<TSharkStatus>;
+  removeTSharkAllowedDir: (dir: string) => Promise<TSharkStatus>;
+  refreshTSharkAllowedDirs: () => Promise<string[]>;
   toolRuntimeSnapshot: ToolRuntimeSnapshot | null;
   isToolRuntimeLoading: boolean;
   refreshToolRuntimeSnapshot: () => Promise<ToolRuntimeSnapshot | null>;

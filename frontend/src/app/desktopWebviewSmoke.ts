@@ -217,7 +217,7 @@ async function runDesktopTypedSmoke(
   };
 }
 
-async function waitDesktopBackendReady(desktopApp: DesktopSmokeBinding): Promise<Record<string, any>> {
+async function waitDesktopBackendReady(desktopApp: DesktopSmokeBinding): Promise<Record<string, unknown>> {
   const deadline = Date.now() + 90_000;
   let lastStatus = "";
   while (Date.now() < deadline) {
@@ -309,10 +309,11 @@ function summarizeNetworkProbes(probes: NetworkProbe[]) {
 }
 
 function getDesktopAppBinding(): DesktopSmokeBinding | undefined {
-  return (window as any)?.go?.main?.DesktopApp as DesktopSmokeBinding | undefined;
+  const w = window as unknown as { go?: { main?: { DesktopApp?: DesktopSmokeBinding } } };
+  return w.go?.main?.DesktopApp;
 }
 
-function assertBinding(value: unknown, name: string): asserts value is (...args: any[]) => Promise<unknown> {
+function assertBinding(value: unknown, name: string): asserts value is (...args: unknown[]) => Promise<unknown> {
   if (typeof value !== "function") {
     throw new Error(`desktop WebView smoke missing Wails binding: ${name}`);
   }
@@ -324,8 +325,8 @@ function requestURL(input: RequestInfo | URL): string {
   return input.url;
 }
 
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" ? (value as Record<string, any>) : {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
 function asList(value: unknown): unknown[] {

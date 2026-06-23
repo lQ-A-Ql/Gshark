@@ -220,12 +220,15 @@ func scanFieldRowsWithOptionsContext(ctx context.Context, filePath string, field
 // fields to expect per row. Callers that already built their own -e list
 // (e.g. runner.go's packet-list pipeline) use this instead of the cache-
 // aware entry point.
-func runDirectFieldScan(args []string, width int, onRow func([]string)) error {
+func runDirectFieldScan(ctx context.Context, args []string, width int, onRow func([]string)) error {
 	if width <= 0 {
 		return nil
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	cmd, err := Command(args...)
+	cmd, err := CommandContext(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("resolve tshark: %w", err)
 	}

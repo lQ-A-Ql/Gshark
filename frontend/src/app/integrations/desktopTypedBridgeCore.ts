@@ -17,8 +17,12 @@ export async function typedCall<T>(
   });
 }
 
-export async function typedBlobCall(operation: () => Promise<unknown>, endpoint: string): Promise<Blob> {
-  const payload = (await typedCall(operation, endpoint, undefined, LONG_TYPED_IPC_TIMEOUT_MS)) as {
+export async function typedBlobCall(
+  operation: () => Promise<unknown>,
+  endpoint: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const payload = (await typedCall(operation, endpoint, signal, LONG_TYPED_IPC_TIMEOUT_MS)) as {
     data_base64?: unknown;
     content_type?: unknown;
     size?: unknown;

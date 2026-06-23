@@ -60,11 +60,11 @@ export function createAnalysisResourceCache<T>({
         const cached = this.get(key);
         if (cached !== undefined) return Promise.resolve(cached);
         const existing = inflight.get(key);
-        if (existing) return existing;
+        if (existing) return waitForCallerSignal(existing, signal);
       }
 
       const promise = load().then((payload) => {
-        if (key && !signal.aborted) {
+        if (key) {
           this.set(key, payload);
         }
         return payload;
@@ -77,7 +77,31 @@ export function createAnalysisResourceCache<T>({
           () => inflight.delete(key),
         );
       }
-      return promise;
+      return waitForCallerSignal(promise, signal);
     },
   };
+}
+
+function waitForCallerSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(abortError());
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+function abortError() {
+  return new DOMException("The operation was aborted.", "AbortError");
 }

@@ -23,22 +23,30 @@ export interface ToolRuntimeConfigStorageRecord {
 
 export const EMPTY_TOOL_RUNTIME_CONFIG: ToolRuntimeConfig = {
   tsharkPath: "",
+  tsharkAllowedDirs: [],
   ffmpegPath: "",
+  ffmpegAllowedDirs: [],
   pythonPath: "",
+  pythonAllowedDirs: [],
   voskModelPath: "",
   yaraEnabled: true,
   yaraBin: "",
+  yaraAllowedDirs: [],
   yaraRules: "",
   yaraTimeoutMs: 25000,
 };
 
 export const TOOL_RUNTIME_CONFIG_FIELDS: readonly ToolRuntimeConfigField[] = [
   "tsharkPath",
+  "tsharkAllowedDirs",
   "ffmpegPath",
+  "ffmpegAllowedDirs",
   "pythonPath",
+  "pythonAllowedDirs",
   "voskModelPath",
   "yaraEnabled",
   "yaraBin",
+  "yaraAllowedDirs",
   "yaraRules",
   "yaraTimeoutMs",
 ];
@@ -63,11 +71,15 @@ export function normalizeStoredToolRuntimeConfig(parsed: unknown, legacyTsharkPa
   const payload = runtimeConfigPayload(parsed);
   return {
     tsharkPath: String(payload.tsharkPath ?? legacyTsharkPath).trim(),
+    tsharkAllowedDirs: asStringList(payload.tsharkAllowedDirs),
     ffmpegPath: String(payload.ffmpegPath ?? "").trim(),
+    ffmpegAllowedDirs: asStringList(payload.ffmpegAllowedDirs),
     pythonPath: String(payload.pythonPath ?? "").trim(),
+    pythonAllowedDirs: asStringList(payload.pythonAllowedDirs),
     voskModelPath: String(payload.voskModelPath ?? "").trim(),
     yaraEnabled: payload.yaraEnabled !== false,
     yaraBin: String(payload.yaraBin ?? "").trim(),
+    yaraAllowedDirs: asStringList(payload.yaraAllowedDirs),
     yaraRules: String(payload.yaraRules ?? "").trim(),
     yaraTimeoutMs: Number(payload.yaraTimeoutMs ?? 25000) || 25000,
   };
@@ -125,11 +137,15 @@ export function explicitFieldsFromPatch(patch: Partial<ToolRuntimeConfig>): Tool
 export function explicitFieldsFromLegacyConfig(config: ToolRuntimeConfig): ToolRuntimeConfigExplicitFields {
   const fields: ToolRuntimeConfigExplicitFields = {};
   if (config.tsharkPath) fields.tsharkPath = true;
+  if (config.tsharkAllowedDirs && config.tsharkAllowedDirs.length > 0) fields.tsharkAllowedDirs = true;
   if (config.ffmpegPath) fields.ffmpegPath = true;
+  if (config.ffmpegAllowedDirs && config.ffmpegAllowedDirs.length > 0) fields.ffmpegAllowedDirs = true;
   if (config.pythonPath) fields.pythonPath = true;
+  if (config.pythonAllowedDirs && config.pythonAllowedDirs.length > 0) fields.pythonAllowedDirs = true;
   if (config.voskModelPath) fields.voskModelPath = true;
   if (config.yaraEnabled !== EMPTY_TOOL_RUNTIME_CONFIG.yaraEnabled) fields.yaraEnabled = true;
   if (config.yaraBin) fields.yaraBin = true;
+  if (config.yaraAllowedDirs && config.yaraAllowedDirs.length > 0) fields.yaraAllowedDirs = true;
   if (config.yaraRules) fields.yaraRules = true;
   if (config.yaraTimeoutMs !== EMPTY_TOOL_RUNTIME_CONFIG.yaraTimeoutMs) fields.yaraTimeoutMs = true;
   return fields;
@@ -150,6 +166,11 @@ export function createToolRuntimeStorageRecord(
     config: normalizeStoredToolRuntimeConfig(config),
     explicitFields: source === "stored-runtime-config" ? normalizeExplicitFields(explicitFields) : {},
   };
+}
+
+function asStringList(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.map((value) => String(value ?? "")).filter((value) => value.length > 0);
 }
 
 function runtimeConfigPayload(parsed: unknown): Partial<ToolRuntimeConfig> {

@@ -11,11 +11,22 @@ export type ToolRuntimeProbeState =
   | "failed";
 export type ToolRuntimeProbeTransport = "desktop-ipc" | "http-fallback" | "unknown";
 
+type ToolRuntimeProbeWindow = Window & {
+  go?: {
+    main?: {
+      DesktopApp?: {
+        GetToolRuntimeSnapshotFast?: unknown;
+        GetToolRuntimeSnapshot?: unknown;
+      };
+    };
+  };
+};
+
 export function detectToolRuntimeProbeTransport(): ToolRuntimeProbeTransport {
   if (typeof window === "undefined") {
     return "unknown";
   }
-  const desktopApp = (window as any)?.go?.main?.DesktopApp;
+  const desktopApp = (window as ToolRuntimeProbeWindow).go?.main?.DesktopApp;
   return desktopApp?.GetToolRuntimeSnapshotFast || desktopApp?.GetToolRuntimeSnapshot ? "desktop-ipc" : "http-fallback";
 }
 

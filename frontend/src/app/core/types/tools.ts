@@ -3,11 +3,15 @@ import type { KnownOrUnknown } from "./unknownEnum";
 
 export interface ToolRuntimeConfig {
   tsharkPath: string;
+  tsharkAllowedDirs?: string[];
   ffmpegPath: string;
+  ffmpegAllowedDirs?: string[];
   pythonPath: string;
+  pythonAllowedDirs?: string[];
   voskModelPath: string;
   yaraEnabled: boolean;
   yaraBin: string;
+  yaraAllowedDirs?: string[];
   yaraRules: string;
   yaraTimeoutMs: number;
 }
@@ -49,6 +53,8 @@ export interface YaraToolStatus {
   usingCustomBin: boolean;
   usingCustomRules: boolean;
   timeoutMs: number;
+  pathWarning?: string;
+  extraAllowedDir?: string;
 }
 
 export interface ToolRuntimeSnapshot {
@@ -66,6 +72,8 @@ export interface ToolRuntimeSnapshot {
     missingOptionalFields?: string[];
     capabilityMessage?: string;
     capabilityCheckDegraded?: boolean;
+    pathWarning?: string;
+    extraAllowedDir?: string;
   };
   ffmpeg: {
     available: boolean;
@@ -73,6 +81,8 @@ export interface ToolRuntimeSnapshot {
     message: string;
     customPath?: string;
     usingCustomPath: boolean;
+    pathWarning?: string;
+    extraAllowedDir?: string;
   };
   speech: SpeechToTextStatus;
   yara: YaraToolStatus;

@@ -32,6 +32,8 @@ export function mergeTSharkStatusIntoSnapshot(
           missingOptionalFields: status.missingOptionalFields,
           capabilityMessage: status.capabilityMessage,
           capabilityCheckDegraded: status.capabilityCheckDegraded,
+          pathWarning: status.pathWarning,
+          extraAllowedDir: status.extraAllowedDir,
         },
       }
     : snapshot;
@@ -45,11 +47,15 @@ export function buildNextToolRuntimeConfig(
     ...base,
     ...patch,
     tsharkPath: String(patch.tsharkPath ?? base.tsharkPath ?? "").trim(),
+    tsharkAllowedDirs: patch.tsharkAllowedDirs ?? base.tsharkAllowedDirs ?? [],
     ffmpegPath: String(patch.ffmpegPath ?? base.ffmpegPath ?? "").trim(),
+    ffmpegAllowedDirs: patch.ffmpegAllowedDirs ?? base.ffmpegAllowedDirs ?? [],
     pythonPath: String(patch.pythonPath ?? base.pythonPath ?? "").trim(),
+    pythonAllowedDirs: patch.pythonAllowedDirs ?? base.pythonAllowedDirs ?? [],
     voskModelPath: String(patch.voskModelPath ?? base.voskModelPath ?? "").trim(),
     yaraEnabled: patch.yaraEnabled ?? base.yaraEnabled,
     yaraBin: String(patch.yaraBin ?? base.yaraBin ?? "").trim(),
+    yaraAllowedDirs: patch.yaraAllowedDirs ?? base.yaraAllowedDirs ?? [],
     yaraRules: String(patch.yaraRules ?? base.yaraRules ?? "").trim(),
     yaraTimeoutMs: Number(patch.yaraTimeoutMs ?? base.yaraTimeoutMs ?? 25000) || 25000,
   };

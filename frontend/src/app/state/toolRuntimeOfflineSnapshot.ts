@@ -16,12 +16,15 @@ export function buildOfflineToolRuntimeSnapshot(config: ToolRuntimeConfig): Tool
       message: "后端未连接",
       customPath: config.ffmpegPath || undefined,
       usingCustomPath: Boolean(config.ffmpegPath),
+      extraAllowedDir: config.ffmpegAllowedDirs?.[0],
     },
     speech: {
       available: false,
       engine: "vosk",
       language: "zh-CN",
       pythonAvailable: false,
+      pythonCommand: config.pythonPath || undefined,
+      pythonExtraAllowedDir: config.pythonAllowedDirs?.[0],
       ffmpegAvailable: false,
       voskAvailable: false,
       modelAvailable: false,
@@ -37,6 +40,7 @@ export function buildOfflineToolRuntimeSnapshot(config: ToolRuntimeConfig): Tool
       usingCustomBin: Boolean(config.yaraBin),
       usingCustomRules: Boolean(config.yaraRules),
       timeoutMs: config.yaraTimeoutMs,
+      extraAllowedDir: config.yaraAllowedDirs?.[0],
     },
   };
 }

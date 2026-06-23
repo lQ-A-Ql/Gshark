@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { UnifiedEvidenceRecord } from "./evidenceSchema";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
 import { backendClients } from "../../integrations/backendClients";
 import type { FeaturePreloadContract } from "../../preload/preloadContracts";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 
 const evidenceCache = createAnalysisResourceCache<UnifiedEvidenceRecord[]>({ capacity: 10 });
 const EMPTY_EVIDENCE: UnifiedEvidenceRecord[] = [];
@@ -33,61 +33,21 @@ export function useEvidence({
 }: UseEvidenceOptions) {
   const modulesKey = buildEvidenceModulesKey(modules);
   const normalizedModules = useMemo(() => parseEvidenceModulesKey(modulesKey), [modulesKey]);
-  const hasCaptureForEvidence = useMemo(
-    () => backendConnected && hasUsableCapturePath(filePath, totalPackets),
-    [backendConnected, filePath, totalPackets],
-  );
-  const [evidence, setEvidence] = useState<UnifiedEvidenceRecord[]>(EMPTY_EVIDENCE);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runRequest, cancel: cancelRequest } = useAbortableRequest();
-
   const cacheKey = useMemo(
     () => buildEvidenceCacheKey(captureRevision, filePath, totalPackets, normalizedModules),
     [captureRevision, filePath, normalizedModules, totalPackets],
   );
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-  const refreshEvidence = useCallback(
-    (force = false) => {
-      if (!hasCaptureForEvidence) {
-        cancelRequest();
-        setEvidence(EMPTY_EVIDENCE);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      if (!force && cacheKey && evidenceCache.has(cacheKey)) {
-        cancelRequest();
-        setEvidence(evidenceCache.get(cacheKey) ?? []);
-        setLoading(false);
-        setError("");
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      return runRequest({
-        request: (signal) => requestEvidence(cacheKey, normalizedModules, signal, { force }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            evidenceCache.set(cacheKey, payload);
-          }
-          setEvidence(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "统一证据加载失败");
-          setEvidence(EMPTY_EVIDENCE);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [cacheKey, cancelRequest, hasCaptureForEvidence, normalizedModules, runRequest],
-  );
-
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshEvidence();
-  }, [isPreloadingCapture, refreshEvidence]);
+  const { data: evidence, loading, error, refresh: refreshEvidence } = useAnalysisResult<UnifiedEvidenceRecord[]>({
+    cache: evidenceCache,
+    cacheKey,
+    emptyValue: EMPTY_EVIDENCE,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "统一证据加载失败",
+    fetch: (signal) => backendClients.evidence.getEvidenceWithFilter(normalizedModules, signal),
+  });
 
   return {
     evidence,

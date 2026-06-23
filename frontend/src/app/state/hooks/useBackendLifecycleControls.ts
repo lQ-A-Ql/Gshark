@@ -1,51 +1,35 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
-import type { DecryptionConfig, ToolRuntimeConfig, ToolRuntimeSnapshot } from "../../core/types";
+import { useCallback } from "react";
 import { backendClients } from "../../integrations/backendClients";
-import type { ToolRuntimeConfigExplicitFields } from "../toolRuntimeStorageConfig";
-
-interface UseBackendLifecycleControlsOptions {
-  readonly backendConnected: boolean;
-  readonly setBackendStatus: Dispatch<SetStateAction<string>>;
-  readonly setDecryptionConfig: Dispatch<SetStateAction<DecryptionConfig>>;
-  readonly setTSharkPathImpl: (
-    path: string,
-    backendConnected: boolean,
-    setBackendStatus: (status: string) => void,
-  ) => Promise<void>;
-  readonly refreshToolRuntimeSnapshotImpl: (backendConnected: boolean) => Promise<ToolRuntimeSnapshot | null>;
-  readonly saveToolRuntimeConfigImpl: (
-    patch: Partial<ToolRuntimeConfig>,
-    backendConnected: boolean,
-    setBackendStatus: (status: string) => void,
-    explicitFields?: ToolRuntimeConfigExplicitFields,
-  ) => Promise<ToolRuntimeSnapshot>;
-}
+import type { DecryptionConfig } from "../../core/types";
+import type { UseBackendLifecycleControlsOptions } from "./backendLifecycleTypes";
+import { useBackendTSharkDirControls } from "./useBackendTSharkDirControls";
+import { useBackendToolRuntimeControls } from "./useBackendToolRuntimeControls";
 
 export function useBackendLifecycleControls({
   backendConnected,
   setBackendStatus,
   setDecryptionConfig,
   setTSharkPathImpl,
+  allowTSharkDirImpl,
+  removeTSharkAllowedDirImpl,
+  refreshTSharkAllowedDirsImpl,
   refreshToolRuntimeSnapshotImpl,
   saveToolRuntimeConfigImpl,
 }: UseBackendLifecycleControlsOptions) {
-  const setBackendStatusText = useCallback((status: string) => setBackendStatus(status), [setBackendStatus]);
-  const setTSharkPath = useCallback(
-    async (path: string) => {
-      await setTSharkPathImpl(path, backendConnected, setBackendStatusText);
-    },
-    [backendConnected, setBackendStatusText, setTSharkPathImpl],
-  );
-  const refreshToolRuntimeSnapshot = useCallback(async () => {
-    return await refreshToolRuntimeSnapshotImpl(backendConnected);
-  }, [backendConnected, refreshToolRuntimeSnapshotImpl]);
-  const saveToolRuntimeConfig = useCallback(
-    async (patch: Partial<ToolRuntimeConfig>, explicitFields?: ToolRuntimeConfigExplicitFields) => {
-      return await saveToolRuntimeConfigImpl(patch, backendConnected, setBackendStatusText, explicitFields);
-    },
-    [backendConnected, saveToolRuntimeConfigImpl, setBackendStatusText],
-  );
-
+  const { allowTSharkDir, removeTSharkAllowedDir, refreshTSharkAllowedDirs } = useBackendTSharkDirControls({
+    backendConnected,
+    setBackendStatusText: setBackendStatus,
+    allowTSharkDirImpl,
+    removeTSharkAllowedDirImpl,
+    refreshTSharkAllowedDirsImpl,
+  });
+  const { setTSharkPath, refreshToolRuntimeSnapshot, saveToolRuntimeConfig } = useBackendToolRuntimeControls({
+    backendConnected,
+    setBackendStatus,
+    setTSharkPathImpl,
+    refreshToolRuntimeSnapshotImpl,
+    saveToolRuntimeConfigImpl,
+  });
   const updateDecryptionConfig = useCallback(
     (patch: Partial<DecryptionConfig>) => {
       setDecryptionConfig((prev) => {
@@ -58,9 +42,11 @@ export function useBackendLifecycleControls({
     },
     [backendConnected, setBackendStatus, setDecryptionConfig],
   );
-
   return {
     setTSharkPath,
+    allowTSharkDir,
+    removeTSharkAllowedDir,
+    refreshTSharkAllowedDirs,
     refreshToolRuntimeSnapshot,
     saveToolRuntimeConfig,
     updateDecryptionConfig,

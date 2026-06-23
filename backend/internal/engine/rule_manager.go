@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -21,11 +20,21 @@ import (
 // RuleManager manages YARA rule packs: versioning, download, cache,
 // enable/disable, and conflict detection.
 type RuleManager struct {
-	mu      sync.RWMutex
-	packs   map[string]*model.RulePack
-	config  model.RuleUpdateConfig
-	dataDir string
-	client  *http.Client
+	mu           sync.RWMutex
+	packs        map[string]*model.RulePack
+	config       model.RuleUpdateConfig
+	dataDir      string
+	client       *http.Client
+	allowedHosts []string
+}
+
+// DefaultAllowedRuleHosts lists trusted hosts for remote rule downloads.
+var DefaultAllowedRuleHosts = []string{
+	"127.0.0.1",
+	"localhost",
+	"::1",
+	"github.com",
+	"raw.githubusercontent.com",
 }
 
 // NewRuleManager creates a RuleManager that stores rule data under dataDir.
@@ -34,12 +43,21 @@ func NewRuleManager(dataDir string) *RuleManager {
 		dataDir = filepath.Join(os.TempDir(), "meow-traffic", "rules")
 	}
 	return &RuleManager{
-		packs:   make(map[string]*model.RulePack),
-		dataDir: dataDir,
+		packs:        make(map[string]*model.RulePack),
+		dataDir:      dataDir,
+		allowedHosts: append([]string(nil), DefaultAllowedRuleHosts...),
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// SetAllowedHosts overrides the list of hosts allowed for remote rule downloads.
+// Use this in tests or when a deployment needs additional trusted sources.
+func (rm *RuleManager) SetAllowedHosts(hosts []string) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.allowedHosts = append([]string(nil), hosts...)
 }
 
 // LoadBuiltinPacks registers the embedded rule packs shipped with the backend.
@@ -220,34 +238,55 @@ func (rm *RuleManager) CheckForUpdates() ([]model.RuleUpdateResult, error) {
 }
 
 // DownloadPack downloads a rule pack from the given URL and caches it locally.
-func (rm *RuleManager) DownloadPack(packID, url string) (*model.RulePack, error) {
-	if strings.TrimSpace(url) == "" {
+// expectedChecksum is required (SHA-256 hex) and must match the downloaded content.
+func (rm *RuleManager) DownloadPack(packID, downloadURL string, expectedChecksum string) (*model.RulePack, error) {
+	if err := validateRulePackID(packID); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(downloadURL) == "" {
 		return nil, fmt.Errorf("download URL is empty")
 	}
 
-	resp, err := rm.client.Get(url)
+	rm.mu.RLock()
+	allowedHosts := rm.allowedHosts
+	rm.mu.RUnlock()
+	parsed, err := validateRuleDownloadURL(downloadURL, allowedHosts)
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", url, err)
+		return nil, err
+	}
+	if err := validateRuleChecksum(expectedChecksum); err != nil {
+		return nil, err
+	}
+
+	resp, err := rm.client.Get(parsed.String())
+	if err != nil {
+		return nil, fmt.Errorf("download %s: %w", downloadURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+		return nil, fmt.Errorf("download %s: HTTP %d", downloadURL, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
+	body, err := readLimitedRulePack(resp.Body, 10<<20)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	checksum := sha256Hex(body)
+	if !strings.EqualFold(expectedChecksum, checksum) {
+		return nil, fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, checksum)
+	}
 
 	cacheDir := rm.getCacheDir()
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create cache dir: %w", err)
 	}
 
-	cachePath := filepath.Join(cacheDir, packID+".yar")
+	cachePath, err := safeCachePath(cacheDir, packID)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.WriteFile(cachePath, body, 0o644); err != nil {
 		return nil, fmt.Errorf("write cache: %w", err)
 	}
@@ -257,7 +296,7 @@ func (rm *RuleManager) DownloadPack(packID, url string) (*model.RulePack, error)
 	pack := &model.RulePack{
 		ID:        packID,
 		Name:      packID,
-		Source:    url,
+		Source:    downloadURL,
 		Version:   model.RuleVersion{Major: 1, Minor: 0, Patch: 0, ReleasedAt: time.Now()},
 		Enabled:   true,
 		RuleCount: ruleCount,
@@ -464,6 +503,13 @@ type remoteRulePack struct {
 func (rm *RuleManager) fetchManifest(baseURL string) ([]remoteRulePack, error) {
 	manifestURL := strings.TrimRight(baseURL, "/") + "/manifest.json"
 
+	rm.mu.RLock()
+	allowedHosts := rm.allowedHosts
+	rm.mu.RUnlock()
+	if _, err := validateRuleDownloadURL(manifestURL, allowedHosts); err != nil {
+		return nil, err
+	}
+
 	resp, err := rm.client.Get(manifestURL)
 	if err != nil {
 		return nil, err
@@ -507,8 +553,12 @@ func (rm *RuleManager) processRemotePack(remote remoteRulePack) model.RuleUpdate
 		result.Error = "no download URL"
 		return result
 	}
+	if strings.TrimSpace(remote.Checksum) == "" {
+		result.Error = "missing checksum"
+		return result
+	}
 
-	pack, err := rm.DownloadPack(remote.ID, remote.URL)
+	pack, err := rm.DownloadPack(remote.ID, remote.URL, remote.Checksum)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -534,102 +584,6 @@ func isNewerVersion(a, b model.RuleVersion) bool {
 func sha256Hex(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
-}
-
-// countYARARules counts the number of "rule " declarations in YARA content.
-func countYARARules(content string) int {
-	count := 0
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "rule ") {
-			// Ensure it's a rule declaration, not inside a string
-			if brace := strings.Index(trimmed, "{"); brace > 4 {
-				name := strings.TrimSpace(trimmed[4:brace])
-				if name != "" {
-					count++
-				}
-			}
-		}
-	}
-	return count
-}
-
-// extractRuleEntries parses YARA content and returns rule entries.
-func extractRuleEntries(content string) []model.RuleEntry {
-	var entries []model.RuleEntry
-	lines := strings.Split(content, "\n")
-
-	currentRule := ""
-	inMeta := false
-	fields := map[string]string{}
-
-	flush := func() {
-		if currentRule == "" {
-			return
-		}
-		entry := model.RuleEntry{
-			ID:      currentRule,
-			Name:    fields["description"],
-			Enabled: true,
-		}
-		if entry.Name == "" {
-			entry.Name = currentRule
-		}
-		entry.Category = fields["family"]
-		if entry.Category == "" {
-			entry.Category = fields["project"]
-		}
-		entry.Severity = normalizeYaraLevel(fields["severity"])
-		if entry.Severity == "" {
-			entry.Severity = "medium"
-		}
-		entries = append(entries, entry)
-		currentRule = ""
-		inMeta = false
-		fields = map[string]string{}
-	}
-
-	for _, rawLine := range lines {
-		line := strings.TrimSpace(rawLine)
-		if line == "" || strings.HasPrefix(line, "//") {
-			continue
-		}
-		if strings.HasPrefix(line, "rule ") {
-			flush()
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				currentRule = strings.TrimSpace(parts[1])
-				if brace := strings.Index(currentRule, "{"); brace >= 0 {
-					currentRule = strings.TrimSpace(currentRule[:brace])
-				}
-			}
-			continue
-		}
-		if currentRule == "" {
-			continue
-		}
-		switch {
-		case line == "meta:":
-			inMeta = true
-			continue
-		case strings.HasSuffix(line, "strings:") || strings.HasSuffix(line, "condition:"):
-			inMeta = false
-			continue
-		case line == "}":
-			flush()
-			continue
-		}
-		if !inMeta {
-			continue
-		}
-		key, value, ok := parseYaraMetaAssignment(line)
-		if !ok {
-			continue
-		}
-		fields[strings.ToLower(key)] = value
-	}
-	flush()
-	return entries
 }
 
 // init ensures cache directory exists.

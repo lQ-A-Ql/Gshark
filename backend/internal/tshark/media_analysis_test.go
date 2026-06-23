@@ -2,6 +2,7 @@ package tshark
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -165,9 +166,9 @@ func TestMediaControlHintsDecodeAsAndRTPPortProbeUseFakeTShark(t *testing.T) {
 	controlHints := map[int][]mediaTrackHint{}
 	protocolMap := map[string]int{}
 	applicationMap := map[string]int{}
-	count, err := scanMediaControlHints("media.pcap", controlHints, protocolMap, applicationMap)
+	count, err := scanMediaControlHints(context.Background(), "media.pcap", controlHints, protocolMap, applicationMap)
 	if err != nil {
-		t.Fatalf("scanMediaControlHints() error = %v", err)
+		t.Fatalf("scanMediaControlHints(context.Background(), ) error = %v", err)
 	}
 	if count != 1 {
 		t.Fatalf("control hint count = %d, want 1", count)
@@ -180,9 +181,9 @@ func TestMediaControlHintsDecodeAsAndRTPPortProbeUseFakeTShark(t *testing.T) {
 	}
 
 	sessions := map[string]*mediaSessionBuilder{}
-	rtpCount, err := scanRTPMediaSessionsWithDecodeAs("media.pcap", []int{0, 5004}, controlHints, sessions, protocolMap, applicationMap)
+	rtpCount, err := scanRTPMediaSessionsWithDecodeAs(context.Background(), "media.pcap", []int{0, 5004}, controlHints, sessions, protocolMap, applicationMap)
 	if err != nil {
-		t.Fatalf("scanRTPMediaSessionsWithDecodeAs() error = %v", err)
+		t.Fatalf("scanRTPMediaSessionsWithDecodeAs(context.Background(), ) error = %v", err)
 	}
 	if rtpCount != 1 || len(sessions) != 1 {
 		t.Fatalf("expected one decode-as RTP session, count=%d sessions=%+v", rtpCount, sessions)
@@ -507,7 +508,7 @@ func TestBuildMediaAnalysisFromPacketStream(t *testing.T) {
 		L4HeaderLen:     8,
 	}
 
-	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
+	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(context.Background(), exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
 		return onPacket(packet)
 	})
 	if err != nil {
@@ -548,7 +549,7 @@ func TestBuildMediaAnalysisFromPacketStreamStaticAudioPayloadType(t *testing.T) 
 		L4HeaderLen:     8,
 	}
 
-	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
+	stats, artifacts, err := BuildMediaAnalysisFromPacketStream(context.Background(), exportDir, 1, MediaScanConfig{}, nil, func(onPacket func(model.Packet) error) error {
 		return onPacket(packet)
 	})
 	if err != nil {

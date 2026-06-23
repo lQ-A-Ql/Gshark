@@ -22,6 +22,7 @@ func cloneManifest(in model.MiscModuleManifest) model.MiscModuleManifest {
 	}
 	if in.InterfaceSchema != nil {
 		schema := *in.InterfaceSchema
+		schema.Permissions = append([]string(nil), in.InterfaceSchema.Permissions...)
 		out.InterfaceSchema = &schema
 	}
 	return out

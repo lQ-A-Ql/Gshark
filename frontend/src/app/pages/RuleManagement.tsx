@@ -5,23 +5,11 @@ import { MetricCard, StatusHint, SurfacePanel } from "../components/DesignSystem
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import {
-  useRuleManagement,
-  type RulePack,
-  type RuleUpdateConfig,
-} from "../features/rules/useRuleManagement";
+import { useRuleManagement, type RulePack, type RuleUpdateConfig } from "../features/rules/useRuleManagement";
 
 export default function RuleManagement() {
-  const {
-    status,
-    loading,
-    error,
-    fetchStatus,
-    togglePack,
-    checkUpdates,
-    downloadPack,
-    updateConfig,
-  } = useRuleManagement();
+  const { status, loading, error, fetchStatus, togglePack, checkUpdates, downloadPack, updateConfig } =
+    useRuleManagement();
 
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateResults, setUpdateResults] = useState<string[]>([]);
@@ -34,6 +22,7 @@ export default function RuleManagement() {
   });
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadPackId, setDownloadPackId] = useState("");
+  const [downloadChecksum, setDownloadChecksum] = useState("");
 
   const handleCheckUpdates = async () => {
     setCheckingUpdates(true);
@@ -59,10 +48,11 @@ export default function RuleManagement() {
   };
 
   const handleDownload = async () => {
-    if (!downloadPackId.trim() || !downloadUrl.trim()) return;
-    await downloadPack(downloadPackId.trim(), downloadUrl.trim());
+    if (!downloadPackId.trim() || !downloadUrl.trim() || !downloadChecksum.trim()) return;
+    await downloadPack(downloadPackId.trim(), downloadUrl.trim(), downloadChecksum.trim());
     setDownloadPackId("");
     setDownloadUrl("");
+    setDownloadChecksum("");
   };
 
   return (
@@ -82,12 +72,7 @@ export default function RuleManagement() {
       <div className="space-y-6">
         {/* Action Bar */}
         <div className="flex items-center gap-4 flex-wrap">
-          <Button
-            size="sm"
-            onClick={handleCheckUpdates}
-            disabled={checkingUpdates}
-            aria-label="检查规则更新"
-          >
+          <Button size="sm" onClick={handleCheckUpdates} disabled={checkingUpdates} aria-label="检查规则更新">
             <Download className={checkingUpdates ? "animate-spin" : ""} />
             检查更新
           </Button>
@@ -117,12 +102,7 @@ export default function RuleManagement() {
                 icon={<Check className="size-4" />}
                 tone="emerald"
               />
-              <MetricCard
-                label="已禁用"
-                value={status.disabled_rules}
-                icon={<X className="size-4" />}
-                tone="slate"
-              />
+              <MetricCard label="已禁用" value={status.disabled_rules} icon={<X className="size-4" />} tone="slate" />
               {status.conflicts.length > 0 && (
                 <MetricCard
                   label="冲突"
@@ -152,11 +132,7 @@ export default function RuleManagement() {
 
         {/* Config Panel */}
         {showConfig && (
-          <SurfacePanel
-            title="更新配置"
-            icon={<Settings className="size-4" />}
-            variant="section"
-          >
+          <SurfacePanel title="更新配置" icon={<Settings className="size-4" />} variant="section">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="config-remote-url" className="text-sm text-muted-foreground">
@@ -193,9 +169,7 @@ export default function RuleManagement() {
                   type="button"
                   variant={configForm.auto_update ? "default" : "outline"}
                   size="sm"
-                  onClick={() =>
-                    setConfigForm({ ...configForm, auto_update: !configForm.auto_update })
-                  }
+                  onClick={() => setConfigForm({ ...configForm, auto_update: !configForm.auto_update })}
                   aria-label={configForm.auto_update ? "关闭自动更新" : "开启自动更新"}
                   aria-pressed={configForm.auto_update}
                 >
@@ -204,19 +178,10 @@ export default function RuleManagement() {
               </div>
             </div>
             <div className="mt-4 flex gap-2">
-              <Button
-                size="sm"
-                onClick={handleSaveConfig}
-                aria-label="保存更新配置"
-              >
+              <Button size="sm" onClick={handleSaveConfig} aria-label="保存更新配置">
                 保存配置
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowConfig(false)}
-                aria-label="取消配置编辑"
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowConfig(false)} aria-label="取消配置编辑">
                 取消
               </Button>
             </div>
@@ -224,11 +189,7 @@ export default function RuleManagement() {
         )}
 
         {/* Download Panel */}
-        <SurfacePanel
-          title="下载规则包"
-          icon={<Download className="size-4" />}
-          variant="section"
-        >
+        <SurfacePanel title="下载规则包" icon={<Download className="size-4" />} variant="section">
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex-1">
               <label htmlFor="download-pack-id" className="text-sm text-muted-foreground">
@@ -256,11 +217,24 @@ export default function RuleManagement() {
                 placeholder="下载 URL"
               />
             </div>
+            <div className="flex-1">
+              <label htmlFor="download-checksum" className="text-sm text-muted-foreground">
+                SHA-256 校验和
+              </label>
+              <Input
+                id="download-checksum"
+                type="text"
+                value={downloadChecksum}
+                onChange={(e) => setDownloadChecksum(e.target.value)}
+                className="mt-1"
+                placeholder="64 位十六进制校验和"
+              />
+            </div>
             <div className="flex items-end">
               <Button
                 size="sm"
                 onClick={handleDownload}
-                disabled={!downloadPackId.trim() || !downloadUrl.trim()}
+                disabled={!downloadPackId.trim() || !downloadUrl.trim() || !downloadChecksum.trim()}
                 aria-label="下载规则包"
               >
                 下载
@@ -272,9 +246,7 @@ export default function RuleManagement() {
         {/* Rule Packs */}
         <div className="space-y-3">
           <h3 className="text-sm font-medium">规则包列表</h3>
-          {!status && loading && (
-            <div className="py-8 text-center text-sm text-muted-foreground">加载中...</div>
-          )}
+          {!status && loading && <div className="py-8 text-center text-sm text-muted-foreground">加载中...</div>}
           {status && status.packs.length === 0 && (
             <div className="py-8 text-center text-sm text-muted-foreground">暂无规则包</div>
           )}
@@ -292,12 +264,9 @@ export default function RuleManagement() {
                 <div>
                   <div className="font-medium">{conflict.conflict}</div>
                   <div className="mt-1 text-muted-foreground">
-                    {conflict.rule_id_1} ({conflict.pack_id_1}) ↔ {conflict.rule_id_2} (
-                    {conflict.pack_id_2})
+                    {conflict.rule_id_1} ({conflict.pack_id_1}) ↔ {conflict.rule_id_2} ({conflict.pack_id_2})
                   </div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">
-                    严重程度: {conflict.severity}
-                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">严重程度: {conflict.severity}</div>
                 </div>
               </StatusHint>
             ))}
@@ -308,13 +277,7 @@ export default function RuleManagement() {
   );
 }
 
-function RulePackCard({
-  pack,
-  onToggle,
-}: {
-  pack: RulePack;
-  onToggle: (id: string, enabled: boolean) => void;
-}) {
+function RulePackCard({ pack, onToggle }: { pack: RulePack; onToggle: (id: string, enabled: boolean) => void }) {
   const version = `v${pack.version.major}.${pack.version.minor}.${pack.version.patch}${pack.version.tag ? `-${pack.version.tag}` : ""}`;
 
   return (
@@ -325,14 +288,10 @@ function RulePackCard({
             <span className="font-medium">{pack.name}</span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{version}</span>
             {pack.source === "embedded" && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                内置
-              </span>
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">内置</span>
             )}
           </div>
-          {pack.description && (
-            <div className="text-sm text-muted-foreground">{pack.description}</div>
-          )}
+          {pack.description && <div className="text-sm text-muted-foreground">{pack.description}</div>}
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span>ID: {pack.id}</span>
             <span>规则数: {pack.rule_count}</span>

@@ -196,7 +196,7 @@ describe("StartupGate", () => {
 
   it("shows runtime probe failures instead of reporting every tool as missing", () => {
     sentinelState.isTSharkChecking = false;
-    sentinelState.toolRuntimeSnapshot = null as any;
+    sentinelState.toolRuntimeSnapshot = null as unknown as typeof sentinelState.toolRuntimeSnapshot;
     sentinelState.toolRuntimeProbeState = "failed";
     sentinelState.toolRuntimeProbeTransport = "desktop-ipc";
     sentinelState.lastToolRuntimeProbeError = "Wails IPC runtime snapshot failed";

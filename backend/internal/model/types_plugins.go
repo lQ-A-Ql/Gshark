@@ -59,11 +59,12 @@ type MiscModuleFormSchema struct {
 }
 
 type MiscModuleInterfaceSchema struct {
-	Method     string `json:"method,omitempty"`
-	InvokePath string `json:"invoke_path,omitempty"`
-	Runtime    string `json:"runtime,omitempty"`
-	Entry      string `json:"entry,omitempty"`
-	HostBridge bool   `json:"host_bridge,omitempty"`
+	Method      string   `json:"method,omitempty"`
+	InvokePath  string   `json:"invoke_path,omitempty"`
+	Runtime     string   `json:"runtime,omitempty"`
+	Entry       string   `json:"entry,omitempty"`
+	HostBridge  bool     `json:"host_bridge,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
 }
 
 type MiscModuleTableColumn struct {
@@ -116,6 +117,7 @@ type MiscModulePackageManifest struct {
 	Backend         string   `json:"backend,omitempty"`
 	Form            string   `json:"form,omitempty"`
 	API             string   `json:"api,omitempty"`
+	Permissions     []string `json:"permissions,omitempty"`
 }
 
 type MiscModulePackageImportResult struct {

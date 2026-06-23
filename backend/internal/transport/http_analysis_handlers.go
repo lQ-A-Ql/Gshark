@@ -97,9 +97,9 @@ func (s *Server) handleMediaAnalysis(w http.ResponseWriter, r *http.Request) {
 		err      error
 	)
 	if forceRefresh {
-		analysis, err = s.media.RefreshMediaAnalysis()
+		analysis, err = s.media.RefreshMediaAnalysisWithContext(r.Context())
 	} else {
-		analysis, err = s.media.MediaAnalysis()
+		analysis, err = s.media.MediaAnalysisWithContext(r.Context())
 	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -259,13 +259,14 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid payload")
 			return
 		}
-		if strings.Contains(payload.Path, "..") {
+		payload.Path = strings.TrimSpace(payload.Path)
+		if !IsSafeFilePath(payload.Path) {
 			writeError(w, http.StatusBadRequest, "path traversal not allowed")
 			return
 		}
 		profiles, err := s.analysis.AddVehicleDBC(payload.Path)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
+			writeError(w, http.StatusBadRequest, sanitizeErrorMessage(err))
 			return
 		}
 		writeJSON(w, http.StatusOK, profiles)
@@ -275,7 +276,7 @@ func (s *Server) handleVehicleDBC(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "missing dbc path")
 			return
 		}
-		if strings.Contains(path, "..") {
+		if !IsSafeFilePath(path) {
 			writeError(w, http.StatusBadRequest, "path traversal not allowed")
 			return
 		}

@@ -44,6 +44,24 @@ describe("useObjectExport", () => {
     expect(objectClient.listObjects).toHaveBeenCalledTimes(1);
   });
 
+  it("aborts fallback object loading on unmount", () => {
+    const objectClient = createClient();
+    let seenSignal: AbortSignal | undefined;
+    objectClient.listObjects.mockImplementation(
+      (signal?: AbortSignal) =>
+        new Promise<ExtractedObject[]>(() => {
+          seenSignal = signal;
+        }),
+    );
+    const { unmount } = renderHook(() =>
+      useObjectExport({ backendConnected: true, extractedObjects: emptyObjects, objectClient }),
+    );
+
+    expect(seenSignal?.aborted).toBe(false);
+    unmount();
+    expect(seenSignal?.aborted).toBe(true);
+  });
+
   it("downloads selected ids and ignores empty selections", async () => {
     const objectClient = createClient();
     const { result } = renderHook(() =>
@@ -54,6 +72,6 @@ describe("useObjectExport", () => {
     await expect(result.current.downloadZip([1, 2])).resolves.toBe(true);
 
     expect(objectClient.downloadObjectsZip).toHaveBeenCalledTimes(1);
-    expect(objectClient.downloadObjectsZip).toHaveBeenCalledWith([1, 2]);
+    expect(objectClient.downloadObjectsZip).toHaveBeenCalledWith([1, 2], expect.any(AbortSignal));
   });
 });

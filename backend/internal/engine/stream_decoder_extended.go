@@ -19,7 +19,7 @@ type decodeAttempt struct {
 	fn      func() (StreamDecodeResult, error)
 }
 
-// decryptAESCBC decrypts AES-CBC ciphertext. If iv is nil or empty, uses zero IV.
+// decryptAESCBC decrypts AES-CBC ciphertext. iv must be exactly one AES block.
 // Supports lenient PKCS7 unpadding — returns raw data on padding failure instead of error.
 func decryptAESCBC(ciphertext, key, iv []byte) ([]byte, error) {
 	normalizedKey := normalizeAESKey(key)
@@ -30,32 +30,29 @@ func decryptAESCBC(ciphertext, key, iv []byte) ([]byte, error) {
 	if len(ciphertext) == 0 || len(ciphertext)%aes.BlockSize != 0 {
 		return nil, errors.New("AES-CBC 密文长度非法")
 	}
-	if len(iv) == 0 {
-		iv = make([]byte, aes.BlockSize)
-	} else if len(iv) != aes.BlockSize {
+	if len(iv) != aes.BlockSize {
 		return nil, fmt.Errorf("AES-CBC IV 长度非法: %d", len(iv))
 	}
 	mode := cipher.NewCBCDecrypter(block, iv)
 	out := make([]byte, len(ciphertext))
 	mode.CryptBlocks(out, ciphertext)
-	return pkcs7UnpadLenient(out, aes.BlockSize), nil
+	return pkcs7UnpadLenient(out, aes.BlockSize)
 }
 
 // pkcs7UnpadLenient tries PKCS7 unpadding but returns raw data on failure instead of error.
-func pkcs7UnpadLenient(data []byte, blockSize int) []byte {
+func pkcs7UnpadLenient(data []byte, blockSize int) ([]byte, error) {
 	if len(data) == 0 {
-		return data
+		return data, nil
 	}
 	unpadded, err := pkcs7Unpad(data, blockSize)
-	if err != nil {
-		// Lenient: return data as-is, trimming trailing nulls
-		trimmed := data
-		for len(trimmed) > 0 && trimmed[len(trimmed)-1] == 0 {
-			trimmed = trimmed[:len(trimmed)-1]
-		}
-		return trimmed
+	if err == nil {
+		return unpadded, nil
 	}
-	return unpadded
+	trimmed := trimTrailingNulls(data)
+	if acceptsUnpaddedPlaintext(trimmed) {
+		return trimmed, nil
+	}
+	return nil, err
 }
 
 // decryptAESECBLenient is like decryptAESECB but uses lenient unpadding.
@@ -71,7 +68,53 @@ func decryptAESECBLenient(ciphertext, key []byte) ([]byte, error) {
 	for offset := 0; offset < len(ciphertext); offset += aes.BlockSize {
 		block.Decrypt(out[offset:offset+aes.BlockSize], ciphertext[offset:offset+aes.BlockSize])
 	}
-	return pkcs7UnpadLenient(out, aes.BlockSize), nil
+	return pkcs7UnpadLenient(out, aes.BlockSize)
+}
+
+func trimTrailingNulls(data []byte) []byte {
+	out := data
+	for len(out) > 0 && out[len(out)-1] == 0 {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+func acceptsUnpaddedPlaintext(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	text := bytesToDisplayText(data)
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	if isStrongPlainScriptResult(trimmed) {
+		return true
+	}
+	if looksMostlyPrintable(data) && scoreDecodedText(trimmed) >= 35 {
+		return true
+	}
+	return looksLikeCSStructuredPlaintext(data)
+}
+
+func looksLikeCSStructuredPlaintext(data []byte) bool {
+	if len(data) < 8 {
+		return false
+	}
+	value := int(data[0])<<24 | int(data[1])<<16 | int(data[2])<<8 | int(data[3])
+	if value > 0 && value <= len(data)-4 {
+		return len(extractPrintableASCIIFragments(data[4:], 4)) > 0
+	}
+	if len(extractPrintableASCIIFragments(data, 6)) == 0 {
+		return false
+	}
+	prefixZeros := 0
+	for _, b := range data[:minInt(len(data), 8)] {
+		if b == 0 {
+			prefixZeros++
+		}
+	}
+	return prefixZeros >= 2
 }
 
 // decodeBehinderPayloadV2 handles Behinder with AES-CBC mode (version 2.x/3.x).
@@ -100,6 +143,14 @@ func decodeBehinderPayloadCBC(raw string, options map[string]any) (StreamDecodeR
 	if err != nil {
 		return StreamDecodeResult{}, err
 	}
+	if len(iv) == 0 {
+		if len(cipherBytes) > aes.BlockSize && (len(cipherBytes)-aes.BlockSize)%aes.BlockSize == 0 {
+			iv = cipherBytes[:aes.BlockSize]
+			cipherBytes = cipherBytes[aes.BlockSize:]
+		} else {
+			return StreamDecodeResult{}, fmt.Errorf("AES-CBC 密文长度非法：冰蝎 AES-CBC 未提供 iv 且密文未前置 IV")
+		}
+	}
 
 	plain, err := decryptAESCBC(cipherBytes, []byte(key), iv)
 	if err != nil {
@@ -109,6 +160,9 @@ func decodeBehinderPayloadCBC(raw string, options map[string]any) (StreamDecodeR
 	summary := "冰蝎 AES-CBC 解密"
 	if optionsBoolDefault(options, "deriveKeyFromPass", true) && optionsString(options, "pass") != "" && optionsString(options, "key") == "" {
 		summary += " (key <- md5(pass)[:16])"
+	}
+	if optionsString(options, "iv") == "" {
+		summary += " (iv 自动提取)"
 	}
 	return buildDecodeResult("behinder", summary, plain, encoding), nil
 }

@@ -23,7 +23,7 @@ func TestToolRuntimeAndSpeechHandlersCoverMethodAndPayloadBranches(t *testing.T)
 	requireStatus(t, rec, http.StatusOK)
 
 	rec = httptest.NewRecorder()
-	server.handleTsharkConfig(rec, httptest.NewRequest(http.MethodPost, "/api/tools/tshark", strings.NewReader(`{"path":" tshark-custom "}`)))
+	server.handleTsharkConfig(rec, httptest.NewRequest(http.MethodPost, "/api/tools/tshark", strings.NewReader(`{"path":" "}`)))
 	requireStatus(t, rec, http.StatusOK)
 
 	rec = httptest.NewRecorder()

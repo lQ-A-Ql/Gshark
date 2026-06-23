@@ -103,7 +103,7 @@ func TestCachedYaraHitsIncludesWarningWhenYaraFails(t *testing.T) {
 	defer svc.captureCtl.packetStore.Close()
 
 	tempDir := t.TempDir()
-	fakeExe := filepath.Join(tempDir, "fake-yara.exe")
+	fakeExe := filepath.Join(tempDir, "yara.exe")
 	ruleFile := filepath.Join(tempDir, "rule.yar")
 	objectFile := filepath.Join(tempDir, "payload.txt")
 	for _, item := range []string{fakeExe, objectFile} {
@@ -188,7 +188,7 @@ func TestCachedYaraHitsWaitsForScanCompletionSignal(t *testing.T) {
 	})
 
 	dir := t.TempDir()
-	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	fakeExe := filepath.Join(dir, "yara.exe")
 	ruleFile := filepath.Join(dir, "rule.yarc")
 	objectPath := filepath.Join(dir, "payload.bin")
 	for _, item := range []string{fakeExe, ruleFile, objectPath} {
@@ -264,7 +264,7 @@ func TestThreatHuntYaraScansHTTPReassembledStream(t *testing.T) {
 	defer svc.captureCtl.packetStore.Close()
 
 	tempDir := t.TempDir()
-	fakeExe := filepath.Join(tempDir, "fake-yara.exe")
+	fakeExe := filepath.Join(tempDir, "yara.exe")
 	ruleFile := filepath.Join(tempDir, "stream-rule.yar")
 	if err := os.WriteFile(fakeExe, []byte("ok"), 0o644); err != nil {
 		t.Fatalf("WriteFile(fake exe) error = %v", err)
@@ -323,7 +323,7 @@ rule TRAFFIC_HTTP_STREAM_SETUP {
 
 func TestBatchScanTargetsWithYaraConfigPropagatesCancelAndTimeoutCauses(t *testing.T) {
 	dir := t.TempDir()
-	fakeExe := filepath.Join(dir, "fake-yara.exe")
+	fakeExe := filepath.Join(dir, "yara.exe")
 	ruleFile := filepath.Join(dir, "rule.yarc")
 	targetPath := filepath.Join(dir, "payload.bin")
 	for _, item := range []string{fakeExe, ruleFile, targetPath} {

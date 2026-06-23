@@ -52,6 +52,12 @@ export function createBackendBridgeFromTransport(transport: BackendBridgeTranspo
     getToolRuntimeSnapshot: toolRuntimeClient.getToolRuntimeSnapshot,
     updateToolRuntimeConfig: toolRuntimeClient.updateToolRuntimeConfig,
     setTSharkPath: toolRuntimeClient.setTSharkPath,
+    allowTSharkDir: toolRuntimeClient.allowTSharkDir,
+    listTSharkAllowedDirs: toolRuntimeClient.listTSharkAllowedDirs,
+    removeTSharkAllowedDir: toolRuntimeClient.removeTSharkAllowedDir,
+    allowToolDir: toolRuntimeClient.allowToolDir,
+    listToolAllowedDirs: toolRuntimeClient.listToolAllowedDirs,
+    removeToolAllowedDir: toolRuntimeClient.removeToolAllowedDir,
     getMCPStatus: toolRuntimeClient.getMCPStatus,
     updateMCPConfig: toolRuntimeClient.updateMCPConfig,
 

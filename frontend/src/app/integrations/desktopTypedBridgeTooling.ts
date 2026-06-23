@@ -22,8 +22,12 @@ export function createObjectToolingTypedOverrides(desktopApp: DesktopTransportBi
     async listObjects(signal) {
       return asObjectList(await typedCall(() => desktopApp.ListObjects!(), "DesktopApp.ListObjects", signal));
     },
-    async downloadObjectsZip(ids) {
-      const blob = await typedBlobCall(() => desktopApp.DownloadObjectsZip!(ids), "DesktopApp.DownloadObjectsZip");
+    async downloadObjectsZip(ids, signal) {
+      const blob = await typedBlobCall(
+        () => desktopApp.DownloadObjectsZip!(ids),
+        "DesktopApp.DownloadObjectsZip",
+        signal,
+      );
       downloadBlob("exported_objects.zip", blob);
     },
     async runWinRMDecrypt(req) {

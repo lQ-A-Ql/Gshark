@@ -153,7 +153,27 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
         message: String(status.message ?? ""),
         customPath: String(status.custom_path ?? ""),
         usingCustomPath: Boolean(status.using_custom_path),
+        pathWarning: String(status.path_warning ?? "") || undefined,
+        extraAllowedDir: String(status.extra_allowed_dir ?? "") || undefined,
       };
+    },
+    async allowTSharkDir(dir: string): Promise<TSharkStatus> {
+      return await fallbackBridge.allowTSharkDir(dir);
+    },
+    async listTSharkAllowedDirs(): Promise<string[]> {
+      return await fallbackBridge.listTSharkAllowedDirs();
+    },
+    async removeTSharkAllowedDir(dir: string): Promise<TSharkStatus> {
+      return await fallbackBridge.removeTSharkAllowedDir(dir);
+    },
+    async allowToolDir(tool, dir) {
+      return await fallbackBridge.allowToolDir(tool, dir);
+    },
+    async listToolAllowedDirs(tool) {
+      return await fallbackBridge.listToolAllowedDirs(tool);
+    },
+    async removeToolAllowedDir(tool, dir) {
+      return await fallbackBridge.removeToolAllowedDir(tool, dir);
     },
     async getMCPStatus(signal?: AbortSignal) {
       return await resolveMCPThroughDesktopIPC({
@@ -333,11 +353,15 @@ function runtimeConfigUpdateMethod(
 function toToolRuntimeRequest(config: ToolRuntimeConfig) {
   return {
     tshark_path: config.tsharkPath,
+    tshark_allowed_dirs: config.tsharkAllowedDirs ?? [],
     ffmpeg_path: config.ffmpegPath,
+    ffmpeg_allowed_dirs: config.ffmpegAllowedDirs ?? [],
     python_path: config.pythonPath,
+    python_allowed_dirs: config.pythonAllowedDirs ?? [],
     vosk_model_path: config.voskModelPath,
     yara_enabled: config.yaraEnabled,
     yara_bin: config.yaraBin,
+    yara_allowed_dirs: config.yaraAllowedDirs ?? [],
     yara_rules: config.yaraRules,
     yara_timeout_ms: config.yaraTimeoutMs,
   };

@@ -9,6 +9,12 @@ const clientSourceDirs = ["src/app/integrations/clients"];
 const migratedTypedRoutePatterns = [
   /^\/api\/tools\/runtime-config(?:\?|$)/,
   /^\/api\/tools\/tshark(?:\?|$)/,
+  /^\/api\/tools\/tshark\/allow-dir(?:\?|$)/,
+  /^\/api\/tools\/tshark\/allowed-dirs(?:\?|$)/,
+  /^\/api\/tools\/tshark\/allowed-dirs\/remove(?:\?|$)/,
+  /^\/api\/tools\/allow-dir(?:\?|$)/,
+  /^\/api\/tools\/allowed-dirs(?:\?|$)/,
+  /^\/api\/tools\/allowed-dirs\/remove(?:\?|$)/,
   /^\/api\/mcp\/config(?:\?|$)/,
   /^\/api\/capture\/(?:start|stop|prepare-replacement|close|status)(?:\?|$)/,
   /^\/api\/packets(?:\?|$)/,

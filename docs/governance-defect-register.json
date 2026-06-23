@@ -469,6 +469,166 @@
         "backend/internal/model"
       ],
       "status": "open"
+    },
+    {
+      "id": "P1-7",
+      "priority": "P1",
+      "title": "http.Server missing request timeouts",
+      "description": "The backend HTTP server in backend/internal/transport/http_server.go does not set ReadTimeout, WriteTimeout, or IdleTimeout, leaving it vulnerable to slow connection DoS and unbounded request bodies on some endpoints.",
+      "keyFiles": [
+        "backend/internal/transport/http_server.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-8",
+      "priority": "P1",
+      "title": "bearer token comparison is not constant time",
+      "description": "withAuth in backend/internal/transport/http_middleware.go compares the Authorization header token to the configured token using strings comparison, allowing timing side-channels.",
+      "keyFiles": [
+        "backend/internal/transport/http_middleware.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-9",
+      "priority": "P1",
+      "title": "CORS origin validation ignores scheme and port",
+      "description": "isAllowedOrigin in backend/internal/transport/http_helpers.go only validates the hostname, allowing origins with unexpected schemes or ports to pass CORS checks.",
+      "keyFiles": [
+        "backend/internal/transport/http_helpers.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-10",
+      "priority": "P1",
+      "title": "rule pack download lacks URL whitelist and mandatory checksum",
+      "description": "RuleManager.DownloadPack accepts arbitrary HTTP/HTTPS URLs and does not require a checksum, enabling SSRF and supply-chain tampering.",
+      "keyFiles": [
+        "backend/internal/engine/rule_manager.go",
+        "backend/internal/transport/http_rule_handlers.go",
+        "backend/internal/engine/rule_manager_security.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-11",
+      "priority": "P1",
+      "title": "MISC Python modules inherit full backend environment",
+      "description": "runtime_python.go constructs cmd.Env by appending to os.Environ(), so MISC Python modules can read sensitive environment variables such as MEOW_TRAFFIC_BACKEND_TOKEN.",
+      "keyFiles": [
+        "backend/internal/miscpkg/runtime_python.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-12",
+      "priority": "P1",
+      "title": "MISC JavaScript modules run in-process with backend privileges",
+      "description": "runtime_javascript.go executes MISC JS modules inside the same Goja VM as the backend process. Even with signature verification, a signed malicious module has full process access.",
+      "keyFiles": [
+        "backend/internal/miscpkg/runtime_javascript.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-13",
+      "priority": "P1",
+      "title": "C2 stream decoder PKCS7 unpadding is not constant time",
+      "description": "pkcs7Unpad in backend/internal/engine/stream_decoder.go compares padding bytes in a variable-time loop, exposing a timing side-channel.",
+      "keyFiles": [
+        "backend/internal/engine/stream_decoder.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P1-14",
+      "priority": "P1",
+      "title": "release smoke check environment variable mismatch",
+      "description": "scripts/build_release_package.py sets GSHARK_RELEASE_SMOKE_CHECK while app.go reads MEOW_TRAFFIC_RELEASE_SMOKE_CHECK, causing the release smoke check to not behave as intended.",
+      "keyFiles": [
+        "scripts/build_release_package.py",
+        "app.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-7",
+      "priority": "P2",
+      "title": "path traversal checks rely on substring matching",
+      "description": "Several transport handlers reject paths only when they contain the literal substring '..', which is fragile. They should use filepath.Clean and base-directory containment checks.",
+      "keyFiles": [
+        "backend/internal/transport/http_capture.go",
+        "backend/internal/transport/http_analysis_handlers.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-8",
+      "priority": "P2",
+      "title": "sanitizeErrorMessage is not used consistently",
+      "description": "A sanitizeErrorMessage helper exists in backend/internal/transport/http_helpers.go but many handlers return raw error strings that may leak filesystem paths or other internal details.",
+      "keyFiles": [
+        "backend/internal/transport/http_helpers.go",
+        "backend/internal/transport/http_capture.go",
+        "backend/internal/transport/http_tool_handlers.go",
+        "backend/internal/transport/http_rule_handlers.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-9",
+      "priority": "P2",
+      "title": "frontend ESLint disables critical rules",
+      "description": "frontend/eslint.config.js disables react-hooks/exhaustive-deps and @typescript-eslint/no-explicit-any, hiding dependency and type-safety bugs.",
+      "keyFiles": [
+        "frontend/eslint.config.js"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-10",
+      "priority": "P2",
+      "title": "SentinelContext exposes a giant value object",
+      "description": "useSentinelContextValues assembles a large value object; any field change triggers re-render of all consumers. The context should be split into focused domain contexts/hooks.",
+      "keyFiles": [
+        "frontend/src/app/state/hooks/useSentinelContextValues.ts",
+        "frontend/src/app/state/SentinelContext.tsx"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-11",
+      "priority": "P2",
+      "title": "frontend lacks a global Error Boundary",
+      "description": "A single rendering error in a feature component can crash the entire React application because there is no top-level Error Boundary.",
+      "keyFiles": [
+        "frontend/src/app/App.tsx"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-12",
+      "priority": "P2",
+      "title": "MCP endpoint is hardcoded",
+      "description": "MCP endpoint URLs are hardcoded to http://127.0.0.1:17891/api/mcp in frontend settings components and backend snapshot helpers, making custom backend URLs error-prone.",
+      "keyFiles": [
+        "frontend/src/app/components/MCPSettingsSection.tsx",
+        "backend/internal/transport/http_helpers.go"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "P2-13",
+      "priority": "P2",
+      "title": "management hooks do not use useAbortableRequest",
+      "description": "useObjectExport and useThreatHuntingWorkbench initiate requests that cannot be cancelled when the component unmounts or the request key changes.",
+      "keyFiles": [
+        "frontend/src/app/features/object/useObjectExport.ts",
+        "frontend/src/app/features/threat-hunting/useThreatHuntingWorkbench.ts"
+      ],
+      "status": "open"
     }
   ]
 }

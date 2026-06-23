@@ -18,6 +18,9 @@ describe("check-desktop-generic-ipc-allowlist script", () => {
     const frontendRoot = writeClientFixture(`
       request("/api/tools/misc/modules");
       request("/api/tools/misc/import");
+      request("/api/tools/allow-dir");
+      request(\`/api/tools/allowed-dirs?tool=\${encodeURIComponent(tool)}\`);
+      request("/api/tools/allowed-dirs/remove");
       request(\`/api/tools/misc/packages/\${encodeURIComponent(id)}/invoke\`);
       request("/api/playbooks");
       request(\`/api/playbooks/\${encodeURIComponent(id)}/run\`);

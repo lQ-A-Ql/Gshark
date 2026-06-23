@@ -1,6 +1,6 @@
 import { createContext, useContext, type PropsWithChildren } from "react";
 import { useSentinelProviderBody } from "./useSentinelProviderBody";
-import type { SentinelContextValue } from "./sentinelTypes";
+import { useSentinelValue } from "./hooks/useSentinelValue";
 import { BackendProvider } from "./contexts/BackendContext";
 import { CaptureProvider } from "./contexts/CaptureContext";
 import { PacketProvider } from "./contexts/PacketContext";
@@ -8,14 +8,14 @@ import { StreamProvider } from "./contexts/StreamContext";
 import { FilterProvider } from "./contexts/FilterContext";
 import { AnalysisProvider } from "./contexts/AnalysisContext";
 
-const SentinelContext = createContext<SentinelContextValue | null>(null);
+const SentinelContext = createContext(false);
 
 export function SentinelProvider({ children }: PropsWithChildren) {
-  const { value, backendValue, captureValue, packetValue, streamValue, filterValue, analysisValue } =
+  const { backendValue, captureValue, packetValue, streamValue, filterValue, analysisValue } =
     useSentinelProviderBody();
 
   return (
-    <SentinelContext.Provider value={value}>
+    <SentinelContext.Provider value={true}>
       <BackendProvider value={backendValue}>
         <CaptureProvider value={captureValue}>
           <PacketProvider value={packetValue}>
@@ -32,9 +32,9 @@ export function SentinelProvider({ children }: PropsWithChildren) {
 }
 
 export function useSentinel() {
-  const ctx = useContext(SentinelContext);
-  if (!ctx) {
+  const insideProvider = useContext(SentinelContext);
+  if (!insideProvider) {
     throw new Error("useSentinel must be used inside SentinelProvider");
   }
-  return ctx;
+  return useSentinelValue();
 }

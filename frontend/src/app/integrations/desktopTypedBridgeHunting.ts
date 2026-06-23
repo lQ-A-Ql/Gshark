@@ -20,12 +20,12 @@ export function createHuntingTypedOverrides(desktopApp: DesktopTransportBinding)
         await typedCall(() => desktopApp.GetHuntingRuntimeConfig!(), "DesktopApp.GetHuntingRuntimeConfig", signal),
       );
     },
-    async updateHuntingRuntimeConfig(config) {
+    async updateHuntingRuntimeConfig(config, signal) {
       return asHuntingRuntimeConfig(
         await typedCall(
           () => desktopApp.UpdateHuntingRuntimeConfig!(toHuntingRuntimeConfigRequest(config)),
           "DesktopApp.UpdateHuntingRuntimeConfig",
-          undefined,
+          signal,
           LONG_TYPED_IPC_TIMEOUT_MS,
         ),
       );

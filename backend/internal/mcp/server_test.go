@@ -552,6 +552,10 @@ func (testMCPMedia) MediaAnalysis() (model.MediaAnalysis, error) {
 	return model.MediaAnalysis{Sessions: []model.MediaSession{{ID: "media-1"}}}, nil
 }
 
+func (testMCPMedia) MediaAnalysisWithContext(context.Context) (model.MediaAnalysis, error) {
+	return model.MediaAnalysis{Sessions: []model.MediaSession{{ID: "media-1"}}}, nil
+}
+
 type testMCPRuntime struct {
 	lastOptions model.ToolRuntimeProbeOptions
 }
@@ -559,6 +563,10 @@ type testMCPRuntime struct {
 func (s *testMCPRuntime) ToolRuntimeSnapshotWithOptions(_ context.Context, opts model.ToolRuntimeProbeOptions) model.ToolRuntimeSnapshot {
 	s.lastOptions = opts
 	return model.ToolRuntimeSnapshot{ProbeMode: opts.Mode, TShark: model.TSharkToolStatus{Available: true, Path: "tshark", Message: "ok"}}
+}
+
+func (s *testMCPRuntime) TSharkStatusWithContext(_ context.Context) model.TSharkToolStatus {
+	return model.TSharkToolStatus{Available: true, Path: "tshark", Message: "ok"}
 }
 
 type testMCPToolAnalysis struct {

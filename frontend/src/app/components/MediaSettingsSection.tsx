@@ -1,6 +1,7 @@
 import { AudioLines } from "lucide-react";
 
 import { ffmpegPathHint } from "./RuntimeSettingsHints";
+import { RuntimeToolPathAllowWarning } from "./RuntimeToolPathAllowWarning";
 import { RuntimeSettingsSectionShell, RuntimeSettingsSectionTitle } from "./RuntimeSettingsSectionShell";
 import { Field } from "./RuntimeSettingsSidebarParts";
 import type { RuntimeSettingsSectionProps } from "./RuntimeSettingsSectionTypes";
@@ -27,6 +28,7 @@ export function MediaSettingsSection(props: RuntimeSettingsSectionProps) {
         unknownMessage={unknownMessage}
         unknownStateText={unknownStateText}
       />
+      <RuntimeToolPathAllowWarning status={snapshot?.ffmpeg} field="ffmpegAllowedDirs" allowToolDir={props.allowToolDir} />
     </RuntimeSettingsSectionShell>
   );
 }

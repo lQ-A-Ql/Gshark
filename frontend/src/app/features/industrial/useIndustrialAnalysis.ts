@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { IndustrialAnalysis as IndustrialAnalysisData } from "../../core/types";
 import { EMPTY_INVESTIGATION_REPORT } from "../../core/types";
-import { useAbortableRequest } from "../../hooks/useAbortableRequest";
+import { useAnalysisResult } from "../../hooks/useAnalysisResult";
 import { backendClients } from "../../integrations/backendClients";
 import { createAnalysisResourceCache } from "../../core/analysisResourceCache";
 import { hasUsableCapturePath } from "../../core/usableCapture";
@@ -49,58 +49,20 @@ export function useIndustrialAnalysis({
     () => buildIndustrialAnalysisCacheKey(captureRevision, filePath, totalPackets),
     [captureRevision, filePath, totalPackets],
   );
-  const [analysis, setAnalysis] = useState<IndustrialAnalysisData>(EMPTY_INDUSTRIAL_ANALYSIS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { run: runAnalysisRequest, cancel: cancelAnalysisRequest } = useAbortableRequest();
 
-  const refreshAnalysis = useCallback(
-    (force = false) => {
-      if (!backendConnected || !hasUsableCapturePath(filePath, totalPackets)) {
-        cancelAnalysisRequest();
-        setLoading(false);
-        setError("");
-        setAnalysis(EMPTY_INDUSTRIAL_ANALYSIS);
-        return;
-      }
-      if (!force && cacheKey && industrialAnalysisCache.has(cacheKey)) {
-        cancelAnalysisRequest();
-        setAnalysis(industrialAnalysisCache.get(cacheKey) ?? EMPTY_INDUSTRIAL_ANALYSIS);
-        setLoading(false);
-        setError("");
-        return;
-      }
-      setLoading(true);
-      setError("");
-      return runAnalysisRequest({
-        request: (signal) =>
-          industrialAnalysisCache.request(cacheKey, {
-            force,
-            signal,
-            load: () => backendClients.analysis.getIndustrialAnalysis(signal),
-          }),
-        onSuccess: (payload) => {
-          if (cacheKey) {
-            industrialAnalysisCache.set(cacheKey, payload);
-          }
-          setAnalysis(payload);
-        },
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "工控分析加载失败");
-          setAnalysis(EMPTY_INDUSTRIAL_ANALYSIS);
-        },
-        onSettled: () => setLoading(false),
-      });
-    },
-    [backendConnected, cacheKey, cancelAnalysisRequest, filePath, runAnalysisRequest, totalPackets],
-  );
+  const enabled = backendConnected && hasUsableCapturePath(filePath, totalPackets);
 
-  useEffect(() => {
-    if (isPreloadingCapture) return;
-    return refreshAnalysis();
-  }, [isPreloadingCapture, refreshAnalysis]);
+  const { data, loading, error, refresh } = useAnalysisResult<IndustrialAnalysisData>({
+    cache: industrialAnalysisCache,
+    cacheKey,
+    emptyValue: EMPTY_INDUSTRIAL_ANALYSIS,
+    enabled,
+    isPreloadingCapture,
+    errorMessage: "工控分析加载失败",
+    fetch: (signal) => backendClients.analysis.getIndustrialAnalysis(signal),
+  });
 
-  return { analysis, loading, error, refreshAnalysis };
+  return { analysis: data, loading, error, refreshAnalysis: refresh };
 }
 
 export function buildIndustrialAnalysisCacheKey(captureRevision: number, filePath: string, totalPackets: number) {
