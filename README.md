@@ -17,15 +17,15 @@ meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、
 ## 技术栈
 
 - 桌面框架：Wails v2
-- 后端：Go 1.22+（桌面壳）/ Go 1.25（后端模块）
+- 后端：Go 1.25（桌面壳与后端模块）
 - 前端：React 18、TypeScript、Vite、Tailwind CSS、Radix UI
 - 解析核心：tshark
-- 本地通信：Wails IPC 桌面代理 + 本地 HTTP 后端；普通浏览器模式保留 HTTP / SSE fallback
+- 本地通信：Wails typed IPC + 进程内后端 runtime；普通浏览器模式保留 HTTP / SSE
 - 扩展运行时：JavaScript、Python
 
 ## 架构建模与核心流程
 
-meow~traffic 采用“桌面壳 + React 工作台 + 本地 Go 后端 + 外部解析工具”的离线分析架构。桌面端主线是 Wails typed IPC：前端页面通过 `desktopBridge` 调用明确的桌面 binding；普通浏览器开发模式保留 HTTP / SSE fallback。后端不使用 Web 框架，HTTP router 由 `net/http.ServeMux` 直接注册，核心业务集中在 `backend/internal/engine`，协议解析和专项字段扫描集中在 `backend/internal/tshark`。
+meow~traffic 采用“桌面壳 + React 工作台 + 进程内 Go 后端 runtime + 外部解析工具”的离线分析架构。桌面端主线是 Wails typed IPC：前端页面通过 `desktopBridge` 调用明确的桌面 binding；普通浏览器开发模式保留 HTTP / SSE fallback。后端不使用 Web 框架，HTTP router 由 `net/http.ServeMux` 直接注册，核心业务集中在 `backend/internal/engine`，协议解析和专项字段扫描集中在 `backend/internal/tshark`。
 
 ### 系统上下文
 
@@ -36,8 +36,9 @@ flowchart LR
     Shell --> Bindings["typed Wails bindings"]
     WebView --> Bridge["bridgeFactory / desktopBridge"]
     Bridge --> Bindings
-    Bridge -. "browser-dev fallback" .-> HTTP["本地 HTTP backend"]
-    Bindings --> Backend["Go backend service"]
+    Bridge -. "browser-dev only" .-> HTTP["本地 HTTP backend"]
+    Bindings --> Runtime["in-process backend runtime"]
+    Runtime --> Backend["Go backend service"]
     HTTP --> Backend
     Backend --> Store["packet store / stream cache"]
     Backend --> Tshark["tshark / field scan"]
@@ -63,7 +64,7 @@ flowchart TB
         Mappers --> WireDTO["wire DTO"]
         WireDTO --> BridgeFactory["bridgeFactory"]
         BridgeFactory --> DesktopBridge["desktop typed bridge"]
-        BridgeFactory --> HttpBridge["httpBridge fallback"]
+        BridgeFactory --> HttpBridge["httpBridge browser-dev"]
     end
 
     subgraph Backend["backend/internal"]
@@ -76,7 +77,8 @@ flowchart TB
         Engine --> Report["report / governance"]
     end
 
-    DesktopBridge --> Transport
+    DesktopBridge --> Runtime["Wails binding / desktopruntime"]
+    Runtime --> Transport
     HttpBridge -. "browser-dev only" .-> Transport
 ```
 
@@ -254,7 +256,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\new-misc-module.ps1 -Id py-sc
 ## 环境要求
 
 - Windows 环境下开发体验最佳。
-- Go 1.22+（桌面壳）/ Go 1.25（后端模块，go.work 统一管理）。
+- Go 1.25（桌面壳与后端模块，go.work 统一管理）。
 - Node.js 20+。
 - pnpm。
 - Wireshark / tshark。

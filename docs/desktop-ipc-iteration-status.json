@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-27T01:35:42+08:00",
+  "updatedAt": "2026-06-23T21:57:23+08:00",
   "currentPhase": "post-phase-5",
-  "currentRound": 36,
+  "currentRound": 37,
   "desktopPolicy": {
-    "desktopRelease": "typed-ipc-first; frontend generic IPC adapter construction removed; backend/generated InvokeBackendJSON/Blob/Text bindings removed; no silent browser-http fallback after typed data-plane IPC failure",
-    "desktopDev": "typed-ipc-first; explicit control-plane HTTP fallback remains available through fallbackBridge; generic IPC adapter construction and backend/generated InvokeBackend* bindings are removed",
+    "desktopRelease": "typed-ipc-only to an in-process backend/desktopruntime mount; no backend child process, no loopback HTTP/SSE dependency, no browser-http fallback when Wails binding exists",
+    "desktopDev": "same as desktop release with current Wails bindings; missing typed control/data bindings fail explicitly instead of falling back to browser HTTP",
     "browserDev": "http-and-eventsource-fallback-retained",
     "oldBindings": "shell/bootstrap compatibility only; not a path for desktop data-plane features"
   },
@@ -20,7 +20,7 @@
         "packet-page",
         "tls"
       ],
-      "fallbackPolicy": "missing binding may fallback; typed IPC failure does not silently fallback to browser HTTP or generic IPC when the matching typed binding exists"
+      "fallbackPolicy": "missing Wails typed binding fails with typed_binding_required or generic_ipc_disabled in desktop mode; browser HTTP fallback is created only when no Wails binding exists"
     },
     "stream": {
       "phase": 2,
@@ -161,8 +161,8 @@
       "phase": 5,
       "status": "completed",
       "allowedUses": [
-        "capture upload, events, runtime identity, health, ffmpeg, and speech-to-text compatibility routes",
-        "browser-dev HTTP/SSE debugging compatibility"
+        "browser-dev HTTP/SSE debugging compatibility",
+        "backend HTTP routes remain available to CLI/browser-dev; Wails desktop invokes the same handlers in-process through desktopruntime"
       ],
       "guardrails": [
         "frontend/scripts/check-desktop-transport-policy.mjs",
@@ -174,7 +174,7 @@
         "typed desktop override files must not wire direct /api paths or generic InvokeBackend* calls",
         "createIpcBackendTransport rejects generic IPC when a matching migrated typed binding exists",
         "client backend route literals must be classified as migrated typed routes or explicit compatibility routes",
-        "desktop release no longer constructs the frontend generic IPC adapter; VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but does not re-enable it",
+        "desktop release no longer constructs the frontend generic IPC adapter or browser HTTP fallback when Wails binding exists; VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains recognizable but does not re-enable it",
         "VITE_DESKTOP_DISABLE_GENERIC_IPC=1 remains a legacy alias that disables the adapter while preserving Wails runtime events",
         "frontend/scripts/check-desktop-generic-ipc-retirement-readiness.mjs validates the release-candidate default-disabled policy and smoke evidence before adapter removal"
       ]
@@ -186,7 +186,7 @@
       "flag": "VITE_DESKTOP_DISABLE_GENERIC_IPC=1",
       "smokeSwitch": "scripts/check-desktop-ipc-smoke.ps1 -DisableGenericIpcAdapterExperiment",
       "failureCode": "generic_ipc_disabled",
-      "policy": "Desktop release no longer constructs createIpcBackendTransport from desktopBridge. VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains a recognizable policy value but does not re-enable adapter construction. Missing typed data-plane routes fail fast with generic_ipc_disabled instead of falling back to generic IPC or browser HTTP. Typed overrides, explicit control-plane HTTP fallback through fallbackBridge, and Wails runtime event subscription remain active.",
+      "policy": "Desktop release no longer constructs createIpcBackendTransport or browser HTTP fallback from desktopBridge. VITE_DESKTOP_GENERIC_IPC_POLICY=compat remains a recognizable policy value but does not re-enable adapter construction. Missing typed data-plane routes fail fast with generic_ipc_disabled or typed_binding_required instead of falling back to generic IPC or browser HTTP. Typed overrides and Wails runtime event subscription remain active.",
       "lastExperimentSmoke": {
         "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
         "genericIpcDisableExperiment": false,
@@ -457,6 +457,46 @@
         "objectCount": 205
       }
     },
+    "inProcessBackendRuntime": {
+      "phase": "post-phase-5",
+      "status": "completed",
+      "scope": "Wails desktop mounts the backend server in-process instead of launching or reusing a loopback backend process.",
+      "policy": "Packaged and Wails desktop builds use typed Wails IPC into backend/desktopruntime. Browser-dev and CLI may still run the standalone HTTP server on 127.0.0.1:17891. Desktop events subscribe directly to transport.Hub and emit meow:backend:* Wails runtime events.",
+      "implementedFiles": [
+        "backend/desktopruntime/runtime.go",
+        "app.go",
+        "desktop_backend_proxy.go",
+        "desktop_event_bridge.go",
+        "frontend/src/app/integrations/bridgeFactory.ts",
+        "frontend/src/app/integrations/desktopBridge.ts",
+        "scripts/sync-wails-assets.ps1"
+      ],
+      "removedDesktopDependencies": [
+        "app_backend_extract_test.go",
+        "desktop_backend_probe.go",
+        "desktop_backend_probe_test.go",
+        "frontend/dist/sentinel-backend.exe build requirement",
+        "desktop SSE bridge to /api/events"
+      ],
+      "guardrails": [
+        "bridgeFactory creates httpBridge only when no Wails binding exists",
+        "desktopBridge receives no fallbackBridge and missing typed bindings fail explicitly",
+        "desktop_event_bridge.go contains no HTTP client or /api/events connection",
+        "check-desktop-assets no longer requires sentinel-backend.exe",
+        "sync-wails-assets removes stale sentinel-backend.exe"
+      ],
+      "lastAudit": {
+        "commit": "01da7dd8 Migrate Wails desktop backend in-process",
+        "rootGoDev": "go test -tags dev ./... passed",
+        "rootGoProduction": "go test -tags production ./... passed",
+        "backendGo": "cd backend && go test ./... passed",
+        "frontendCi": "cd frontend && pnpm run ci passed: 282 files / 938 tests",
+        "wailsBindingCheck": "cd frontend && pnpm run wails-binding:check passed",
+        "desktopAssets": "scripts/sync-wails-assets.ps1 plus scripts/check-desktop-assets.ps1 passed",
+        "buildWails": "wails build -s -skipembedcreate -nopackage passed and produced build/bin/meow-traffic.exe",
+        "gitDiffCheck": "git diff --check and git diff --cached --check passed"
+      }
+    },
     "oldGeneratedBindings": {
       "phase": "post-phase-5",
       "status": "shell-compat-only; backend/generated InvokeBackend* removed",
@@ -526,74 +566,71 @@
     }
   },
   "phaseAudit": {
-    "id": "desktop-ipc-final-closure-audit-round-36",
-    "status": "final-closure-completed",
+    "id": "desktop-ipc-in-process-runtime-round-37",
+    "status": "in-process-runtime-completed",
     "score": {
-      "total": 99,
+      "total": 98,
       "contractCorrectness": 25,
       "desktopPolicyCompliance": 20,
       "regressionSafety": 20,
       "diagnosticsAndFailureShape": 15,
       "docsAndTraceability": 10,
-      "devBrowserCompatibility": 9
+      "devBrowserCompatibility": 8
     },
     "hardBlockers": [],
     "fullGatesRun": true,
-    "desktopWebviewSmokeRun": true,
-    "browserDevSmokeRun": true,
+    "desktopWebviewSmokeRun": false,
+    "browserDevSmokeRun": false,
     "evidence": {
-      "smokeScript": "scripts/check-desktop-ipc-smoke.ps1",
-      "summaryPath": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json",
-      "capturePackets": 7074,
-      "httpStreams": 119,
-      "tcpStreams": 177,
-      "udpStreams": 54,
-      "objectCount": 205,
-      "objectEvidenceCount": 205,
-      "directBackendApiRequestCount": 0,
-      "totalInstrumentedNetworkRequests": 0,
-      "genericIpcPolicy": "disabled",
-      "genericIpcDisableExperimentBuildFlag": true,
-      "browserDevOk": true,
-      "desktopReleaseOk": true,
-      "desktopWebviewTypedOk": true
+      "commit": "01da7dd8 Migrate Wails desktop backend in-process",
+      "rootGoDev": "passed",
+      "rootGoProduction": "passed",
+      "backendGo": "passed",
+      "frontendCi": "passed",
+      "wailsBindingCheck": "passed",
+      "desktopAssets": "passed after sync-wails-assets",
+      "buildWails": "passed with -s -skipembedcreate -nopackage",
+      "desktopHTTPFallbackAudit": "bridgeFactory creates httpBridge only when no Wails binding exists; desktopBridge has no fallbackBridge parameter; desktop_event_bridge contains no HTTP SSE client",
+      "smokeScript": "not rerun after Round 37 because subagent validation used full frontend/root/backend/build gates; Round 36 smoke remains the last real WebView/browser-dev smoke evidence"
     }
   },
   "lastRound": {
-    "id": "desktop-ipc-final-closure-audit-round-36",
+    "id": "desktop-ipc-in-process-runtime-round-37",
     "phase": "post-phase-5",
-    "primaryDomain": "final closure audit",
+    "primaryDomain": "Wails in-process backend runtime",
     "score": {
-      "total": 99,
+      "total": 98,
       "contractCorrectness": 25,
       "desktopPolicyCompliance": 20,
       "regressionSafety": 20,
       "diagnosticsAndFailureShape": 15,
       "docsAndTraceability": 10,
-      "devBrowserCompatibility": 9
+      "devBrowserCompatibility": 8
     },
     "hardBlockers": [],
     "fullGatesRun": true,
     "focusedTestsRun": true,
-    "manualSmokeRun": true,
-    "decision": "closure-completed; desktop IPC migration is final-closure green with full gates, build:wails, guardrails, desktop release smoke, WebView typed smoke, and browser-dev smoke passing. Future rounds should be maintenance-only unless a new typed IPC domain is explicitly introduced.",
+    "manualSmokeRun": false,
+    "decision": "in-process-runtime-completed; Wails desktop now mounts backend/desktopruntime in-process, desktop IPC no longer falls back to browser HTTP when Wails binding exists, and packaged desktop no longer embeds or launches sentinel-backend.exe. Future rounds should be maintenance-only unless a new typed IPC domain is explicitly introduced.",
     "evidence": {
-      "focusedFrontendVitest": "passed: desktopBridge, desktopDisabledGenericIpcTransport, desktopIpcControls, post-removal monitor, removal preflight, binding cleanup preflight, old-binding compat: 7 files / 63 tests",
+      "bugCause": "old desktop event bridge connected to http://127.0.0.1:17891/api/events and failed when the loopback backend process was absent or incompatible",
+      "focusedBackendRuntimeTest": "cd backend && go test ./desktopruntime passed; TestDoRawReturnsWhenContextExpires covers runtime context deadline behavior",
+      "focusedFrontendVitest": "desktop bridge focused suite passed earlier in the round; frontend CI passed after bridgeFactory/desktopBridge changes",
       "rootGoDev": "go test -tags dev ./... passed",
       "rootGoProduction": "go test -tags production ./... passed",
       "backendGo": "cd backend && go test ./... passed",
-      "frontendCi": "cd frontend && pnpm run ci passed: 238 files / 766 tests",
-      "buildWails": "cd frontend && pnpm run build:wails passed",
-      "wailsBindingCheck": "node frontend/scripts/check-wails-bindings.mjs passed",
-      "postRemovalMonitorCheck": "node frontend/scripts/check-desktop-generic-ipc-post-removal-monitor.mjs passed",
-      "bindingCleanupPreflight": "node frontend/scripts/check-desktop-generic-ipc-binding-cleanup-preflight.mjs passed; deletionReady=true",
-      "removalPreflight": "node frontend/scripts/check-desktop-generic-ipc-removal-preflight.mjs passed; adapterRemoved=true",
-      "oldBindingCompat": "node frontend/scripts/check-desktop-old-binding-compat.mjs passed; shell/bootstrap compatibility only",
-      "desktopSmoke": "scripts/check-desktop-ipc-smoke.ps1 passed; desktopRelease.ok=true, desktopWebviewTyped.ok=true, browserDev.ok=true, directBackendApiRequestCount=0, totalInstrumentedNetworkRequests=0, genericIpcPolicy=disabled, capturePackets=7074, httpStreams=119, objectCount=205",
-      "smokeSummary": "output/desktop-ipc-smoke/desktop-ipc-smoke-summary.json updatedAt=2026-05-27T01:33:26.3887959+08:00",
-      "gitDiffCheck": "git diff --check passed after final doc refresh"
+      "frontendCi": "cd frontend && pnpm run ci passed: 282 files / 938 tests",
+      "desktopAssets": "scripts/sync-wails-assets.ps1 plus scripts/check-desktop-assets.ps1 passed",
+      "buildWails": "wails build -s -skipembedcreate -nopackage passed",
+      "wailsBindingCheck": "cd frontend && pnpm run wails-binding:check passed",
+      "postRemovalMonitorCheck": "covered by pnpm run ci",
+      "bindingCleanupPreflight": "covered by pnpm run ci",
+      "removalPreflight": "covered by pnpm run ci",
+      "oldBindingCompat": "covered by pnpm run ci",
+      "desktopSmoke": "not rerun after Round 37; last real WebView/browser-dev smoke remains Round 36",
+      "gitDiffCheck": "git diff --check and git diff --cached --check passed"
     }
   },
   "openBlockers": [],
-  "recommendedNextSlice": "Maintenance-only unless explicitly scoped: keep browser-dev HTTP/SSE, keep GetBackendAuthToken/OpenCaptureDialog/BackendStatus/update/native dialogs as shell/control-plane compatibility, run post-removal monitor in CI, and do not restore generic IPC data-plane without a deliberate rollback plan."
+  "recommendedNextSlice": "Maintenance-only unless explicitly scoped: keep browser-dev HTTP/SSE, keep native shell/dialog/update bindings, keep desktop runtime in-process, run post-removal/Wails binding guardrails in CI, and do not restore desktop HTTP fallback or generic IPC data-plane without a deliberate rollback plan."
 }
