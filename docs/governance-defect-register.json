@@ -624,7 +624,7 @@
       "status": "resolved",
       "resolvedIn": 2,
       "evidence": {
-        "closedByCommit": "7e4e7bb6",
+        "closedByCommit": "c5006c19",
         "closedAt": "2026-06-23T00:00:00+08:00",
         "modifiedFiles": [
           "backend/internal/miscpkg/runtime_javascript.go",
