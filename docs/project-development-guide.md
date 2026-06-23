@@ -152,9 +152,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-ignored-tracked-files.p
 | 变更 | 必须更新 |
 | --- | --- |
 | 新增或调整 HTTP route | `docs/api/openapi.yaml` |
-| 新增 typed Wails 数据面 binding | `docs/project-design-and-constraints.md` 和相关架构图 |
-| 新增核心前端类型或 wire DTO 家族 | 架构文档；如对外公开则同步 OpenAPI |
+| 新增 typed Wails 数据面 binding | `docs/project-design-and-constraints.md`、`docs/project-model.md` 和相关架构图 |
+| 新增核心前端类型或 wire DTO 家族 | `docs/project-model.md` 或架构文档；如对外公开则同步 OpenAPI |
 | 新增 MISC 包交付形态 | `docs/misc-module-interface.md` |
 | 新增威胁狩猎规则、YARA 或 playbook 契约 | `docs/api/openapi.yaml`、架构文档或约束文档 |
-| 新增 CI、构建、包管理约束 | 本文档；如影响阅读入口则同步 `docs/README.md` |
+| 新增 CI、构建、包管理约束 | 本文档；如影响阅读入口或门禁矩阵则同步 `docs/README.md`、`docs/project-model.md` |
 | 新增全局工程治理规则或阶段性整改状态 | `docs/full-governance-phase1-register.md` 或 `docs/governance-defect-register.json` |

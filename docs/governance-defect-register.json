@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-14T18:56:26+08:00",
+  "updatedAt": "2026-06-23T00:00:00+08:00",
   "entries": [
     {
       "id": "P0-1",
@@ -478,7 +478,24 @@
       "keyFiles": [
         "backend/internal/transport/http_server.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/transport/http_server.go",
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/transport -run \"Test.*Timeout|Test.*Server|TestWithCORS|TestWithAuth\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-8",
@@ -488,7 +505,24 @@
       "keyFiles": [
         "backend/internal/transport/http_middleware.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/transport/http_middleware.go",
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/transport -run \"TestWithAuth|TestHandlerAllowsEventStreamAccessToken\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-9",
@@ -498,7 +532,24 @@
       "keyFiles": [
         "backend/internal/transport/http_helpers.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/transport/http_helpers.go",
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/transport -run \"TestWithCORS|Test.*Origin\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/transport/http_server_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-10",
@@ -510,7 +561,28 @@
         "backend/internal/transport/http_rule_handlers.go",
         "backend/internal/engine/rule_manager_security.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/engine/rule_manager.go",
+          "backend/internal/engine/rule_manager_security.go",
+          "backend/internal/engine/rule_manager_test.go",
+          "backend/internal/transport/http_rule_handlers.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/engine -run \"TestRule|TestDownloadPack|TestCheckForUpdates|TestReadLimited\" -count=1",
+          "cd backend && go test ./internal/transport -run \"TestRulesAPIContract\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/engine/rule_manager_test.go",
+          "backend/internal/transport/http_api_contract_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-11",
@@ -520,17 +592,57 @@
       "keyFiles": [
         "backend/internal/miscpkg/runtime_python.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/miscpkg/runtime_python.go",
+          "backend/internal/miscpkg/runtime_python_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/miscpkg -run \"TestMinimalPythonEnvDoesNotExposeBackendToken\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/miscpkg/runtime_python_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-12",
       "priority": "P1",
       "title": "MISC JavaScript modules run in-process with backend privileges",
-      "description": "runtime_javascript.go executes MISC JS modules inside the same Goja VM as the backend process. Even with signature verification, a signed malicious module has full process access.",
+      "description": "MISC JavaScript modules previously executed inside the backend Go process. They now run in an isolated worker child process with minimal environment, dangerous globals disabled, and permission-gated host calls.",
       "keyFiles": [
-        "backend/internal/miscpkg/runtime_javascript.go"
+        "backend/internal/miscpkg/runtime_javascript.go",
+        "backend/internal/miscpkg/runtime_javascript_test.go",
+        "backend/internal/miscpkg/module_loader.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "7e4e7bb6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/miscpkg/runtime_javascript.go",
+          "backend/internal/miscpkg/runtime_javascript_test.go",
+          "docs/misc-module-interface.md",
+          "docs/project-model.md"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/miscpkg -run \"TestInvokeJavaScript|TestImportZipBytesAndInvokeJavaScript|TestInvokeJavaScriptModule\" -count=1",
+          "cd backend && go test ./internal/miscpkg -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/miscpkg/runtime_javascript_test.go",
+          "backend/internal/miscpkg/manager_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-13",
@@ -540,7 +652,27 @@
       "keyFiles": [
         "backend/internal/engine/stream_decoder.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/engine/stream_decoder.go",
+          "backend/internal/engine/c2_decrypt.go",
+          "backend/internal/engine/stream_decoder_test.go",
+          "backend/internal/engine/c2_decrypt_test.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/engine -run \"TestPKCS7|TestStreamDecoder|TestC2Decrypt|TestDecryptAES\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/engine/stream_decoder_test.go",
+          "backend/internal/engine/c2_decrypt_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P1-14",
@@ -551,7 +683,26 @@
         "scripts/build_release_package.py",
         "app.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "app.go",
+          "scripts/build_release_package.py",
+          "app_backend_extract_test.go"
+        ],
+        "validationCommands": [
+          "go test -tags dev ./...",
+          "go test -tags production ./...",
+          "python scripts/build_release_package.py --skip-build v1.0.4-rc.1"
+        ],
+        "evidenceTests": [
+          "app_backend_extract_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P2-7",
@@ -562,7 +713,26 @@
         "backend/internal/transport/http_capture.go",
         "backend/internal/transport/http_analysis_handlers.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "backend/internal/transport/path_security.go",
+          "backend/internal/transport/path_security_test.go",
+          "backend/internal/transport/http_capture.go",
+          "backend/internal/transport/http_analysis_handlers.go"
+        ],
+        "validationCommands": [
+          "cd backend && go test ./internal/transport -run \"TestSafePathUnder|TestIsSafeRelativePath|TestHandle\" -count=1",
+          "cd backend && go test ./..."
+        ],
+        "evidenceTests": [
+          "backend/internal/transport/path_security_test.go"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P2-8",
@@ -585,7 +755,26 @@
       "keyFiles": [
         "frontend/eslint.config.js"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "frontend/eslint.config.js",
+          "frontend/scripts/check-type-governance.mjs",
+          "frontend/package.json"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run lint",
+          "cd frontend && pnpm run type-governance:check",
+          "cd frontend && pnpm run ci:boundaries"
+        ],
+        "evidenceTests": [
+          "frontend/scripts/check-desktop-generic-ipc-allowlist.test.mjs"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P2-10",
@@ -606,7 +795,25 @@
       "keyFiles": [
         "frontend/src/app/App.tsx"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/App.tsx",
+          "frontend/src/app/components/ErrorBoundary.tsx"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run test:run",
+          "cd frontend && pnpm run typecheck",
+          "cd frontend && pnpm run lint"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/App.test.tsx"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P2-12",
@@ -617,7 +824,26 @@
         "frontend/src/app/components/MCPSettingsSection.tsx",
         "backend/internal/transport/http_helpers.go"
       ],
-      "status": "open"
+      "status": "resolved",
+      "resolvedIn": 2,
+      "evidence": {
+        "closedByCommit": "98f946c6",
+        "closedAt": "2026-06-23T00:00:00+08:00",
+        "modifiedFiles": [
+          "frontend/src/app/integrations/backendEndpoint.ts",
+          "frontend/src/app/components/MCPSettingsSection.tsx",
+          "frontend/src/app/components/useRuntimeSettingsSidebarModel.ts"
+        ],
+        "validationCommands": [
+          "cd frontend && pnpm run test:run -- MCPSettings bridgeFactory",
+          "cd frontend && pnpm run typecheck",
+          "cd frontend && pnpm run lint"
+        ],
+        "evidenceTests": [
+          "frontend/src/app/integrations/bridgeFactory.test.ts"
+        ],
+        "reportPath": "docs/audit-development-report-archive-2026-06-23/v2-remediation-plan-and-acceptance.md"
+      }
     },
     {
       "id": "P2-13",

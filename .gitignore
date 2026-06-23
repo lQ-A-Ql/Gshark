@@ -1,4 +1,6 @@
 # IDE / OS
+/.agents/
+/.obsidian/
 .vscode/
 .idea/
 .claude/
@@ -18,8 +20,10 @@ Thumbs.db
 *.log
 *.tmp
 .tmp_*
+/.tmp-gocache/
 tmp/
 temp/
+/cover
 
 # Node / frontend build
 frontend/node_modules/

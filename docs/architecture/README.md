@@ -1,6 +1,6 @@
 # meow~traffic 架构总览
 
-meow~traffic（内部兼容名：sentinel）是基于 Wails、Go 后端和 React 前端的桌面端离线流量分析应用。本文是当前架构图谱的权威入口，图中的模块名以仓库真实目录、文件和接口为准。
+meow~traffic（内部兼容名：sentinel）是基于 Wails、Go 后端和 React 前端的桌面端离线流量分析应用。本文是当前架构图谱入口，图中的模块名以仓库真实目录、文件和接口为准。整体模型、信任边界、扩展模型和门禁矩阵见 [项目整体模型](../project-model.md)。
 
 ## 1. 系统上下文
 

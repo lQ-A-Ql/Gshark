@@ -22,7 +22,7 @@ V2 的目标不是再做一次“大重构”，而是在 V0/V1 已关闭 Critic
 | CORS | 已校验 scheme、host、port | `backend/internal/transport/http_helpers.go` | 可关闭 P1-9 |
 | RuleManager | 已有 host allowlist、checksum 必填、下载大小限制、safe cache path | `backend/internal/engine/rule_manager.go`、`rule_manager_security.go` | 可关闭 P1-10，需确认产品默认 allowlist |
 | MISC Python | 已最小化环境变量，避免继承 backend token | `backend/internal/miscpkg/runtime_python.go` | 可关闭 P1-11 |
-| MISC JS | 已禁用 `eval`、`Function`、`require`、`process`，并加权限门禁 | `backend/internal/miscpkg/runtime_javascript.go`、`module_loader.go` | 短期缓解完成；“独立进程沙箱”仍保留长期任务 |
+| MISC JS | 已改为独立 worker 子进程执行，禁用 `eval`、`Function`、`require`、`process`，并加权限门禁 | `backend/internal/miscpkg/runtime_javascript.go`、`module_loader.go` | 可关闭 P1-12；仍声明不是系统级恶意代码沙箱 |
 | C2/stream decoder | 已修复 constant-time padding、lenient plaintext 误接收、raw payload dedupe 与资源上限 | `backend/internal/engine/c2_decrypt.go`、`stream_decoder.go` | 可关闭 P1-13，需保留密码学回归 |
 | release smoke env | 已统一 `MEOW_TRAFFIC_RELEASE_SMOKE_CHECK` | `app.go`、`scripts/build_release_package.py` | 可关闭 P1-14 |
 | 全局 ErrorBoundary | 已加入 App 根部 | `frontend/src/app/App.tsx`、`frontend/src/app/components/ErrorBoundary.tsx` | 可关闭 P2-11 |
@@ -34,7 +34,6 @@ V2 的目标不是再做一次“大重构”，而是在 V0/V1 已关闭 Critic
 
 | ID | 问题 | 原因 | 下一步 |
 |----|------|------|--------|
-| P1-12 | MISC JS in-process 权限模型 | 当前是短期缓解，不是强隔离 | V2.5 设计独立子进程或 WASM/QuickJS sandbox |
 | P2-8 | `sanitizeErrorMessage` 使用不统一 | 当前仅部分关键 handler 使用 | 增加 transport error sanitization 扫描与迁移 |
 | P2-10 | SentinelContext 巨型 value | 已有子 hooks 基础，但未完成消费侧迁移 | 按页面分批迁移，不做一次性重写 |
 | P2-12 | MCP endpoint 前端硬编码风险 | 运行时代码已集中到 `backendEndpoint.ts`；剩余匹配为测试 fixtures/断言 | 保持搜索门禁，禁止新增运行时硬编码 |
@@ -104,8 +103,8 @@ V2 的目标不是再做一次“大重构”，而是在 V0/V1 已关闭 Critic
 | 3.3 | `capture.read` 抓包路径权限 | 已实现 | 未声明时不暴露 capture path |
 | 3.4 | `host.scan` 扫描权限 | 已实现 | JS `ctx.scanFields()` / Python `scan_fields()` 无权限拒绝 |
 | 3.5 | Python 最小环境 | 已实现 | 子进程无法读取 backend token |
-| 3.6 | JS in-process 短期限制 | 已实现缓解 | `eval`、`Function`、`require`、`process` 不可用 |
-| 3.7 | JS 独立进程沙箱设计 | 未完成 | 输出设计文档与 POC，不纳入当前短期关闭 |
+| 3.6 | JS dangerous globals 限制 | 已实现 | `eval`、`Function`、`require`、`process` 不可用 |
+| 3.7 | JS 独立 worker 子进程 | 已实现 | JS 后端不在 Go 后端主进程内执行；worker 使用最小环境与 JSON host bridge |
 
 ### Stage 4：前端架构和治理
 
@@ -242,7 +241,7 @@ V2 评分采用 100 分制，作为是否进入 release candidate 的依据：
 Release candidate 门槛：
 
 - 总分 ≥ 85。
-- P1 无 open，P1-12 可作为 “mitigated + accepted residual risk” 但必须有后续沙箱设计 ticket。
+- P1 无 open；MISC JS 已离开后端主进程执行，但仍需在文档中声明不是系统级恶意代码沙箱。
 - `cd backend; go test ./...` 通过。
 - `cd frontend; pnpm run ci` 通过。
 - `./scripts/check-all.ps1` 通过。
@@ -298,7 +297,7 @@ Release candidate 门槛：
 7. `docs/governance-defect-register.json` 暂不批量标记 resolved：
    - 当前 schema 的 resolved 证据要求 `closedByCommit`，本轮尚未产生提交，不能伪造 commit hash。
    - P1-7、P1-8、P1-9、P1-10、P1-11、P1-13、P1-14、P2-11 已具备代码和测试关闭条件，等待提交后补真实 `closedByCommit`。
-   - P1-12 仍保持 open；当前实现只属于短期缓解，不等价于独立进程/强隔离 sandbox。
+   - P1-12 已通过 JS worker 子进程、最小环境和权限门禁关闭；仍不宣称系统级恶意代码沙箱。
 8. P2-8、P2-10 继续作为后续阶段任务；P2-12/P2-13 当前批次已有实质收敛，但仍保留搜索/迁移门禁防回归。
 
 ## 8. 已知验证记录

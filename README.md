@@ -389,6 +389,7 @@ python .\scripts\build_release_package.py v0.0.5 --skip-build
 ## 文档入口
 
 - [文档中心](./docs/README.md)
+- [项目整体模型](./docs/project-model.md)
 - [项目开发指南](./docs/project-development-guide.md)
 - [设计与工程约束](./docs/project-design-and-constraints.md)
 - [工程化全量审计方案](./docs/engineering-full-audit-plan.md)
