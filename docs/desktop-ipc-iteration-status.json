@@ -149,21 +149,11 @@
     },
     "pluginManagement": {
       "phase": "post-phase-5",
-      "status": "completed",
-      "typedMethods": [
-        "ListPlugins",
-        "GetPluginSource",
-        "SavePluginSource",
-        "AddPlugin",
-        "DeletePlugin",
-        "TogglePlugin",
-        "SetPluginsEnabled"
-      ],
-      "fallbackPolicy": "matching /api/plugins* generic IPC paths are rejected when the typed binding exists; browser-dev HTTP remains available",
+      "status": "retired",
+      "typedMethods": [],
+      "fallbackPolicy": "legacy /api/plugins* plugin management is not present in the current backend or Wails bindings; MISC modules are the supported extension surface",
       "lastSmokeEvidence": {
-        "sample": "http.pcap",
-        "pluginCount": 0,
-        "businessEmptyResult": true,
+        "retiredFromCurrentDesktopSmoke": true,
         "directBackendApiRequestCount": 0
       }
     },

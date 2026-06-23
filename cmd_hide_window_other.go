@@ -1,4 +1,4 @@
-//go:build (dev && !windows) || (production && !windows)
+//go:build (dev && !windows) || (production && !windows) || (bindings && !windows)
 
 package main
 

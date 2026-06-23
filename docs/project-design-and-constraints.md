@@ -10,7 +10,7 @@ meow~traffic 是桌面优先的离线流量分析工作台，面向安全分析�
 
 - Go module 仍使用 `github.com/gshark/sentinel/...`。
 - 内部目录、事件和缓存路径可能仍使用 `meow-traffic` 或 `sentinel`。
-- 内嵌后端二进制仍是 `sentinel-backend.exe`。
+- 历史发布资产或归档中可能出现 `sentinel-backend.exe`，但当前 Wails 桌面构建产物不再嵌入或启动该后端二进制。
 - 环境变量仍使用 `MEOW_TRAFFIC_*`。
 
 除非迁移方案覆盖代码、文档、发布资产、用户数据和回滚路径，否则不要直接改名。
@@ -80,6 +80,7 @@ flowchart LR
 - 桌面数据面调用必须优先走明确的 typed Wails binding。
 - 已迁移的桌面数据面缺少 typed binding 时，应以 `generic_ipc_disabled` 失败，不允许静默回退到浏览器 HTTP。
 - 普通 browser-dev 模式继续使用 HTTP REST 和 SSE。
+- Wails 桌面构建产物不得让 WebView 直接请求 `127.0.0.1:17891`；HTTP/SSE 只保留给 browser-dev/CLI。
 - wire DTO 表示后端 JSON；mapper 负责归一化到 `core/types`；feature hooks 和 pages 只消费归一化类型。
 - 避免在 pages/features 中直接 `fetch` 后端；应新增 bridge/client 方法。
 - 分析 hook 应使用公共 cache/guard 语义：同 key inflight 去重、force refresh 绕过缓存、capture revision/filePath/totalPackets 变化刷新、空样本或无可用路径时不发 IPC/HTTP 请求。
@@ -106,6 +107,7 @@ HTTP route 权威来源：
 
 - 每个新增 HTTP route 都要同步 OpenAPI。
 - 每个新增 typed 桌面数据面 binding 都要进入前端 bridge requirements。
+- 每个新增桌面控制面 IPC binding 都要进入 `frontend/scripts/check-wails-bindings.mjs` 对应分组；Wails 绑定生成失败不得手工绕过。
 - 每个供前端消费的新后端 JSON shape 都应有 wire DTO 和 mapper；MISC 动态输出等明确动态结构除外。
 
 ## 证据模型
@@ -124,9 +126,9 @@ HTTP route 权威来源：
 
 ## 安全与运行时约束
 
-- 后端 API 在设置或自动生成 `MEOW_TRAFFIC_BACKEND_TOKEN` 后使用 bearer token。
+- standalone 后端 API 在设置或自动生成 `MEOW_TRAFFIC_BACKEND_TOKEN` 后使用 bearer token。
 - `/health`、`/api/events`、`/api/audit/logs` 在 middleware 中有特殊鉴权处理；修改暴露面前先检查 `http_middleware.go`。
-- 桌面事件应通过 Wails runtime events 桥接，不要让 WebView 页面直连 `/api/events`。
+- 桌面事件应从进程内 `transport.Hub` 订阅并通过 Wails runtime events 桥接，不要让 WebView 页面直连 `/api/events`。
 - 桌面 blob 响应有大小上限，避免 WebView 内存尖峰。
 - zip MISC 模块通过受控 JavaScript/Python 运行时执行，不要把任意压缩包内容视为可信。
 - 外部工具（`tshark`、FFmpeg、Python、Vosk、YARA）必须清晰报告降级状态，不能阻塞应用启动主路径。

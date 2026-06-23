@@ -7,49 +7,41 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gshark/sentinel/backend/desktopruntime"
 )
 
-func TestBackendProxyClientInjectsAuthorizationAndDecodesJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
-			t.Fatalf("unexpected authorization header %q", got)
-		}
+func TestDesktopRuntimeDecodesJSON(t *testing.T) {
+	rt := desktopruntime.NewWithHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
-	defer server.Close()
-
-	client := newBackendProxyClientWithBaseURL(server.URL, "secret-token")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var payload map[string]string
-	if err := client.getJSON(ctx, "/health", &payload); err != nil {
-		t.Fatalf("getJSON() error = %v", err)
+	if err := rt.GetJSON(ctx, "/health", &payload); err != nil {
+		t.Fatalf("GetJSON() error = %v", err)
 	}
 	if payload["status"] != "ok" {
 		t.Fatalf("unexpected payload: %#v", payload)
 	}
 }
 
-func TestBackendProxyClientNormalizesBackendErrorMessage(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestDesktopRuntimeNormalizesBackendErrorMessage(t *testing.T) {
+	rt := desktopruntime.NewWithHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"capture file is not accessible"}`, http.StatusBadRequest)
 	}))
-	defer server.Close()
-
-	client := newBackendProxyClientWithBaseURL(server.URL, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var payload map[string]string
-	err := client.getJSON(ctx, "/api/capture/start", &payload)
+	err := rt.GetJSON(ctx, "/api/capture/start", &payload)
 	if err == nil {
 		t.Fatal("expected normalized backend error")
 	}
@@ -58,27 +50,21 @@ func TestBackendProxyClientNormalizesBackendErrorMessage(t *testing.T) {
 	}
 }
 
-func TestBackendProxyClientGetsCaptureStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestDesktopRuntimeGetsCaptureStatus(t *testing.T) {
+	rt := desktopruntime.NewWithHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/capture/status" {
 			http.NotFound(w, r)
 			return
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
-			t.Fatalf("unexpected authorization header %q", got)
-		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"file_path":"C:\\capture.pcapng","has_capture":true,"packet_count":1509}`))
 	}))
-	defer server.Close()
-
-	client := newBackendProxyClientWithBaseURL(server.URL, "secret-token")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var payload map[string]any
-	if err := client.getJSON(ctx, "/api/capture/status", &payload); err != nil {
-		t.Fatalf("getJSON() error = %v", err)
+	if err := rt.GetJSON(ctx, "/api/capture/status", &payload); err != nil {
+		t.Fatalf("GetJSON() error = %v", err)
 	}
 	if payload["file_path"] != `C:\capture.pcapng` || payload["has_capture"] != true || payload["packet_count"] != float64(1509) {
 		t.Fatalf("unexpected capture status payload: %#v", payload)
@@ -86,19 +72,15 @@ func TestBackendProxyClientGetsCaptureStatus(t *testing.T) {
 }
 
 func TestDesktopTypedJSONProxiesRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/analysis/industrial" || r.Method != http.MethodGet {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
-			t.Fatalf("unexpected authorization header %q", got)
-		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true}`))
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	payload, err := app.GetIndustrialAnalysis(false)
 	if err != nil {
 		t.Fatalf("GetIndustrialAnalysis() error = %v", err)
@@ -109,7 +91,7 @@ func TestDesktopTypedJSONProxiesRequest(t *testing.T) {
 }
 
 func TestDesktopTypedBlobAndTextHelpers(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/objects/download":
 			if r.Method != http.MethodPost {
@@ -144,10 +126,9 @@ func TestDesktopTypedBlobAndTextHelpers(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	blob, err := app.DownloadObjectsZip([]int{1, 2})
 	if err != nil {
 		t.Fatalf("DownloadObjectsZip() error = %v", err)
@@ -197,8 +178,8 @@ func TestDesktopTypedBlobAndTextHelpers(t *testing.T) {
 	}
 }
 
-func TestBackendProxyClientBlobReadLimit(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestDesktopRuntimeBlobReadLimit(t *testing.T) {
+	rt := desktopruntime.NewWithHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/blob/exact":
 			_, _ = w.Write([]byte("123"))
@@ -208,31 +189,28 @@ func TestBackendProxyClientBlobReadLimit(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer server.Close()
-
-	client := newBackendProxyClientWithBaseURL(server.URL, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	raw, err := client.doRawLimited(ctx, http.MethodGet, "/api/blob/exact", nil, "", 3)
+	raw, err := rt.DoRaw(ctx, http.MethodGet, "/api/blob/exact", nil, "", 3)
 	if err != nil {
-		t.Fatalf("doRawLimited exact limit error = %v", err)
+		t.Fatalf("DoRaw exact limit error = %v", err)
 	}
 	if string(raw.Body) != "123" {
 		t.Fatalf("unexpected exact limit body %q", raw.Body)
 	}
 
-	_, err = client.doRawLimited(ctx, http.MethodGet, "/api/blob/over", nil, "", 3)
+	_, err = rt.DoRaw(ctx, http.MethodGet, "/api/blob/over", nil, "", 3)
 	if err == nil {
 		t.Fatal("expected blob size limit error")
 	}
-	if !strings.Contains(err.Error(), "桌面 IPC blob 响应过大") || !strings.Contains(err.Error(), "/api/blob/over") {
+	if !strings.Contains(err.Error(), "blob response too large") || !strings.Contains(err.Error(), "/api/blob/over") {
 		t.Fatalf("unexpected blob size error: %v", err)
 	}
 }
 
 func TestDesktopTypedMiscImportMultipart(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/tools/misc/import" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -262,21 +240,86 @@ func TestDesktopTypedMiscImportMultipart(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"imported":true}`))
-	}))
-	defer server.Close()
+	})
 
 	packagePath := filepath.Join(t.TempDir(), "module.zip")
 	if err := os.WriteFile(packagePath, []byte("zip"), 0o600); err != nil {
 		t.Fatalf("write temp module package: %v", err)
 	}
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	payload, err := app.ImportMiscModulePackageFromPath(packagePath)
 	if err != nil {
 		t.Fatalf("ImportMiscModulePackageFromPath() error = %v", err)
 	}
 	if payload.(map[string]any)["imported"] != true {
 		t.Fatalf("unexpected payload: %#v", payload)
+	}
+}
+
+func TestDesktopTypedToolAllowedDirBindings(t *testing.T) {
+	seen := map[string]int{}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := r.Method + " " + r.URL.String()
+		seen[key]++
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/tools/tshark/allow-dir":
+			_, _ = w.Write([]byte(`{"available":true,"path":"C:\\Tools\\tshark.exe","message":"ok","extra_allowed_dir":"C:\\Tools"}`))
+		case "/api/tools/tshark/allowed-dirs":
+			_, _ = w.Write([]byte(`{"dirs":["C:\\Tools"]}`))
+		case "/api/tools/tshark/allowed-dirs/remove":
+			_, _ = w.Write([]byte(`{"available":true,"path":"tshark","message":"removed"}`))
+		case "/api/tools/allow-dir":
+			_, _ = w.Write([]byte(`{"config":{"ffmpeg_allowed_dirs":["C:\\FFmpeg"]},"ffmpeg":{"available":true,"path":"ffmpeg","message":"ok"}}`))
+		case "/api/tools/allowed-dirs":
+			_, _ = w.Write([]byte(`{"dirs":["C:\\FFmpeg"]}`))
+		case "/api/tools/allowed-dirs/remove":
+			_, _ = w.Write([]byte(`{"config":{"ffmpeg_allowed_dirs":[]},"ffmpeg":{"available":true,"path":"ffmpeg","message":"removed"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	app := newTestDesktopApp(handler)
+
+	if _, err := app.AllowTSharkDir(`C:\Tools`); err != nil {
+		t.Fatalf("AllowTSharkDir() error = %v", err)
+	}
+	tsharkDirs, err := app.ListTSharkAllowedDirs()
+	if err != nil {
+		t.Fatalf("ListTSharkAllowedDirs() error = %v", err)
+	}
+	if len(tsharkDirs.Dirs) != 1 || tsharkDirs.Dirs[0] != `C:\Tools` {
+		t.Fatalf("unexpected tshark dirs: %#v", tsharkDirs)
+	}
+	if _, err := app.RemoveTSharkAllowedDir(`C:\Tools`); err != nil {
+		t.Fatalf("RemoveTSharkAllowedDir() error = %v", err)
+	}
+	if _, err := app.AllowToolDir("ffmpeg", `C:\FFmpeg`); err != nil {
+		t.Fatalf("AllowToolDir() error = %v", err)
+	}
+	toolDirs, err := app.ListToolAllowedDirs("ffmpeg")
+	if err != nil {
+		t.Fatalf("ListToolAllowedDirs() error = %v", err)
+	}
+	if len(toolDirs.Dirs) != 1 || toolDirs.Dirs[0] != `C:\FFmpeg` {
+		t.Fatalf("unexpected tool dirs: %#v", toolDirs)
+	}
+	if _, err := app.RemoveToolAllowedDir("ffmpeg", `C:\FFmpeg`); err != nil {
+		t.Fatalf("RemoveToolAllowedDir() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"POST /api/tools/tshark/allow-dir",
+		"GET /api/tools/tshark/allowed-dirs",
+		"DELETE /api/tools/tshark/allowed-dirs/remove",
+		"POST /api/tools/allow-dir",
+		"GET /api/tools/allowed-dirs?tool=ffmpeg",
+		"DELETE /api/tools/allowed-dirs/remove",
+	} {
+		if seen[want] != 1 {
+			t.Fatalf("expected route %q once, seen=%#v", want, seen)
+		}
 	}
 }
 
@@ -296,7 +339,7 @@ func TestValidateDesktopBackendRequestRejectsUnsafeInputs(t *testing.T) {
 }
 
 func TestDesktopPingBackendDataPlaneReportsPartialFailure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/health":
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
@@ -305,20 +348,24 @@ func TestDesktopPingBackendDataPlaneReportsPartialFailure(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	probe := app.PingBackendDataPlane()
 	if probe.Ready || !probe.HealthOK || probe.IdentityOK || !strings.Contains(probe.Message, "runtime identity probe failed") {
 		t.Fatalf("unexpected probe: %#v", probe)
 	}
 }
 
-func newTestDesktopApp(baseURL string) *DesktopApp {
+func newTestDesktopApp(handler http.Handler) *DesktopApp {
+	if handler == nil {
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, `{"error":"test runtime handler not configured for `+r.URL.Path+`"}`, http.StatusNotFound)
+		})
+	}
 	return &DesktopApp{
 		backendAuthToken: "secret-token",
-		backendBaseURL:   baseURL,
 		backendStatus:    "running",
+		backendRuntime:   desktopruntime.NewWithHandler(handler),
 	}
 }

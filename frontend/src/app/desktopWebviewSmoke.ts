@@ -17,7 +17,6 @@ type DesktopSmokeBinding = {
   ListThreatHits?: (prefixes: string[]) => Promise<unknown>;
   GetHuntingRuntimeConfig?: () => Promise<unknown>;
   ListVehicleDBCProfiles?: () => Promise<unknown>;
-  ListPlugins?: () => Promise<unknown>;
   ListMiscModules?: () => Promise<unknown>;
   SelectMiscModulePackage?: () => Promise<unknown>;
   ImportMiscModulePackageFromPath?: (path: string) => Promise<unknown>;
@@ -107,7 +106,6 @@ async function runDesktopTypedSmoke(
   assertBinding(desktopApp.ListThreatHits, "ListThreatHits");
   assertBinding(desktopApp.GetHuntingRuntimeConfig, "GetHuntingRuntimeConfig");
   assertBinding(desktopApp.ListVehicleDBCProfiles, "ListVehicleDBCProfiles");
-  assertBinding(desktopApp.ListPlugins, "ListPlugins");
   assertBinding(desktopApp.ListMiscModules, "ListMiscModules");
   assertBinding(desktopApp.SelectMiscModulePackage, "SelectMiscModulePackage");
   assertBinding(desktopApp.ImportMiscModulePackageFromPath, "ImportMiscModulePackageFromPath");
@@ -169,7 +167,6 @@ async function runDesktopTypedSmoke(
   const threatHits = await desktopApp.ListThreatHits!(["flag{", "ctf{"]);
   const huntingConfig = asRecord(await desktopApp.GetHuntingRuntimeConfig!());
   const dbcProfiles = await desktopApp.ListVehicleDBCProfiles!();
-  const plugins = await desktopApp.ListPlugins!();
   const miscModules = await desktopApp.ListMiscModules!();
   const httpStream = asRecord(await desktopApp.GetHttpStream!(sampledHttpStream));
   const rawStreamPage = asRecord(await desktopApp.GetRawStreamPage!("TCP", sampledTcpStream, 0, 1));
@@ -196,7 +193,6 @@ async function runDesktopTypedSmoke(
     huntingPrefixCount: asList(huntingConfig.prefixes).length,
     huntingYaraEnabled: Boolean(huntingConfig.yara_enabled),
     vehicleDBCProfileCount: asList(dbcProfiles).length,
-    pluginCount: asList(plugins).length,
     miscModuleCount: asList(miscModules).length,
     miscImportBindingAvailable: true,
     miscDeleteBindingAvailable: true,

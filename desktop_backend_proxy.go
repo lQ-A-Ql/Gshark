@@ -1,4 +1,4 @@
-//go:build dev || production
+//go:build dev || production || bindings
 
 package main
 
@@ -15,32 +15,13 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gshark/sentinel/backend/desktopruntime"
 )
 
-const backendBaseURL = "http://127.0.0.1:17891"
 const desktopBackendBlobMaxBytes int64 = 50 * 1024 * 1024
-
-type backendProxyClient struct {
-	baseURL   string
-	token     string
-	client    *http.Client
-	userAgent string
-}
-
-type runtimeIdentity struct {
-	Service        string `json:"service"`
-	Version        string `json:"version"`
-	BuildCommit    string `json:"build_commit,omitempty"`
-	AuthEnabled    bool   `json:"auth_enabled"`
-	BuildID        string `json:"build_id,omitempty"`
-	ExecutablePath string `json:"executable_path,omitempty"`
-	WorkingDir     string `json:"working_dir,omitempty"`
-	StartedAt      string `json:"started_at,omitempty"`
-}
 
 type captureStartRequest struct {
 	FilePath         string `json:"file_path"`
@@ -65,6 +46,10 @@ type desktopToolRuntimeConfig struct {
 	YaraAllowedDirs   []string `json:"yara_allowed_dirs,omitempty"`
 	YaraRules         string   `json:"yara_rules"`
 	YaraTimeoutMS     int      `json:"yara_timeout_ms"`
+}
+
+type desktopToolAllowedDirs struct {
+	Dirs []string `json:"dirs"`
 }
 
 type desktopMCPConfig struct {
@@ -203,172 +188,12 @@ type backendProxyRawResponse struct {
 	Body       []byte
 }
 
-func newBackendProxyClient(token string) *backendProxyClient {
-	return newBackendProxyClientWithBaseURL(backendBaseURL, token)
-}
-
-func newBackendProxyClientWithBaseURL(baseURL, token string) *backendProxyClient {
-	return &backendProxyClient{
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		token:     strings.TrimSpace(token),
-		client:    &http.Client{},
-		userAgent: "meow-traffic-DesktopProxy",
+func (a *DesktopApp) requireBackendRuntime() (*desktopruntime.Runtime, error) {
+	rt := a.getBackendRuntime()
+	if rt == nil || !rt.Ready() {
+		return nil, errors.New("desktop backend runtime is not ready")
 	}
-}
-
-func (c *backendProxyClient) getJSON(ctx context.Context, path string, dest any) error {
-	return c.doJSON(ctx, http.MethodGet, path, nil, dest)
-}
-
-func (c *backendProxyClient) postJSON(ctx context.Context, path string, payload any, dest any) error {
-	return c.doJSON(ctx, http.MethodPost, path, payload, dest)
-}
-
-func (c *backendProxyClient) postMultipartFile(ctx context.Context, path, fieldName, filePath string, dest any) error {
-	cleanPath := strings.TrimSpace(filePath)
-	if cleanPath == "" {
-		return errors.New("file path is required")
-	}
-	file, err := os.Open(cleanPath)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer file.Close()
-
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile(strings.TrimSpace(fieldName), filepath.Base(cleanPath))
-	if err != nil {
-		_ = writer.Close()
-		return fmt.Errorf("create multipart file part: %w", err)
-	}
-	if _, err := io.Copy(part, file); err != nil {
-		_ = writer.Close()
-		return fmt.Errorf("copy multipart file content: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return fmt.Errorf("close multipart body: %w", err)
-	}
-
-	raw, err := c.doRaw(ctx, http.MethodPost, path, bytes.NewReader(buf.Bytes()), writer.FormDataContentType())
-	if err != nil {
-		return err
-	}
-	if dest == nil || len(bytes.TrimSpace(raw.Body)) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(raw.Body, dest); err != nil {
-		return fmt.Errorf("decode backend response: %w", err)
-	}
-	return nil
-}
-
-func (c *backendProxyClient) doJSON(ctx context.Context, method, path string, payload any, dest any) error {
-	var body io.Reader
-	contentType := ""
-	if payload != nil {
-		encoded, err := json.Marshal(payload)
-		if err != nil {
-			return fmt.Errorf("encode request body: %w", err)
-		}
-		body = bytes.NewReader(encoded)
-		contentType = "application/json"
-	}
-
-	raw, err := c.doRaw(ctx, method, path, body, contentType)
-	if err != nil {
-		return err
-	}
-	if dest == nil || len(bytes.TrimSpace(raw.Body)) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(raw.Body, dest); err != nil {
-		return fmt.Errorf("decode backend response: %w", err)
-	}
-	return nil
-}
-
-func (c *backendProxyClient) doRaw(ctx context.Context, method, path string, body io.Reader, contentType string) (backendProxyRawResponse, error) {
-	return c.doRawLimited(ctx, method, path, body, contentType, 0)
-}
-
-func (c *backendProxyClient) doRawLimited(ctx context.Context, method, path string, body io.Reader, contentType string, maxBytes int64) (backendProxyRawResponse, error) {
-	method = strings.ToUpper(strings.TrimSpace(method))
-	if method == "" {
-		method = http.MethodGet
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
-	if err != nil {
-		return backendProxyRawResponse{}, fmt.Errorf("build backend request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-	if strings.TrimSpace(contentType) != "" {
-		req.Header.Set("Content-Type", strings.TrimSpace(contentType))
-	}
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-
-	res, err := c.client.Do(req)
-	if err != nil {
-		return backendProxyRawResponse{}, fmt.Errorf("connect backend %s %s: %w", method, path, err)
-	}
-	defer res.Body.Close()
-
-	reader := res.Body
-	if maxBytes > 0 {
-		reader = io.NopCloser(io.LimitReader(res.Body, maxBytes+1))
-	}
-	raw, err := io.ReadAll(reader)
-	if err != nil {
-		return backendProxyRawResponse{}, fmt.Errorf("read backend response: %w", err)
-	}
-	if maxBytes > 0 && int64(len(raw)) > maxBytes {
-		return backendProxyRawResponse{}, fmt.Errorf("桌面 IPC blob 响应过大：%s 超过 50MB，请使用原生导出或缩小选择范围。", path)
-	}
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return backendProxyRawResponse{}, normalizeBackendProxyError(res.StatusCode, raw)
-	}
-	return backendProxyRawResponse{StatusCode: res.StatusCode, Header: res.Header.Clone(), Body: raw}, nil
-}
-
-func normalizeBackendProxyError(statusCode int, raw []byte) error {
-	var payload struct {
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal(raw, &payload); err == nil {
-		if msg := strings.TrimSpace(payload.Error); msg != "" {
-			return errors.New(msg)
-		}
-	}
-	message := strings.TrimSpace(string(raw))
-	if message == "" {
-		message = http.StatusText(statusCode)
-	}
-	return fmt.Errorf("backend request failed: %d %s", statusCode, message)
-}
-
-func (a *DesktopApp) backendProxy() *backendProxyClient {
-	a.mu.Lock()
-	token := a.backendAuthToken
-	baseURL := strings.TrimSpace(a.backendBaseURL)
-	a.mu.Unlock()
-	if baseURL == "" {
-		baseURL = backendBaseURL
-	}
-	return newBackendProxyClientWithBaseURL(baseURL, token)
-}
-
-func (a *DesktopApp) backendProxyBaseURL() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	baseURL := strings.TrimSpace(a.backendBaseURL)
-	if baseURL == "" {
-		return backendBaseURL
-	}
-	return strings.TrimRight(baseURL, "/")
+	return rt, nil
 }
 
 func (a *DesktopApp) backendProxyContext(timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -381,25 +206,32 @@ func (a *DesktopApp) backendProxyContext(timeout time.Duration) (context.Context
 func (a *DesktopApp) IsBackendReady() bool {
 	ctx, cancel := a.backendProxyContext(3 * time.Second)
 	defer cancel()
-	var payload map[string]string
-	return a.backendProxy().getJSON(ctx, "/health", &payload) == nil
+	rt := a.getBackendRuntime()
+	if rt == nil {
+		return false
+	}
+	_, err := rt.Health(ctx)
+	return err == nil
 }
 
 func (a *DesktopApp) PingBackendDataPlane() desktopBackendProbe {
 	ctx, cancel := a.backendProxyContext(8 * time.Second)
 	defer cancel()
-	proxy := a.backendProxy()
 	probe := desktopBackendProbe{}
+	rt := a.getBackendRuntime()
+	if rt == nil {
+		probe.Message = "runtime is not ready"
+		return probe
+	}
 
-	var health map[string]any
-	if err := proxy.getJSON(ctx, "/health", &health); err != nil {
+	if _, err := rt.Health(ctx); err != nil {
 		probe.Message = "health probe failed: " + err.Error()
 		return probe
 	}
 	probe.HealthOK = true
 
-	var identity map[string]any
-	if err := proxy.getJSON(ctx, "/api/runtime/identity", &identity); err != nil {
+	identity, err := rt.Identity(ctx)
+	if err != nil {
 		probe.Message = "runtime identity probe failed: " + err.Error()
 		return probe
 	}
@@ -407,7 +239,7 @@ func (a *DesktopApp) PingBackendDataPlane() desktopBackendProbe {
 	probe.MiscPackageDir = strings.TrimSpace(fmt.Sprint(identity["misc_package_dir"]))
 
 	var status map[string]any
-	if err := proxy.getJSON(ctx, "/api/capture/status", &status); err != nil {
+	if err := rt.GetJSON(ctx, "/api/capture/status", &status); err != nil {
 		probe.Message = "capture status probe failed: " + err.Error()
 		return probe
 	}
@@ -457,11 +289,15 @@ func (a *DesktopApp) invokeBackendRaw(req desktopBackendRequest, responseKind st
 	if responseKind == "blob" {
 		maxBytes = desktopBackendBlobMaxBytes
 	}
-	raw, err := a.backendProxy().doRawLimited(ctx, method, path, body, contentType, maxBytes)
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return backendProxyRawResponse{}, err
+	}
+	raw, err := rt.DoRaw(ctx, method, path, body, contentType, maxBytes)
 	if err != nil {
 		return backendProxyRawResponse{}, fmt.Errorf("desktop IPC backend %s request failed for %s %s: %w", responseKind, method, path, err)
 	}
-	return raw, nil
+	return backendProxyRawResponse{StatusCode: raw.StatusCode, Header: raw.Header, Body: raw.Body}, nil
 }
 
 func (r desktopBackendRequest) normalizedMethod() string {
@@ -635,7 +471,11 @@ func (a *DesktopApp) getToolRuntimeSnapshot(probeMode string) (map[string]any, e
 	if strings.TrimSpace(probeMode) != "" {
 		path += "?probe=" + url.QueryEscape(strings.TrimSpace(probeMode))
 	}
-	if err := a.backendProxy().getJSON(ctx, path, &snapshot); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, path, &snapshot); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
@@ -661,7 +501,11 @@ func (a *DesktopApp) updateToolRuntimeConfig(cfg desktopToolRuntimeConfig, probe
 	if strings.TrimSpace(probeMode) != "" {
 		path += "?probe=" + url.QueryEscape(strings.TrimSpace(probeMode))
 	}
-	if err := a.backendProxy().postJSON(ctx, path, cfg, &snapshot); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, path, cfg, &snapshot); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
@@ -671,7 +515,102 @@ func (a *DesktopApp) SetTSharkPath(path string) (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var payload map[string]any
-	if err := a.backendProxy().postJSON(ctx, "/api/tools/tshark", map[string]string{"path": strings.TrimSpace(path)}, &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, "/api/tools/tshark", map[string]string{"path": strings.TrimSpace(path)}, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) AllowTSharkDir(dir string) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, "/api/tools/tshark/allow-dir", map[string]string{"dir": strings.TrimSpace(dir)}, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) ListTSharkAllowedDirs() (desktopToolAllowedDirs, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload desktopToolAllowedDirs
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return desktopToolAllowedDirs{}, err
+	}
+	if err := rt.GetJSON(ctx, "/api/tools/tshark/allowed-dirs", &payload); err != nil {
+		return desktopToolAllowedDirs{}, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) RemoveTSharkAllowedDir(dir string) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.DeleteJSONWithBody(ctx, "/api/tools/tshark/allowed-dirs/remove", map[string]string{"dir": strings.TrimSpace(dir)}, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) AllowToolDir(tool, dir string) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, "/api/tools/allow-dir", map[string]string{
+		"tool": strings.TrimSpace(tool),
+		"dir":  strings.TrimSpace(dir),
+	}, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) ListToolAllowedDirs(tool string) (desktopToolAllowedDirs, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload desktopToolAllowedDirs
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return desktopToolAllowedDirs{}, err
+	}
+	path := "/api/tools/allowed-dirs?tool=" + url.QueryEscape(strings.TrimSpace(tool))
+	if err := rt.GetJSON(ctx, path, &payload); err != nil {
+		return desktopToolAllowedDirs{}, err
+	}
+	return payload, nil
+}
+
+func (a *DesktopApp) RemoveToolAllowedDir(tool, dir string) (map[string]any, error) {
+	ctx, cancel := a.backendProxyContext(10 * time.Second)
+	defer cancel()
+	var payload map[string]any
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.DeleteJSONWithBody(ctx, "/api/tools/allowed-dirs/remove", map[string]string{
+		"tool": strings.TrimSpace(tool),
+		"dir":  strings.TrimSpace(dir),
+	}, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -681,7 +620,11 @@ func (a *DesktopApp) GetMCPStatus() (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var payload map[string]any
-	if err := a.backendProxy().getJSON(ctx, "/api/mcp/config", &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, "/api/mcp/config", &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -691,7 +634,11 @@ func (a *DesktopApp) UpdateMCPConfig(cfg desktopMCPConfig) (map[string]any, erro
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var payload map[string]any
-	if err := a.backendProxy().postJSON(ctx, "/api/mcp/config", cfg, &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, "/api/mcp/config", cfg, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -700,7 +647,11 @@ func (a *DesktopApp) UpdateMCPConfig(cfg desktopMCPConfig) (map[string]any, erro
 func (a *DesktopApp) StartCapture(filePath, filter string) error {
 	ctx, cancel := a.backendProxyContext(15 * time.Second)
 	defer cancel()
-	return a.backendProxy().postJSON(ctx, "/api/capture/start", captureStartRequest{
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return err
+	}
+	return rt.PostJSON(ctx, "/api/capture/start", captureStartRequest{
 		FilePath:         strings.TrimSpace(filePath),
 		DisplayFilter:    filter,
 		MaxPackets:       0,
@@ -714,26 +665,42 @@ func (a *DesktopApp) StartCapture(filePath, filter string) error {
 func (a *DesktopApp) StopCapture() error {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
-	return a.backendProxy().postJSON(ctx, "/api/capture/stop", map[string]any{}, nil)
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return err
+	}
+	return rt.PostJSON(ctx, "/api/capture/stop", map[string]any{}, nil)
 }
 
 func (a *DesktopApp) PrepareCaptureReplacement() error {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
-	return a.backendProxy().postJSON(ctx, "/api/capture/prepare-replacement", map[string]any{}, nil)
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return err
+	}
+	return rt.PostJSON(ctx, "/api/capture/prepare-replacement", map[string]any{}, nil)
 }
 
 func (a *DesktopApp) CloseCapture() error {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
-	return a.backendProxy().postJSON(ctx, "/api/capture/close", map[string]any{}, nil)
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return err
+	}
+	return rt.PostJSON(ctx, "/api/capture/close", map[string]any{}, nil)
 }
 
 func (a *DesktopApp) GetCaptureStatus() (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var payload map[string]any
-	if err := a.backendProxy().getJSON(ctx, "/api/capture/status", &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, "/api/capture/status", &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -751,7 +718,11 @@ func (a *DesktopApp) ListPacketsPage(cursor, limit int, filter string) (map[stri
 		query += "&filter=" + url.QueryEscape(filter)
 	}
 	var payload map[string]any
-	if err := a.backendProxy().getJSON(ctx, query, &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, query, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -769,7 +740,11 @@ func (a *DesktopApp) LocatePacketPage(packetID, limit int, filter string) (map[s
 		query += "&filter=" + url.QueryEscape(filter)
 	}
 	var payload map[string]any
-	if err := a.backendProxy().getJSON(ctx, query, &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, query, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -779,7 +754,11 @@ func (a *DesktopApp) GetPacket(packetID int) (map[string]any, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var payload map[string]any
-	if err := a.backendProxy().getJSON(ctx, fmt.Sprintf("/api/packet?id=%d", packetID), &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, fmt.Sprintf("/api/packet?id=%d", packetID), &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -966,7 +945,11 @@ func (a *DesktopApp) GetTLSConfig() (desktopTLSConfig, error) {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
 	var cfg desktopTLSConfig
-	if err := a.backendProxy().getJSON(ctx, "/api/tls", &cfg); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return desktopTLSConfig{}, err
+	}
+	if err := rt.GetJSON(ctx, "/api/tls", &cfg); err != nil {
 		return desktopTLSConfig{}, err
 	}
 	return cfg, nil
@@ -975,14 +958,22 @@ func (a *DesktopApp) GetTLSConfig() (desktopTLSConfig, error) {
 func (a *DesktopApp) UpdateTLSConfig(cfg desktopTLSConfig) error {
 	ctx, cancel := a.backendProxyContext(10 * time.Second)
 	defer cancel()
-	return a.backendProxy().postJSON(ctx, "/api/tls", cfg, nil)
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return err
+	}
+	return rt.PostJSON(ctx, "/api/tls", cfg, nil)
 }
 
 func (a *DesktopApp) desktopGetJSON(path string, timeout time.Duration) (any, error) {
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
 	var payload any
-	if err := a.backendProxy().getJSON(ctx, path, &payload); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.GetJSON(ctx, path, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil
@@ -992,7 +983,11 @@ func (a *DesktopApp) desktopPostJSON(path string, payload any, timeout time.Dura
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
 	var response any
-	if err := a.backendProxy().postJSON(ctx, path, payload, &response); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostJSON(ctx, path, payload, &response); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1002,7 +997,11 @@ func (a *DesktopApp) desktopPutJSON(path string, payload any, timeout time.Durat
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
 	var response any
-	if err := a.backendProxy().doJSON(ctx, http.MethodPut, path, payload, &response); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PutJSON(ctx, path, payload, &response); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1012,7 +1011,11 @@ func (a *DesktopApp) desktopPostMultipartFile(path, fieldName, filePath string, 
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
 	var response any
-	if err := a.backendProxy().postMultipartFile(ctx, path, fieldName, filePath, &response); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.PostMultipartFile(ctx, path, fieldName, filePath, &response); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1022,7 +1025,11 @@ func (a *DesktopApp) desktopDeleteJSON(path string, timeout time.Duration) (any,
 	ctx, cancel := a.backendProxyContext(timeout)
 	defer cancel()
 	var response any
-	if err := a.backendProxy().doJSON(ctx, http.MethodDelete, path, nil, &response); err != nil {
+	rt, err := a.requireBackendRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if err := rt.DeleteJSON(ctx, path, &response); err != nil {
 		return nil, err
 	}
 	return response, nil

@@ -8,6 +8,12 @@ export interface DesktopControlPlaneBinding {
   GetMCPStatus?: () => Promise<unknown>;
   UpdateMCPConfig?: (config: unknown) => Promise<unknown>;
   SetTSharkPath?: (path: string) => Promise<unknown>;
+  AllowTSharkDir?: (dir: string) => Promise<unknown>;
+  ListTSharkAllowedDirs?: () => Promise<unknown>;
+  RemoveTSharkAllowedDir?: (dir: string) => Promise<unknown>;
+  AllowToolDir?: (tool: string, dir: string) => Promise<unknown>;
+  ListToolAllowedDirs?: (tool: string) => Promise<unknown>;
+  RemoveToolAllowedDir?: (tool: string, dir: string) => Promise<unknown>;
   StartCapture?: (filePath: string, filter: string) => Promise<void>;
   StopCapture?: () => Promise<void>;
   PrepareCaptureReplacement?: () => Promise<void>;

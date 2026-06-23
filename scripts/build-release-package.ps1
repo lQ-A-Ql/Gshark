@@ -17,7 +17,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$bundledBackendPath = Join-Path $root "frontend/dist/sentinel-backend.exe"
 $bundledRulePath = Join-Path $root "frontend/dist/rules/yara/default.yar"
 
 if ([string]::IsNullOrWhiteSpace($AssetName)) {
@@ -41,9 +40,6 @@ if (-not $SkipBuild) {
 
 & powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts/check-desktop-assets.ps1")
 
-if (-not (Test-Path $bundledBackendPath)) {
-  throw "required bundled backend is missing: $bundledBackendPath"
-}
 if (-not (Test-Path $bundledRulePath)) {
   throw "required bundled rules are missing: $bundledRulePath"
 }
@@ -143,7 +139,7 @@ if ($smokeExitCode -ne 0) {
   throw "release smoke check failed with exit code ${smokeExitCode}: $smokeText"
 }
 if (-not $smokeText.Contains("release smoke check: ok")) {
-  throw "release smoke check did not confirm bundled backend bootstrap: $smokeText"
+  throw "release smoke check did not confirm desktop runtime bootstrap: $smokeText"
 }
 Write-Host "release smoke check: ok" -ForegroundColor Green
 

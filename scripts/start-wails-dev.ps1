@@ -75,9 +75,7 @@ function Clear-WailsBackendCaches {
 }
 
 Stop-PortProcess 34115
-Stop-PortProcess 17891
 Write-PortProbeSummary 34115
-Write-PortProbeSummary 17891
 
 Set-Location "$PSScriptRoot\.."
 if (-not $NoClean) {
@@ -86,7 +84,6 @@ if (-not $NoClean) {
 	Write-Host "[meow-traffic] backend cache cleanup skipped (-NoClean)" -ForegroundColor DarkYellow
 }
 
-Write-Host "[meow-traffic] probe: Wails runtime snapshot uses desktop IPC first; HTTP is fallback for non-Wails browser mode." -ForegroundColor DarkGray
-Write-Host "[meow-traffic] probe: if old 'tshark capability:' log text appears, a stale backend binary/process is still running." -ForegroundColor DarkGray
+Write-Host "[meow-traffic] probe: Wails desktop mounts the backend runtime in-process; backend HTTP is browser-dev/CLI only." -ForegroundColor DarkGray
 Write-Host "[meow-traffic] starting wails dev mode" -ForegroundColor Cyan
 wails dev

@@ -1,4 +1,4 @@
-//go:build dev || production
+//go:build dev || production || bindings
 
 package main
 
@@ -192,7 +192,7 @@ func (a *DesktopApp) InstallAppUpdate() (err error) {
 		return fmt.Errorf("当前已经是最新版本")
 	}
 	if !status.CanInstall {
-		return fmt.Errorf(status.Message)
+		return fmt.Errorf("%s", status.Message)
 	}
 	if asset == nil || strings.TrimSpace(asset.BrowserDownloadURL) == "" {
 		return fmt.Errorf("未找到可安装的更新包")
@@ -228,7 +228,7 @@ func (a *DesktopApp) InstallAppUpdate() (err error) {
 	}
 	updateLogf("install-updater-spawned target=%q pid=%d", targetPath, os.Getpid())
 
-	a.stopBackend()
+	a.stopBackendRuntime()
 	if a.ctx != nil {
 		wruntime.Quit(a.ctx)
 	}

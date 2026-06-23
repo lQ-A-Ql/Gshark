@@ -7,6 +7,7 @@ import {
 } from "./clients/captureClient";
 import type { FFmpegStatus, TSharkStatus } from "./clients/toolRuntimeClient";
 import { asToolRuntimeSnapshot } from "./mappers/runtimeMapper";
+import { asTSharkStatus } from "./mappers/tsharkStatusMapper";
 import { asMCPStatus } from "./mappers/mcpStatusMapper";
 import { asDecryptionConfig, toDecryptionConfigRequest } from "./mappers/tlsMapper";
 import { withToolRuntimeSnapshotMeta } from "./toolRuntimeSnapshotMeta";
@@ -14,7 +15,7 @@ import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
 import { createBackendBridgeFromTransport } from "./backendBridgeTransport";
 import { createTypedDesktopOverrides } from "./desktopTypedBridge";
 import { createDisabledGenericIpcBackendTransport } from "./desktopDisabledGenericIpcTransport";
-import { withDesktopIpcControls } from "./desktopIpcControls";
+import { DesktopIpcRequestError, withDesktopIpcControls } from "./desktopIpcControls";
 import { isLegacyDesktopGenericIpcDisableExperimentEnabled } from "./desktopGenericIpcPolicy";
 import { asPlainObject } from "./mappers/mapperPrimitives";
 import type { MCPStatusWireDTO } from "./wire/mcpWireDtos";
@@ -23,14 +24,13 @@ export { resolveDesktopGenericIpcPolicy } from "./desktopGenericIpcPolicy";
 
 interface DesktopBridgeContext {
   desktopApp: DesktopTransportBinding;
-  fallbackBridge: BackendBridge;
 }
 
 const FAST_RUNTIME_IPC_TIMEOUT_MS = 2000;
 const DEFAULT_TYPED_IPC_TIMEOUT_MS = 10000;
 const START_CAPTURE_IPC_TIMEOUT_MS = 15000;
 
-export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridgeContext): BackendBridge {
+export function createDesktopBridge({ desktopApp }: DesktopBridgeContext): BackendBridge {
   // isDesktopGenericIpcDisabled is now always true for the removed generic adapter path.
   const disabledTransport = createDisabledGenericIpcBackendTransport();
   const dataBridge = createBackendBridgeFromTransport({
@@ -45,45 +45,40 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     ...dataBridge,
     ...createTypedDesktopOverrides(desktopApp),
     async isAvailable() {
-      if (desktopApp.IsBackendReady) {
-        const backendReady = await desktopApp.IsBackendReady();
-        if (!backendReady) {
+      try {
+        if (desktopApp.IsBackendReady) {
+          const backendReady = await desktopApp.IsBackendReady();
+          if (!backendReady) {
+            return false;
+          }
+        }
+        if (!desktopApp.PingBackendDataPlane) {
           return false;
         }
-      }
-      if (desktopApp.PingBackendDataPlane) {
         const probe = await desktopApp.PingBackendDataPlane();
         return Boolean((probe as { ready?: unknown })?.ready);
+      } catch {
+        return false;
       }
-      return await fallbackBridge.isAvailable();
     },
     async getDesktopBackendStatus() {
       if (!desktopApp.BackendStatus) {
-        return await fallbackBridge.getDesktopBackendStatus();
+        return "";
       }
       return String(await desktopApp.BackendStatus()).trim();
     },
     async getToolRuntimeSnapshot(signal?: AbortSignal, mode = "full") {
       const ipcSnapshot = runtimeSnapshotMethod(desktopApp, mode);
       if (!ipcSnapshot) {
-        return await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
+        throw missingTypedBindingError(`DesktopApp.GetToolRuntimeSnapshot(${mode})`);
       }
-      try {
-        const payload = await withDesktopIpcControls(ipcSnapshot, {
-          endpoint: `DesktopApp.GetToolRuntimeSnapshot(${mode})`,
-          responseKind: "typed-ipc",
-          signal,
-          timeoutMs: mode === "fast" ? FAST_RUNTIME_IPC_TIMEOUT_MS : DEFAULT_TYPED_IPC_TIMEOUT_MS,
-        });
-        return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
-      } catch (error) {
-        const fallbackSnapshot = await fallbackBridge.getToolRuntimeSnapshot(signal, mode);
-        return withToolRuntimeSnapshotMeta(
-          fallbackSnapshot,
-          "http-fallback",
-          desktopIpcErrorMessage(error, "Wails IPC 运行时组件探测失败"),
-        );
-      }
+      const payload = await withDesktopIpcControls(ipcSnapshot, {
+        endpoint: `DesktopApp.GetToolRuntimeSnapshot(${mode})`,
+        responseKind: "typed-ipc",
+        signal,
+        timeoutMs: mode === "fast" ? FAST_RUNTIME_IPC_TIMEOUT_MS : DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
     },
     async checkTShark(): Promise<TSharkStatus> {
       try {
@@ -121,25 +116,19 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     async updateToolRuntimeConfig(config: ToolRuntimeConfig, signal?: AbortSignal, mode = "full") {
       const ipcUpdate = runtimeConfigUpdateMethod(desktopApp, mode);
       if (!ipcUpdate) {
-        return await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
+        throw missingTypedBindingError(`DesktopApp.UpdateToolRuntimeConfig(${mode})`);
       }
-      try {
-        const payload = await withDesktopIpcControls(() => ipcUpdate(toToolRuntimeRequest(config)), {
-          endpoint: `DesktopApp.UpdateToolRuntimeConfig(${mode})`,
-          responseKind: "typed-ipc",
-          signal,
-          timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
-        });
-        return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
-      } catch (error) {
-        const fallbackSnapshot = await fallbackBridge.updateToolRuntimeConfig(config, signal, mode);
-        const message = error instanceof Error ? error.message : "Wails IPC 运行时组件配置同步失败";
-        return withToolRuntimeSnapshotMeta(fallbackSnapshot, "http-fallback", message);
-      }
+      const payload = await withDesktopIpcControls(() => ipcUpdate(toToolRuntimeRequest(config)), {
+        endpoint: `DesktopApp.UpdateToolRuntimeConfig(${mode})`,
+        responseKind: "typed-ipc",
+        signal,
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
     },
     async setTSharkPath(path: string): Promise<TSharkStatus> {
       if (!desktopApp.SetTSharkPath) {
-        return await fallbackBridge.setTSharkPath(path);
+        throw missingTypedBindingError("DesktopApp.SetTSharkPath");
       }
       const payload = await withDesktopIpcControls(() => desktopApp.SetTSharkPath!(path), {
         endpoint: "DesktopApp.SetTSharkPath",
@@ -158,29 +147,76 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
       };
     },
     async allowTSharkDir(dir: string): Promise<TSharkStatus> {
-      return await fallbackBridge.allowTSharkDir(dir);
+      if (!desktopApp.AllowTSharkDir) {
+        throw missingTypedBindingError("DesktopApp.AllowTSharkDir");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.AllowTSharkDir!(dir), {
+        endpoint: "DesktopApp.AllowTSharkDir",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return asTSharkStatusFromPayload(payload);
     },
     async listTSharkAllowedDirs(): Promise<string[]> {
-      return await fallbackBridge.listTSharkAllowedDirs();
+      if (!desktopApp.ListTSharkAllowedDirs) {
+        throw missingTypedBindingError("DesktopApp.ListTSharkAllowedDirs");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.ListTSharkAllowedDirs!(), {
+        endpoint: "DesktopApp.ListTSharkAllowedDirs",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return dirsFromPayload(payload);
     },
     async removeTSharkAllowedDir(dir: string): Promise<TSharkStatus> {
-      return await fallbackBridge.removeTSharkAllowedDir(dir);
+      if (!desktopApp.RemoveTSharkAllowedDir) {
+        throw missingTypedBindingError("DesktopApp.RemoveTSharkAllowedDir");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.RemoveTSharkAllowedDir!(dir), {
+        endpoint: "DesktopApp.RemoveTSharkAllowedDir",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return asTSharkStatusFromPayload(payload);
     },
     async allowToolDir(tool, dir) {
-      return await fallbackBridge.allowToolDir(tool, dir);
+      if (!desktopApp.AllowToolDir) {
+        throw missingTypedBindingError("DesktopApp.AllowToolDir");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.AllowToolDir!(tool, dir), {
+        endpoint: "DesktopApp.AllowToolDir",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
     },
     async listToolAllowedDirs(tool) {
-      return await fallbackBridge.listToolAllowedDirs(tool);
+      if (!desktopApp.ListToolAllowedDirs) {
+        throw missingTypedBindingError("DesktopApp.ListToolAllowedDirs");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.ListToolAllowedDirs!(tool), {
+        endpoint: "DesktopApp.ListToolAllowedDirs",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return dirsFromPayload(payload);
     },
     async removeToolAllowedDir(tool, dir) {
-      return await fallbackBridge.removeToolAllowedDir(tool, dir);
+      if (!desktopApp.RemoveToolAllowedDir) {
+        throw missingTypedBindingError("DesktopApp.RemoveToolAllowedDir");
+      }
+      const payload = await withDesktopIpcControls(() => desktopApp.RemoveToolAllowedDir!(tool, dir), {
+        endpoint: "DesktopApp.RemoveToolAllowedDir",
+        responseKind: "typed-ipc",
+        timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+      });
+      return withToolRuntimeSnapshotMeta(asToolRuntimeSnapshot(payload), "desktop-ipc");
     },
     async getMCPStatus(signal?: AbortSignal) {
       return await resolveMCPThroughDesktopIPC({
         signal,
         desktopMethod: desktopApp.GetMCPStatus,
         desktopMethodName: "DesktopApp.GetMCPStatus",
-        fallback: () => fallbackBridge.getMCPStatus(signal),
       });
     },
     async updateMCPConfig(config: MCPConfig, signal?: AbortSignal) {
@@ -190,14 +226,11 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
           ? () => desktopApp.UpdateMCPConfig!({ enabled: config.enabled })
           : undefined,
         desktopMethodName: "DesktopApp.UpdateMCPConfig",
-        fallback: () => fallbackBridge.updateMCPConfig(config, signal),
       });
     },
     async startStreamingPackets(filePath: string, filter: string, signal?: AbortSignal) {
       if (!desktopApp.StartCapture) {
-        return signal
-          ? await fallbackBridge.startStreamingPackets(filePath, filter, signal)
-          : await fallbackBridge.startStreamingPackets(filePath, filter);
+        throw missingTypedBindingError("DesktopApp.StartCapture");
       }
       await withDesktopIpcControls(() => desktopApp.StartCapture!(filePath, filter), {
         endpoint: "DesktopApp.StartCapture",
@@ -208,7 +241,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async stopStreamingPackets() {
       if (!desktopApp.StopCapture) {
-        return await fallbackBridge.stopStreamingPackets();
+        throw missingTypedBindingError("DesktopApp.StopCapture");
       }
       await withDesktopIpcControls(() => desktopApp.StopCapture!(), {
         endpoint: "DesktopApp.StopCapture",
@@ -218,7 +251,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async prepareCaptureReplacement() {
       if (!desktopApp.PrepareCaptureReplacement) {
-        return await fallbackBridge.prepareCaptureReplacement();
+        throw missingTypedBindingError("DesktopApp.PrepareCaptureReplacement");
       }
       await withDesktopIpcControls(() => desktopApp.PrepareCaptureReplacement!(), {
         endpoint: "DesktopApp.PrepareCaptureReplacement",
@@ -228,7 +261,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async closeCapture() {
       if (!desktopApp.CloseCapture) {
-        return await fallbackBridge.closeCapture();
+        throw missingTypedBindingError("DesktopApp.CloseCapture");
       }
       await withDesktopIpcControls(() => desktopApp.CloseCapture!(), {
         endpoint: "DesktopApp.CloseCapture",
@@ -238,7 +271,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async getCaptureStatus(signal?: AbortSignal) {
       if (!desktopApp.GetCaptureStatus) {
-        return await fallbackBridge.getCaptureStatus(signal);
+        throw missingTypedBindingError("DesktopApp.GetCaptureStatus");
       }
       const payload = await withDesktopIpcControls(() => desktopApp.GetCaptureStatus!(), {
         endpoint: "DesktopApp.GetCaptureStatus",
@@ -264,7 +297,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async getTLSConfig() {
       if (!desktopApp.GetTLSConfig) {
-        return await fallbackBridge.getTLSConfig();
+        throw missingTypedBindingError("DesktopApp.GetTLSConfig");
       }
       return asDecryptionConfig(
         await withDesktopIpcControls(() => desktopApp.GetTLSConfig!(), {
@@ -276,7 +309,7 @@ export function createDesktopBridge({ desktopApp, fallbackBridge }: DesktopBridg
     },
     async updateTLSConfig(cfg: DecryptionConfig) {
       if (!desktopApp.UpdateTLSConfig) {
-        return await fallbackBridge.updateTLSConfig(cfg);
+        throw missingTypedBindingError("DesktopApp.UpdateTLSConfig");
       }
       await withDesktopIpcControls(() => desktopApp.UpdateTLSConfig!(toDecryptionConfigRequest(cfg)), {
         endpoint: "DesktopApp.UpdateTLSConfig",
@@ -293,41 +326,46 @@ export function isDesktopGenericIpcDisableExperimentEnabled(): boolean {
   return isLegacyDesktopGenericIpcDisableExperimentEnabled();
 }
 
-function desktopIpcErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
+function asTSharkStatusFromPayload(payload: unknown): TSharkStatus {
+  return asTSharkStatus(asPlainObject(payload) ?? {});
+}
+
+function dirsFromPayload(payload: unknown): string[] {
+  const dirs = asPlainObject(payload)?.dirs;
+  if (!Array.isArray(dirs)) {
+    return [];
   }
-  if (typeof error === "string" && error.trim()) {
-    return error.trim();
-  }
-  return fallback;
+  return dirs.map((dir) => String(dir ?? "")).filter((dir) => dir.length > 0);
 }
 
 async function resolveMCPThroughDesktopIPC({
   signal,
   desktopMethod,
   desktopMethodName,
-  fallback,
 }: {
   signal?: AbortSignal;
   desktopMethod?: () => Promise<unknown>;
   desktopMethodName: string;
-  fallback: () => Promise<MCPStatus>;
 }): Promise<MCPStatus> {
   if (!desktopMethod) {
-    return await fallback();
+    throw missingTypedBindingError(desktopMethodName);
   }
-  try {
-    const payload = await withDesktopIpcControls(desktopMethod, {
-      endpoint: desktopMethodName,
-      responseKind: "typed-ipc",
-      signal,
-      timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
-    });
-    return asMCPStatus((asPlainObject(payload) ?? {}) as MCPStatusWireDTO);
-  } catch {
-    return await fallback();
-  }
+  const payload = await withDesktopIpcControls(desktopMethod, {
+    endpoint: desktopMethodName,
+    responseKind: "typed-ipc",
+    signal,
+    timeoutMs: DEFAULT_TYPED_IPC_TIMEOUT_MS,
+  });
+  return asMCPStatus((asPlainObject(payload) ?? {}) as MCPStatusWireDTO);
+}
+
+function missingTypedBindingError(endpoint: string): DesktopIpcRequestError {
+  return new DesktopIpcRequestError(
+    "typed_binding_required",
+    `桌面构建要求 Wails typed IPC binding：${endpoint}。请重新生成 Wails bindings 后再运行。`,
+    endpoint,
+    0,
+  );
 }
 
 function runtimeSnapshotMethod(

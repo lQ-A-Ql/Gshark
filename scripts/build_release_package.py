@@ -15,7 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO = "lQ-A-Ql/Gshark"
 DEFAULT_SOURCE_EXE = ROOT / "build" / "bin" / "meow-traffic.exe"
-BUNDLED_BACKEND_PATH = ROOT / "frontend" / "dist" / "sentinel-backend.exe"
 BUNDLED_RULE_PATH = ROOT / "frontend" / "dist" / "rules" / "yara" / "default.yar"
 
 
@@ -68,8 +67,6 @@ def run_command(args: list[str], cwd: Path) -> None:
 
 def ensure_release_inputs() -> None:
     missing: list[str] = []
-    if not BUNDLED_BACKEND_PATH.is_file():
-        missing.append(str(BUNDLED_BACKEND_PATH))
     if not BUNDLED_RULE_PATH.is_file():
         missing.append(str(BUNDLED_RULE_PATH))
     if missing:
@@ -98,7 +95,7 @@ def run_release_smoke_check(exe_path: Path) -> None:
         )
     if "release smoke check: ok" not in output:
         raise RuntimeError(
-            f"release smoke check did not confirm bundled backend bootstrap: {output.strip()}"
+            f"release smoke check did not confirm desktop runtime bootstrap: {output.strip()}"
         )
 
 

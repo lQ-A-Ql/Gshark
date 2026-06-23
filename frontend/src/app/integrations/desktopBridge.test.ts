@@ -117,6 +117,7 @@ describe("createDesktopBridge", () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const desktopApp: DesktopTransportBinding = {
       IsBackendReady: vi.fn(async () => true),
+      PingBackendDataPlane: vi.fn(async () => ({ ready: true })),
       BackendStatus: vi.fn(async () => " running (reused-existing) "),
       StartCapture: vi.fn(async () => undefined),
       GetCaptureStatus: vi.fn(async () => ({
@@ -139,7 +140,7 @@ describe("createDesktopBridge", () => {
     const fallbackBridge = createFallbackBridge({
       isAvailable: vi.fn(async () => true),
     });
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.isAvailable()).resolves.toBe(true);
     await expect(bridge.getDesktopBackendStatus()).resolves.toBe("running (reused-existing)");
@@ -163,7 +164,7 @@ describe("createDesktopBridge", () => {
     });
 
     expect(desktopApp.StartCapture).toHaveBeenCalledWith("C:/cases/sample.pcapng", "tcp");
-    expect(fallbackBridge.isAvailable).toHaveBeenCalledTimes(1);
+    expect(fallbackBridge.isAvailable).not.toHaveBeenCalled();
     expect(desktopApp.UpdateTLSConfig).toHaveBeenCalledWith({
       ssl_key_log_file: "C:/keys/ssl.log",
       rsa_private_key: "",
@@ -175,29 +176,28 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getTLSConfig).not.toHaveBeenCalled();
   });
 
-  it("does not report desktop availability until the HTTP data-plane probe passes", async () => {
+  it("does not report desktop availability until the Wails data-plane probe passes", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
-      isAvailable: vi.fn(async () => false),
+      isAvailable: vi.fn(async () => true),
     });
     const bridge = createDesktopBridge({
-      desktopApp: { IsBackendReady: vi.fn(async () => true) },
-      fallbackBridge,
+      desktopApp: { IsBackendReady: vi.fn(async () => true), PingBackendDataPlane: vi.fn(async () => ({ ready: false })) },
     });
 
     await expect(bridge.isAvailable()).resolves.toBe(false);
 
-    expect(fallbackBridge.isAvailable).toHaveBeenCalledTimes(1);
+    expect(fallbackBridge.isAvailable).not.toHaveBeenCalled();
   });
 
-  it("skips HTTP data-plane probes while the desktop backend is not ready", async () => {
+  it("skips Wails data-plane probes while the desktop backend is not ready", async () => {
     const fallbackBridge = createFallbackBridge({
       isAvailable: vi.fn(async () => true),
     });
     const desktopApp: DesktopTransportBinding = {
       IsBackendReady: vi.fn(async () => false),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.isAvailable()).resolves.toBe(false);
 
@@ -273,7 +273,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: { StartCapture: vi.fn(async () => undefined) },
-      fallbackBridge,
     });
 
     await expect(bridge.listPacketsPage(100, 50, "http")).rejects.toMatchObject({
@@ -325,7 +324,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
@@ -460,7 +458,7 @@ describe("createDesktopBridge", () => {
       GetMediaBatchTranscriptionStatus: vi.fn(async () => ({ task_id: "task-1", completed: 1, done: true })),
       CancelMediaBatchTranscription: vi.fn(async () => ({ task_id: "task-1", cancelled: true, done: true })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.locatePacketPage(42, 50, "http")).resolves.toEqual({
       packetId: 42,
@@ -695,7 +693,7 @@ describe("createDesktopBridge", () => {
       })),
       UpdateHypothesisStatus: vi.fn(async () => ({ ...hypothesis, status: "confirmed", conclusion: "ok" })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.listPlaybooks()).resolves.toEqual([playbook]);
     await expect(bridge.getPlaybook("pb-1")).resolves.toEqual(playbook);
@@ -785,7 +783,7 @@ describe("createDesktopBridge", () => {
       DownloadMediaArtifact: vi.fn(async () => typedBlob),
       GetMediaPlaybackBlob: vi.fn(async () => typedBlob),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     try {
       await bridge.exportMediaBatchTranscription("json");
@@ -821,7 +819,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
@@ -841,7 +838,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
@@ -859,7 +855,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
@@ -879,7 +874,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.listObjects()).rejects.toMatchObject({
@@ -902,7 +896,7 @@ describe("createDesktopBridge", () => {
     const desktopApp: DesktopTransportBinding = {
       ListObjects: vi.fn(async () => []),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.listObjects()).resolves.toEqual([]);
 
@@ -918,7 +912,6 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     const stop = bridge.subscribeEvents({ status: vi.fn() });
@@ -931,7 +924,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackUnsubscribe).not.toHaveBeenCalled();
   });
 
-  it("uses Wails IPC for packet pages and falls back to HTTP with transport metadata", async () => {
+  it("uses Wails IPC for packet pages and reports desktop IPC transport metadata", async () => {
     const fallbackBridge = createFallbackBridge({
       listPacketsPage: vi.fn(async () => ({
         items: [],
@@ -948,7 +941,7 @@ describe("createDesktopBridge", () => {
         has_more: true,
       })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     const page = await bridge.listPacketsPage(0, 50, "tcp");
 
@@ -973,7 +966,6 @@ describe("createDesktopBridge", () => {
           throw new Error("ipc unavailable");
         }),
       },
-      fallbackBridge,
     });
 
     await expect(bridge.listPacketsPage(0, 50, "")).rejects.toThrow("ipc unavailable");
@@ -993,7 +985,6 @@ describe("createDesktopBridge", () => {
       desktopApp: {
         GetCaptureStatus: vi.fn(async () => new Promise<unknown>(() => undefined)),
       },
-      fallbackBridge,
     });
 
     const request = bridge.getCaptureStatus();
@@ -1019,7 +1010,6 @@ describe("createDesktopBridge", () => {
         GetEvidence: vi.fn(async () => new Promise<unknown>(() => undefined)),
         GetEvidenceWithFilter: vi.fn(async () => new Promise<unknown>(() => undefined)),
       },
-      fallbackBridge,
     });
 
     expect(DEFAULT_TYPED_IPC_TIMEOUT_MS).toBe(10000);
@@ -1053,10 +1043,8 @@ describe("createDesktopBridge", () => {
 
   it("fails with generic_ipc_disabled instead of invoking legacy adapter failures", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
-    const fallbackBridge = createFallbackBridge();
     const bridge = createDesktopBridge({
       desktopApp: {},
-      fallbackBridge,
     });
 
     await expect(bridge.getIndustrialAnalysis()).rejects.toMatchObject({
@@ -1080,7 +1068,6 @@ describe("createDesktopBridge", () => {
       desktopApp: {
         ListPacketsPage: vi.fn(async () => new Promise<unknown>(() => undefined)),
       },
-      fallbackBridge,
     });
 
     const request = bridge.listPacketsPage(0, 50, "", controller.signal);
@@ -1090,7 +1077,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.listPacketsPage).not.toHaveBeenCalled();
   });
 
-  it("falls back per method when a desktop control-plane binding is missing", async () => {
+  it("requires typed control-plane bindings instead of falling back to HTTP", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       startStreamingPackets: vi.fn(async () => undefined),
@@ -1102,18 +1089,19 @@ describe("createDesktopBridge", () => {
     });
     const bridge = createDesktopBridge({
       desktopApp: { BackendStatus: vi.fn(async () => "running") },
-      fallbackBridge,
     });
 
-    await bridge.startStreamingPackets("C:/cases/no-ipc.pcapng", "");
-    await expect(bridge.getCaptureStatus()).resolves.toEqual({
-      filePath: "http-fallback.pcapng",
-      hasCapture: true,
-      packetCount: 12,
+    await expect(bridge.startStreamingPackets("C:/cases/no-ipc.pcapng", "")).rejects.toMatchObject({
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.StartCapture",
+    });
+    await expect(bridge.getCaptureStatus()).rejects.toMatchObject({
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetCaptureStatus",
     });
 
-    expect(fallbackBridge.startStreamingPackets).toHaveBeenCalledWith("C:/cases/no-ipc.pcapng", "");
-    expect(fallbackBridge.getCaptureStatus).toHaveBeenCalled();
+    expect(fallbackBridge.startStreamingPackets).not.toHaveBeenCalled();
+    expect(fallbackBridge.getCaptureStatus).not.toHaveBeenCalled();
   });
 
   it("keeps abortable runtime snapshot calls on Wails IPC when the binding exists", async () => {
@@ -1124,7 +1112,7 @@ describe("createDesktopBridge", () => {
         config: { tshark_path: "desktop-tshark" },
       })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await bridge.getToolRuntimeSnapshot(controller.signal);
 
@@ -1132,7 +1120,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
   });
 
-  it("falls back to HTTP when Wails runtime snapshot IPC fails", async () => {
+  it("surfaces Wails runtime snapshot IPC failures without HTTP fallback", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge();
     const desktopApp: DesktopTransportBinding = {
@@ -1140,18 +1128,18 @@ describe("createDesktopBridge", () => {
         throw new Error("runtime ipc unavailable");
       }),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
-    const snapshot = await bridge.getToolRuntimeSnapshot(new AbortController().signal);
+    await expect(bridge.getToolRuntimeSnapshot(new AbortController().signal)).rejects.toMatchObject({
+      code: "backend_proxy_failed",
+      endpoint: "DesktopApp.GetToolRuntimeSnapshot(full)",
+    });
 
     expect(desktopApp.GetToolRuntimeSnapshot).toHaveBeenCalledTimes(1);
-    expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal), "full");
-    expect(snapshot.config.tsharkPath).toBe("fallback-tshark");
-    expect(snapshot.transport).toBe("http-fallback");
-    expect(snapshot.transportError).toContain("runtime ipc unavailable");
+    expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
   });
 
-  it("falls back to HTTP fast snapshot when Wails IPC does not return within the fast budget", async () => {
+  it("times out fast Wails runtime snapshots without HTTP fallback", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     vi.useFakeTimers();
     try {
@@ -1159,22 +1147,24 @@ describe("createDesktopBridge", () => {
       const desktopApp: DesktopTransportBinding = {
         GetToolRuntimeSnapshotFast: vi.fn(async () => new Promise<unknown>(() => undefined)),
       };
-      const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+      const bridge = createDesktopBridge({ desktopApp });
 
       const snapshotPromise = bridge.getToolRuntimeSnapshot(undefined, "fast");
+      const rejection = expect(snapshotPromise).rejects.toMatchObject({
+        code: "ipc_timeout",
+        endpoint: "DesktopApp.GetToolRuntimeSnapshot(fast)",
+      });
       await vi.advanceTimersByTimeAsync(2000);
-      const snapshot = await snapshotPromise;
+      await rejection;
 
       expect(desktopApp.GetToolRuntimeSnapshotFast).toHaveBeenCalledTimes(1);
-      expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(undefined, "fast");
-      expect(snapshot.transport).toBe("http-fallback");
-      expect(snapshot.transportError).toContain("GetToolRuntimeSnapshot");
+      expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("falls back to HTTP instead of generic IPC when a typed fast runtime snapshot binding fails", async () => {
+  it("surfaces typed fast runtime snapshot failures instead of generic IPC or HTTP", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       getToolRuntimeSnapshot: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot(undefined, "fast")),
@@ -1184,15 +1174,15 @@ describe("createDesktopBridge", () => {
         throw "typed runtime bridge missing";
       }),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
-    const snapshot = await bridge.getToolRuntimeSnapshot(undefined, "fast");
-    expect(snapshot).toMatchObject({ config: { tsharkPath: "fallback-tshark" } });
-    expect(snapshot.transport).toBe("http-fallback");
-    expect(snapshot.transportError).toContain("typed runtime bridge missing");
+    await expect(bridge.getToolRuntimeSnapshot(undefined, "fast")).rejects.toMatchObject({
+      code: "backend_proxy_failed",
+      endpoint: "DesktopApp.GetToolRuntimeSnapshot(fast)",
+    });
 
     expect(desktopApp.GetToolRuntimeSnapshotFast).toHaveBeenCalledTimes(1);
-    expect(fallbackBridge.getToolRuntimeSnapshot).toHaveBeenCalledWith(undefined, "fast");
+    expect(fallbackBridge.getToolRuntimeSnapshot).not.toHaveBeenCalled();
   });
 
   it("keeps abortable runtime config updates on Wails IPC when the binding exists", async () => {
@@ -1209,7 +1199,7 @@ describe("createDesktopBridge", () => {
         yara: { enabled: true, available: true, timeout_ms: 25000 },
       })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await bridge.updateToolRuntimeConfig(
       {
@@ -1229,7 +1219,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.updateToolRuntimeConfig).not.toHaveBeenCalled();
   });
 
-  it("falls back to HTTP when Wails runtime config update IPC fails", async () => {
+  it("surfaces Wails runtime config update IPC failures without HTTP fallback", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const fallbackBridge = createFallbackBridge({
       updateToolRuntimeConfig: vi.fn(async () => createFallbackBridge().getToolRuntimeSnapshot()),
@@ -1239,7 +1229,7 @@ describe("createDesktopBridge", () => {
         throw new Error("runtime config ipc unavailable");
       }),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
     const config = {
       tsharkPath: "desktop-tshark",
       ffmpegPath: "",
@@ -1251,12 +1241,13 @@ describe("createDesktopBridge", () => {
       yaraTimeoutMs: 25000,
     };
 
-    const snapshot = await bridge.updateToolRuntimeConfig(config, new AbortController().signal);
+    await expect(bridge.updateToolRuntimeConfig(config, new AbortController().signal)).rejects.toMatchObject({
+      code: "backend_proxy_failed",
+      endpoint: "DesktopApp.UpdateToolRuntimeConfig(full)",
+    });
 
     expect(desktopApp.UpdateToolRuntimeConfig).toHaveBeenCalledTimes(1);
-    expect(fallbackBridge.updateToolRuntimeConfig).toHaveBeenCalledWith(config, expect.any(AbortSignal), "full");
-    expect(snapshot.transport).toBe("http-fallback");
-    expect(snapshot.transportError).toContain("runtime config ipc unavailable");
+    expect(fallbackBridge.updateToolRuntimeConfig).not.toHaveBeenCalled();
   });
 
   it("uses typed Wails IPC for MCP status and config when available", async () => {
@@ -1304,7 +1295,7 @@ describe("createDesktopBridge", () => {
         stdio_supported: false,
       })),
     };
-    const bridge = createDesktopBridge({ desktopApp, fallbackBridge });
+    const bridge = createDesktopBridge({ desktopApp });
 
     await expect(bridge.getMCPStatus()).resolves.toMatchObject({
       enabled: true,
@@ -1322,7 +1313,7 @@ describe("createDesktopBridge", () => {
     expect(fallbackBridge.updateMCPConfig).not.toHaveBeenCalled();
   });
 
-  it("normalizes MCP status consistently across HTTP fallback and Wails IPC", async () => {
+  it("requires Wails IPC for MCP status and config in desktop mode", async () => {
     vi.stubEnv("VITE_DESKTOP_GENERIC_IPC_POLICY", "compat");
     const expectedStatus = {
       config: { enabled: true },
@@ -1360,20 +1351,24 @@ describe("createDesktopBridge", () => {
         stdio_supported: false,
       })),
     };
-    const ipcBridge = createDesktopBridge({ desktopApp, fallbackBridge });
-    const httpBridge = createDesktopBridge({ desktopApp: {}, fallbackBridge });
+    const ipcBridge = createDesktopBridge({ desktopApp });
+    const missingIpcBridge = createDesktopBridge({ desktopApp: {} });
 
     await expect(ipcBridge.getMCPStatus()).resolves.toEqual(expectedStatus);
-    await expect(httpBridge.getMCPStatus()).resolves.toEqual(expectedStatus);
     await expect(ipcBridge.updateMCPConfig({ enabled: false })).resolves.toEqual({
       ...expectedStatus,
       config: { enabled: false },
       enabled: false,
     });
-    await expect(httpBridge.updateMCPConfig({ enabled: false })).resolves.toEqual({
-      ...expectedStatus,
-      config: { enabled: false },
-      enabled: false,
+    await expect(missingIpcBridge.getMCPStatus()).rejects.toMatchObject({
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.GetMCPStatus",
     });
+    await expect(missingIpcBridge.updateMCPConfig({ enabled: false })).rejects.toMatchObject({
+      code: "typed_binding_required",
+      endpoint: "DesktopApp.UpdateMCPConfig",
+    });
+    expect(fallbackBridge.getMCPStatus).not.toHaveBeenCalled();
+    expect(fallbackBridge.updateMCPConfig).not.toHaveBeenCalled();
   });
 });

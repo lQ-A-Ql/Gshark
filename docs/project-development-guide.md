@@ -8,14 +8,14 @@
 
 | 路径 | Module | Go 版本 | 职责 |
 | --- | --- | --- | --- |
-| `.` | `github.com/gshark/sentinel/desktop` | Go 1.22 | Wails 桌面壳、前端嵌入、桌面 binding |
+| `.` | `github.com/gshark/sentinel/desktop` | Go 1.25 | Wails 桌面壳、前端嵌入、桌面 binding、进程内后端 runtime 挂载 |
 | `backend/` | `github.com/gshark/sentinel/backend` | Go 1.25 | HTTP 后端、tshark 集成、分析逻辑、MISC 运行时 |
 
-根模块只承载桌面壳，真实业务逻辑集中在 `backend/`。运行后端命令时先 `cd backend`；运行前端命令时先 `cd frontend`。
+根模块承载桌面壳，并通过本地 `replace` 引用 `backend/desktopruntime`，让 Wails 构建产物在同一进程内挂载后端 server。真实业务逻辑仍集中在 `backend/`。运行后端命令时先 `cd backend`；运行前端命令时先 `cd frontend`。
 
 ## 构建标签
 
-桌面应用入口受 `dev` 或 `production` build tag 保护。根目录 `main.go`、`app.go`、`build_mode_*.go` 都要求 `//go:build dev || production`。不带 tag 时，根模块只会编译 `main_nondesktop.go`，它只打印提示并退出。
+桌面应用入口受 `dev` 或 `production` build tag 保护；Wails binding 生成阶段额外使用 `bindings` tag。根目录桌面文件要求 `//go:build dev || production || bindings`。不带 tag 时，根模块只会编译 `main_nondesktop.go`，它只打印提示并退出。
 
 ```powershell
 # 桌面壳测试
@@ -44,7 +44,7 @@ pnpm install --frozen-lockfile
 | --- | --- |
 | `pnpm run dev` | 启动 Vite 开发服务 |
 | `pnpm run build` | 仅执行 Vite 生产构建 |
-| `pnpm run build:wails` | Vite 构建、复制后端二进制、检查桌面资源 |
+| `pnpm run build:wails` | Vite 构建、同步非二进制桌面资源、检查桌面资源 |
 | `pnpm run ci` | 包管理、类型、lint、格式、体积、边界、IPC、Vitest、Vite 构建全套检查 |
 | `pnpm run ci:quality` | 包管理、typecheck、lint、format、size 检查 |
 | `pnpm run ci:boundaries` | 前端架构、preload、client/mapper/wire 边界检查 |
@@ -59,7 +59,7 @@ pnpm install --frozen-lockfile
 
 | 组件 | 端口 |
 | --- | --- |
-| 后端 HTTP/SSE | `17891` |
+| 后端 HTTP/SSE | `17891`，仅 browser-dev/CLI 使用 |
 | Wails dev server | `34115` |
 
 桌面优先开发启动：
@@ -81,7 +81,7 @@ cd backend
 go test ./...
 ```
 
-普通浏览器开发模式继续通过 `httpBridge` 使用 HTTP/SSE fallback。桌面模式的数据面调用应走 typed Wails IPC。
+普通浏览器开发模式继续通过 `httpBridge` 使用 HTTP/SSE fallback。Wails 桌面模式在进程内挂载后端 runtime，数据面和控制面应走 typed Wails IPC；构建产物不再依赖 `127.0.0.1:17891`。
 
 ## 运行时配置
 
@@ -89,9 +89,8 @@ go test ./...
 
 | 变量 | 用途 |
 | --- | --- |
-| `MEOW_TRAFFIC_BACKEND_TOKEN` | 后端 bearer token；未设置时自动生成 |
-| `MEOW_TRAFFIC_ALLOW_EXISTING_BACKEND=1` | 复用已经运行的后端 |
-| `VITE_BACKEND_URL` | 前端 API override，默认 `http://127.0.0.1:17891` |
+| `MEOW_TRAFFIC_BACKEND_TOKEN` | standalone HTTP 后端 bearer token；桌面进程内 runtime 不需要它 |
+| `VITE_BACKEND_URL` | browser-dev 前端 API override，默认 `http://127.0.0.1:17891`；Wails 桌面忽略 |
 | `MEOW_TRAFFIC_FFMPEG` | 显式 FFmpeg 路径 |
 | `MEOW_TRAFFIC_PYTHON` | 显式 Python 路径 |
 | `MEOW_TRAFFIC_VOSK_MODEL` | 显式 Vosk 模型目录 |
@@ -103,15 +102,11 @@ go test ./...
 - 完整探测会补齐 tshark 字段、Python `vosk`、YARA 规则等慢信息。
 - 缺少 tshark 可选字段表示能力降级，不代表 tshark 完全不可用。
 
-## Wails 后端二进制缓存
+## Wails 进程内后端 runtime
 
-`main.go` 会在桌面构建时嵌入 `frontend/dist/sentinel-backend.exe`。修改后端代码后，旧二进制可能从以下位置被复用：
+`main.go` 只嵌入前端静态资源和规则文件，不再嵌入 `frontend/dist/sentinel-backend.exe`。桌面启动时通过 `backend/desktopruntime.Runtime` 在 Wails 进程内创建 `engine.Service`、`transport.Hub` 和 `transport.Server`，并通过 Wails IPC 调用进程内 handler。
 
-- `frontend/dist/sentinel-backend.exe`
-- `build/bin/sentinel-backend.exe`
-- `%TEMP%\meow-traffic\backend\sentinel-backend.exe`
-
-`scripts/start-wails-dev.ps1` 通常会清理这些位置。如果仍然看到旧后端行为，删除这些文件并清理 Go build cache。
+`scripts/sync-wails-assets.ps1` 会删除历史残留的 `frontend/dist/sentinel-backend.exe`。如果 Wails dev 没有看到后端源码变化，优先清理 Go build cache，而不是重建后端二进制。
 
 ## 检查命令
 

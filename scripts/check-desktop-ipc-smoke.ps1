@@ -143,9 +143,12 @@ function Wait-CaptureReady([string]$BaseUrl, [hashtable]$Headers, [int]$Timeout)
   throw "Timed out waiting for capture readiness: $encoded"
 }
 
-function Test-EventStreamReady([string]$EventsUrl) {
+function Test-EventStreamReady([string]$EventsUrl, [hashtable]$Headers = @{}) {
   $client = [System.Net.Http.HttpClient]::new()
   $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, $EventsUrl)
+  foreach ($key in $Headers.Keys) {
+    [void]$request.Headers.TryAddWithoutValidation([string]$key, [string]$Headers[$key])
+  }
   try {
     $response = $client.SendAsync(
       $request,
@@ -210,7 +213,7 @@ function Invoke-DesktopReleaseSmoke {
   Assert-Condition ($exitCode -eq 0) "Desktop Wails release smoke exited with code ${exitCode}: $logText"
   Assert-Condition (($logText + $resultText).Contains("release smoke check: ok")) "Desktop release smoke did not report success"
   Assert-Condition ($logText.Contains("Environment created successfully")) "Desktop release smoke did not create WebView2 environment"
-  Assert-Condition ($logText.Contains("sentinel backend listening on 127.0.0.1:$BackendPort")) "Desktop release smoke did not start embedded backend"
+  Assert-Condition ($logText.Contains("backend runtime mounted in Wails process")) "Desktop release smoke did not mount the in-process backend runtime"
 
   [ordered]@{
     ok = $true
@@ -267,7 +270,6 @@ function Invoke-DesktopWebviewTypedSmoke {
     Assert-Condition ($result.locatedPacketFound -eq $true) "Desktop WebView typed smoke did not locate sampled packet"
     Assert-Condition ([int]$result.huntingPrefixCount -gt 0) "Desktop WebView typed smoke returned no hunting prefixes"
     Assert-Condition ([int]$result.vehicleDBCProfileCount -ge 0) "Desktop WebView typed smoke returned invalid vehicle DBC profile count"
-    Assert-Condition ([int]$result.pluginCount -ge 0) "Desktop WebView typed smoke returned invalid plugin count"
     Assert-Condition ([int]$result.miscModuleCount -ge 0) "Desktop WebView typed smoke returned invalid MISC module count"
     Assert-Condition ($result.miscImportBindingAvailable -eq $true) "Desktop WebView typed smoke did not confirm ImportMiscModulePackageFromPath binding availability"
     Assert-Condition ($result.miscDeleteBindingAvailable -eq $true) "Desktop WebView typed smoke did not confirm DeleteMiscModulePackage binding availability"
@@ -320,7 +322,6 @@ function Invoke-DesktopWebviewTypedSmoke {
     huntingPrefixCount = [int]$result.huntingPrefixCount
     huntingYaraEnabled = [bool]$result.huntingYaraEnabled
     vehicleDBCProfileCount = [int]$result.vehicleDBCProfileCount
-    pluginCount = [int]$result.pluginCount
     miscModuleCount = [int]$result.miscModuleCount
     miscImportBindingAvailable = [bool]$result.miscImportBindingAvailable
     miscDeleteBindingAvailable = [bool]$result.miscDeleteBindingAvailable
@@ -376,7 +377,7 @@ function Invoke-BrowserDevSmoke {
     $runtimeFast = Invoke-SmokeJson "GET" "$baseUrl/api/tools/runtime-config?probe=fast" $headers
     $mcp = Invoke-SmokeJson "GET" "$baseUrl/api/mcp/config" $headers
     $tls = Invoke-SmokeJson "GET" "$baseUrl/api/tls" $headers
-    $eventLine = Test-EventStreamReady "$baseUrl/api/events?access_token=$token"
+    $eventLine = Test-EventStreamReady "$baseUrl/api/events" $headers
 
     Invoke-SmokeJson "POST" "$baseUrl/api/capture/prepare-replacement" $headers | Out-Null
     Invoke-SmokeJson "POST" "$baseUrl/api/capture/start" $headers @{

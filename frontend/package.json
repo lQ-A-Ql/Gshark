@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/build-backend-binary.ps1 && powershell -ExecutionPolicy Bypass -File ../scripts/check-desktop-assets.ps1",
+    "build:wails": "vite build && powershell -ExecutionPolicy Bypass -File ../scripts/sync-wails-assets.ps1 && powershell -ExecutionPolicy Bypass -File ../scripts/check-desktop-assets.ps1",
     "boundary:check": "node scripts/check-boundaries.mjs",
     "ci": "pnpm run ci:quality && pnpm run ci:boundaries && pnpm run ci:desktop && pnpm run ci:test-build",
     "ci:boundaries": "pnpm run boundary:check && pnpm run preload:budget:check && pnpm run preload:boundary:check && pnpm run client:any:check && pnpm run mapper:any:check && pnpm run wire:any:check && pnpm run type-governance:check",

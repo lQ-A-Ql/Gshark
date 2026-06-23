@@ -7,22 +7,22 @@ export interface BridgeFactoryOptions {
 }
 
 export function createBridge(options: BridgeFactoryOptions): BackendBridge {
-  const httpBridge = createHttpBridge(options);
   let desktopApp: DesktopTransportBinding | undefined;
   let desktopBridge: BackendBridge | undefined;
+  let browserHttpBridge: BackendBridge | undefined;
 
   const resolveBridge = () => {
     const currentDesktopApp = options.getDesktopAppBinding();
     if (!currentDesktopApp) {
       desktopApp = undefined;
       desktopBridge = undefined;
-      return httpBridge;
+      browserHttpBridge ??= createHttpBridge(options);
+      return browserHttpBridge;
     }
     if (currentDesktopApp !== desktopApp || !desktopBridge) {
       desktopApp = currentDesktopApp;
       desktopBridge = createDesktopBridge({
         desktopApp: currentDesktopApp,
-        fallbackBridge: httpBridge,
       });
     }
     return desktopBridge;

@@ -1,4 +1,4 @@
-//go:build !dev && !production
+//go:build !dev && !production && !bindings
 
 package main
 

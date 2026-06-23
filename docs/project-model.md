@@ -38,7 +38,7 @@ flowchart LR
 
 | 层级 | 目录/入口 | 主要职责 | 约束 |
 | --- | --- | --- | --- |
-| 桌面壳 | `main.go`、`app.go`、`desktop_*.go` | Wails 生命周期、前端嵌入、typed binding、后端二进制启动与事件转发 | 根入口必须带 `dev || production` build tag |
+| 桌面壳 | `main.go`、`app.go`、`desktop_*.go` | Wails 生命周期、前端嵌入、typed binding、进程内后端 runtime 挂载与事件转发 | 根入口必须带 `dev || production` build tag；`bindings` tag 仅供 Wails 生成 |
 | 前端工作台 | `frontend/src/app` | 页面、组件、状态、bridge、wire DTO、mapper、核心类型 | `pnpm` only；桌面数据面 typed IPC 优先 |
 | 后端服务 | `backend/internal/transport` | HTTP/SSE、鉴权、审计、OpenAPI 契约、MISC HTTP 端点 | `net/http.ServeMux`；handler 使用 `r.Context()` |
 | 后端编排 | `backend/internal/engine` | capture、packet、stream、analysis、evidence、report、tool runtime | 新长任务必须有 `WithContext` 变体 |
@@ -54,8 +54,8 @@ flowchart TD
     subgraph DesktopShell["桌面壳"]
         WailsApp["Wails App"]
         TypedBindings["DesktopApp typed bindings"]
-        EventBridge["SSE -> Wails runtime events"]
-        BackendBinary["embedded sentinel-backend.exe"]
+        EventBridge["transport.Hub -> Wails runtime events"]
+        BackendRuntime["desktopruntime in-process server"]
     end
 
     subgraph Frontend["React 工作台"]
@@ -92,7 +92,7 @@ flowchart TD
 
     WailsApp --> TypedBindings
     WailsApp --> EventBridge
-    WailsApp --> BackendBinary
+    WailsApp --> BackendRuntime
     Pages --> Features
     Features --> State
     Features --> BridgeFactory
@@ -101,8 +101,10 @@ flowchart TD
     BridgeFactory --> HttpBridge
     DesktopBridge --> TypedBindings
     HttpBridge --> Transport
-    TypedBindings --> Service
-    EventBridge --> Transport
+    TypedBindings --> BackendRuntime
+    BackendRuntime --> Transport
+    BackendRuntime --> Service
+    EventBridge --> BackendRuntime
 
     Transport --> Service
     Transport --> Runtime

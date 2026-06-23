@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BackendBridge, DesktopTransportBinding } from "./bridgeTypes";
+import type { DesktopTransportBinding } from "./bridgeTypes";
 
 const mocks = vi.hoisted(() => ({
   createHttpBridge: vi.fn(),
@@ -24,9 +24,8 @@ describe("createBridge", () => {
       listObjects: vi.fn(),
       listThreatHits: vi.fn(),
     });
-    mocks.createDesktopBridge.mockImplementation(({ fallbackBridge }: { fallbackBridge: BackendBridge }) => ({
+    mocks.createDesktopBridge.mockImplementation(() => ({
       id: "desktop",
-      fallbackBridge,
     }));
   });
 
@@ -48,10 +47,10 @@ describe("createBridge", () => {
       getDesktopAppBinding: () => binding,
     });
     expect((bridge as unknown as { id: string }).id).toBe("desktop");
-    expect((bridge as unknown as { fallbackBridge: { id: string } }).fallbackBridge.id).toBe("http");
+    expect(mocks.createHttpBridge).not.toHaveBeenCalled();
   });
 
-  it("passes the report/evidence-capable http bridge into desktop composition", async () => {
+  it("passes only the Wails binding into desktop composition", async () => {
     const { createBridge } = await import("./bridgeFactory");
     const binding: DesktopTransportBinding = {
       BackendStatus: vi.fn(async () => "running"),
@@ -64,13 +63,11 @@ describe("createBridge", () => {
 
     expect(mocks.createDesktopBridge).toHaveBeenCalledTimes(1);
     const args = mocks.createDesktopBridge.mock.calls[0]?.[0] as {
-      fallbackBridge: BackendBridge;
       desktopApp: DesktopTransportBinding;
     };
     expect(args.desktopApp).toBe(binding);
-    expect(typeof (args.fallbackBridge as unknown as { getEvidenceWithFilter: unknown }).getEvidenceWithFilter).toBe("function");
-    expect(typeof (args.fallbackBridge as unknown as { listObjects: unknown }).listObjects).toBe("function");
-    expect(typeof (args.fallbackBridge as unknown as { listThreatHits: unknown }).listThreatHits).toBe("function");
+    expect("fallbackBridge" in args).toBe(false);
+    expect(mocks.createHttpBridge).not.toHaveBeenCalled();
   });
 
   it("resolves a Wails binding that appears after bridge creation", async () => {

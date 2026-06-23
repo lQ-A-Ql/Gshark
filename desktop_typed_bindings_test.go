@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +15,7 @@ import (
 
 func TestDesktopStreamTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -39,10 +38,9 @@ func TestDesktopStreamTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.GetHttpStream(7); err != nil {
 		t.Fatalf("GetHttpStream error = %v", err)
 	}
@@ -70,7 +68,7 @@ func TestDesktopStreamTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 
 func TestDesktopPacketTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -82,10 +80,9 @@ func TestDesktopPacketTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.LocatePacketPage(42, 50, "http && tcp"); err != nil {
 		t.Fatalf("LocatePacketPage error = %v", err)
 	}
@@ -109,7 +106,7 @@ func TestDesktopPacketTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 
 func TestDesktopHuntingTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -121,10 +118,9 @@ func TestDesktopHuntingTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.ListThreatHits([]string{"flag{", "ctf{", " "}); err != nil {
 		t.Fatalf("ListThreatHits error = %v", err)
 	}
@@ -154,7 +150,7 @@ func TestDesktopHuntingTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 
 func TestDesktopPlaybookTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -227,10 +223,9 @@ func TestDesktopPlaybookTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.ListPlaybooks(); err != nil {
 		t.Fatalf("ListPlaybooks error = %v", err)
 	}
@@ -322,7 +317,7 @@ func TestDesktopPlaybookTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 
 func TestDesktopVehicleDBCTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -351,10 +346,9 @@ func TestDesktopVehicleDBCTypedBindingsProxyExpectedBackendRoutes(t *testing.T) 
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.ListVehicleDBCProfiles(); err != nil {
 		t.Fatalf("ListVehicleDBCProfiles error = %v", err)
 	}
@@ -378,7 +372,7 @@ func TestDesktopVehicleDBCTypedBindingsProxyExpectedBackendRoutes(t *testing.T) 
 
 func TestDesktopMiscTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -422,15 +416,14 @@ func TestDesktopMiscTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
 	moduleZip := filepath.Join(t.TempDir(), "module.zip")
 	if err := os.WriteFile(moduleZip, []byte("zip-bytes"), 0o644); err != nil {
 		t.Fatalf("write temp module zip: %v", err)
 	}
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	payload, err := app.ListMiscModules()
 	if err != nil {
 		t.Fatalf("ListMiscModules error = %v", err)
@@ -470,16 +463,9 @@ func TestDesktopMiscTypedBindingsProxyExpectedBackendRoutes(t *testing.T) {
 	}
 }
 
-func TestBackendProxyClientUsesPerRequestContextTimeout(t *testing.T) {
-	client := newBackendProxyClientWithBaseURL("http://127.0.0.1:1", "")
-	if client.client.Timeout != 0 {
-		t.Fatalf("backend proxy http client timeout = %s, want context-controlled timeout", client.client.Timeout)
-	}
-}
-
 func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -511,10 +497,9 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.ListObjects(); err != nil {
 		t.Fatalf("ListObjects error = %v", err)
 	}
@@ -574,7 +559,7 @@ func TestDesktopObjectToolingAndAnalysisTypedBindingsProxyExpectedRoutes(t *test
 
 func TestDesktopMediaTypedBindingsProxyExpectedRoutes(t *testing.T) {
 	seen := map[string]int{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.String()
 		seen[key]++
 		w.Header().Set("Content-Type", "application/json")
@@ -615,10 +600,9 @@ func TestDesktopMediaTypedBindingsProxyExpectedRoutes(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	app := newTestDesktopApp(server.URL)
+	app := newTestDesktopApp(handler)
 	if _, err := app.GetMediaAnalysis(true); err != nil {
 		t.Fatalf("GetMediaAnalysis error = %v", err)
 	}

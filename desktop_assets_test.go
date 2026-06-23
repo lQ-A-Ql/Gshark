@@ -6,7 +6,6 @@ import "testing"
 
 func TestEmbeddedDesktopAssets(t *testing.T) {
 	requiredAssets := []string{
-		"frontend/dist/sentinel-backend.exe",
 		"frontend/dist/rules/yara/default.yar",
 	}
 

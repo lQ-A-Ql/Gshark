@@ -9,10 +9,12 @@ flowchart LR
     Analyst["分析员"] --> Wails["Wails 桌面壳\nmain.go / app.go"]
     Wails --> WebView["React WebView\nfrontend/src/app"]
     Wails --> DesktopBindings["typed Wails bindings\nDesktopApp"]
-    DesktopBindings --> Engine["backend engine.Service"]
+    DesktopBindings --> Runtime["backend/desktopruntime\nin-process handler"]
+    Runtime --> Engine["backend engine.Service"]
+    Runtime --> Hub["transport.Hub\nbackend events"]
 
     WebView --> BridgeFactory["bridgeFactory"]
-    BridgeFactory --> DesktopBridge["desktopBridge\ntyped IPC 优先"]
+    BridgeFactory --> DesktopBridge["desktopBridge\ntyped IPC only"]
     BridgeFactory --> HttpBridge["httpBridge\nbrowser-dev HTTP/SSE"]
     DesktopBridge --> DesktopBindings
     HttpBridge --> HTTPServer["transport.Server\n127.0.0.1:17891"]
@@ -24,11 +26,12 @@ flowchart LR
     Engine --> PythonVosk["Python + Vosk\n语音转写"]
     Engine --> MiscRuntime["MISC JS/Python runtime\nzip 自定义模块"]
     HTTPServer --> MCP["MCP JSON-RPC\n/api/mcp"]
+    Hub --> WailsEvents["Wails runtime events\nmeow:backend:*"]
 ```
 
 关键约束：
 
-- 桌面模式的数据面优先走 typed Wails IPC。
+- 桌面模式的数据面和控制面走 typed Wails IPC，缺 binding 时直接失败。
 - 普通浏览器开发模式保留 HTTP REST 与 SSE。
 - 两条传输路径最终都汇聚到同一个 `engine.Service`。
 - 外部工具能力降级应被报告，不应阻塞应用启动主路径。

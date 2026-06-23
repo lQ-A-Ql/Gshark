@@ -3,10 +3,6 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $requiredAssets = @(
   @{
-    Name = "bundled backend binary"
-    Path = Join-Path $root "frontend/dist/sentinel-backend.exe"
-  },
-  @{
     Name = "bundled YARA default rule"
     Path = Join-Path $root "frontend/dist/rules/yara/default.yar"
   }
