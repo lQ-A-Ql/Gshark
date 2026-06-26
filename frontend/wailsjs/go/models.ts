@@ -1,15 +1,15 @@
 export namespace main {
-
+	
 	export class AppUpdateAsset {
 	    name: string;
 	    downloadUrl: string;
 	    sizeBytes: number;
 	    contentType: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppUpdateAsset(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -39,11 +39,11 @@ export namespace main {
 	    selectedAsset?: AppUpdateAsset;
 	    canInstall: boolean;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppUpdateStatus(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.currentVersion = source["currentVersion"];
@@ -67,7 +67,7 @@ export namespace main {
 	        this.canInstall = source["canInstall"];
 	        this.message = source["message"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -91,11 +91,11 @@ export namespace main {
 	    content_type: string;
 	    filename?: string;
 	    size: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopBackendBlob(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.data_base64 = source["data_base64"];
@@ -111,11 +111,11 @@ export namespace main {
 	    capture_status_ok: boolean;
 	    misc_package_dir?: string;
 	    message?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopBackendProbe(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ready = source["ready"];
@@ -131,11 +131,11 @@ export namespace main {
 	    scope?: Record<string, any>;
 	    vshell?: Record<string, any>;
 	    cs?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopC2DecryptRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.family = source["family"];
@@ -150,11 +150,11 @@ export namespace main {
 	    yara_bin: string;
 	    yara_rules: string;
 	    yara_timeout_ms: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopHuntingRuntimeConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.prefixes = source["prefixes"];
@@ -166,11 +166,11 @@ export namespace main {
 	}
 	export class desktopMCPConfig {
 	    enabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopMCPConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -182,11 +182,11 @@ export namespace main {
 	    ntlm_hash: string;
 	    nt_proof_str: string;
 	    encrypted_session_key: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopSMB3RandomSessionKeyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.username = source["username"];
@@ -200,11 +200,11 @@ export namespace main {
 	    decoder: string;
 	    payload: string;
 	    options?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopStreamDecodeRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.decoder = source["decoder"];
@@ -215,11 +215,11 @@ export namespace main {
 	export class desktopStreamPayloadPatch {
 	    index: number;
 	    body: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopStreamPayloadPatch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.index = source["index"];
@@ -230,11 +230,11 @@ export namespace main {
 	    ssl_key_log_file: string;
 	    rsa_private_key: string;
 	    target_ip_port: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopTLSConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ssl_key_log_file = source["ssl_key_log_file"];
@@ -244,11 +244,11 @@ export namespace main {
 	}
 	export class desktopToolAllowedDirs {
 	    dirs: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopToolAllowedDirs(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dirs = source["dirs"];
@@ -267,11 +267,11 @@ export namespace main {
 	    yara_allowed_dirs?: string[];
 	    yara_rules: string;
 	    yara_timeout_ms: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopToolRuntimeConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tshark_path = source["tshark_path"];
@@ -292,11 +292,11 @@ export namespace main {
 	    enabled: boolean;
 	    capture_path?: string;
 	    misc_package_dir?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopWebviewSmokeConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -312,11 +312,11 @@ export namespace main {
 	    preview_lines: number;
 	    include_error_frames: boolean;
 	    extract_command_output: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new desktopWinRMDecryptRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.port = source["port"];
@@ -332,11 +332,11 @@ export namespace main {
 	    filePath: string;
 	    fileSize: number;
 	    fileName: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new openCaptureDialogResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.filePath = source["filePath"];
@@ -346,3 +346,4 @@ export namespace main {
 	}
 
 }
+
