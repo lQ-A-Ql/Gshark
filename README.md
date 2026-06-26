@@ -1,8 +1,15 @@
 # meow~traffic
 
-meow~traffic 是一款面向安全分析师、CTF 选手、应急响应人员、协议研究和危险应用分析场景的桌面端离线流量分析工具。项目以 `tshark` 为解析核心，前端提供高信息密度的分析工作区与专项页面，后端负责抓包加载、分页、流重组、对象提取、协议专项分析、威胁狩猎和 MISC 模块执行。
+> 闲来无事搓的一个流量分析小工具 以前叫`Gshark`但是太多重名了 就改成了`meow~traffic`
 
-> 品牌已更名为 `meow~traffic`；为保持兼容，仓库、Go module path、`MEOW_TRAFFIC_*` 环境变量和 `meow-traffic` 目录名等内部标识仍暂时保留旧名。`sentinel-backend.exe` 只作为历史发布/归档词汇保留，当前 Wails 桌面构建不再嵌入或启动后端二进制。
+![logo-Br8vLNVg.png|514](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/logo-Br8vLNVg.png)
+## 展示环节
+![image.png|387](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/20260626233347216.png)
+![image.png|384](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/20260626233416597.png)
+![image.png](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/20260626233435772.png)
+![image.png](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/20260626233527393.png)
+![image.png](https://raw.githubusercontent.com/lQ-A-Ql/blog-image/main/20260626233541109.png)
+
 
 ## 核心特性
 
